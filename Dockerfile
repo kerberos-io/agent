@@ -1,60 +1,19 @@
-FROM debian:buster AS builder
+FROM kerberos/debian-opencv-ffmpeg:1.0.0 AS builder
 MAINTAINER Kerberos.io
 
-#################################
-# Surpress Upstart errors/warning
-
-RUN dpkg-divert --local --rename --add /sbin/initctl
-RUN ln -sf /bin/true /sbin/initctl
-
-#############################################
-# Let the container know that there is no tty
-
-ENV DEBIAN_FRONTEND noninteractive
-
-#################################
-# Clone and build FFMpeg & OpenCV
-
-RUN apt-get update && apt-get upgrade -y && apt-get -y --no-install-recommends install git cmake wget dh-autoreconf autotools-dev autoconf automake gcc build-essential libtool make ca-certificates supervisor nasm zlib1g-dev tar libx264. unzip wget pkg-config libavresample-dev && \
-	git clone https://github.com/FFmpeg/FFmpeg && \
-	cd FFmpeg && git checkout remotes/origin/release/4.0 && \
-	./configure --prefix=/usr/local --target-os=linux --enable-nonfree --enable-libx264 --enable-gpl --enable-shared && \
-	make -j8 && \
-  make install && \
-  cd .. && rm -rf FFmpeg
-RUN	wget -O opencv.zip https://github.com/opencv/opencv/archive/4.0.0.zip && \
-	unzip opencv.zip && mv opencv-4.0.0 opencv && cd opencv && mkdir build && cd build && \
-	cmake -D CMAKE_BUILD_TYPE=RELEASE \
-		 -D CMAKE_INSTALL_PREFIX=/usr/ \
-		 -D OPENCV_GENERATE_PKGCONFIG=YES \
-		 -D BUILD_TESTS=OFF \
-		 -D OPENCV_ENABLE_NONFREE=ON \
-		 #-D BUILD_opencv_dnn=OFF \
-		 -D BUILD_opencv_ml=OFF \
-		 -D BUILD_opencv_stitching=OFF \
-		 -D BUILD_opencv_ts=OFF \
-		 -D BUILD_opencv_java_bindings_generator=OFF \
-		 -D BUILD_opencv_python_bindings_generator=OFF \
-		 -D INSTALL_PYTHON_EXAMPLES=OFF \
-		 -D BUILD_EXAMPLES=OFF .. && make -j8 && make install && cd ../.. && rm -rf opencv*
-
-############################
-# Build Golang
+ARG gitlab_id
+ARG gitlab_token
 
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
-
-RUN apt-get install -y git
-RUN ARCH=$([ "$(uname -m)" = "armv7l" ] && echo "armv6l" || echo "amd64") && wget "https://dl.google.com/go/go1.14.2.linux-$ARCH.tar.gz" && \
-	tar -xvf "go1.14.2.linux-$ARCH.tar.gz" && \
-	mv go /usr/local
+ENV GOSUMDB=off
 
 RUN mkdir -p /go/src/github.com/kerberos-io/opensource
 COPY backend /go/src/github.com/kerberos-io/opensource/backend
 RUN cd /go/src/github.com/kerberos-io/opensource/backend && \
    go mod download && \
-   go build -o main && \
+   go build main.go && \
 	 mkdir -p /opensource && \
 	 mv main /opensource && \
 	 mkdir -p /opensource/data/cloud && \
@@ -75,7 +34,7 @@ RUN cd /go/src/github.com/kerberos-io/opensource/backend && \
  RUN ldd /opensource/main | tr -s '[:blank:]' '\n' | grep '^/' | \
      xargs -I % sh -c 'mkdir -p $(dirname ./%); cp % ./%;'
  RUN mkdir -p lib64 && cp /lib64/ld-linux-x86-64.so.2 lib64/
- RUN mkdir ./usr/lib
+ RUN mkdir -p ./usr/lib
  RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
  		 cp -r /usr/local/lib/libavformat* ./usr/lib && \
  		 cp -r /usr/local/lib/libswscale* ./usr/lib && \
