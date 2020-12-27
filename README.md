@@ -20,7 +20,7 @@ This repository contains the next generation of Kerberos.io, **Kerberos Open Sou
 
 This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/opensource/tree/develop) and [project overview](https://github.com/kerberos-io/opensource/projects/1).
 
-![Kerberos version 2 vs version 3](kerberos-agent-v2-v3.png)
+![Kerberos version 2 vs version 3](images/kerberos-agent-v2-v3.png)
 
 ## Introduction
 
