@@ -12,7 +12,7 @@
 
 [**Docker Hub**](https://hub.docker.com/r/kerberos/opensource) | [**Documentation**](https://doc.kerberos.io)
 
-Kerberos Open source (v3) is a cutting edge video surveillance management system made available as Open source (Apache 2.0) with a Commons Clause License on top. This means that all the source code is available for you or your company, and you can use and transform it as long it is for non commercial usage. Read more about the license at the bottom of this page.
+Kerberos Open source (v3) is a cutting edge video surveillance management system made available as Open source (Apache 2.0) with a Commons Clause License on top. This means that all the source code is available for you or your company, and you can use and transform it as long it is for non commercial usage. Read more [about the license here](LICENSE).
 
 ## Previous releases
 
@@ -60,19 +60,3 @@ Kerberos Open Source comes with different installation flavours (it includes bot
 - Raspbian: You have a Raspberry Pi, but you want other services running next to the Kerberos agent.
 - Docker: You have a lot of IP cameras, and/or don't want to mess with dependencies.
 - Generic: You want to develop/extend Kerberos with your own features, or you want to run a Kerberos agent on a not supported OS/architecure.
-
-## Common Clause License
-
-[“Commons Clause” License Condition v1.0](https://commonsclause.com/)
-
-The Software is provided to you by the Licensor under the License, as defined below, subject to the following condition.
-
-Without limiting other conditions in the License, the grant of rights under the License will not include, and the License does not grant to you, the right to Sell the Software.
-
-For purposes of the foregoing, “Sell” means practicing any or all of the rights granted to you under the License to provide to third parties, for a fee or other consideration (including without limitation fees for hosting or consulting/ support services related to the Software), a product or service whose value derives, entirely or substantially, from the functionality of the Software. Any license notice or attribution required by the License must also include this Commons Clause License Condition notice.
-
-Software: Kerberos Open Source
-
-License: Apache 2.0
-
-Licensor: Kerberos.io
