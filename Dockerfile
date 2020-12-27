@@ -28,6 +28,7 @@ RUN cd /go/src/github.com/kerberos-io/opensource/backend && \
    go build main.go && \
 	 mkdir -p /opensource && \
 	 mv main /opensource && \
+	 mv www /opensource && \
 	 mkdir -p /opensource/data/cloud && \
 	 mkdir -p /opensource/data/snapshots && \
 	 mkdir -p /opensource/data/log && \
