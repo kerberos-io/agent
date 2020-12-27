@@ -51,7 +51,7 @@ RUN ARCH=$([ "$(uname -m)" = "armv7l" ] && echo "armv6l" || echo "amd64") && wge
 	mv go /usr/local
 
 RUN mkdir -p /go/src/github.com/kerberos-io/opensource
-COPY backend /go/src/github.com/kerberos-io/opensource
+COPY backend /go/src/github.com/kerberos-io/opensource/backend
 RUN cd /go/src/github.com/kerberos-io/opensource/backend && \
    go mod download && \
    go build -o main && \
@@ -75,6 +75,7 @@ RUN cd /go/src/github.com/kerberos-io/opensource/backend && \
  RUN ldd /opensource/main | tr -s '[:blank:]' '\n' | grep '^/' | \
      xargs -I % sh -c 'mkdir -p $(dirname ./%); cp % ./%;'
  RUN mkdir -p lib64 && cp /lib64/ld-linux-x86-64.so.2 lib64/
+ RUN mkdir ./usr/lib
  RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
  		 cp -r /usr/local/lib/libavformat* ./usr/lib && \
  		 cp -r /usr/local/lib/libswscale* ./usr/lib && \
