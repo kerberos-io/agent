@@ -11,6 +11,14 @@ ENV GOSUMDB=off
 
 RUN mkdir -p /go/src/github.com/kerberos-io/opensource
 COPY backend /go/src/github.com/kerberos-io/opensource/backend
+COPY frontend /go/src/github.com/kerberos-io/opensource/frontend
+
+# Build react
+RUN curl -sL https://deb.nodesource.com/setup_14.x | bash -
+RUN cd /go/src/github.com/kerberos-io/opensource/frontend && \
+    yarn build
+
+# Build golang
 RUN cd /go/src/github.com/kerberos-io/opensource/backend && \
    go mod download && \
    go build main.go && \
