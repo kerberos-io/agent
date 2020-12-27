@@ -39,7 +39,7 @@ RUN	wget -O opencv.zip https://github.com/opencv/opencv/archive/4.0.0.zip && \
 		 -D BUILD_EXAMPLES=OFF .. && make -j8 && make install && cd ../.. && rm -rf opencv*
 
 ############################
-# Build gGlang
+# Build Golang
 
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
@@ -49,9 +49,6 @@ RUN apt-get install -y git
 RUN ARCH=$([ "$(uname -m)" = "armv7l" ] && echo "armv6l" || echo "amd64") && wget "https://dl.google.com/go/go1.14.2.linux-$ARCH.tar.gz" && \
 	tar -xvf "go1.14.2.linux-$ARCH.tar.gz" && \
 	mv go /usr/local
-
-ENV GO111MODULE=on \
-   CGO_ENABLED=1
 
 RUN mkdir -p /go/src/github.com/kerberos-io/opensource
 COPY backend /go/src/github.com/kerberos-io/opensource
