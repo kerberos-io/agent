@@ -20,12 +20,31 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a7068f59-4f3c-433c-8799-69696924bbcd" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/frontend/yarn.lock" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/asset-manifest.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/favicon.ico" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/index.html" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/logo192.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/logo512.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/manifest.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/robots.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/css/main.8c8b27cf.chunk.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/css/main.8c8b27cf.chunk.css.map" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/js/2.5077aee4.chunk.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/js/2.5077aee4.chunk.js.LICENSE.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/js/2.5077aee4.chunk.js.map" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/js/3.7d3b22ba.chunk.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/js/3.7d3b22ba.chunk.js.map" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/js/main.dc5ea753.chunk.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/js/main.dc5ea753.chunk.js.map" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/js/runtime-main.d0ac5cd7.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/js/runtime-main.d0ac5cd7.js.map" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend/www/static/media/logo.6ce24c58.svg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kerberos-agent-v2-v3.png" beforeDir="false" afterPath="$PROJECT_DIR$/images/kerberos-agent-v2-v3.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/backend/go.mod" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/backend/go.sum" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/backend/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -132,21 +151,21 @@
       <screen x="0" y="23" width="1440" height="877" />
     </state>
     <state x="472" y="270" key="#com.intellij.fileTypes.FileTypeChooser/0.23.1440.877@0.23.1440.877" timestamp="1609103012985" />
-    <state width="1253" height="224" key="GridCell.Tab.0.bottom" timestamp="1609101951562">
+    <state width="1335" height="224" key="GridCell.Tab.0.bottom" timestamp="1609105061227">
       <screen x="0" y="23" width="1440" height="877" />
     </state>
-    <state width="1253" height="224" key="GridCell.Tab.0.bottom/0.23.1440.877@0.23.1440.877" timestamp="1609101951562" />
-    <state width="1253" height="224" key="GridCell.Tab.0.center" timestamp="1609101951561">
+    <state width="1335" height="224" key="GridCell.Tab.0.bottom/0.23.1440.877@0.23.1440.877" timestamp="1609105061227" />
+    <state width="1335" height="224" key="GridCell.Tab.0.center" timestamp="1609105061226">
       <screen x="0" y="23" width="1440" height="877" />
     </state>
-    <state width="1253" height="224" key="GridCell.Tab.0.center/0.23.1440.877@0.23.1440.877" timestamp="1609101951561" />
-    <state width="1253" height="224" key="GridCell.Tab.0.left" timestamp="1609101951561">
+    <state width="1335" height="224" key="GridCell.Tab.0.center/0.23.1440.877@0.23.1440.877" timestamp="1609105061226" />
+    <state width="1335" height="224" key="GridCell.Tab.0.left" timestamp="1609105061226">
       <screen x="0" y="23" width="1440" height="877" />
     </state>
-    <state width="1253" height="224" key="GridCell.Tab.0.left/0.23.1440.877@0.23.1440.877" timestamp="1609101951561" />
-    <state width="1253" height="224" key="GridCell.Tab.0.right" timestamp="1609101951561">
+    <state width="1335" height="224" key="GridCell.Tab.0.left/0.23.1440.877@0.23.1440.877" timestamp="1609105061226" />
+    <state width="1335" height="224" key="GridCell.Tab.0.right" timestamp="1609105061226">
       <screen x="0" y="23" width="1440" height="877" />
     </state>
-    <state width="1253" height="224" key="GridCell.Tab.0.right/0.23.1440.877@0.23.1440.877" timestamp="1609101951561" />
+    <state width="1335" height="224" key="GridCell.Tab.0.right/0.23.1440.877@0.23.1440.877" timestamp="1609105061226" />
   </component>
 </project>

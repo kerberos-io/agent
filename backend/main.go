@@ -1,15 +1,16 @@
 package main
 
 import (
-	"os"
 	"fmt"
-	"log"
-	"time"
-	"github.com/gin-gonic/gin"
-	"github.com/gin-contrib/cors"
 	"github.com/appleboy/gin-jwt/v2"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/pprof"
+	"github.com/gin-gonic/contrib/static"
+	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/opensource/backend/src/models"
+	"log"
+	"os"
+	"time"
 )
 
 func main(){
@@ -57,6 +58,9 @@ func main(){
 				AllowCredentials: true,
 				MaxAge: 12 * time.Hour,
 			}))
+
+			// Serve frontend static files
+			r.Use(static.Serve("/", static.LocalFile("./www", true)))
 
 			// the jwt middleware
 		  	identityKey := "id"
@@ -118,21 +122,24 @@ func main(){
 				log.Fatal("JWT Error:" + err.Error())
 			}
 
-			r.GET("/restart", func(c *gin.Context) {
-				c.JSON(200, gin.H{
-					"restart": true,
-				})
-			})
-
-			r.GET("/motion", func(c *gin.Context) {
-				c.JSON(200, gin.H{
-					"data": "☄ Simulate motion",
-				})
-			})
-
-			r.Use(authMiddleware.MiddlewareFunc())
+			api := r.Group("/api")
 			{
+				api.GET("/restart", func(c *gin.Context) {
+					c.JSON(200, gin.H{
+						"restart": true,
+					})
+				})
 
+				api.GET("/motion", func(c *gin.Context) {
+					c.JSON(200, gin.H{
+						"data": "☄ Simulate motion",
+					})
+				})
+
+				api.Use(authMiddleware.MiddlewareFunc())
+				{
+
+				}
 			}
 
 			r.Run(":" + port)
