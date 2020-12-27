@@ -42,10 +42,10 @@ If you are looking for a solution that scales with your video surveillance or vi
 ## Installation
 Kerberos Open Source comes with different installation flavours (it includes both the machinery and web repository). The reason is because depending on the use case one option is better than another. A short list of recommendations:
 
-KiOS: You have a Raspberry Pi, and you only want to run a Kerberos agent on it.
-Raspbian: You have a Raspberry Pi, but you want other services running next to the Kerberos agent.
-Docker: You have a lot of IP cameras, and/or don't want to mess with dependencies.
-Generic: You want to develop/extend Kerberos with your own features, or you want to run a Kerberos agent on a not supported OS/architecure.
+- KiOS: You have a Raspberry Pi, and you only want to run a Kerberos agent on it.
+- Raspbian: You have a Raspberry Pi, but you want other services running next to the Kerberos agent.
+- Docker: You have a lot of IP cameras, and/or don't want to mess with dependencies.
+- Generic: You want to develop/extend Kerberos with your own features, or you want to run a Kerberos agent on a not supported OS/architecure.
 
 ## Common Clause License
 
