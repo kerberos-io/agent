@@ -14,7 +14,10 @@ COPY backend /go/src/github.com/kerberos-io/opensource/backend
 COPY frontend /go/src/github.com/kerberos-io/opensource/frontend
 
 # Build react
-RUN apt-get install curl && curl -sL https://deb.nodesource.com/setup_14.x | bash -
+RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add - && \
+    echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list && \
+    apt update && apt install yarn
+
 RUN cd /go/src/github.com/kerberos-io/opensource/frontend && \
     yarn build
 
