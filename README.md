@@ -1,7 +1,5 @@
 # Kerberos Open Source
 
-[**Docker Hub**](https://hub.docker.com/r/kerberos/opensource) | [**Documentation**](https://doc.kerberos.io)
-
 <p align="center">
   <a href="https://doc.kerberos.io"><img src="https://img.shields.io/badge/kerberos-opensource-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
   <a href="https://twitter.com/kerberosio?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40kerberosio&style=social&url=https%3A%2F%2Ftwitter.com%2Fkerberosio" alt="Twitter Widget"></a>
@@ -11,7 +9,8 @@
   <a href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Commons Clause-yellow.svg" alt="License: Commons Clause"></a>
 </p>
-<br>
+
+[**Docker Hub**](https://hub.docker.com/r/kerberos/opensource) | [**Documentation**](https://doc.kerberos.io)
 
 Kerberos Open source (v3) is a cutting edge video surveillance management system made available as Open source (Apache 2.0) with a Commons Clause License on top. This means that all the source code is available for you or your company, and you can use and transform it as long it is for non commercial usage. Read more about the license at the bottom of this page.
 
