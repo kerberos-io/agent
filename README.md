@@ -4,7 +4,7 @@ Kerberos Open source (v3) is a cutting edge video surveillance management system
 
 ## Previous releases
 
-This repository contains the next generation of **Kerberos Open Source (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made.
+This repository contains the next generation of Kerberos.io, **Kerberos Open Source (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made.
 
 ![Kerberos version 2 vs version 3](kerberos-agent-v2-v3.png)
 
