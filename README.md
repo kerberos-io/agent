@@ -61,7 +61,7 @@ Kerberos Open Source **will ship in different formats**: Docker, binary, snap, K
 
 ## Run
 
-Kerberos Open Source is divided in two parts a backend` and `frontend`. Both parts live in this repository in their relative folders. 
+Kerberos Open Source is divided in two parts a `backend` and `frontend`. Both parts live in this repository in their relative folders. 
 
 ### Backend
 
