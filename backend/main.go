@@ -62,6 +62,12 @@ func main(){
 
 			api := r.Group("/api")
 			{
+				api.GET("/configure", func(c *gin.Context) {
+					c.JSON(200, gin.H{
+						"restart": true,
+					})
+				})
+
 				api.GET("/restart", func(c *gin.Context) {
 					c.JSON(200, gin.H{
 						"restart": true,
