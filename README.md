@@ -19,9 +19,9 @@ Kerberos Open source (v3) is a cutting edge video surveillance management system
 
 ## Previous releases
 
-This repository contains the next generation of Kerberos.io, **Kerberos Open Source (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made.
+This repository contains the next generation of Kerberos.io, **Kerberos Open Source (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/opensource/tree/develop) and [project overview](https://github.com/kerberos-io/opensource/projects/1). Kerberos Open Source (v3) is not yet released.
 
-This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/opensource/tree/develop) and [project overview](https://github.com/kerberos-io/opensource/projects/1).
+Read more about this [at the FAQ](#faq) below.
 
 ![Kerberos version 2 vs version 3](.github/images/kerberos-agent-v2-v3.png)
 
@@ -75,22 +75,24 @@ You can simply run the `backend` using following command.
     
  This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference.
  
+ ---
+ 
  ### Frontend
  
  The `frontend` is a **React** project which is the main entry point for an end user to view recordings, a livestream, and modify the configuration of the `backend`
- 
-       git clone https://github.com/kerberos-io/opensource
-       cd frontend
-       yarn start
-       
+     
+    git clone https://github.com/kerberos-io/opensource
+    cd frontend
+    yarn start
+
  This will start a webserver on port 3000`.
  
  #### Build
  
  After making changes you can run the `yarn build` command, this will create a build artifact and move it to the `backend/www` folder. By restarting the backend and navigating to `8080` you will see the React webpage (including your changes) visualised.
   
- ---
- ### FAQ
+
+ ## FAQ
  
  #### 1. Why a mono repo?
  
