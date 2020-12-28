@@ -1,0 +1,27 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "This is the API for using and configure Kerberos Open source.",
+        "title": "Swagger Kerberos Open Source API",
+        "termsOfService": "https://kerberos.io",
+        "contact": {
+            "name": "API Support",
+            "url": "https://www.kerberos.io/support",
+            "email": "support@kerberos.io"
+        },
+        "license": {
+            "name": "Apache 2.0 - Commons Clause",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "basePath": "/",
+    "paths": {},
+    "securityDefinitions": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

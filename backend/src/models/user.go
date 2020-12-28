@@ -1,7 +1,9 @@
 package models
 
 type User struct {
-	Username 	string 		`json:"username" bson:"username"`
-	Password 	string 		`json:"password" bson:"password"`
-	Role 			string 		`json:"role" bson:"role"`
+	Installed	 bool			`json:"installed" bson:"installed"`
+	Username 	 string 		`json:"username" bson:"username"`
+	Password 	 string 		`json:"password" bson:"password"`
+	Role 		 string 		`json:"role" bson:"role"`
+	Language 	 string 		`json:"language" bson:"language"`
 }

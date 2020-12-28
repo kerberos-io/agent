@@ -1,7 +1,7 @@
 package models
 
 type Config struct {
-    Type  		        string        `json:"type" binding:"required"`
+    Type  		      string        `json:"type" binding:"required"`
     Key               string        `json:"key"`
     Name              string        `json:"name"`
     Timezone          string        `json:"timezone,omitempty" bson:"timezone,omitempty"`

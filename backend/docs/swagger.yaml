@@ -1,0 +1,20 @@
+basePath: /
+info:
+  contact:
+    email: support@kerberos.io
+    name: API Support
+    url: https://www.kerberos.io/support
+  description: This is the API for using and configure Kerberos Open source.
+  license:
+    name: Apache 2.0 - Commons Clause
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: https://kerberos.io
+  title: Swagger Kerberos Open Source API
+  version: "1.0"
+paths: {}
+securityDefinitions:
+  Bearer:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
