@@ -13,4 +13,3 @@
 
 
 [**Docker Hub**](https://hub.docker.com/r/kerberos/opensource) | [**Documentation**](https://doc.kerberos.io)
-
