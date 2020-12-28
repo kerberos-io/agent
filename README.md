@@ -95,9 +95,9 @@ You can simply run the `backend` using following command.
  
  #### 1. Why a mono repo?
  
- We have noticed in the past (v1 and v2) the splitting the repositories (machinery and web), created a lot of confusion within our community. People didn't understand the different versions and so on. This caused a lack of collaboration, and made it impossible for some people to collaborate. 
+ We have noticed in the past (v1 and v2) splitting the repositories (machinery and web), created a lot of confusion within our community. People didn't understand the different versions and so on. This caused a lack of collaboration, and made it impossible for some people to collaborate and contribute. 
  
- Having a mono repo, which is well organised, simplifies the entry point for new people who would like to understand and/or contribute to Kerberos Open Source.
+ Having a mono repo, which is well organised, simplifies the entry point for new people who would like to use, understand and/or contribute to Kerberos Open Source.
  
  #### 2. Why a change in technologies?
  
