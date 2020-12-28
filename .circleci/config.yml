@@ -19,7 +19,9 @@ jobs:
     steps:
       - checkout
       - run: node --version
-      - run: yarn build
+      - run: cd frontend && yarn
+      - run: cd frontend && yarn test
+      - run: cd frontend && yarn build
 
 
 workflows:
