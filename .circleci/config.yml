@@ -24,3 +24,4 @@ jobs:
       # specify any bash command here prefixed with `run: `
       - run: cd backend && go mod download
       - run: cd backend && go test -v ./...
+      - run: cd backend && go vet
