@@ -1,0 +1,32 @@
+# Golang CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-go/ for more details
+version: 2
+jobs:
+  backend:
+    docker:
+      - image: circleci/golang:1.15
+    working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
+    steps:
+      - checkout
+      - run: cd backend && go mod download
+      - run: cd backend && go test -v ./...
+      - run: cd backend && go vet
+
+  frontend:
+    docker:
+      - image: cimg/node:15.5.0
+    steps:
+      - checkout
+      - run: node --version
+      - run: cd frontend && yarn
+      - run: cd frontend && yarn test
+      - run: cd frontend && yarn build
+
+
+workflows:
+  version: 2
+  build:
+    jobs:
+      - backend
+      - frontend

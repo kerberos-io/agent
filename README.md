@@ -1,6 +1,17 @@
 # Kerberos Open Source
 
-Kerberos Open source (v3) is a cutting edge video surveillance management system made available as Open source (Apache 2.0) with a Commons Clause License on top. This means that all the source code is available for you or your company, and you can use and transform it as long it is for non commercial usage. Read more about the license at the bottom of this page.
+<a href="https://doc.kerberos.io"><img src="https://img.shields.io/badge/kerberos-opensource-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
+<a href="https://twitter.com/kerberosio?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40kerberosio&style=social&url=https%3A%2F%2Ftwitter.com%2Fkerberosio" alt="Twitter Widget"></a>
+<br>
+<a href="https://circleci.com/gh/kerberos-io/opensource"><img src="https://circleci.com/gh/kerberos-io/opensource.svg?style=svg"/></a>
+<a href="https://travis-ci.org/kerberos-io/opensource"><img src="https://travis-ci.org/kerberosio/opensource.svg?branch=master" alt="Build Status"></a>
+<a href="https://pkg.go.dev/github.com/pion/webrtc/v3"><img src="https://pkg.go.dev/badge/github.com/kerberos-io/opensource/v3" alt="PkgGoDev"></a>
+<a href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/License-Commons Clause-yellow.svg" alt="License: Commons Clause"></a>
+
+[**Docker Hub**](https://hub.docker.com/r/kerberos/opensource) | [**Documentation**](https://doc.kerberos.io)
+
+Kerberos Open source (v3) is a cutting edge video surveillance management system made available as Open source (Apache 2.0) with a Commons Clause License on top. This means that all the source code is available for you or your company, and you can use and transform it as long it is for non commercial usage. Read more [about the license here](LICENSE).
 
 ## Previous releases
 
@@ -8,7 +19,7 @@ This repository contains the next generation of Kerberos.io, **Kerberos Open Sou
 
 This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/opensource/tree/develop) and [project overview](https://github.com/kerberos-io/opensource/projects/1).
 
-![Kerberos version 2 vs version 3](kerberos-agent-v2-v3.png)
+![Kerberos version 2 vs version 3](images/kerberos-agent-v2-v3.png)
 
 ## Introduction
 
@@ -48,19 +59,3 @@ Kerberos Open Source comes with different installation flavours (it includes bot
 - Raspbian: You have a Raspberry Pi, but you want other services running next to the Kerberos agent.
 - Docker: You have a lot of IP cameras, and/or don't want to mess with dependencies.
 - Generic: You want to develop/extend Kerberos with your own features, or you want to run a Kerberos agent on a not supported OS/architecure.
-
-## Common Clause License
-
-[“Commons Clause” License Condition v1.0](https://commonsclause.com/)
-
-The Software is provided to you by the Licensor under the License, as defined below, subject to the following condition.
-
-Without limiting other conditions in the License, the grant of rights under the License will not include, and the License does not grant to you, the right to Sell the Software.
-
-For purposes of the foregoing, “Sell” means practicing any or all of the rights granted to you under the License to provide to third parties, for a fee or other consideration (including without limitation fees for hosting or consulting/ support services related to the Software), a product or service whose value derives, entirely or substantially, from the functionality of the Software. Any license notice or attribution required by the License must also include this Commons Clause License Condition notice.
-
-Software: Kerberos Open Source
-
-License: Apache 2.0
-
-Licensor: Kerberos.io

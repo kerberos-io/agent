@@ -1,0 +1,86 @@
+{
+	"type": "template",
+	"key": "",
+	"name": "camera",
+	"capture": {
+		"id": "ipcamera",
+		"ipcamera": {
+			"rtsp": "",
+			"fps": ""
+		},
+		"usbcamera": {
+			"rtsp": "",
+			"fps": ""
+		},
+		"raspicamera": {
+			"rtsp": "",
+			"fps": ""
+		},
+		"continuous": "false",
+		"postrecording": 10,
+		"prerecording": 5,
+		"maxlengthrecording": 10
+	},
+	"timetable": [
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 69840,
+			"start2": 70080,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		}
+	],
+	"region": {
+		"rectangle": {
+			"x1": 0,
+			"y1": 0,
+			"x2": 800,
+			"y2": 640
+		},
+		"polygon": []
+	},
+	"cloud": "kstorage",
+	"kstorage": {
+		"uri": "",
+		"cloud_key": "",
+		"access_key": "",
+		"secret_access_key": "",
+		"provider": "",
+		"directory": ""
+	}
+}
