@@ -53,9 +53,55 @@ Kerberos.io applies the concept of agents. An agent is running next to or on you
 If you are looking for a solution that scales with your video surveillance or video analytics well, [Kerberos Enterprise might be a better fit](https://doc.kerberos.io/enterprise/introduction).
 
 ## Installation
-Kerberos Open Source comes with different installation flavours (it includes both the machinery and web repository). The reason is because depending on the use case one option is better than another. A short list of recommendations:
+Kerberos Open Source **will ship in different formats**: Docker, binary, snap, KiOS. Version 3 is still in active development right now, and not yet released.
 
-- KiOS: You have a Raspberry Pi, and you only want to run a Kerberos agent on it.
-- Raspbian: You have a Raspberry Pi, but you want other services running next to the Kerberos agent.
-- Docker: You have a lot of IP cameras, and/or don't want to mess with dependencies.
-- Generic: You want to develop/extend Kerberos with your own features, or you want to run a Kerberos agent on a not supported OS/architecure.
+## Run
+
+Kerberos Open Source is divided in two parts a backend` and `frontend`. Both parts live in this repository in their relative folders. 
+
+### Backend
+
+The `backend` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent, and does the camera processing, on the other hand it acts as a webserver that communicaties directly with the front-end.
+
+You can simply run the `backend` using following command.
+
+    git clone https://github.com/kerberos-io/opensource
+    cd backend
+    go run main.go run mycamername 8080
+    
+ This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference.
+ 
+ ### Frontend
+ 
+ The `frontend` is a **React** project which is the main entry point for an end user to view recordings, a livestream, and modify the configuration of the `backend`
+ 
+       git clone https://github.com/kerberos-io/opensource
+       cd frontend
+       yarn start
+       
+ This will start a webserver on port 3000`.
+ 
+ #### Build
+ 
+ After making changes you can run the `yarn build` command, this will create a build artifact and move it to the `backend/www` folder. By restarting the backend and navigating to `8080` you will see the React webpage (including your changes) visualised.
+  
+ ---
+ ### FAQ
+ 
+ #### 1. Why a mono repo?
+ 
+ We have noticed in the past (v1 and v2) the splitting the repositories (machinery and web), created a lot of confusion within our community. People didn't understand the different versions and so on. This caused a lack of collaboration, and made it impossible for some people to collaborate. 
+ 
+ Having a mono repo, which is well organised, simplifies the entry point for new people who would like to understand and/or contribute to Kerberos Open Source.
+ 
+ #### 2. Why a change in technologies?
+ 
+ In previous version (v1 and v2) we used technologies like C++, PHP and BackboneJS. 7 years ago this was still acceptable, however time has changed and new technologies such as React and Golang became very popular.
+ 
+ Due to previous reason we have decided to rebuild the Kerberos Open Source technology from scratch, taking into account all the feedback we acquired over the years. Having these technologies available, we will enable more people to contribute and use our technology.
+
+#### 3. What is the difference with Kerberos Enterprise?
+
+We started the developments of Kerberos Enterprise a year ago, our main focus here was scalability, and fast development and easy deployment. We noticed that with technologies such as Golang and React, we can still provide a highly performant video surveillance system.
+
+Kerberos Open Source will use the same technology stack, and some code pieces, of Kerberos Enterprise which we have already build. We have a very clear now, of how a well developed and documented video surveillance system needs to look like.
