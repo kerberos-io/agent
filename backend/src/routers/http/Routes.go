@@ -1,7 +1,7 @@
 package http
 
 import (
-	"github.com/appleboy/gin-jwt"
+	"github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/opensource/backend/src/components"
 	"github.com/kerberos-io/opensource/backend/src/models"
