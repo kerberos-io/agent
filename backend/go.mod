@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
+	github.com/appleboy/gin-jwt v2.5.0+incompatible
 	github.com/appleboy/gin-jwt/v2 v2.6.4
 	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-contrib/pprof v1.3.0
@@ -15,4 +16,5 @@ require (
 	github.com/ugorji/go v1.1.13 // indirect
 	golang.org/x/net v0.0.0-20190611141213-3f473d35a33a // indirect
 	golang.org/x/tools v0.0.0-20190611222205-d73e1c7e250b // indirect
+	gopkg.in/dgrijalva/jwt-go.v3 v3.2.0 // indirect
 )

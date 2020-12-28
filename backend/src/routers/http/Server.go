@@ -6,8 +6,6 @@ import (
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	_ "github.com/kerberos-io/opensource/backend/docs"
-	"github.com/kerberos-io/opensource/backend/src/components"
-	"github.com/kerberos-io/opensource/backend/src/models"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"log"
@@ -31,8 +29,6 @@ import (
 // @in header
 // @name Authorization
 
-var userConfig models.User
-
 func StartServer(name string, port string){
 
 	// Initialize REST API
@@ -47,71 +43,18 @@ func StartServer(name string, port string){
 	// Serve frontend static files
 	r.Use(static.Serve("/", static.LocalFile("./www", true)))
 
+	// Add Swagger
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	// The JWT middleware
-	middleWare := JWTMiddleWare()
+	middleWare :=JWTMiddleWare()
 	authMiddleware, err := jwt.New(&middleWare)
 	if err != nil {
 		log.Fatal("JWT Error:" + err.Error())
 	}
 
-	// Add Swagger
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	// Add all routes
+	AddRoutes(r, authMiddleware)
 
-	// Get the user configuration
-	userConfig = components.ReadUserConfig()
-
-	api := r.Group("/api")
-	{
-		// Bootstrap godoc
-		// @Router /install [get]
-		// @ID install
-		// @Tags frontend
-		// @Summary Get to know if the system was installed before or not.
-		// @Description Get to know if the system was installed before or not.
-		// @Success 200 {object} models.APIResponse
-
-		api.GET("/install", func(c *gin.Context) {
-			c.JSON(200, models.APIResponse {
-				Data: userConfig.Installed,
-			})
-		})
-
-		// Bootstrap godoc
-		// @Router /install [post]
-		// @ID install
-		// @Tags frontend
-		// @Summary If not yet installed, initiate the user configuration.
-		// @Description If not yet installed, initiate the user configuration.
-		// @Success 200 {object} models.APIResponse
-
-		api.POST("/install", func(c *gin.Context) {
-			// TODO update user config and update global object.
-			// userConfig = ...
-			c.JSON(200, models.APIResponse {
-				Data: userConfig,
-			})
-		})
-
-		api.Use(authMiddleware.MiddlewareFunc())
-		{
-			/*api.PUT("/configure", func(c *gin.Context) {
-				c.JSON(200, gin.H{
-					"configure": true,
-				})
-			})
-
-			api.GET("/restart", func(c *gin.Context) {
-				c.JSON(200, gin.H{
-					"restart": true,
-				})
-			})
-
-			api.GET("/motion", func(c *gin.Context) {
-				c.JSON(200, gin.H{
-					"data": "☄ Simulate motion",
-				})
-			})*/
-		}
-	}
 	r.Run(":" + port)
 }

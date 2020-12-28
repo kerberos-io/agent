@@ -1,0 +1,1 @@
+swag init -d ./src/routers/http -g ./Server.go
