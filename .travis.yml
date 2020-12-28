@@ -1,0 +1,16 @@
+language: go
+
+go:
+  - 1.15.x
+  - tip
+
+before_install:
+  - cd backend
+  - go mod download
+
+script:
+  - go vet
+  - go test -race -coverprofile=coverage.txt -covermode=atomic
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
