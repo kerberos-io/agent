@@ -86,8 +86,6 @@ func main(){
 				}
 			}
 
-			yolo := "ok"
-
 			r.Run(":" + port)
 
 		}
