@@ -23,6 +23,7 @@ jobs:
 
 
 workflows:
+  version: 2
   backend_and_frontend:
     jobs:
       - backend
