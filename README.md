@@ -23,7 +23,7 @@ This repository contains the next generation of Kerberos.io, **Kerberos Open Sou
 
 Read more about this [at the FAQ](#faq) below.
 
-![Kerberos version 2 vs version 3](.github/images/kerberos-agent-v2-v3.png)
+<img src="https://github.com//kerberos-io/opensource/raw/master/.github/images/kerberos-agent-v2-v3.png" width="500px">
 
 ## Introduction
 
