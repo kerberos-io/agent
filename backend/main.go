@@ -84,7 +84,9 @@ func main(){
 				{
 
 				}
-			} typoooo
+			}
+
+			yolo := "ok"
 
 			r.Run(":" + port)
 
