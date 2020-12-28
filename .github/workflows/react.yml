@@ -24,14 +24,18 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: ${{ matrix.node-version }}
-    - name: Change directory
-      run: cd frontend
-    - uses: borales/actions-yarn@v2.3.0
+    - name: Yarn install
+      working-directory: ./frontend
+      uses: borales/actions-yarn@v2.3.0
       with:
         cmd: install # will run `yarn install` command
-    - uses: borales/actions-yarn@v2.3.0
+    - name: Yarn build
+      working-directory: ./frontend
+      uses: borales/actions-yarn@v2.3.0
       with:
         cmd: build # will run `yarn build` command
-    - uses: borales/actions-yarn@v2.3.0
+    - name: Yarn test
+      working-directory: ./frontend
+      uses: borales/actions-yarn@v2.3.0
       with:
         cmd: test # will run `yarn test` command
