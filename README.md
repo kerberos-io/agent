@@ -1,14 +1,13 @@
 # Kerberos Open Source
 
-<p align="center">
-  <a href="https://doc.kerberos.io"><img src="https://img.shields.io/badge/kerberos-opensource-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
-  <a href="https://twitter.com/kerberosio?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40kerberosio&style=social&url=https%3A%2F%2Ftwitter.com%2Fkerberosio" alt="Twitter Widget"></a>
-  <br>
-  <a href="https://travis-ci.org/kerberos-io/opensource"><img src="https://travis-ci.org/kerberosio/opensource.svg?branch=master" alt="Build Status"></a>
-  <a href="https://pkg.go.dev/github.com/pion/webrtc/v3"><img src="https://pkg.go.dev/badge/github.com/pion/webrtc/v3" alt="PkgGoDev"></a>
-  <a href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Commons Clause-yellow.svg" alt="License: Commons Clause"></a>
-</p>
+<a href="https://doc.kerberos.io"><img src="https://img.shields.io/badge/kerberos-opensource-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
+<a href="https://twitter.com/kerberosio?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40kerberosio&style=social&url=https%3A%2F%2Ftwitter.com%2Fkerberosio" alt="Twitter Widget"></a>
+<br>
+<a href="https://circleci.com/gh/circleci/circleci-docs"><img src="https://circleci.com/gh/kerberos-io/opensource.svg?style=svg"/></a>
+<a href="https://travis-ci.org/kerberos-io/opensource"><img src="https://travis-ci.org/kerberosio/opensource.svg?branch=master" alt="Build Status"></a>
+<a href="https://pkg.go.dev/github.com/pion/webrtc/v3"><img src="https://pkg.go.dev/badge/github.com/kerberos-io/opensource/v3" alt="PkgGoDev"></a>
+<a href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/License-Commons Clause-yellow.svg" alt="License: Commons Clause"></a>
 
 [**Docker Hub**](https://hub.docker.com/r/kerberos/opensource) | [**Documentation**](https://doc.kerberos.io)
 
