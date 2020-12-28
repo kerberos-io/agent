@@ -9,10 +9,6 @@ on:
   pull_request:
     branches: [ develop, master ]
 
-defaults:
-  run:
-    working-directory: ./frontend
-
 jobs:
   build:
 
@@ -28,6 +24,8 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: ${{ matrix.node-version }}
+    - name: Change directory
+      run: cd frontend
     - uses: borales/actions-yarn@v2.3.0
       with:
         cmd: install # will run `yarn install` command
