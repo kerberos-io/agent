@@ -85,7 +85,7 @@ func main(){
 
 				}
 			}
-
+			fmt.Println(":" + port)
 			r.Run(":" + port)
 
 		}
