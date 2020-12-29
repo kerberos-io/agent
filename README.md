@@ -7,7 +7,9 @@
 <a href="https://travis-ci.org/kerberos-io/opensource"><img src="https://travis-ci.org/kerberos-io/opensource.svg?branch=master" alt="Build Status"></a>
 <a href="https://pkg.go.dev/github.com/kerberos-io/opensource/machinery"><img src="https://pkg.go.dev/badge/github.com/kerberos-io/opensource/machinery" alt="PkgGoDev"></a>
 <a href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
+<br>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-Commons Clause-yellow.svg" alt="License: Commons Clause"></a>
+<a href="https://www.figma.com/file/PpjFz2GGX6ZaWyIzef6mqT/Web?node-id=0%3A1"><img src="https://img.shields.io/badge/web-figma design-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
 
 [![Kerberos.io - video surveillance](https://kerberos.io/images/kerberos.png)](https://kerberos.io)
 
