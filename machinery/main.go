@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
-	"github.com/kerberos-io/opensource/machinery/src/routers"
-	"github.com/kerberos-io/opensource/machinery/src/routers/mqtt"
 	"log"
 	"os"
+	"github.com/kerberos-io/opensource/machinery/src/routers"
 )
 
 func main(){
@@ -22,13 +21,13 @@ func main(){
 			//cloud.PendingUpload(log, name)
 		case "discover":
 			timeout := os.Args[2]
-      		fmt.Println(timeout)
+			fmt.Println(timeout)
 			//duration, _ := strconv.Atoi(timeout)
 			//capture.Discover(log, time.Duration(duration))
 		case "run": {
 			name := os.Args[2]
 			port := os.Args[3]
-			mqtt.StartListener(name)
+			routers.StartMqttListener(name)
 			routers.StartWebserver(name, port)
 		}
 		default:
