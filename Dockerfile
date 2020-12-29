@@ -10,8 +10,8 @@ ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 ENV GOSUMDB=off
 
 RUN mkdir -p /go/src/github.com/kerberos-io/opensource
-COPY machinery /go/src/github.com/kerberos-io/opensource/backend
-COPY web /go/src/github.com/kerberos-io/opensource/frontend
+COPY machinery /go/src/github.com/kerberos-io/opensource/machinery
+COPY web /go/src/github.com/kerberos-io/opensource/web
 
 # Build react
 RUN apt-get install curl && curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
@@ -19,7 +19,7 @@ RUN apt-get install curl && curl -sL https://deb.nodesource.com/setup_14.x | bas
     echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
     apt update && apt install yarn -y
 
-RUN cd /go/src/github.com/kerberos-io/opensource/frontend && \
+RUN cd /go/src/github.com/kerberos-io/opensource/web && \
     npm install && yarn build
 
 # Build golang
