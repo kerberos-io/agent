@@ -76,9 +76,9 @@ Kerberos Open Source is divided in two parts a `machinery` and `web`. Both parts
  
 ### Machinery
 
-The `machinery` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent, and does the camera processing, on the other hand it acts as a webserver that communicates directly with the web (React).
+The `machinery` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent which is doing all the heavy lifting with camera processing and other kinds of logic, on the other hand it acts as a webserver (Rest API) that allows communication from the web (React) or any other custom application. The API is documented using `swagger`.
 
-You can simply run the `machinery` using following command.
+You can simply run the `machinery` using following commands.
 
     git clone https://github.com/kerberos-io/opensource
     cd machinery
