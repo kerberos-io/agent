@@ -15,8 +15,53 @@
         },
         "version": "1.0"
     },
-    "basePath": "/api",
-    "paths": {},
+    "basePath": "/",
+    "paths": {
+        "/api/install": {
+            "get": {
+                "description": "Get to know if the system was installed before or not.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Get to know if the system was installed before or not.",
+                "operationId": "web.getinstallation",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "If not yet installed, initiate the user configuration.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "If not yet installed, initiate the user configuration.",
+                "operationId": "web.updateinstallation",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "models.APIResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object"
+                }
+            }
+        }
+    },
     "securityDefinitions": {
         "Bearer": {
             "type": "apiKey",

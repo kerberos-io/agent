@@ -12,9 +12,6 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/swaggo/files v0.0.0-20190704085106-630677cd5c14
 	github.com/swaggo/gin-swagger v1.3.0
-	github.com/swaggo/swag v1.5.1
+	github.com/swaggo/swag v1.7.0
 	github.com/ugorji/go v1.1.13 // indirect
-	golang.org/x/net v0.0.0-20190611141213-3f473d35a33a // indirect
-	golang.org/x/tools v0.0.0-20190611222205-d73e1c7e250b // indirect
-	gopkg.in/dgrijalva/jwt-go.v3 v3.2.0 // indirect
 )

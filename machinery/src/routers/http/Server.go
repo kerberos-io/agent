@@ -11,6 +11,7 @@ import (
 	"log"
 )
 
+
 // @title Swagger Kerberos Open Source API
 // @version 1.0
 // @description This is the API for using and configure Kerberos Open source.
@@ -23,7 +24,7 @@ import (
 // @license.name Apache 2.0 - Commons Clause
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @BasePath /api
+// @BasePath /
 
 // @securityDefinitions.apikey Bearer
 // @in header
@@ -56,5 +57,6 @@ func StartServer(name string, port string){
 	// Add all routes
 	AddRoutes(r, authMiddleware)
 
+	// Run the api on port
 	r.Run(":" + port)
 }

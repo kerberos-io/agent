@@ -1,12 +1,12 @@
 package components
 
 import (
-	"os"
-	"fmt"
-	"time"
-	"io/ioutil"
 	"encoding/json"
+	"fmt"
 	"github.com/kerberos-io/opensource/machinery/src/models"
+	"io/ioutil"
+	"os"
+	"time"
 )
 
 func ReadUserConfig() models.User {

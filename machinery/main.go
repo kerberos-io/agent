@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/kerberos-io/opensource/machinery/src/routers/http"
+	"github.com/kerberos-io/opensource/machinery/src/routers"
 	"github.com/kerberos-io/opensource/machinery/src/routers/mqtt"
 	"log"
 	"os"
@@ -29,7 +29,7 @@ func main(){
 			name := os.Args[2]
 			port := os.Args[3]
 			mqtt.StartListener(name)
-			http.StartServer(name, port)
+			routers.StartWebserver(name, port)
 		}
 		default:
 			fmt.Println("Sorry I don't understand :(")

@@ -32,7 +32,52 @@ var doc = `{
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
-    "paths": {},
+    "paths": {
+        "/api/install": {
+            "get": {
+                "description": "Get to know if the system was installed before or not.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "Get to know if the system was installed before or not.",
+                "operationId": "web.getinstallation",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "If not yet installed, initiate the user configuration.",
+                "produces": [
+                    "application/json"
+                ],
+                "summary": "If not yet installed, initiate the user configuration.",
+                "operationId": "web.updateinstallation",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "models.APIResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object"
+                }
+            }
+        }
+    },
     "securityDefinitions": {
         "Bearer": {
             "type": "apiKey",
@@ -55,7 +100,7 @@ type swaggerInfo struct {
 var SwaggerInfo = swaggerInfo{
 	Version:     "1.0",
 	Host:        "",
-	BasePath:    "/api",
+	BasePath:    "/",
 	Schemes:     []string{},
 	Title:       "Swagger Kerberos Open Source API",
 	Description: "This is the API for using and configure Kerberos Open source.",
