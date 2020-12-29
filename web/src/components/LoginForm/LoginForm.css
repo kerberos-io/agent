@@ -1,0 +1,49 @@
+.error {
+  color: white !important;
+  background: #e45b5b;
+  background-image: linear-gradient(163deg, #791818, #b4524e);
+  border-radius: 8px;
+  padding: 12px 8px;
+  text-align: center;
+  width: 100%;
+  display: table;
+  position: relative;
+  margin-bottom: 20px;
+}
+
+h1 {
+  color: black;
+}
+
+.login-title {
+  text-align: center;
+}
+
+.signin-button {
+  background-color: #b4524e !important;
+  box-shadow: none !important;
+  margin-top: 10px !important;
+  padding: 15px 4px !important;
+}
+
+.paper-loginform {
+  margin-top: 0;
+  display: 'flex';
+  flex-direction: 'column';
+  align-items: 'center';
+}
+
+.avatar {
+  margin: 1px;
+  color: black !important;
+}
+
+.form {
+  width: '100%';
+  margin-top: 1px;
+}
+
+.submit {
+  margin: 3px 0px 2px;
+  background: black !important;
+}
