@@ -23,7 +23,7 @@ import (
 // @license.name Apache 2.0 - Commons Clause
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @BasePath /
+// @BasePath /api
 
 // @securityDefinitions.apikey Bearer
 // @in header

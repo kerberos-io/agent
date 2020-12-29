@@ -55,7 +55,7 @@ type swaggerInfo struct {
 var SwaggerInfo = swaggerInfo{
 	Version:     "1.0",
 	Host:        "",
-	BasePath:    "/",
+	BasePath:    "/api",
 	Schemes:     []string{},
 	Title:       "Swagger Kerberos Open Source API",
 	Description: "This is the API for using and configure Kerberos Open source.",

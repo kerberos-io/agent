@@ -15,7 +15,7 @@
         },
         "version": "1.0"
     },
-    "basePath": "/",
+    "basePath": "/api",
     "paths": {},
     "securityDefinitions": {
         "Bearer": {
