@@ -62,6 +62,18 @@ Kerberos Open Source **will ship in different formats**: Docker, binary, snap, K
 
 Kerberos Open Source is divided in two parts a `machinery` and `web`. Both parts live in this repository in their relative folders. For development or running the application on your local machine, you have to run both the `machinery` and the `web` as described below. When running in production everything is shipped as only one artifact, read more about this at [Building for production](#building-for-production).
 
+ ### Web
+ 
+ The `web` is a **React** project which is the main entry point for an end user to view recordings, a livestream, and modify the configuration of the `machinery`.
+     
+    git clone https://github.com/kerberos-io/opensource
+    cd web
+    yarn start
+
+ This will start a webserver and launches the web app on port `3000`.
+ 
+---
+ 
 ### Machinery
 
 The `machinery` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent, and does the camera processing, on the other hand it acts as a webserver that communicates directly with the web (React).
@@ -73,19 +85,6 @@ You can simply run the `machinery` using following command.
     go run main.go run mycameraname 8080
     
  This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference.
- 
- ---
- 
- ### Web
- 
- The `web` is a **React** project which is the main entry point for an end user to view recordings, a livestream, and modify the configuration of the `machinery`.
-     
-    git clone https://github.com/kerberos-io/opensource
-    cd web
-    yarn start
-
- This will start a webserver and launches the web app on port `3000`.
- 
 
  ## Building for Production
  
@@ -98,6 +97,7 @@ You can simply run the `machinery` using following command.
     cd web
     yarn build
  
+ --- 
  ### Machinery
  
  Building the `machinery` is also super easy 🚀, by using `go build` you can create a single binary which ships it all; thank you Golang. After building you will endup with a binary called `main`, this is what contains everything you need to run Kerberos Open Source.
