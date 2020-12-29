@@ -102,10 +102,20 @@ You can simply run the `machinery` using following command.
  
  Building the `machinery` is also super easy 🚀, by using `go build` you can create a single binary which ships it all; thank you Golang. After building you will endup with a binary called `main`, this is what contains everything you need to run Kerberos Open Source.
  
- Remember the build step of the `web` part, during build time we move the build directory to the `machinery` directory. Inside the `machinery` web server we reference this application. This makes it possible to just a have single web server that runs it all.  
+ Remember the build step of the `web` part, during build time we move the build directory to the `machinery` directory. Inside the `machinery` web server [we reference the](https://github.com/kerberos-io/opensource/blob/master/machinery/src/routers/http/Server.go#L44) `build` directory. This makes it possible to just a have single web server that runs it all.  
 
     cd machinery
     go build
+    
+ ## Building for Docker
+ 
+ Inside the root of this `opensource` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping **Kerberos Open Source**. Important to note is that start from a prebuild base image, `kerberos/debian-opencv-ffmpeg:1.0.0`.
+ This base image contains already a couple of tools, such as Golang, FFmpeg and OpenCV. We do this for faster compilation times. 
+ 
+ By running the `docker build` command, you will create the Kerberos Open Source Docker image. After building you can simply run the image as a Docker container. 
+    
+    docker build -t kerberos/opensource .
+    docker run -p 8080:8080 --name mycamera -d kerberos/opensource
     
  ## FAQ
  
