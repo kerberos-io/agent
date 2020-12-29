@@ -9,6 +9,7 @@
 <a href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-Commons Clause-yellow.svg" alt="License: Commons Clause"></a>
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/83d79d3092c040acb8c51ee0dfddf4b9)](https://app.codacy.com/gh/kerberos-io/opensource?utm_source=github.com&utm_medium=referral&utm_content=kerberos-io/opensource&utm_campaign=Badge_Grade)
 [![Kerberos.io - video surveillance](https://kerberos.io/images/kerberos.png)](https://kerberos.io)
 
 
