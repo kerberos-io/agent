@@ -58,9 +58,9 @@ If you are looking for a solution that scales with your video surveillance or vi
 ## Installation
 Kerberos Open Source **will ship in different formats**: Docker, binary, snap, KiOS. Version 3 is still in active development right now, and not yet released.
 
-## Run
+## Run and develop
 
-Kerberos Open Source is divided in two parts a `machinery` and `web`. Both parts live in this repository in their relative folders. 
+Kerberos Open Source is divided in two parts a `machinery` and `web`. Both parts live in this repository in their relative folders. For development or running the application on your local machine, you have to run both the `machinery` and the `web` as described below. When running in production everything is shipped as only one artifact, read more about this at [Building for production](#building-for-production).
 
 ### Machinery
 
@@ -84,13 +84,29 @@ You can simply run the `machinery` using following command.
     cd web
     yarn start
 
- This will start a webserver on port `3000`.
+ This will start a webserver and launches the web app on port `3000`.
  
- #### Build
- 
- After making changes you can run the `yarn build` command, this will create a build artifact and move it to the `machinery/www` folder. By restarting the `machinery` and navigating to `8080` you will see the React webpage (including your changes) visualised.
-  
 
+ ## Building for Production
+ 
+ Running Kerberos Open Source in production only require a single binary to run. Nevertheless, we have two parts, the `machinery` and the `web`, we merge them during build time. So this is what happens.
+ 
+ ### Web
+ 
+ To build the Kerberos Open Source web app, you simply have to run the `build` command of `yarn`. This will create a `build` directory inside the `web` directory, which contains a minified version of the React application. Other than that, we [also move](https://github.com/kerberos-io/opensource/blob/master/web/package.json#L16) this `build` directory to the `machinery` directory.
+    
+    cd web
+    yarn build
+ 
+ ### Machinery
+ 
+ Building the `machinery` is also super easy 🚀, by using `go build` you can create a single binary which ships it all; thank you Golang. After building you will endup with a binary called `main`, this is what contains everything you need to run Kerberos Open Source.
+ 
+ Remember the build step of the `web` part, during build time we move the build directory to the `machinery` directory. Inside the `machinery` web server we reference this application. This makes it possible to just a have single web server that runs it all.  
+
+    cd machinery
+    go build
+    
  ## FAQ
  
  #### 1. Why a mono repo?
