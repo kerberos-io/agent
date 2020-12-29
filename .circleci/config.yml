@@ -3,7 +3,7 @@
 # Check https://circleci.com/docs/2.0/language-go/ for more details
 version: 2
 jobs:
-  backend:
+  machinery:
     docker:
       - image: circleci/golang:1.15
     working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
@@ -13,7 +13,7 @@ jobs:
       - run: cd machinery && go test -v ./...
       - run: cd machinery && go vet
 
-  frontend:
+  web:
     docker:
       - image: cimg/node:15.5.0
     steps:
