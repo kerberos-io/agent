@@ -10,8 +10,8 @@ ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
 ENV GOSUMDB=off
 
 RUN mkdir -p /go/src/github.com/kerberos-io/opensource
-COPY backend /go/src/github.com/kerberos-io/opensource/backend
-COPY frontend /go/src/github.com/kerberos-io/opensource/frontend
+COPY machinery /go/src/github.com/kerberos-io/opensource/backend
+COPY web /go/src/github.com/kerberos-io/opensource/frontend
 
 # Build react
 RUN apt-get install curl && curl -sL https://deb.nodesource.com/setup_14.x | bash - && \

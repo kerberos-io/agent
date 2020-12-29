@@ -25,8 +25,8 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
     - name: Yarn install
-      run: cd frontend && yarn
+      run: cd web && yarn
     - name: Yarn test
-      run: cd frontend && yarn test
+      run: cd web && yarn test
     - name: Yarn build
-      run: cd frontend && yarn build
+      run: cd web && yarn build

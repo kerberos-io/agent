@@ -5,7 +5,7 @@
 <br>
 <a href="https://circleci.com/gh/kerberos-io/opensource"><img src="https://circleci.com/gh/kerberos-io/opensource.svg?style=svg"/></a>
 <a href="https://travis-ci.org/kerberos-io/opensource"><img src="https://travis-ci.org/kerberos-io/opensource.svg?branch=master" alt="Build Status"></a>
-<a href="https://pkg.go.dev/github.com/kerberos-io/opensource/backend"><img src="https://pkg.go.dev/badge/github.com/kerberos-io/opensource/backend" alt="PkgGoDev"></a>
+<a href="https://pkg.go.dev/github.com/kerberos-io/opensource/machinery"><img src="https://pkg.go.dev/badge/github.com/kerberos-io/opensource/machinery" alt="PkgGoDev"></a>
 <a href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-Commons Clause-yellow.svg" alt="License: Commons Clause"></a>
 
@@ -60,35 +60,35 @@ Kerberos Open Source **will ship in different formats**: Docker, binary, snap, K
 
 ## Run
 
-Kerberos Open Source is divided in two parts a `backend` and `frontend`. Both parts live in this repository in their relative folders. 
+Kerberos Open Source is divided in two parts a `machinery` and `web`. Both parts live in this repository in their relative folders. 
 
-### Backend
+### Machinery
 
-The `backend` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent, and does the camera processing, on the other hand it acts as a webserver that communicaties directly with the front-end.
+The `machinery` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent, and does the camera processing, on the other hand it acts as a webserver that communicates directly with the web (React).
 
-You can simply run the `backend` using following command.
+You can simply run the `machinery` using following command.
 
     git clone https://github.com/kerberos-io/opensource
-    cd backend
-    go run main.go run mycamername 8080
+    cd machinery
+    go run main.go run mycameraname 8080
     
  This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference.
  
  ---
  
- ### Frontend
+ ### Web
  
- The `frontend` is a **React** project which is the main entry point for an end user to view recordings, a livestream, and modify the configuration of the `backend`
+ The `web` is a **React** project which is the main entry point for an end user to view recordings, a livestream, and modify the configuration of the `machinery`.
      
     git clone https://github.com/kerberos-io/opensource
-    cd frontend
+    cd web
     yarn start
 
  This will start a webserver on port `3000`.
  
  #### Build
  
- After making changes you can run the `yarn build` command, this will create a build artifact and move it to the `backend/www` folder. By restarting the backend and navigating to `8080` you will see the React webpage (including your changes) visualised.
+ After making changes you can run the `yarn build` command, this will create a build artifact and move it to the `machinery/www` folder. By restarting the `machinery` and navigating to `8080` you will see the React webpage (including your changes) visualised.
   
 
  ## FAQ

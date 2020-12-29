@@ -3,7 +3,7 @@ package http
 import (
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
-	"github.com/kerberos-io/opensource/backend/src/models"
+	"github.com/kerberos-io/opensource/machinery/src/models"
 	"time"
 )
 

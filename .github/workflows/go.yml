@@ -22,10 +22,10 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Get dependencies
-      run: cd backend && go mod download
+      run: cd machinery && go mod download
 
     - name: Build
-      run: cd backend && go build -v ./...
+      run: cd machinery && go build -v ./...
 
     - name: Test
-      run: cd backend && go test -v ./...
+      run: cd machinery && go test -v ./...

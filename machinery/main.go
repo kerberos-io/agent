@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"github.com/kerberos-io/opensource/backend/src/routers/http"
-	"github.com/kerberos-io/opensource/backend/src/routers/mqtt"
+	"github.com/kerberos-io/opensource/machinery/src/routers/http"
+	"github.com/kerberos-io/opensource/machinery/src/routers/mqtt"
 	"log"
 	"os"
 )

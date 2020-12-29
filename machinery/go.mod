@@ -1,4 +1,4 @@
-module github.com/kerberos-io/opensource/backend
+module github.com/kerberos-io/opensource/machinery
 
 go 1.15
 

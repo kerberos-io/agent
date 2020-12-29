@@ -5,7 +5,7 @@ import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
-	_ "github.com/kerberos-io/opensource/backend/docs"
+	_ "github.com/kerberos-io/opensource/machinery/docs"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"log"
@@ -40,7 +40,7 @@ func StartServer(name string, port string){
 	// Setup CORS
 	r.Use(CORS())
 
-	// Serve frontend static files
+	// Serve web static files
 	r.Use(static.Serve("/", static.LocalFile("./www", true)))
 
 	// Add Swagger

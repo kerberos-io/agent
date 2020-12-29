@@ -6,7 +6,7 @@ import (
 	"time"
 	"io/ioutil"
 	"encoding/json"
-	"github.com/kerberos-io/opensource/backend/src/models"
+	"github.com/kerberos-io/opensource/machinery/src/models"
 )
 
 func ReadUserConfig() models.User {

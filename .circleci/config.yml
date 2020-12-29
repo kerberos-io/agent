@@ -9,9 +9,9 @@ jobs:
     working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
     steps:
       - checkout
-      - run: cd backend && go mod download
-      - run: cd backend && go test -v ./...
-      - run: cd backend && go vet
+      - run: cd machinery && go mod download
+      - run: cd machinery && go test -v ./...
+      - run: cd machinery && go vet
 
   frontend:
     docker:
@@ -19,14 +19,14 @@ jobs:
     steps:
       - checkout
       - run: node --version
-      - run: cd frontend && yarn
-      - run: cd frontend && yarn test
-      - run: cd frontend && yarn build
+      - run: cd web && yarn
+      - run: cd web && yarn test
+      - run: cd web && yarn build
 
 
 workflows:
   version: 2
   build:
     jobs:
-      - backend
-      - frontend
+      - machinery
+      - web
