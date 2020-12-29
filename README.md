@@ -123,6 +123,6 @@ You can simply run the `machinery` using following command.
 
 #### 3. What is the difference with Kerberos Enterprise?
 
-We started the developments of Kerberos Enterprise a year ago, our main focus here was scalability, and fast development and easy deployment. We noticed that with technologies such as Golang and React, we can still provide a highly performant video surveillance system.
+We started the developments of Kerberos Enterprise a year ago (January, 2019), our focus here was scalability, and fast development and easy deployment. We noticed that with technologies such as Golang and React, we can still provide a highly performant video surveillance system.
 
 Kerberos Open Source will use the same technology stack, and some code pieces, of Kerberos Enterprise which we have already build. We have a very clear now, of how a well developed and documented video surveillance system needs to look like.
