@@ -18,7 +18,7 @@ func main(){
 			log.Printf("%s: %0.1f\n", "You are currrently running Kerberos Open Source", VERSION)
 		case "pending-upload":
 			name := os.Args[2]
-      		fmt.Println(name)
+			fmt.Println(name)
 			//cloud.PendingUpload(log, name)
 		case "discover":
 			timeout := os.Args[2]
