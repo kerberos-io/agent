@@ -1,10 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
-// NO TESTS FOR NOW :(
-
-/*test('renders learn react link', () => {
+test('renders Kerberos Open Source text', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
+  const linkElement = screen.getByText(/Kerberos Open Source/i);
   expect(linkElement).toBeInTheDocument();
-});*/
+});

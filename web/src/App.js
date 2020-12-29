@@ -7,6 +7,9 @@ function App(props) {
       <header className="App-header">
         { props.children }
       </header>
+      <div className="kerberos-branding">
+        Kerberos Open Source
+      </div>
     </div>
   );
 }
