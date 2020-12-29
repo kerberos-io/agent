@@ -10,20 +10,23 @@
 <a target="_blank" href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
 <a target="_blank" href="https://goreportcard.com/report/github.com/kerberos-io/opensource"><img src="https://goreportcard.com/badge/github.com/kerberos-io/opensource" alt="Coverage Status"></a>
 <a target="_blank" href="https://app.codacy.com/gh/kerberos-io/opensource?utm_source=github.com&utm_medium=referral&utm_content=kerberos-io/opensource&utm_campaign=Badge_Grade"><img src="https://api.codacy.com/project/badge/Grade/83d79d3092c040acb8c51ee0dfddf4b9"/>
-<a target="_blank" href="https://www.figma.com/file/PpjFz2GGX6ZaWyIzef6mqT/Web?node-id=0%3A1"><img src="https://img.shields.io/badge/web-figma design-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
+<a target="_blank" href="https://www.figma.com/file/PpjFz2GGX6ZaWyIzef6mqT"><img src="https://img.shields.io/badge/web-figma design-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
 
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-Commons Clause-yellow.svg" alt="License: Commons Clause"></a>
 
 [![Kerberos.io - video surveillance](https://kerberos.io/images/kerberos.png)](https://kerberos.io)
 
-
 [**Docker Hub**](https://hub.docker.com/r/kerberos/opensource) | [**Documentation**](https://doc.kerberos.io) | [**Website**](https://kerberos.io)
 
 Kerberos Open source (v3) is a cutting edge video surveillance management system made available as Open source (Apache 2.0) with a Commons Clause License on top. This means that all the source code is available for you or your company, and you can use and transform it as long it is for non commercial usage. Read more [about the license here](LICENSE).
 
+## Work In Progress
+
+Kerberos Open Source (v3) is not yet released, and is actively developed. You can follow the progress [on our project board](https://github.com/kerberos-io/opensource/projects/1) and review our designs at [Figma](https://www.figma.com/file/PpjFz2GGX6ZaWyIzef6mqT). Feel free to give any feedback.
+
 ## Previous releases
 
-This repository contains the next generation of Kerberos.io, **Kerberos Open Source (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/opensource/tree/develop) and [project overview](https://github.com/kerberos-io/opensource/projects/1). Kerberos Open Source (v3) is not yet released.
+This repository contains the next generation of Kerberos.io, **Kerberos Open Source (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/opensource/tree/develop) and [project overview](https://github.com/kerberos-io/opensource/projects/1). 
 
 Read more about this [at the FAQ](#faq) below.
 
