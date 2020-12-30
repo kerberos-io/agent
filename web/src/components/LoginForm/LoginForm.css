@@ -13,6 +13,11 @@
 
 h1 {
   color: black;
+  font-weight: bold;
+  font-size: 50px;
+  text-align: center;
+  margin: 0;
+  padding: 0;
 }
 
 .login-title {
@@ -20,10 +25,15 @@ h1 {
 }
 
 .signin-button {
-  background-color: #b4524e !important;
+  background-color: #791717 !important;
   box-shadow: none !important;
   margin-top: 10px !important;
   padding: 15px 4px !important;
+  border-radius: 25px !important;
+  font-style: normal !important;
+  font-weight: bold !important;
+  font-size: 18px !important;
+  text-transform: none !important;
 }
 
 .paper-loginform {
@@ -41,6 +51,10 @@ h1 {
 .form {
   width: '100%';
   margin-top: 1px;
+}
+
+.loginfield {
+  border-radius: 25px !important;
 }
 
 .submit {

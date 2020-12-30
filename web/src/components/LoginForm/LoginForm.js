@@ -26,33 +26,38 @@ class LoginForm extends React.Component {
     return <div className="paper-loginform">
 
         { loginError && <span className="error">{ error }</span> }
-
-        { loginError && this.isInvalidLicense(error) && <>
-            <Typography className="login-title" component="h1" variant="h5">
-              Update License key
-            </Typography>
-            <form className="form" onSubmit={this.updateLicenseKey} noValidate>
-              <TextField
-                variant="outlined"
-                margin="normal"
-                required
-                fullWidth
-                id="licensekey"
-                label="Licensekey"
-                name="licensekey"
-              />
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                color="primary"
-                className="signin-button"
-              >
-                Update
-              </Button>
-            </form>
-          </>
-        }
+        <h1>Login</h1>
+        <form className="form" onSubmit={this.handleSubmit} noValidate>
+          <TextField
+            variant="outlined"
+            margin="normal"
+            required
+            fullWidth
+            className="loginfield"
+            id="username"
+            label="Username"
+            name="username"
+          />
+          <TextField
+            variant="outlined"
+            margin="normal"
+            required
+            fullWidth
+            name="password"
+            label="Password"
+            type="password"
+            id="password"
+          />
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            color="primary"
+            className="signin-button"
+          >
+            Let's Go
+          </Button>
+        </form>
     </div>
   }
 }

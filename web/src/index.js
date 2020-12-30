@@ -37,7 +37,7 @@ function getAuthState() {
         role,
         loggedIn: difference >= 0,
         loginError: false,
-        installed: !!installed,
+        installed: true, //!!installed,
         error: ""
       }
     };

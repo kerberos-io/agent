@@ -1,6 +1,6 @@
 .login-body {
-  background-color: #2C3E50;
-  background-image: linear-gradient(163deg, #0f0101, #b4524e);
+  background-color: #8a2828;
+  background-image: linear-gradient(163deg, #8a2828 0%, #8a2828 50%, #952d2d 50%, #952d2d 100%);
   color: #606468;
   height: 100vh;
   width: 100vw;
@@ -15,7 +15,16 @@
   left: 50%;
   transform: translate(-50%, -50%);
   background: #fff;
-  border-radius: 20px;
-  padding: 50px 40px !important;
-  max-width: 600px;
+  border-radius: 72px;
+  padding: 80px 140px !important;
+  max-width: 100% !important;
+  width: auto !important;
+}
+
+.kerberos-logo {
+
+}
+
+.github-logo {
+  
 }
