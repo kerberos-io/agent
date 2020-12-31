@@ -7,6 +7,10 @@
 
 <a target="_blank" href="https://circleci.com/gh/kerberos-io/opensource"><img src="https://circleci.com/gh/kerberos-io/opensource.svg?style=svg"/></a>
 <a target="_blank" href="https://travis-ci.org/kerberos-io/opensource"><img src="https://travis-ci.org/kerberos-io/opensource.svg?branch=master" alt="Build Status"></a>
+<img src="https://github.com/kerberos-io/opensource/workflows/Go/badge.svg"/>
+<img src="https://github.com/kerberos-io/opensource/workflows/React/badge.svg"/>
+<img src="https://github.com/kerberos-io/opensource/workflows/CodeQL/badge.svg"/>
+
 <a target="_blank" href="https://pkg.go.dev/github.com/kerberos-io/opensource/machinery"><img src="https://pkg.go.dev/badge/github.com/kerberos-io/opensource/machinery" alt="PkgGoDev"></a>
 <a target="_blank" href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
 <a target="_blank" href="https://goreportcard.com/report/github.com/kerberos-io/opensource"><img src="https://goreportcard.com/badge/github.com/kerberos-io/opensource" alt="Coverage Status"></a>
