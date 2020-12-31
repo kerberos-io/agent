@@ -147,6 +147,10 @@ We started the developments of Kerberos Enterprise a year ago (January, 2020), o
 
 Kerberos Open Source will use the same technology stack, and some code pieces, of Kerberos Enterprise which we have already build. We have a very clear now, of how a well developed and documented video surveillance system needs to look like.
 
+#### 4. When are we going to be able to install the first version?
+
+We plan to ship the first version by the end of Q1, afterwards we will add more and more features as usual.
+
 ## Contributors
 
 This project exists thanks to all the people who contribute. 
