@@ -142,3 +142,11 @@ Due to previous reason we have decided to rebuild the Kerberos Open Source techn
 We started the developments of Kerberos Enterprise a year ago (January, 2020), our focus here was scalability, and fast development and easy deployment. We noticed that with technologies such as Golang and React, we can still provide a highly performant video surveillance system.
 
 Kerberos Open Source will use the same technology stack, and some code pieces, of Kerberos Enterprise which we have already build. We have a very clear now, of how a well developed and documented video surveillance system needs to look like.
+
+## Contributors
+
+This project exists thanks to all the people who contribute. 
+
+<a href="https://github.com/kerberos-io/opensource/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kerberos-io/opensource" />
+</a>
