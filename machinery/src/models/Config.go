@@ -64,7 +64,7 @@ type Rectangle struct {
 //Polygon is a sequence of coordinates (x,y). The ID specifies an unique identifier,
 //as multiple polygons can be defined.
 type Polygon struct {
-    Id            string        `json:"ID"`
+    ID            string        `json:"id"`
     Coordinates   []Coordinate  `json:"coordinates"`
 }
 
