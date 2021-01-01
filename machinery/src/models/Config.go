@@ -1,7 +1,7 @@
 package models
 
 
-//Config: Is the highlevel struct which contains all the configuration of
+//Config is the highlevel struct which contains all the configuration of
 //your Kerberos Open Source instance.
 type Config struct {
     Type  		      string        `json:"type" binding:"required"`
