@@ -1,10 +1,10 @@
-import React from 'react';
-import { bindActionCreators } from 'redux';
-import { connect } from 'react-redux';
-import { push } from 'react-router-redux';
-import PropTypes from 'prop-types';
+import React from "react";
+import { bindActionCreators } from "redux";
+import { connect } from "react-redux";
+import { push } from "react-router-redux";
+import PropTypes from "prop-types";
 
-export default function (ComposedComponent) {
+export default function Guest(ComposedComponent) {
   class Guest extends React.Component {
     componentDidMount() {
       const { isAuthenticated, isInstalled, redirectInstallation, redirectDashboard } = this.props;

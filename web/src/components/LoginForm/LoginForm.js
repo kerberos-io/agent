@@ -24,7 +24,6 @@ class LoginForm extends React.Component {
     const { loginError, error } = this.props;
 
     return <div className="paper-loginform">
-
         { loginError && <span className="error">{ error }</span> }
         <h1>Login</h1>
         <form className="form" onSubmit={this.handleSubmit} noValidate>
@@ -43,6 +42,7 @@ class LoginForm extends React.Component {
             margin="normal"
             required
             fullWidth
+            className="passwordfield"
             name="password"
             label="Password"
             type="password"
@@ -57,6 +57,10 @@ class LoginForm extends React.Component {
           >
             Let's Go
           </Button>
+
+          <div className="shortcuts">
+            Lost Password | Documentation
+          </div>
         </form>
     </div>
   }

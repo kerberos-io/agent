@@ -23,11 +23,11 @@ export const history = createBrowserHistory();
 // So we know if the user is still signed in.
 function getAuthState() {
   try {
-    const token = localStorage.getItem('token') || undefined;
-    const expire = localStorage.getItem('expire') || undefined;
-    const username = localStorage.getItem('username') || undefined;
-    const role = localStorage.getItem('role') || undefined;
-    const installed = localStorage.getItem('installed') || undefined;
+    const token = localStorage.getItem('token') || null;
+    const expire = localStorage.getItem('expire') || null;
+    const username = localStorage.getItem('username') || null;
+    const role = localStorage.getItem('role') || null;
+    const installed = localStorage.getItem('installed') || null;
     const difference = new Date(expire)-new Date();
     const state = {
       auth: {
