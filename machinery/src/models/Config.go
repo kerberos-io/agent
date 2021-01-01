@@ -19,7 +19,7 @@ type Config struct {
 //Capture defines which camera type (Id) you are using (IP, USB or Raspberry Pi camera),
 //and also contains recording specific parameters.
 type Capture struct {
-    Id                  string        `json:"id"`
+    Name                string        `json:"name"`
     IPCamera            IPCamera      `json:"ipcamera"`
     USBCamera           USBCamera     `json:"usbcamera"`
     RaspiCamera         RaspiCamera   `json:"raspicamera"`
@@ -48,7 +48,7 @@ type RaspiCamera struct {
 //Region specifies the type (Id) of Region Of Interest (ROI), you
 //would like to use.
 type Region struct {
-    Id            string        `json:"id"`
+    Name          string        `json:"name"`
     Rectangle     Rectangle     `json:"rectangle"`
     Polygon       []Polygon     `json:"polygon"`
 }
