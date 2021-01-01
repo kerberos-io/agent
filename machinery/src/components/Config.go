@@ -9,10 +9,12 @@ import (
 	"time"
 )
 
+
+// Reads the user configuration of the Kerberos Open Source instance.
+// This will return a models.User struct including the username, password,
+// selected language, and if the installation was completed or not.
 func ReadUserConfig() models.User {
 	var userConfig models.User
-
-	// Open global config
 	for {
 		jsonFile, err := os.Open("./data/config/user.json")
 		if err != nil {
