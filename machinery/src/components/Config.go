@@ -9,7 +9,6 @@ import (
 	"time"
 )
 
-
 // ReadUserConfig Reads the user configuration of the Kerberos Open Source instance.
 // This will return a models.User struct including the username, password,
 // selected language, and if the installation was completed or not.

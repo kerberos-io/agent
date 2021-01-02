@@ -11,7 +11,6 @@ import (
 	"log"
 )
 
-
 // @title Swagger Kerberos Open Source API
 // @version 1.0
 // @description This is the API for using and configure Kerberos Open source.
@@ -30,7 +29,7 @@ import (
 // @in header
 // @name Authorization
 
-func StartServer(name string, port string){
+func StartServer(name string, port string) {
 
 	// Initialize REST API
 	r := gin.Default()
@@ -48,7 +47,7 @@ func StartServer(name string, port string){
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// The JWT middleware
-	middleWare :=JWTMiddleWare()
+	middleWare := JWTMiddleWare()
 	authMiddleware, err := jwt.New(&middleWare)
 	if err != nil {
 		log.Fatal("JWT Error:" + err.Error())

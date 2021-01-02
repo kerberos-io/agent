@@ -5,10 +5,10 @@ import (
 	"github.com/kerberos-io/opensource/machinery/src/routers/mqtt"
 )
 
-func StartWebserver(name string, port string){
+func StartWebserver(name string, port string) {
 	http.StartServer(name, port)
 }
 
-func StartMqttListener(name string){
+func StartMqttListener(name string) {
 	mqtt.StartListener(name)
 }

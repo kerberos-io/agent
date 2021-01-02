@@ -28,14 +28,14 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 		},
 		IdentityHandler: func(c *gin.Context) interface{} {
 			claims := jwt.ExtractClaims(c)
-			user := claims["id"].(map[string]interface {})
+			user := claims["id"].(map[string]interface{})
 			return &models.User{
 				Username: user["username"].(string),
-				Role: user["role"].(string),
+				Role:     user["role"].(string),
 			}
 		},
 		Authorizator: func(data interface{}, c *gin.Context) bool {
-			if _, ok := data.(*models.User); ok  { //&& v.Username == "admin" {
+			if _, ok := data.(*models.User); ok { //&& v.Username == "admin" {
 				return true
 			}
 			return false
