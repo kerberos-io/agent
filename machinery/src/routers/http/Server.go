@@ -5,6 +5,7 @@ import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
+	//Swagger documentantion
 	_ "github.com/kerberos-io/opensource/machinery/docs"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -57,5 +58,8 @@ func StartServer(name string, port string) {
 	AddRoutes(r, authMiddleware)
 
 	// Run the api on port
-	r.Run(":" + port)
+	err = r.Run(":" + port)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

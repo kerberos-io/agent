@@ -61,7 +61,8 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 		// TokenHeadName is a string in the header. Default value is "Bearer"
 		TokenHeadName: "Bearer",
 
-		// TimeFunc provides the current time. You can override it to use another time value. This is useful for testing or if your server uses a different time zone than your tokens.
+		// TimeFunc provides the current time. You can override it to use another time
+		// value. This is useful for testing or if your server uses a different time zone than your tokens.
 		TimeFunc: time.Now,
 	}
 	return m

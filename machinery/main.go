@@ -18,12 +18,9 @@ func main() {
 	case "pending-upload":
 		name := os.Args[2]
 		fmt.Println(name)
-		//cloud.PendingUpload(log, name)
 	case "discover":
 		timeout := os.Args[2]
 		fmt.Println(timeout)
-		//duration, _ := strconv.Atoi(timeout)
-		//capture.Discover(log, time.Duration(duration))
 	case "run":
 		{
 			name := os.Args[2]
@@ -34,5 +31,4 @@ func main() {
 	default:
 		fmt.Println("Sorry I don't understand :(")
 	}
-	return
 }
