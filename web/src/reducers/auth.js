@@ -6,7 +6,7 @@ const auth = (state = {
   token: '',
   expire: '',
   loginError: false,
-  error: ''
+  error: '',
 }, action) => {
   switch (action.type) {
     case 'LOGIN':
@@ -32,14 +32,14 @@ const auth = (state = {
       return {
         ...state,
         loginError: true,
-        error: action.error
+        error: action.error,
       };
 
     case 'INSTALLED':
       return {
         ...state,
         installed: true,
-        error: ''
+        error: '',
       };
 
     case 'LOGOUT':
@@ -49,16 +49,15 @@ const auth = (state = {
       localStorage.removeItem('expire');
       localStorage.removeItem('username');
       localStorage.removeItem('role');
-
       return {
         ...state,
         loggedIn: false,
         loginError: false,
-        error: ''
+        error: '',
       };
     default:
-      return state
+      return state;
   }
-}
+};
 
 export default auth;

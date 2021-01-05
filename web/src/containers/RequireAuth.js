@@ -7,13 +7,16 @@ import PropTypes from 'prop-types';
 export default function (ComposedComponent) {
   class Auth extends React.Component {
     componentDidMount() {
-      const { isAuthenticated, isInstalled, redirectInstallation, redirectLogin } = this.props;
+      const {
+        isAuthenticated, isInstalled, redirectInstallation, redirectLogin,
+      } = this.props;
       if (!isInstalled) {
         redirectInstallation();
       } else if (!isAuthenticated) {
         redirectLogin();
       }
     }
+
     render() {
       return (
         <div>
@@ -23,25 +26,23 @@ export default function (ComposedComponent) {
     }
   }
 
-  const mapStateToProps = (state) => {
-    return {
-      isAuthenticated: state.auth.loggedIn,
-      isInstalled: state.auth.installed
-    };
-  };
+  const mapStateToProps = (state) => ({
+    isAuthenticated: state.auth.loggedIn,
+    isInstalled: state.auth.installed,
+  });
 
-  const mapDispatchToProps = dispatch => bindActionCreators({
+  const mapDispatchToProps = (dispatch) => bindActionCreators({
     redirectLogin: () => push('/login'),
-    redirectInstallation: () => push('/install')
-  }, dispatch)
+    redirectInstallation: () => push('/install'),
+  }, dispatch);
 
   Auth.propTypes = {
     isAuthenticated: PropTypes.bool.isRequired,
-    isInstalled: PropTypes.bool.isRequired
+    isInstalled: PropTypes.bool.isRequired,
   };
 
   return connect(
     mapStateToProps,
-    mapDispatchToProps
+    mapDispatchToProps,
   )(Auth);
 }

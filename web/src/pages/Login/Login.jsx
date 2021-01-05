@@ -2,14 +2,14 @@ import React from 'react';
 import CssBaseline from '@material-ui/core/CssBaseline';
 import Container from '@material-ui/core/Container';
 import LoginForm from '../../components/LoginForm/LoginForm';
-import './Install.css';
+import './Login.css';
 
-export default function Install() {
+export default function Login() {
   return (
-    <Container className="login-body" component="main" >
+    <Container className="login-body" component="main">
       <CssBaseline />
       <Container maxWidth="xs" className="login-container">
-        I've been here.
+        <LoginForm className="login-form" />
       </Container>
     </Container>
   );

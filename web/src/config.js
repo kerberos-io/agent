@@ -1,17 +1,17 @@
-const hostname = window.location.hostname;
-const protocol = window.location.protocol;
+const { hostname } = window.location;
+const { protocol } = window.location;
 
 const dev = {
-  ENV: "dev",
+  ENV: 'dev',
   HOSTNAME: hostname,
-  API_URL: `${protocol}//${hostname}:8080/`
+  API_URL: `${protocol}//${hostname}:8080/`,
 };
 
 const prod = {
-  ENV: "prod",
+  ENV: 'prod',
   HOSTNAME: hostname,
-  API_URL: `${protocol}//${hostname}:8080/`
-  //API_URL: window["env"]["apiUrl"] !== "" ? `${protocol}//${window["env"]["apiUrl"]}/` : `${protocol}//api.${hostname}/`,
+  API_URL: `${protocol}//${hostname}:8080/`,
+  // API_URL: window["env"]["apiUrl"] !== "" ? `${protocol}//${window["env"]["apiUrl"]}/` : `${protocol}//api.${hostname}/`,
 };
 
 const config = process.env.REACT_APP_STAGE === 'production'
@@ -20,6 +20,6 @@ const config = process.env.REACT_APP_STAGE === 'production'
 
 export default {
   // Add common config values here
-  //MAX_ATTACHMENT_SIZE: 5000000,
-  ...config
+  // MAX_ATTACHMENT_SIZE: 5000000,
+  ...config,
 };

@@ -1,7 +1,7 @@
 import React from 'react';
-import { connect } from 'react-redux';
-import { withRouter } from 'react-router-dom';
-/*import CRUDStorageProvider from '../../components/StorageProvider/CRUDStorageProvider';
+// import { connect } from 'react-redux';
+// import { withRouter } from 'react-router-dom';
+/* import CRUDStorageProvider from '../../components/StorageProvider/CRUDStorageProvider';
 import ListStorageProviders from '../../components/StorageProvider/ListStorageProviders';
 import Button from '@material-ui/core/Button';
 import AddIcon from '@material-ui/icons/Add';
@@ -9,13 +9,13 @@ import {
   getStorageProvider,
   addStorageProvider,
   editStorageProvider,
-  removeStorageProvider } from '../../actions';*/
+  removeStorageProvider } from '../../actions'; */
 import './Dashboard.css';
 import 'typeface-roboto';
 
+// eslint-disable-next-line react/prefer-stateless-function
 class Dashboard extends React.Component {
-
-  /*constructor() {
+  /* constructor() {
     super();
     this.getStorageProviders = this.getStorageProviders.bind(this);
     this.addStorageProvider = this.addStorageProvider.bind(this);
@@ -41,27 +41,28 @@ class Dashboard extends React.Component {
 
   removeStorageProvider(data) {
     this.props.dispatchRemoveStorageProvider(data.id, this.getStorageProviders);
-  }*/
+  } */
 
   render() {
-    return <div>
-          <div className="actions">
-          </div>
-          <div className="list">
-          </div>
+    return (
+      <div>
+        <div className="actions" />
+        <div className="list" />
       </div>
+    );
   }
 }
 
-const mapStateToProps = (state, ownProps) => ({
-  //providers: state.storage.providers,
-})
+// const mapStateToProps = (state, ownProps) => ({
+// providers: state.storage.providers,
+// });
 
-const mapDispatchToProps = (dispatch, ownProps) => ({
-  //dispatchGetStorageProvider: () => dispatch(getStorageProvider()),
-  //dispatchAddStorageProvider: (data, success) => dispatch(addStorageProvider(data, success)),
-  //dispatchEditStorageProvider: (data, success) => dispatch(editStorageProvider(data, success)),
-  //dispatchRemoveStorageProvider: (id, success) => dispatch(removeStorageProvider(id, success))
-})
+// const mapDispatchToProps = (dispatch, ownProps) => ({
+// dispatchGetStorageProvider: () => dispatch(getStorageProvider()),
+// dispatchAddStorageProvider: (data, success) => dispatch(addStorageProvider(data, success)),
+// dispatchEditStorageProvider: (data, success) => dispatch(editStorageProvider(data, success)),
+// dispatchRemoveStorageProvider: (id, success) => dispatch(removeStorageProvider(id, success))
+// });
 
-export default withRouter(connect(mapStateToProps, mapDispatchToProps)(Dashboard));
+// export default withRouter(connect(mapStateToProps, mapDispatchToProps)(Dashboard));
+export default Dashboard;

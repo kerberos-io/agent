@@ -11,6 +11,7 @@
     "connected-react-router": "^6.8.0",
     "eslint-watch": "^7.0.0",
     "history": "4.10.1",
+    "prop-types": "^15.7.2",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
     "react-redux": "^7.2.2",
