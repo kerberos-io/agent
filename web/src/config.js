@@ -10,8 +10,7 @@ const dev = {
 const prod = {
   ENV: 'prod',
   HOSTNAME: hostname,
-  API_URL: `${protocol}//${hostname}:8080/`,
-  // API_URL: window["env"]["apiUrl"] !== "" ? `${protocol}//${window["env"]["apiUrl"]}/` : `${protocol}//api.${hostname}/`,
+  API_URL: `${protocol}//${hostname}/api/`,
 };
 
 const config = process.env.REACT_APP_STAGE === 'production'

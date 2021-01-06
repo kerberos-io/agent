@@ -23,7 +23,7 @@ export function doLogin(username, password, onSuccess, onError) {
     });
 }
 
-export function checkIfInstalled(onSuccess, onError) {
+export function doCheckIfInstalled(onSuccess, onError) {
   API.get('api/installed')
     .then((res) => {
       if (res.status !== 200) {
@@ -43,10 +43,10 @@ export function checkIfInstalled(onSuccess, onError) {
     });
 }
 
-export function doAuth(onSuccess, onError) {
+/* export function doAuth(onSuccess, onError) {
 
 }
 
 export function doRefreshToken(onSuccess, onError) {
 
-}
+} */

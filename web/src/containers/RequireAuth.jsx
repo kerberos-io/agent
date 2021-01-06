@@ -4,7 +4,7 @@ import { connect } from 'react-redux';
 import { push } from 'react-router-redux';
 import PropTypes from 'prop-types';
 
-export default function (ComposedComponent) {
+export default function RequireAuth(ComposedComponent) {
   class Auth extends React.Component {
     componentDidMount() {
       const {
@@ -18,9 +18,10 @@ export default function (ComposedComponent) {
     }
 
     render() {
+      const { isAuthenticated } = this.props;
       return (
         <div>
-          { this.props.isAuthenticated ? <ComposedComponent {...this.props} /> : null }
+          { isAuthenticated ? <ComposedComponent /> : null }
         </div>
       );
     }
@@ -39,6 +40,8 @@ export default function (ComposedComponent) {
   Auth.propTypes = {
     isAuthenticated: PropTypes.bool.isRequired,
     isInstalled: PropTypes.bool.isRequired,
+    redirectInstallation: PropTypes.func.isRequired,
+    redirectLogin: PropTypes.func.isRequired,
   };
 
   return connect(

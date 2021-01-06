@@ -1,7 +1,7 @@
 import { push } from 'react-router-redux';
-import { doLogin, doUpdateLicenseKey } from '../api/authentication';
+import { doLogin, doCheckIfInstalled } from '../api/authentication';
 
-export const login = (username, password) => function (dispatch) {
+export const login = (username, password) => function dispatcher(dispatch) {
   doLogin(username, password, (data) => {
     // mark interface as logged in.
     dispatch({
@@ -12,7 +12,7 @@ export const login = (username, password) => function (dispatch) {
       expire: data.expire,
     });
     dispatch(push('/'));
-  }, (error, data) => {
+  }, (error) => {
     dispatch({
       type: 'LOGIN_FAILED',
       error: error.message,
@@ -20,7 +20,23 @@ export const login = (username, password) => function (dispatch) {
   });
 };
 
-export const logout = () => function (dispatch) {
+export const checkIfInstalled = () => function dispatcher(dispatch) {
+  doCheckIfInstalled((data) => {
+    // Todo..
+    dispatch({
+      type: 'INSTALLED',
+      installed: data,
+    });
+  }, (error) => {
+    // Todo..
+    dispatch({
+      type: 'INSTALLED_ERROR',
+      error,
+    });
+  });
+};
+
+export const logout = () => function dispatcher(dispatch) {
   dispatch({
     type: 'LOGOUT',
   });
