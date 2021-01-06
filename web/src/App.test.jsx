@@ -1,11 +1,16 @@
-import React from 'react';
-import {
-  render, screen, expect, test,
-} from '@testing-library/react';
+import * as React from 'react';
+import {render, screen} from '@testing-library/react';
 import App from './App';
 
-test('renders Kerberos Open Source text', () => {
-  render(<App />);
-  const linkElement = screen.getByText(/Kerberos Open Source/i);
-  expect(linkElement).toBeInTheDocument();
-});
+
+/* Test default values by rendering a context consumer without a
+ * matching provider
+ */
+test('App.jsx verify if children are rendered.', () => {
+  render(<App>
+    <div>Kerberos Open Source</div>
+  </App>)
+  expect(screen.getByText(/^Kerberos Open Source/)).toHaveTextContent(
+      'Kerberos Open Source',
+  )
+})
