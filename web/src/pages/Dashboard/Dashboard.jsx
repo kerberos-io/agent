@@ -10,8 +10,7 @@ import {
   addStorageProvider,
   editStorageProvider,
   removeStorageProvider } from '../../actions'; */
-import './Dashboard.css';
-import 'typeface-roboto';
+import './Dashboard.scss';
 
 // eslint-disable-next-line react/prefer-stateless-function
 class Dashboard extends React.Component {

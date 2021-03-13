@@ -4,9 +4,8 @@ import { withRouter } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import Button from '@material-ui/core/Button';
 import TextField from '@material-ui/core/TextField';
-// import Typography from '@material-ui/core/Typography';
 import { login } from '../../actions';
-import './LoginForm.css';
+import './LoginForm.scss';
 
 class LoginForm extends React.Component {
   constructor() {

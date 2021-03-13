@@ -2,7 +2,7 @@ import React from 'react';
 import CssBaseline from '@material-ui/core/CssBaseline';
 import Container from '@material-ui/core/Container';
 import LoginForm from '../../components/LoginForm/LoginForm';
-import './Login.css';
+import './Login.scss';
 
 export default function Login() {
   return (
