@@ -1,6 +1,5 @@
 import axios from 'axios';
 import config from '../config';
-// import createAuthRefreshInterceptor from 'axios-auth-refresh';
 
 const axiosBase = axios.create({
   baseURL: config.API_URL,
@@ -12,17 +11,6 @@ axiosBase.interceptors.request.use((request) => {
 });
 
 export default axiosBase;
-
-/* const refreshAuthLogic = failedRequest => axiosBase.get('refresh_token')
-    .then(tokenRefreshResponse => {
-      localStorage.setItem('token', tokenRefreshResponse.data.token);
-      localStorage.setItem('expire', tokenRefreshResponse.data.expire);
-      failedRequest.response.config.headers['Authentication'] = \
-       'Bearer ' + tokenRefreshResponse.data.token;
-      return Promise.resolve();
-});
-
-createAuthRefreshInterceptor(a, refreshAuthLogic); */
 
 export function getToken() {
   return localStorage.getItem('token');

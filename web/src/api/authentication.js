@@ -10,9 +10,11 @@ export function doLogin(username, password, onSuccess, onError) {
         throw new Error(res.data);
       }
       return res.data;
-    }).then((data) => {
+    })
+    .then((data) => {
       onSuccess(data);
-    }).catch((error) => {
+    })
+    .catch((error) => {
       if (error.response) {
         onError(error.response.data);
       } else {
@@ -30,9 +32,11 @@ export function doCheckIfInstalled(onSuccess, onError) {
         throw new Error(res.data);
       }
       return res.data;
-    }).then((data) => {
+    })
+    .then((data) => {
       onSuccess(data);
-    }).catch((error) => {
+    })
+    .catch((error) => {
       if (error.response) {
         onError(error.response.data);
       } else {

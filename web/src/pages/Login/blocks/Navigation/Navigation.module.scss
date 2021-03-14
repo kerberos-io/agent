@@ -1,0 +1,28 @@
+.topnavigation {
+  position: absolute;
+  top: 0;
+  list-style: none;
+  margin: 13px 0 0 0;
+
+  li {
+    float: left;
+
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 24px;
+
+    &::after {
+      content: "·";
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+  }
+
+  li:last-child {
+    &::after {
+      content: "";
+      padding: 0;
+    }
+  }
+}

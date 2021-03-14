@@ -13,9 +13,7 @@ const prod = {
   API_URL: `${protocol}//${hostname}/api/`,
 };
 
-const config = process.env.REACT_APP_STAGE === 'production'
-  ? prod
-  : dev;
+const config = process.env.REACT_APP_STAGE === 'production' ? prod : dev;
 
 export default {
   // Add common config values here

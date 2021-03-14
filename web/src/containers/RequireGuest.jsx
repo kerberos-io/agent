@@ -8,7 +8,10 @@ export default function RequireGuest(ComposedComponent) {
   class Guest extends React.Component {
     componentDidMount() {
       const {
-        isAuthenticated, isInstalled, redirectInstallation, redirectDashboard,
+        isAuthenticated,
+        isInstalled,
+        redirectInstallation,
+        redirectDashboard,
       } = this.props;
       if (!isInstalled) {
         redirectInstallation();
@@ -19,11 +22,7 @@ export default function RequireGuest(ComposedComponent) {
 
     render() {
       const { isAuthenticated } = this.props;
-      return (
-        <div>
-          { !isAuthenticated ? <ComposedComponent /> : null }
-        </div>
-      );
+      return <div>{!isAuthenticated ? <ComposedComponent /> : null}</div>;
     }
   }
 
@@ -32,10 +31,14 @@ export default function RequireGuest(ComposedComponent) {
     isInstalled: state.auth.installed,
   });
 
-  const mapDispatchToProps = (dispatch) => bindActionCreators({
-    redirectDashboard: () => push('/'),
-    redirectInstallation: () => push('/install'),
-  }, dispatch);
+  const mapDispatchToProps = (dispatch) =>
+    bindActionCreators(
+      {
+        redirectDashboard: () => push('/'),
+        redirectInstallation: () => push('/install'),
+      },
+      dispatch
+    );
 
   Guest.propTypes = {
     isAuthenticated: PropTypes.bool.isRequired,
@@ -44,8 +47,5 @@ export default function RequireGuest(ComposedComponent) {
     redirectDashboard: PropTypes.func.isRequired,
   };
 
-  return connect(
-    mapStateToProps,
-    mapDispatchToProps,
-  )(Guest);
+  return connect(mapStateToProps, mapDispatchToProps)(Guest);
 }

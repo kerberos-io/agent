@@ -1,14 +1,12 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import './App.scss';
+import styles from './App.module.scss';
 
-function App(props) {
+export default function App(props) {
   const { children } = props;
   return (
-    <div className="App">
-      <header className="App-header">
-        { children }
-      </header>
+    <div className={styles.body}>
+      <header>{children}</header>
     </div>
   );
 }
@@ -16,5 +14,3 @@ function App(props) {
 App.propTypes = {
   children: PropTypes.node.isRequired,
 };
-
-export default App;
