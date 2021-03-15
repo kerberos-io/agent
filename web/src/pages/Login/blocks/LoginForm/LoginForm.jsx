@@ -27,13 +27,6 @@ class LoginForm extends React.Component {
     dispatchLogin(data.get('username'), data.get('password'));
   }
 
-  handleKeyDown(event) {
-    if (event.keyCode === 13) {
-      console.log(this);
-      console.log(`key down`);
-    }
-  }
-
   togglePasswordVisible() {
     const { passwordVisible } = this.state;
     this.setState({
@@ -76,7 +69,7 @@ class LoginForm extends React.Component {
                     tabIndex={0}
                     className={styles.showPassword}
                     onClick={() => this.togglePasswordVisible()}
-                    onKeyDown={(event) => this.handleKeyDown(event)}
+                    onKeyDown={() => this.togglePasswordVisible()}
                   >
                     <img src={ShowPasswordIcon} alt="Show password button" />
                   </div>
