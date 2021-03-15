@@ -3,14 +3,14 @@ import React from 'react';
 // import { withRouter } from 'react-router-dom';
 /* import CRUDStorageProvider from '../../components/StorageProvider/CRUDStorageProvider';
 import ListStorageProviders from '../../components/StorageProvider/ListStorageProviders';
-import Button from '@material-ui/core/Button';
-import AddIcon from '@material-ui/icons/Add';
 import {
   getStorageProvider,
   addStorageProvider,
   editStorageProvider,
   removeStorageProvider } from '../../actions'; */
-import './Dashboard.scss';
+import styles from './Dashboard.module.scss';
+import Header from '../../components/Header/Header';
+import Warning from '../../components/Warning/Warning';
 
 // eslint-disable-next-line react/prefer-stateless-function
 class Dashboard extends React.Component {
@@ -44,9 +44,9 @@ class Dashboard extends React.Component {
 
   render() {
     return (
-      <div>
-        <div className="actions" />
-        <div className="list" />
+      <div className={styles.dashboard}>
+        <Header />
+        <Warning />
       </div>
     );
   }

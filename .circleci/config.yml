@@ -19,7 +19,6 @@ jobs:
     steps:
       - checkout
       - run: node --version
-      - run: sudo apt-get install python
       - run: cd web && yarn
       - run: cd web && yarn test
       - run: cd web && yarn build
