@@ -15,10 +15,11 @@ jobs:
 
   web:
     docker:
-      - image: cimg/node:15.5.0
+      - image: cimg/node:15.11.0
     steps:
       - checkout
       - run: node --version
+      - run: apt-get install python2
       - run: cd web && yarn
       - run: cd web && yarn test
       - run: cd web && yarn build
