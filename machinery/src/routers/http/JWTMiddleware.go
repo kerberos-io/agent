@@ -1,7 +1,6 @@
 package http
 
 import (
-	"errors"
 	jwt "github.com/appleboy/gin-jwt/v2"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
@@ -53,10 +52,8 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 					Role: "admin",
 				}, nil
 			} else {
-				return nil, errors.New("Invalid credentials")
+				return nil, jwt.ErrFailedAuthentication
 			}
-
-			return nil, jwt.ErrFailedAuthentication
 		},
 		LoginResponse: func(c *gin.Context, code int, token string, expire time.Time) {
 
