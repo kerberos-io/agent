@@ -97,7 +97,9 @@ You can simply run the `machinery` using following commands.
     cd machinery
     go run main.go run mycameraname 8080
 
-This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference.
+This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/), as it comes with all the debugging and linting features builtin.
+
+![run-in-goland](https://user-images.githubusercontent.com/1546779/111139940-0a4d1a80-8582-11eb-8985-ceaf7359f4ee.gif)
 
 ## Building for Production
 
