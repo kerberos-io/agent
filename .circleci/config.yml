@@ -19,7 +19,7 @@ jobs:
     steps:
       - checkout
       - run: node --version
-      - run: apt-get install python2
+      - run: sudo apt-get install python2
       - run: cd web && yarn
       - run: cd web && yarn test
       - run: cd web && yarn build
