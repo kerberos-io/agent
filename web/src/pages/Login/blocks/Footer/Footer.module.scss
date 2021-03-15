@@ -1,0 +1,45 @@
+.footer {
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+
+  ul {
+    list-style: none;
+
+    li {
+      float: left;
+      font-family: Inter;
+      font-style: normal;
+      font-weight: normal;
+      font-size: 14px;
+      line-height: 24px;
+      text-align: center;
+      color: #6D6666;
+
+      &::after {
+        content: "·";
+        padding-left: 20px;
+        padding-right: 20px;
+      }
+    }
+
+    li:last-child {
+      &::after {
+        content: "";
+        padding: 0;
+      }
+    }
+  }
+
+  p {
+    font-family: Inter;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 12px;
+    line-height: 24px;
+    text-align: center;
+    color: #A69D9D;
+  }
+}

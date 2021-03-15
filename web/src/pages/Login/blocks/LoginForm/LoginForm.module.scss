@@ -11,6 +11,7 @@
   -webkit-border-radius: 4px;
   -moz-border-radius: 4px;
   border-radius: 4px;
+  box-shadow: 0px 4px 34px rgba(0, 0, 0, 0.04), 0px 3px 4px rgba(0, 0, 0, 0.1);
 
   h1 {
     font-size: 16px;
@@ -49,6 +50,7 @@
 
   .input {
     padding: 12px 48px;
+    position: relative;
 
     input {
       background: #FFFFFF;
@@ -64,8 +66,64 @@
     }
   }
 
+  .passwordWrapper {
+    width: 100%;
+    position: relative;
+
+    .showPassword {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      top: 0;
+      right: 0;
+      border-left: 1px solid #E5E3E3;
+      height: 100%;
+      cursor: pointer;
+      width: 50px;
+      outline: none;
+
+      img {
+        display: table;
+        width: 18px;
+        height: 12px;
+      }
+    }
+  }
+
+  .username {
+    &::before {
+      content: "";
+      background-image: url("../../../../assets/images/icons/user.svg");
+      width: 14px;
+      height: 18px;
+      display: table;
+      position: absolute;
+      top: 27px;
+      z-index: 1;
+      left: 70px;
+    }
+  }
+
+  .password {
+    &::before {
+      content: "";
+      background-image: url("../../../../assets/images/icons/password.svg");
+      width: 14px;
+      height: 18px;
+      display: table;
+      position: absolute;
+      top: 27px;
+      z-index: 1;
+      left: 70px;
+    }
+  }
+
+
   button {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     margin: 0 auto;
     padding: 11px 24px 13px;
     width: 125px;
@@ -74,6 +132,7 @@
     box-shadow: inset 0px -2px 0px #6A2624;
     border-radius: 4px;
     border: 0;
+    cursor: pointer;
 
     font-family: Inter;
     font-style: normal;
@@ -85,5 +144,9 @@
     outline: none;
     margin-top: 24px;
     margin-bottom: 48px;
+
+    img {
+      margin-right: 10px;
+    }
   }
 }

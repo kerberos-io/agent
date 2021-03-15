@@ -1,14 +1,22 @@
 import React from 'react';
 import { connect } from 'react-redux';
+import classNames from 'classnames';
 import { withRouter } from 'react-router-dom';
 import PropTypes from 'prop-types';
-import { login } from '../../actions';
+import { login } from '../../../../actions';
 import styles from './LoginForm.module.scss';
+import LoginIcon from '../../../../assets/images/icons/login.svg';
+import ShowPasswordIcon from '../../../../assets/images/icons/discover-password.svg';
 
 class LoginForm extends React.Component {
   constructor() {
     super();
+    this.state = {
+      passwordVisible: false,
+    };
     this.handleSubmit = this.handleSubmit.bind(this);
+    this.togglePasswordVisible = this.togglePasswordVisible.bind(this);
+    this.handleKeyDown = this.handleKeyDown.bind(this);
   }
 
   handleSubmit(event) {
@@ -19,8 +27,23 @@ class LoginForm extends React.Component {
     dispatchLogin(data.get('username'), data.get('password'));
   }
 
+  handleKeyDown(event) {
+    if (event.keyCode === 13) {
+      console.log(this);
+      console.log(`key down`);
+    }
+  }
+
+  togglePasswordVisible() {
+    const { passwordVisible } = this.state;
+    this.setState({
+      passwordVisible: !passwordVisible,
+    });
+  }
+
   render() {
     const { loginError, error } = this.props;
+    const { passwordVisible } = this.state;
     return (
       <div className={styles.wrappper}>
         <div className={styles.loginform}>
@@ -31,7 +54,7 @@ class LoginForm extends React.Component {
           <section>
             <form onSubmit={this.handleSubmit} noValidate>
               <label htmlFor="username">Username</label>
-              <div className={styles.input}>
+              <div className={classNames(styles.input, styles.username)}>
                 <input
                   type="text"
                   id="username"
@@ -40,15 +63,29 @@ class LoginForm extends React.Component {
                 />
               </div>
               <label htmlFor="password">Password</label>
-              <div className={styles.input}>
-                <input
-                  type="password"
-                  id="password"
-                  name="password"
-                  placeholder="Password"
-                />
+              <div className={classNames(styles.input, styles.password)}>
+                <div className={styles.passwordWrapper}>
+                  <input
+                    type={passwordVisible ? 'text' : 'password'}
+                    id="password"
+                    name="password"
+                    placeholder="Password"
+                  />
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    className={styles.showPassword}
+                    onClick={() => this.togglePasswordVisible()}
+                    onKeyDown={(event) => this.handleKeyDown(event)}
+                  >
+                    <img src={ShowPasswordIcon} alt="Show password button" />
+                  </div>
+                </div>
               </div>
-              <button type="submit">Login</button>
+              <button type="submit">
+                <img src={LoginIcon} alt="Login icon" />
+                Login
+              </button>
             </form>
           </section>
         </div>
@@ -77,36 +114,3 @@ LoginForm.propTypes = {
 export default withRouter(
   connect(mapStateToProps, mapDispatchToProps)(LoginForm)
 );
-
-/*
-          <TextField
-            variant="outlined"
-            margin="normal"
-            required
-            fullWidth
-            className="loginfield"
-            id="username"
-            label="Username"
-            name="username"
-          />
-          <TextField
-            variant="outlined"
-            margin="normal"
-            required
-            fullWidth
-            className="passwordfield"
-            name="password"
-            label="Password"
-            type="password"
-            id="password"
-          />
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            color="primary"
-            className="signin-button"
-          >
-            Let&apos;s Go
-          </Button>
-          */
