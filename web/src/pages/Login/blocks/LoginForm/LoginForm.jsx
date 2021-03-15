@@ -59,7 +59,7 @@ class LoginForm extends React.Component {
                   type="text"
                   id="username"
                   name="username"
-                  placeholder="Username"
+                  placeholder="Your username"
                 />
               </div>
               <label htmlFor="password">Password</label>
@@ -69,7 +69,7 @@ class LoginForm extends React.Component {
                     type={passwordVisible ? 'text' : 'password'}
                     id="password"
                     name="password"
-                    placeholder="Password"
+                    placeholder="Your password"
                   />
                   <div
                     role="button"
