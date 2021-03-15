@@ -47,8 +47,6 @@
     display: flex;
     justify-content: flex-end;
     align-items: center;
-
-    font-family: Inter;
     font-style: normal;
     font-weight: 600;
     font-size: 15px;
@@ -56,6 +54,10 @@
     text-align: right;
     text-transform: uppercase;
     color: #FFFFFF;
+
+    .title {
+      margin-right: 10px;
+    }
   }
 
   .navigation {

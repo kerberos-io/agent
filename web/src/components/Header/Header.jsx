@@ -1,6 +1,7 @@
 import React from 'react';
 import styles from './Header.module.scss';
 import LogoSVG from '../../assets/images/icons/logo-w-border.svg';
+import Toggle from '../Toggle/Toggle';
 
 export default function Header() {
   return (
@@ -19,7 +20,10 @@ export default function Header() {
           <li>Allien</li>
         </ul>
       </div>
-      <div className={styles.right}>recording</div>
+      <div className={styles.right}>
+        <span className={styles.title}>recording</span>
+        <Toggle />
+      </div>
     </header>
   );
 }
