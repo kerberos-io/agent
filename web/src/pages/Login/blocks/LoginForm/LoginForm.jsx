@@ -16,7 +16,6 @@ class LoginForm extends React.Component {
     };
     this.handleSubmit = this.handleSubmit.bind(this);
     this.togglePasswordVisible = this.togglePasswordVisible.bind(this);
-    this.handleKeyDown = this.handleKeyDown.bind(this);
   }
 
   handleSubmit(event) {
