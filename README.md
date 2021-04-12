@@ -15,7 +15,7 @@
 <a target="_blank" href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
 <a target="_blank" href="https://goreportcard.com/report/github.com/kerberos-io/opensource"><img src="https://goreportcard.com/badge/github.com/kerberos-io/opensource" alt="Coverage Status"></a>
 <a target="_blank" href="https://app.codacy.com/gh/kerberos-io/opensource?utm_source=github.com&utm_medium=referral&utm_content=kerberos-io/opensource&utm_campaign=Badge_Grade"><img src="https://api.codacy.com/project/badge/Grade/83d79d3092c040acb8c51ee0dfddf4b9"/>
-<a target="_blank" href="https://www.figma.com/file/PpjFz2GGX6ZaWyIzef6mqT/Open-Source?node-id=0%3A1"><img src="https://img.shields.io/badge/web-figma design-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
+<a target="_blank" href="https://www.figma.com/proto/msuYC6sv2cOCqZeDtBxNy7/%5BNEW%5D-Kerberos.io-Apps?node-id=1%3A1788&viewport=-490%2C191%2C0.34553584456443787&scaling=min-zoom&page-id=1%3A2%3Ffuid%3D449684443467913607" alt="Kerberos Open Source"></a>
 
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 
@@ -27,7 +27,7 @@ Kerberos Open source (v3) is a cutting edge video surveillance management system
 
 ## Work In Progress
 
-Kerberos Open Source (v3) is not yet released, and is actively developed. You can follow the progress [on our project board](https://github.com/kerberos-io/opensource/projects/1) and review our designs at [Figma](https://www.figma.com/file/PpjFz2GGX6ZaWyIzef6mqT/Open-Source?node-id=0%3A1). Feel free to give any feedback.
+Kerberos Open Source (v3) is not yet released, and is actively developed. You can follow the progress [on our project board](https://github.com/kerberos-io/opensource/projects/1) and review our designs at [Figma](https://www.figma.com/proto/msuYC6sv2cOCqZeDtBxNy7/%5BNEW%5D-Kerberos.io-Apps?node-id=1%3A1788&viewport=-490%2C191%2C0.34553584456443787&scaling=min-zoom&page-id=1%3A2%3Ffuid%3D449684443467913607). Feel free to give any feedback.
 
 ## Previous releases
 
