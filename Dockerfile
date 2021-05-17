@@ -31,7 +31,7 @@ RUN cd /go/src/github.com/kerberos-io/opensource/web && \
 ##################
 # Build Machinery
 
-RUN cd /go/src/github.com/kerberos-io/opensource/backend && \
+RUN cd /go/src/github.com/kerberos-io/opensource/machinery && \
    go mod download && \
    go build main.go && \
 	 mkdir -p /opensource && \
