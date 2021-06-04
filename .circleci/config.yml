@@ -15,7 +15,7 @@ jobs:
 
   web:
     docker:
-      - image: cimg/node:15.5.0
+      - image: cimg/node:15.11.0
     steps:
       - checkout
       - run: node --version

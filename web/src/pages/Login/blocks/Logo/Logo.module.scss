@@ -1,0 +1,36 @@
+div.logo {
+  text-align: center;
+
+  h1 {
+    color: #fff;
+    font-size: 25px;
+    margin-top: 25px;
+    margin-bottom: 0;
+    font-weight: 400;
+    line-height: 36px;
+
+    span.version{
+      font-size: 13px;
+      padding-left: 5px;
+    }
+  }
+
+
+  h2 {
+    color: #fff;
+    font-size: 15px;
+    margin-top: 12px;
+    font-weight: 400;
+    line-height: 24px;
+    opacity: 80%;
+  }
+
+  h3 {
+    color: #fff;
+    font-size: 14px;
+    margin-top: 12px;
+    font-weight: 400;
+    line-height: 24px;
+    opacity: 60%;
+  }
+}

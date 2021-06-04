@@ -8,7 +8,10 @@ export default function RequireInstall(ComposedComponent) {
   class Install extends React.Component {
     componentDidMount() {
       const {
-        isAuthenticated, isInstalled, redirectDashboard, redirectLogin,
+        isAuthenticated,
+        isInstalled,
+        redirectDashboard,
+        redirectLogin,
       } = this.props;
       if (isInstalled) {
         if (isAuthenticated) {
@@ -21,11 +24,7 @@ export default function RequireInstall(ComposedComponent) {
 
     render() {
       const { isInstalled } = this.props;
-      return (
-        <div>
-          { !isInstalled ? <ComposedComponent /> : null }
-        </div>
-      );
+      return <div>{!isInstalled ? <ComposedComponent /> : null}</div>;
     }
   }
 
@@ -34,10 +33,14 @@ export default function RequireInstall(ComposedComponent) {
     isInstalled: state.auth.installed,
   });
 
-  const mapDispatchToProps = (dispatch) => bindActionCreators({
-    redirectDashboard: () => push('/'),
-    redirectLogin: () => push('/login'),
-  }, dispatch);
+  const mapDispatchToProps = (dispatch) =>
+    bindActionCreators(
+      {
+        redirectDashboard: () => push('/'),
+        redirectLogin: () => push('/login'),
+      },
+      dispatch
+    );
 
   Install.propTypes = {
     isAuthenticated: PropTypes.bool.isRequired,
@@ -46,8 +49,5 @@ export default function RequireInstall(ComposedComponent) {
     redirectLogin: PropTypes.func.isRequired,
   };
 
-  return connect(
-    mapStateToProps,
-    mapDispatchToProps,
-  )(Install);
+  return connect(mapStateToProps, mapDispatchToProps)(Install);
 }

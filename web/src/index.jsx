@@ -42,18 +42,15 @@ function getAuthState() {
       },
     };
     return state;
-  } catch (err) { return undefined; }
+  } catch (err) {
+    return undefined;
+  }
 }
 
 const store = createStore(
   rootReducer(history),
   { ...getAuthState() },
-  composeWithDevTools(
-    applyMiddleware(
-      thunk,
-      routerMiddleware(history),
-    ),
-  ),
+  composeWithDevTools(applyMiddleware(thunk, routerMiddleware(history)))
 );
 
 ReactDOM.render(
@@ -68,5 +65,5 @@ ReactDOM.render(
       </Switch>
     </ConnectedRouter>
   </Provider>,
-  document.getElementById('root'),
+  document.getElementById('root')
 );

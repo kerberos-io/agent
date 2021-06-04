@@ -1,0 +1,152 @@
+.wrappper {
+  display: flex;
+  justify-content: center;
+}
+
+.loginform {
+  width: 478px;
+  background: #FBFBFB;
+  position: relative;
+  top: -60px;
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  border-radius: 4px;
+  box-shadow: 0px 4px 34px rgba(0, 0, 0, 0.04), 0px 3px 4px rgba(0, 0, 0, 0.1);
+
+  h1 {
+    font-size: 16px;
+    font-style: normal;
+    font-weight: 600;
+    line-height: 24px;
+    text-align: left;
+    padding: 18px 24px;
+    margin: 0;
+    border-bottom: 1px solid #E5E3E3;
+    margin-bottom: 24px;
+
+    &:before {
+      content: "";
+      background: #EAEAEA;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: table;
+      float: left;
+      top: 3px;
+      position: relative;
+      margin-right: 10px;
+    }
+  }
+
+  label {
+    font-family: Inter;
+    font-size: 15px;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 24px;
+    padding: 24px 48px 0px 48px;
+    display: table;
+  }
+
+  .input {
+    padding: 12px 48px;
+    position: relative;
+
+    input {
+      background: #FFFFFF;
+      border: 1px solid #E5E3E3;
+      box-sizing: border-box;
+      border-radius: 4px;
+      padding: 12px 0 12px 54px;
+      outline: none;
+      width: 100%;
+      color: #A69D9D;
+      font-size: 15px;
+      line-height: 24px;
+    }
+  }
+
+  .passwordWrapper {
+    width: 100%;
+    position: relative;
+
+    .showPassword {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      top: 0;
+      right: 0;
+      border-left: 1px solid #E5E3E3;
+      height: 100%;
+      cursor: pointer;
+      width: 50px;
+      outline: none;
+
+      img {
+        display: table;
+        width: 18px;
+        height: 12px;
+      }
+    }
+  }
+
+  .username {
+    &::before {
+      content: "";
+      background-image: url("../../../../assets/images/icons/user.svg");
+      width: 14px;
+      height: 18px;
+      display: table;
+      position: absolute;
+      top: 27px;
+      z-index: 1;
+      left: 70px;
+    }
+  }
+
+  .password {
+    &::before {
+      content: "";
+      background-image: url("../../../../assets/images/icons/password.svg");
+      width: 14px;
+      height: 18px;
+      display: table;
+      position: absolute;
+      top: 27px;
+      z-index: 1;
+      left: 70px;
+    }
+  }
+
+
+  button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    padding: 11px 24px 13px;
+    width: 125px;
+    height: 48px;
+    background: #943734;
+    box-shadow: inset 0px -2px 0px #6A2624;
+    border-radius: 4px;
+    border: 0;
+    cursor: pointer;
+
+    font-family: Inter;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 18px;
+    line-height: 24px;
+    text-align: center;
+    color: #FCFCFC;
+    outline: none;
+    margin-top: 24px;
+    margin-bottom: 48px;
+
+    img {
+      margin-right: 10px;
+    }
+  }
+}

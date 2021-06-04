@@ -85,6 +85,8 @@ The `web` is a **React** project which is the main entry point for an end user t
 
 This will start a webserver and launches the web app on port `3000`.
 
+![signin-to-opensource](https://user-images.githubusercontent.com/1546779/111135333-d02d4a00-857c-11eb-8426-e65076ed111c.gif)
+
 ### Machinery
 
 The `machinery` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent which is doing all the heavy lifting with camera processing and other kinds of logic, on the other hand it acts as a webserver (Rest API) that allows communication from the web (React) or any other custom application. The API is documented using `swagger`.
@@ -95,7 +97,9 @@ You can simply run the `machinery` using following commands.
     cd machinery
     go run main.go run mycameraname 8080
 
-This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference.
+This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/), as it comes with all the debugging and linting features builtin.
+
+![run-in-goland](https://user-images.githubusercontent.com/1546779/111139940-0a4d1a80-8582-11eb-8985-ceaf7359f4ee.gif)
 
 ## Building for Production
 

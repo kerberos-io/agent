@@ -8,7 +8,10 @@ export default function RequireAuth(ComposedComponent) {
   class Auth extends React.Component {
     componentDidMount() {
       const {
-        isAuthenticated, isInstalled, redirectInstallation, redirectLogin,
+        isAuthenticated,
+        isInstalled,
+        redirectInstallation,
+        redirectLogin,
       } = this.props;
       if (!isInstalled) {
         redirectInstallation();
@@ -19,11 +22,7 @@ export default function RequireAuth(ComposedComponent) {
 
     render() {
       const { isAuthenticated } = this.props;
-      return (
-        <div>
-          { isAuthenticated ? <ComposedComponent /> : null }
-        </div>
-      );
+      return <div>{isAuthenticated ? <ComposedComponent /> : null}</div>;
     }
   }
 
@@ -32,10 +31,14 @@ export default function RequireAuth(ComposedComponent) {
     isInstalled: state.auth.installed,
   });
 
-  const mapDispatchToProps = (dispatch) => bindActionCreators({
-    redirectLogin: () => push('/login'),
-    redirectInstallation: () => push('/install'),
-  }, dispatch);
+  const mapDispatchToProps = (dispatch) =>
+    bindActionCreators(
+      {
+        redirectLogin: () => push('/login'),
+        redirectInstallation: () => push('/install'),
+      },
+      dispatch
+    );
 
   Auth.propTypes = {
     isAuthenticated: PropTypes.bool.isRequired,
@@ -44,8 +47,5 @@ export default function RequireAuth(ComposedComponent) {
     redirectLogin: PropTypes.func.isRequired,
   };
 
-  return connect(
-    mapStateToProps,
-    mapDispatchToProps,
-  )(Auth);
+  return connect(mapStateToProps, mapDispatchToProps)(Auth);
 }

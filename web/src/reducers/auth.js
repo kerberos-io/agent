@@ -1,16 +1,18 @@
-const auth = (state = {
-  username: '',
-  role: '',
-  loggedIn: false,
-  installed: false,
-  token: '',
-  expire: '',
-  loginError: false,
-  error: '',
-}, action) => {
+const auth = (
+  state = {
+    username: '',
+    role: '',
+    loggedIn: false,
+    installed: false,
+    token: '',
+    expire: '',
+    loginError: false,
+    error: '',
+  },
+  action
+) => {
   switch (action.type) {
     case 'LOGIN':
-
       // Save token in localStorage
       localStorage.setItem('token', action.token);
       localStorage.setItem('expire', action.expire);
@@ -43,7 +45,6 @@ const auth = (state = {
       };
 
     case 'LOGOUT':
-
       // Remove token from localStorage
       localStorage.removeItem('token');
       localStorage.removeItem('expire');

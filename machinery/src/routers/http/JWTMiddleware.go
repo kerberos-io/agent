@@ -2,8 +2,10 @@ package http
 
 import (
 	jwt "github.com/appleboy/gin-jwt/v2"
+	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/opensource/machinery/src/models"
+	"net/http"
 	"time"
 )
 
@@ -33,6 +35,45 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 				Username: user["username"].(string),
 				Role:     user["role"].(string),
 			}
+		},
+		Authenticator: func(c *gin.Context) (interface{}, error) {
+			var loginVals models.User
+			if err := c.ShouldBind(&loginVals); err != nil {
+				return "", jwt.ErrMissingLoginValues
+			}
+			username := loginVals.Username
+			password := loginVals.Password
+
+			usernameENV := "root"
+			passwordENV := "root"
+			if username == usernameENV && password == passwordENV {
+				return &models.User{
+					Username:  username,
+					Role: "admin",
+				}, nil
+			} else {
+				return nil, jwt.ErrFailedAuthentication
+			}
+		},
+		LoginResponse: func(c *gin.Context, code int, token string, expire time.Time) {
+
+			// Decrypt the token
+			hmacSecret := []byte(myKey) // todo in config file
+			t, _ := jwtgo.Parse(token, func(token *jwtgo.Token) (interface{}, error) {
+				return hmacSecret, nil
+			})
+
+			// Get the claims
+			claims, _ := t.Claims.(jwtgo.MapClaims)
+			user := claims["id"].(map[string]interface {})
+
+			c.JSON(http.StatusOK, gin.H{
+				"code":   http.StatusOK,
+				"token":  token,
+				"expire": expire.Format(time.RFC3339),
+				"username": user["username"].(string),
+				"role": user["role"].(string),
+			})
 		},
 		Authorizator: func(data interface{}, c *gin.Context) bool {
 			if _, ok := data.(*models.User); ok { //&& v.Username == "admin" {
