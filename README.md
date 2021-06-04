@@ -3,7 +3,7 @@
 <a target="_blank" href="https://kerberos.io"><img src="https://img.shields.io/badge/kerberos-website-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
 <a target="_blank" href="https://doc.kerberos.io"><img src="https://img.shields.io/badge/kerberos-documentation-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
 <a target="_blank" href="https://twitter.com/kerberosio?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40kerberosio&style=social&url=https%3A%2F%2Ftwitter.com%2Fkerberosio" alt="Twitter Widget"></a>
-<a target="_blank" href="https://join.slack.com/t/kerberosio/shared_invite/zt-kfj36t7m-iLelioSPfg5~1e2qBBjhBw"><img src="https://img.shields.io/badge/join-slack-gray.svg?longCache=true&colorB=blue" alt="Kerberos Open Source"></a>
+<a target="_blank" href="https://communityinviter.com/apps/kerberosio/kerberos"><img src="https://img.shields.io/badge/slack-@kerberosio/npp-yellow.svg?logo=slack " alt="Kerberos Open Source"></a>
 
 <a target="_blank" href="https://circleci.com/gh/kerberos-io/opensource"><img src="https://circleci.com/gh/kerberos-io/opensource.svg?style=svg"/></a>
 <a target="_blank" href="https://travis-ci.org/kerberos-io/opensource"><img src="https://travis-ci.org/kerberos-io/opensource.svg?branch=master" alt="Build Status"></a>
