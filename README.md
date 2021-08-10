@@ -1,4 +1,4 @@
-# Kerberos Open Source
+# Kerberos.io Open Source agent
 
 <a target="_blank" href="https://kerberos.io"><img src="https://img.shields.io/badge/kerberos-website-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
 <a target="_blank" href="https://doc.kerberos.io"><img src="https://img.shields.io/badge/kerberos-documentation-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
