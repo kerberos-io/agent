@@ -1,5 +1,4 @@
-FROM kerberos/debian-opencv-ffmpeg:1.0.0 AS builder
-MAINTAINER Kerberos.io
+FROM kerberos/debian-opencv-ffmpeg AS builder
 
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
@@ -25,7 +24,7 @@ RUN apt-get update && apt-get install -y curl && curl -sL https://deb.nodesource
 # Build Web
 
 RUN cd /go/src/github.com/kerberos-io/opensource/web && \
-    npm install && yarn build
+    npm install && npx browserslist@latest --update-db && yarn build
     # this will move the /build directory to ../machinery/www
 
 ##################
