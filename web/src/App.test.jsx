@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { render, screen, test, expect } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import App from './App';
 
 /* Test default values by rendering a context consumer without a
