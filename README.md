@@ -52,7 +52,7 @@ Kerberos.io is a cutting edge video surveillance system with a strong focus on u
 - Cloud storage through Kerberos Cloud.
 - MIT License
 
-### Kerberos Enterprise
+### Kerberos Factory (part of [Kerberos Enterprise suite](https://doc.kerberos.io/enterprise/first-things-first/))
 
 - Installation on top of Kubernetes (K8S).
 - Camera support for IP camera only (RTSP/H264).
