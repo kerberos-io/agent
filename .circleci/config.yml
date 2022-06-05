@@ -13,15 +13,15 @@ jobs:
       - run: cd machinery && go test -v ./...
       - run: cd machinery && go vet
 
-  web:
+  ui:
     docker:
-      - image: cimg/node:15.11.0
+      - image: cimg/python:3.9.13-node
     steps:
       - checkout
       - run: node --version
-      - run: cd web && yarn
-      - run: cd web && yarn test
-      - run: cd web && yarn build
+      - run: cd ui && yarn
+      - run: cd ui && yarn test
+      - run: cd ui && yarn build
 
 
 workflows:
@@ -29,4 +29,4 @@ workflows:
   build:
     jobs:
       - machinery
-      - web
+      - ui
