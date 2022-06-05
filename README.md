@@ -1,21 +1,21 @@
 # Kerberos Agent
 
-<a target="_blank" href="https://kerberos.io"><img src="https://img.shields.io/badge/kerberos-website-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
-<a target="_blank" href="https://doc.kerberos.io"><img src="https://img.shields.io/badge/kerberos-documentation-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Open Source"></a>
+<a target="_blank" href="https://kerberos.io"><img src="https://img.shields.io/badge/kerberos-website-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Agent"></a>
+<a target="_blank" href="https://doc.kerberos.io"><img src="https://img.shields.io/badge/kerberos-documentation-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Agent"></a>
 <a target="_blank" href="https://twitter.com/kerberosio?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40kerberosio&style=social&url=https%3A%2F%2Ftwitter.com%2Fkerberosio" alt="Twitter Widget"></a>
 <a target="_blank" href="[https://communityinviter.com/apps/kerberosio/kerberos](https://join.slack.com/t/kerberosio/shared_invite/zt-1a5oj4pwm-O4qCAN9c5r2um0Ns0ge8ww)"><img src="https://img.shields.io/badge/slack-@kerberosio/npp-yellow.svg?logo=slack " alt="Kerberos.io"></a>
 
-<a target="_blank" href="https://circleci.com/gh/kerberos-io/opensource"><img src="https://circleci.com/gh/kerberos-io/agent.svg?style=svg"/></a>
-<a target="_blank" href="https://travis-ci.org/kerberos-io/opensource"><img src="https://travis-ci.org/kerberos-io/agent.svg?branch=master" alt="Build Status"></a>
+<a target="_blank" href="https://circleci.com/gh/kerberos-io/agent"><img src="https://circleci.com/gh/kerberos-io/agent.svg?style=svg"/></a>
+<a target="_blank" href="https://travis-ci.org/kerberos-io/agent"><img src="https://travis-ci.org/kerberos-io/agent.svg?branch=master" alt="Build Status"></a>
 <img src="https://github.com/kerberos-io/agent/workflows/Go/badge.svg"/>
 <img src="https://github.com/kerberos-io/agent/workflows/React/badge.svg"/>
 <img src="https://github.com/kerberos-io/agent/workflows/CodeQL/badge.svg"/>
 
-<a target="_blank" href="https://pkg.go.dev/github.com/kerberos-io/opensource/machinery"><img src="https://pkg.go.dev/badge/github.com/kerberos-io/opensource/machinery" alt="PkgGoDev"></a>
-<a target="_blank" href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
-<a target="_blank" href="https://goreportcard.com/report/github.com/kerberos-io/opensource"><img src="https://goreportcard.com/badge/github.com/kerberos-io/opensource" alt="Coverage Status"></a>
-<a target="_blank" href="https://app.codacy.com/gh/kerberos-io/opensource?utm_source=github.com&utm_medium=referral&utm_content=kerberos-io/opensource&utm_campaign=Badge_Grade"><img src="https://api.codacy.com/project/badge/Grade/83d79d3092c040acb8c51ee0dfddf4b9"/>
-<a target="_blank" href="https://www.figma.com/proto/msuYC6sv2cOCqZeDtBxNy7/%5BNEW%5D-Kerberos.io-Apps?node-id=1%3A1788&viewport=-490%2C191%2C0.34553584456443787&scaling=min-zoom&page-id=1%3A2%3Ffuid%3D449684443467913607" alt="Kerberos Open Source"></a>
+<a target="_blank" href="https://pkg.go.dev/github.com/kerberos-io/agent/machinery"><img src="https://pkg.go.dev/badge/github.com/kerberos-io/agent/machinery" alt="PkgGoDev"></a>
+<a target="_blank" href="https://codecov.io/gh/kerberos-io/agent"><img src="https://codecov.io/gh/kerberos-io/agent/branch/master/graph/badge.svg" alt="Coverage Status"></a>
+<a target="_blank" href="https://goreportcard.com/report/github.com/kerberos-io/agent"><img src="https://goreportcard.com/badge/github.com/kerberos-io/agent" alt="Coverage Status"></a>
+<a target="_blank" href="https://app.codacy.com/gh/kerberos-io/agent?utm_source=github.com&utm_medium=referral&utm_content=kerberos-io/agent&utm_campaign=Badge_Grade"><img src="https://api.codacy.com/project/badge/Grade/83d79d3092c040acb8c51ee0dfddf4b9"/>
+<a target="_blank" href="https://www.figma.com/proto/msuYC6sv2cOCqZeDtBxNy7/%5BNEW%5D-Kerberos.io-Apps?node-id=1%3A1788&viewport=-490%2C191%2C0.34553584456443787&scaling=min-zoom&page-id=1%3A2%3Ffuid%3D449684443467913607" alt="Kerberos Agent"></a>
 
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
     
@@ -27,11 +27,11 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
     
 ## Work In Progress
 
-Kerberos Agent (v3) is not yet released, and is actively developed. You can follow the progress [on our project board](https://github.com/kerberos-io/opensource/projects/1) and review our designs at [Figma](https://www.figma.com/proto/msuYC6sv2cOCqZeDtBxNy7/%5BNEW%5D-Kerberos.io-Apps?node-id=1%3A1788&viewport=-490%2C191%2C0.34553584456443787&scaling=min-zoom&page-id=1%3A2%3Ffuid%3D449684443467913607). Feel free to give any feedback.
+Kerberos Agent (v3) is not yet released, and is actively developed. You can follow the progress [on our project board](https://github.com/kerberos-io/agent/projects/1) and review our designs at [Figma](https://www.figma.com/proto/msuYC6sv2cOCqZeDtBxNy7/%5BNEW%5D-Kerberos.io-Apps?node-id=1%3A1788&viewport=-490%2C191%2C0.34553584456443787&scaling=min-zoom&page-id=1%3A2%3Ffuid%3D449684443467913607). Feel free to give any feedback.
 
 ## Previous releases
 
-This repository contains the next generation of Kerberos.io, **Kerberos Agent (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/opensource/tree/develop) and [project overview](https://github.com/kerberos-io/opensource/projects/1).
+This repository contains the next generation of Kerberos.io, **Kerberos Agent (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/agent/tree/develop) and [project overview](https://github.com/kerberos-io/agent/projects/1).
 
 Read more about this [at the FAQ](#faq) below.
 
@@ -79,13 +79,13 @@ Kerberos Agent is divided in two parts a `machinery` and `web`. Both parts live 
 
 The `web` is a **React** project which is the main entry point for an end user to view recordings, a livestream, and modify the configuration of the `machinery`.
 
-    git clone https://github.com/kerberos-io/opensource
+    git clone https://github.com/kerberos-io/agent
     cd web
     yarn start
 
 This will start a webserver and launches the web app on port `3000`.
 
-![signin-to-opensource](https://user-images.githubusercontent.com/1546779/111135333-d02d4a00-857c-11eb-8426-e65076ed111c.gif)
+![signin-to-agent](https://user-images.githubusercontent.com/1546779/111135333-d02d4a00-857c-11eb-8426-e65076ed111c.gif)
 
 ### Machinery
 
@@ -93,7 +93,7 @@ The `machinery` is a **Golang** project which delivers two functions: it acts as
 
 You can simply run the `machinery` using following commands.
 
-    git clone https://github.com/kerberos-io/opensource
+    git clone https://github.com/kerberos-io/agent
     cd machinery
     go run main.go run mycameraname 8080
 
@@ -107,7 +107,7 @@ Running Kerberos Agent in production only require a single binary to run. Nevert
 
 ### Web
 
-To build the Kerberos Agent web app, you simply have to run the `build` command of `yarn`. This will create a `build` directory inside the `web` directory, which contains a minified version of the React application. Other than that, we [also move](https://github.com/kerberos-io/opensource/blob/master/web/package.json#L16) this `build` directory to the `machinery` directory.
+To build the Kerberos Agent web app, you simply have to run the `build` command of `yarn`. This will create a `build` directory inside the `web` directory, which contains a minified version of the React application. Other than that, we [also move](https://github.com/kerberos-io/agent/blob/master/web/package.json#L16) this `build` directory to the `machinery` directory.
 
     cd web
     yarn build
@@ -116,20 +116,20 @@ To build the Kerberos Agent web app, you simply have to run the `build` command 
 
 Building the `machinery` is also super easy 🚀, by using `go build` you can create a single binary which ships it all; thank you Golang. After building you will endup with a binary called `main`, this is what contains everything you need to run Kerberos Agent.
 
-Remember the build step of the `web` part, during build time we move the build directory to the `machinery` directory. Inside the `machinery` web server [we reference the](https://github.com/kerberos-io/opensource/blob/master/machinery/src/routers/http/Server.go#L44) `build` directory. This makes it possible to just a have single web server that runs it all.  
+Remember the build step of the `web` part, during build time we move the build directory to the `machinery` directory. Inside the `machinery` web server [we reference the](https://github.com/kerberos-io/agent/blob/master/machinery/src/routers/http/Server.go#L44) `build` directory. This makes it possible to just a have single web server that runs it all.  
 
     cd machinery
     go build
 
 ## Building for Docker
 
-Inside the root of this `opensource` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping **Kerberos Agent**. Important to note is that start from a prebuild base image, `kerberos/debian-opencv-ffmpeg:1.0.0`.
+Inside the root of this `agent` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping **Kerberos Agent**. Important to note is that start from a prebuild base image, `kerberos/debian-opencv-ffmpeg:1.0.0`.
 This base image contains already a couple of tools, such as Golang, FFmpeg and OpenCV. We do this for faster compilation times.
 
 By running the `docker build` command, you will create the Kerberos Agent Docker image. After building you can simply run the image as a Docker container.
 
-    docker build -t kerberos/opensource .
-    docker run -p 8080:8080 --name mycamera -d kerberos/opensource
+    docker build -t kerberos/agent .
+    docker run -p 8080:8080 --name mycamera -d kerberos/agent
 
 ## FAQ
 
@@ -163,6 +163,6 @@ Kerberos Agent (v3) is now available under the MIT license.
 
 This project exists thanks to all the people who contribute.
 
-<a href="https://github.com/kerberos-io/opensource/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=kerberos-io/opensource" />
+<a href="https://github.com/kerberos-io/agent/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kerberos-io/agent" />
 </a>
