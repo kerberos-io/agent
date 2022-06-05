@@ -74,12 +74,12 @@ Kerberos Agent **will ship in different formats**: Docker, binary, snap, KiOS. V
 
 Kerberos Agent is divided in two parts a `machinery` and `web`. Both parts live in this repository in their relative folders. For development or running the application on your local machine, you have to run both the `machinery` and the `web` as described below. When running in production everything is shipped as only one artifact, read more about this at [Building for production](#building-for-production).
 
-### Web
+### UI
 
 The `web` is a **React** project which is the main entry point for an end user to view recordings, a livestream, and modify the configuration of the `machinery`.
 
     git clone https://github.com/kerberos-io/agent
-    cd web
+    cd ui
     yarn start
 
 This will start a webserver and launches the web app on port `3000`.
@@ -104,11 +104,11 @@ This will launch the Kerberos Agent and run a webserver on port `8080`. You can 
 
 Running Kerberos Agent in production only require a single binary to run. Nevertheless, we have two parts, the `machinery` and the `web`, we merge them during build time. So this is what happens.
 
-### Web
+### UI
 
 To build the Kerberos Agent web app, you simply have to run the `build` command of `yarn`. This will create a `build` directory inside the `web` directory, which contains a minified version of the React application. Other than that, we [also move](https://github.com/kerberos-io/agent/blob/master/web/package.json#L16) this `build` directory to the `machinery` directory.
 
-    cd web
+    cd ui
     yarn build
 
 ### Machinery
