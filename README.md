@@ -6,7 +6,6 @@
 <a target="_blank" href="[https://communityinviter.com/apps/kerberosio/kerberos](https://join.slack.com/t/kerberosio/shared_invite/zt-1a5oj4pwm-O4qCAN9c5r2um0Ns0ge8ww)"><img src="https://img.shields.io/badge/slack-@kerberosio/npp-yellow.svg?logo=slack " alt="Kerberos.io"></a>
 
 <a target="_blank" href="https://circleci.com/gh/kerberos-io/agent"><img src="https://circleci.com/gh/kerberos-io/agent.svg?style=svg"/></a>
-<a target="_blank" href="https://travis-ci.org/kerberos-io/agent"><img src="https://travis-ci.org/kerberos-io/agent.svg?branch=master" alt="Build Status"></a>
 <img src="https://github.com/kerberos-io/agent/workflows/Go/badge.svg"/>
 <img src="https://github.com/kerberos-io/agent/workflows/React/badge.svg"/>
 <img src="https://github.com/kerberos-io/agent/workflows/CodeQL/badge.svg"/>
