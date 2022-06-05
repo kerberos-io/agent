@@ -15,7 +15,7 @@ jobs:
 
   ui:
     docker:
-      - image: cimg/python:3.9.13-node
+      - image: cimg/python:3.7-node
     steps:
       - checkout
       - run: node --version
