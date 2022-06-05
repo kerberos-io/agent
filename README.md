@@ -5,11 +5,11 @@
 <a target="_blank" href="https://twitter.com/kerberosio?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40kerberosio&style=social&url=https%3A%2F%2Ftwitter.com%2Fkerberosio" alt="Twitter Widget"></a>
 <a target="_blank" href="[https://communityinviter.com/apps/kerberosio/kerberos](https://join.slack.com/t/kerberosio/shared_invite/zt-1a5oj4pwm-O4qCAN9c5r2um0Ns0ge8ww)"><img src="https://img.shields.io/badge/slack-@kerberosio/npp-yellow.svg?logo=slack " alt="Kerberos.io"></a>
 
-<a target="_blank" href="https://circleci.com/gh/kerberos-io/opensource"><img src="https://circleci.com/gh/kerberos-io/opensource.svg?style=svg"/></a>
-<a target="_blank" href="https://travis-ci.org/kerberos-io/opensource"><img src="https://travis-ci.org/kerberos-io/opensource.svg?branch=master" alt="Build Status"></a>
-<img src="https://github.com/kerberos-io/opensource/workflows/Go/badge.svg"/>
-<img src="https://github.com/kerberos-io/opensource/workflows/React/badge.svg"/>
-<img src="https://github.com/kerberos-io/opensource/workflows/CodeQL/badge.svg"/>
+<a target="_blank" href="https://circleci.com/gh/kerberos-io/opensource"><img src="https://circleci.com/gh/kerberos-io/agent.svg?style=svg"/></a>
+<a target="_blank" href="https://travis-ci.org/kerberos-io/opensource"><img src="https://travis-ci.org/kerberos-io/agent.svg?branch=master" alt="Build Status"></a>
+<img src="https://github.com/kerberos-io/agent/workflows/Go/badge.svg"/>
+<img src="https://github.com/kerberos-io/agent/workflows/React/badge.svg"/>
+<img src="https://github.com/kerberos-io/agent/workflows/CodeQL/badge.svg"/>
 
 <a target="_blank" href="https://pkg.go.dev/github.com/kerberos-io/opensource/machinery"><img src="https://pkg.go.dev/badge/github.com/kerberos-io/opensource/machinery" alt="PkgGoDev"></a>
 <a target="_blank" href="https://codecov.io/gh/kerberos-io/opensource"><img src="https://codecov.io/gh/kerberos-io/opensource/branch/master/graph/badge.svg" alt="Coverage Status"></a>
@@ -18,13 +18,13 @@
 <a target="_blank" href="https://www.figma.com/proto/msuYC6sv2cOCqZeDtBxNy7/%5BNEW%5D-Kerberos.io-Apps?node-id=1%3A1788&viewport=-490%2C191%2C0.34553584456443787&scaling=min-zoom&page-id=1%3A2%3Ffuid%3D449684443467913607" alt="Kerberos Open Source"></a>
 
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-
-[![Kerberos.io - video surveillance](https://kerberos.io/images/kerberos.png)](https://kerberos.io)
-
+    
 [**Docker Hub**](https://hub.docker.com/r/kerberos/agent) | [**Documentation**](https://doc.kerberos.io) | [**Website**](https://kerberos.io)
 
 Kerberos Agent is a cutting edge video surveillance management system made available as Open Source under the MIT License. This means that all the source code is available for you or your company, and you can use, transform and distribute the source code; as long you keep a reference of the original license. Kerberos Agent can be used for commercial usage (which was not the case for v2). Read more [about the license here](LICENSE).
 
+![login-ossag](https://user-images.githubusercontent.com/1546779/172066784-4d9cefc6-9599-4d2e-bc65-e1f2862b7409.png)    
+    
 ## Work In Progress
 
 Kerberos Open Source (v3) is not yet released, and is actively developed. You can follow the progress [on our project board](https://github.com/kerberos-io/opensource/projects/1) and review our designs at [Figma](https://www.figma.com/proto/msuYC6sv2cOCqZeDtBxNy7/%5BNEW%5D-Kerberos.io-Apps?node-id=1%3A1788&viewport=-490%2C191%2C0.34553584456443787&scaling=min-zoom&page-id=1%3A2%3Ffuid%3D449684443467913607). Feel free to give any feedback.
@@ -35,8 +35,8 @@ This repository contains the next generation of Kerberos.io, **Kerberos Open Sou
 
 Read more about this [at the FAQ](#faq) below.
 
-<img src="https://github.com//kerberos-io/opensource/raw/master/.github/images/kerberos-agent-v2-v3.png" width="500px">
-
+![opensource-to-agent](https://user-images.githubusercontent.com/1546779/172066873-7752c979-de63-4417-8d26-34192fdbd1e6.svg)
+    
 ## Introduction
 
 Kerberos.io is a cutting edge video surveillance system with a strong focus on user experience, scalability, resilience, extension and integration. Kerberos.io provides different solutions, but from a high level point of view it comes into two flavours: Kerberos Open Source and Kerberos Enterprise. The main differences, very brief, between Open Source and Enterprise are described below. Both Kerberos Open Source and Kerberos Enterprise can be extended and integrated with Kerberos Storage and/or Kerberos Cloud.
