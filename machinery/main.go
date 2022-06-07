@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/kerberos-io/opensource/machinery/src/routers"
 	"log"
 	"os"
+
+	"github.com/kerberos-io/opensource/machinery/src/routers"
 )
 
 func main() {
@@ -14,7 +15,7 @@ func main() {
 
 	switch action {
 	case "version":
-		log.Printf("%s: %0.1f\n", "You are currrently running Kerberos Open Source", VERSION)
+		log.Printf("%s: %0.1f\n", "You are currrently running Kerberos Agent", VERSION)
 	case "pending-upload":
 		name := os.Args[2]
 		fmt.Println(name)
