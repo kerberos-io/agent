@@ -7,22 +7,21 @@ import PropTypes from 'prop-types';
 export default function RequireAuth(ComposedComponent) {
   class Auth extends React.Component {
     componentDidMount() {
-      const {
-        isAuthenticated,
-        isInstalled,
-        redirectInstallation,
-        redirectLogin,
-      } = this.props;
-      if (!isInstalled) {
-        redirectInstallation();
-      } else if (!isAuthenticated) {
-        redirectLogin();
+      const { isAuthenticated, redirect } = this.props;
+      console.log(isAuthenticated);
+      if (!isAuthenticated) {
+        redirect();
       }
     }
 
     render() {
       const { isAuthenticated } = this.props;
-      return <div>{isAuthenticated ? <ComposedComponent /> : null}</div>;
+      return (
+        <div>
+          {/* eslint-disable-next-line react/jsx-props-no-spreading */}
+          {isAuthenticated ? <ComposedComponent {...this.props} /> : null}
+        </div>
+      );
     }
   }
 
@@ -34,8 +33,7 @@ export default function RequireAuth(ComposedComponent) {
   const mapDispatchToProps = (dispatch) =>
     bindActionCreators(
       {
-        redirectLogin: () => push('/login'),
-        redirectInstallation: () => push('/install'),
+        redirect: () => push('/login'),
       },
       dispatch
     );
@@ -43,8 +41,7 @@ export default function RequireAuth(ComposedComponent) {
   Auth.propTypes = {
     isAuthenticated: PropTypes.bool.isRequired,
     isInstalled: PropTypes.bool.isRequired,
-    redirectInstallation: PropTypes.func.isRequired,
-    redirectLogin: PropTypes.func.isRequired,
+    redirect: PropTypes.func.isRequired,
   };
 
   return connect(mapStateToProps, mapDispatchToProps)(Auth);

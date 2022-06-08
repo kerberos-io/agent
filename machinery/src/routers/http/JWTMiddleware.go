@@ -1,12 +1,13 @@
 package http
 
 import (
+	"net/http"
+	"time"
+
 	jwt "github.com/appleboy/gin-jwt/v2"
 	jwtgo "github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	"github.com/kerberos-io/opensource/machinery/src/models"
-	"net/http"
-	"time"
+	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
 func JWTMiddleWare() jwt.GinJWTMiddleware {
@@ -48,8 +49,8 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 			passwordENV := "root"
 			if username == usernameENV && password == passwordENV {
 				return &models.User{
-					Username:  username,
-					Role: "admin",
+					Username: username,
+					Role:     "admin",
 				}, nil
 			} else {
 				return nil, jwt.ErrFailedAuthentication
@@ -65,14 +66,14 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 
 			// Get the claims
 			claims, _ := t.Claims.(jwtgo.MapClaims)
-			user := claims["id"].(map[string]interface {})
+			user := claims["id"].(map[string]interface{})
 
 			c.JSON(http.StatusOK, gin.H{
-				"code":   http.StatusOK,
-				"token":  token,
-				"expire": expire.Format(time.RFC3339),
+				"code":     http.StatusOK,
+				"token":    token,
+				"expire":   expire.Format(time.RFC3339),
 				"username": user["username"].(string),
-				"role": user["role"].(string),
+				"role":     user["role"].(string),
 			})
 		},
 		Authorizator: func(data interface{}, c *gin.Context) bool {

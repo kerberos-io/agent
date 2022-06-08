@@ -1,8 +1,8 @@
 package routers
 
 import (
-	"github.com/kerberos-io/opensource/machinery/src/routers/http"
-	"github.com/kerberos-io/opensource/machinery/src/routers/mqtt"
+	"github.com/kerberos-io/agent/machinery/src/routers/http"
+	"github.com/kerberos-io/agent/machinery/src/routers/mqtt"
 )
 
 func StartWebserver(name string, port string) {

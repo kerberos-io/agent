@@ -3,10 +3,11 @@ package components
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/kerberos-io/opensource/machinery/src/models"
 	"io/ioutil"
 	"os"
 	"time"
+
+	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
 // ReadUserConfig Reads the user configuration of the Kerberos Open Source instance.

@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/kerberos-io/opensource/machinery/src/routers"
+	"github.com/kerberos-io/agent/machinery/src/routers"
 )
 
 func main() {

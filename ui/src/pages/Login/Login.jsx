@@ -50,7 +50,7 @@ class Login extends React.Component {
 
     return (
       <LandingLayout
-        title="Kerberos Factory"
+        title="Kerberos Agent"
         version={config.VERSION}
         description="Scale your Kerberos Agents"
       >

@@ -47,7 +47,7 @@ export const checkIfInstalled = () =>
   };
 
 export const resetLogin = () => {
-  return function (dispatch) {
+  return function d(dispatch) {
     dispatch({
       type: 'RESET_LOGIN',
       error: null,
@@ -56,7 +56,7 @@ export const resetLogin = () => {
 };
 
 export const logout = () => {
-  return function (dispatch) {
+  return function d(dispatch) {
     dispatch({
       type: 'LOGOUT',
     });

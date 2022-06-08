@@ -1,15 +1,17 @@
 package http
 
 import (
-	"github.com/appleboy/gin-jwt/v2"
+	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
+
 	//Swagger documentantion
-	_ "github.com/kerberos-io/opensource/machinery/docs"
+	"log"
+
+	_ "github.com/kerberos-io/agent/machinery/docs"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"log"
 )
 
 // @title Swagger Kerberos Open Source API
@@ -35,19 +37,16 @@ func StartServer(name string, port string) {
 	// Initialize REST API
 	r := gin.Default()
 
-	// Profile
+	// Profileerggerg
 	pprof.Register(r)
 
 	// Setup CORS
 	r.Use(CORS())
 
-	// Serve web static files
-	r.Use(static.Serve("/", static.LocalFile("./www", true)))
-
 	// Add Swagger
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// The JWT middleware
+	// The JWT middlewareergreggre
 	middleWare := JWTMiddleWare()
 	authMiddleware, err := jwt.New(&middleWare)
 	if err != nil {
@@ -56,6 +55,11 @@ func StartServer(name string, port string) {
 
 	// Add all routes
 	AddRoutes(r, authMiddleware)
+
+	// Add static routes to UI
+	r.Use(static.Serve("/", static.LocalFile("./www", true)))
+	r.Use(static.Serve("/dashboard", static.LocalFile("./www", true)))
+	r.Use(static.Serve("/login", static.LocalFile("./www", true)))
 
 	// Run the api on port
 	err = r.Run(":" + port)

@@ -1,5 +1,4 @@
 import React from 'react';
-
 import styles from './Dashboard.module.scss';
 import Header from '../../components/Header/Header';
 import Warning from '../../components/Warning/Warning';

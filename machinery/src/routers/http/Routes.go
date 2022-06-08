@@ -1,13 +1,13 @@
 package http
 
 import (
-	"github.com/appleboy/gin-jwt/v2"
+	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
-	"github.com/kerberos-io/opensource/machinery/src/components"
-	"github.com/kerberos-io/opensource/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/components"
+	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
-func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware) *gin.RouterGroup{
+func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware) *gin.RouterGroup {
 	api := r.Group("/api")
 	{
 		api.POST("/login", authMiddleware.LoginHandler)
