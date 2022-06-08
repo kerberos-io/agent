@@ -20,7 +20,7 @@ jobs:
       - checkout
       - run: node --version
       - run: cd ui && yarn
-      - run: cd ui && yarn test
+      - run: cd ui && yarn test --passWithNoTests
       - run: cd ui && yarn build
 
 

@@ -27,6 +27,6 @@ jobs:
     - name: Yarn install
       run: cd ui && yarn
     - name: Yarn test
-      run: cd ui && yarn test
+      run: cd ui && yarn test --passWithNoTests
     - name: Yarn build
       run: cd ui && yarn build
