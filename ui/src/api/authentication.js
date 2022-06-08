@@ -5,16 +5,16 @@ export function doLogin(username, password, onSuccess, onError) {
     username,
     password,
   })
-    .then(res => {
+    .then((res) => {
       if (res.status !== 200) {
         throw new Error(res.data);
       }
       return res.data;
     })
-    .then(data => {
+    .then((data) => {
       onSuccess(data);
     })
-    .catch(error => {
+    .catch((error) => {
       if (error.response) {
         onError(error.response.data);
       } else {
@@ -27,16 +27,16 @@ export function doLogin(username, password, onSuccess, onError) {
 
 export function doCheckIfInstalled(onSuccess, onError) {
   API.get('api/installed')
-    .then(res => {
+    .then((res) => {
       if (res.status !== 200) {
         throw new Error(res.data);
       }
       return res.data;
     })
-    .then(data => {
+    .then((data) => {
       onSuccess(data);
     })
-    .catch(error => {
+    .catch((error) => {
       if (error.response) {
         onError(error.response.data);
       } else {

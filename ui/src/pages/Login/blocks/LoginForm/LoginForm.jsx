@@ -86,12 +86,12 @@ class LoginForm extends React.Component {
   }
 }
 
-const mapStateToProps = state => ({
+const mapStateToProps = (state) => ({
   loginError: state.auth.loginError,
   error: state.auth.error,
 });
 
-const mapDispatchToProps = dispatch => ({
+const mapDispatchToProps = (dispatch) => ({
   dispatchLogin: (username, password) => {
     dispatch(login(username, password));
   },

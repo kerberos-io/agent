@@ -1,0 +1,98 @@
+:root {
+  --hub: hsl(278, 30%, 48%);
+  --hub-hsl: 278, 30%, 48%;
+  --hub-darker: hsl(278, 34%, 31%);
+  --hub-darker-hsl: 278, 34%, 31%;
+  --oss: hsl(2, 48%, 39%);
+  --oss-hsl: 2, 48%, 39%;
+  --oss-darker: hsl(2, 52%, 25%);
+  --oss-darker-hsl: 2, 52%, 25%;
+  --enterprise: hsl(162, 24%, 38%);
+  --enterprise-hsl: 162, 24%, 38%;
+  --enterprise-darker: hsl(162, 26%, 26%);
+  --enterprise-darker-hsl: 162, 26%, 26%;
+  --vault: hsl(229, 25%, 45%);
+  --vault-hsl: 229, 25%, 45%;
+  --vault-darker: hsl(230, 28%, 31%);
+  --vault-darker-hsl: 230, 28%, 31%;
+
+  --primary: hsl(162, 24%, 38%);
+  --primary-hsl: 162, 24%, 38%;
+  --primary-darker: hsl(162, 26%, 26%);
+  --primary-darker-hsl: 162, 26%, 26%;
+
+  --secondary: hsl(229, 25%, 45%);
+  --secondary-hsl: 229, 25%, 45%;
+  --secondary-darker: hsl(230, 28%, 31%);
+  --secondary-darker-hsl: 230, 28%, 31%;
+
+  --text: hsl(0, 3%, 15%);
+  --text-hsl: 0, 3%, 15%;
+  --text-muted: hsl(0, 3%, 41%);
+  --text-muted-hsl: 0, 3%, 41%;
+  --text-light: hsl(0, 5%, 63%);
+  --text-light-hsl: 0, 5%, 63%;
+
+  --card: hsl(0, 0%, 100%);
+  --card-hsl: 0, 0%, 100%;
+  --card-muted: hsl(0, 0%, 98%);
+  --card-muted-hsl: 0, 0%, 98%;
+
+  --info: hsl(205, 74%, 53%);
+  --info-hsl: 205, 74%, 53%;
+  --info-darker: hsl(205, 71%, 41%);
+  --info-darker-hsl: 205, 71%, 41%;
+  --success: hsl(131, 31%, 52%);
+  --success-hsl: 131, 31%, 52%;
+  --success-darker: hsl(130, 35%, 39%);
+  --success-darker-hsl: 130, 35%, 39%;
+  --warning: hsl(47, 86%, 47%);
+  --warning-hsl: 47, 86%, 47%;
+  --alert: hsl(2, 58%, 48%);
+  --alert-darker: hsl(2, 63%, 36%);
+  --alert-darker-hsl: 2, 63%, 36%;
+  --alert-hsl: 2, 58%, 48%;
+
+  --bg: hsl(0, 5%, 93%);
+  --bg-hsl: 0, 5%, 93%;
+  --bg-muted: hsl(0, 4%, 89%);
+  --bg-muted-hsl: 0, 4%, 89%;
+  --bg-white: hsl(0, 0%, 100%);
+  --bg-white-hsl: 0, 0%, 100%;
+
+  --upper-gradient: linear-gradient(90deg, var(--primary-darker) 0%, var(--primary) 58.33%, var(--hub) 100%);
+  --upper-gradient-mobile: linear-gradient(90deg, var(--primary-darker) 0%, var(--primary) 100%);
+
+  /* Special colors to be picked */
+  --color-pink: hsl(324, 86%, 47%);
+  --color-purple: hsl(285, 86%, 47%);
+  --color-purple-dark: hsl(258, 86%, 47%);
+  --color-blue-dark: hsl(227, 86%, 47%);
+  --color-blue: hsl(219, 86%, 47%);
+  --color-blue-light: hsl(194, 86%, 47%);
+  --color-blue-green: hsl(172, 86%, 47%);
+  --color-green: hsl(150, 86%, 47%);
+  --color-green-yellow: hsl(100, 86%, 47%);
+  --color-yellow: hsl(64, 86%, 47%);
+  --color-orange: hsl(36, 86%, 47%);
+  --color-red: hsl(8, 86%, 47%);
+  --color-white: hsl(0, 0%, 100%);
+  --color-gray-light: hsl(0, 0%, 75%);
+  --color-gray: hsl(0, 0%, 50%);
+  --color-gray-dark: hsl(0, 0%, 25%);
+  --color-black: hsl(0, 0%, 0%);
+}
+
+/*
+  Self-hosted fonts
+*/
+
+
+
+body {
+  box-sizing: border-box;
+  background: var(--bg);
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif; // use regular Inter font by default..
+}

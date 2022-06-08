@@ -1,0 +1,118 @@
+// ========== FUNCTIONS & MIXINS ========== //
+
+/*
+  Override SASS' handling of HSL(a) color functions, don't touch it and let CSS handle it itself.
+  This will enable the trick with variable alpha channels for CSS color variables (see below).
+*/
+@function hsla($args...) { @return #{'hsla(#{$args})'}; }
+
+/*
+  Function for defining (not only) vertical rhythm by multiplies of 12px
+    Examples:
+    width: size(2); (equals to "width: 24px;")
+    line-height: size(3); (equals to "line-height: 36px;")
+*/
+@function size($multiplier) {
+  @return $multiplier * 12px;
+}
+
+// Bulma breakpoints
+$gap: 32px;
+$tablet: 769px;
+$desktop:	960px + (2 * $gap);
+$widescreen:	1152px + (2 * $gap);
+$fullhd: 1344px + (2 * $gap);
+$videocard-widesreen:34vw;
+$videocard-desktop:66vw;
+$videocard-wall:50vw;
+
+// Responsive mixin (Bulma's)
+@mixin break($media) {
+  @if $media == t {
+    @media only screen and (min-width: $tablet) { @content; }
+  }
+  @else if $media == d {
+    @media only screen and (min-width: $desktop) { @content; }
+  }
+  @else if $media == w {
+    @media only screen and (min-width: $widescreen) { @content; }
+  }
+  @else if $media == f {
+    @media only screen and (min-width: $fullhd) { @content; }
+  }
+}
+
+/*
+  Responsivity mixin for custom min-width styles
+    Examples:
+    @include break-from(450px) { ... }
+*/
+@mixin break-from($size) {
+  @media only screen and (min-width: $size) { @content; }
+}
+
+
+// ========== VARIABLES ========== //
+
+:root {
+
+  // ---------- UI ---------- //
+
+  --radius: 4px;
+
+  --main-content-gutter: 24px; // margins between main content and sidebar/viewport
+  @include break(t) {
+    --main-content-gutter: 36px;
+  }
+  @include break(w) {
+    --main-content-gutter: 48px;
+  }
+}
+
+
+// ========== PLACEHOLDERS ========== //
+/*
+  Usage:
+  @extend %box-shadow;
+*/
+
+%card-header-shadow {
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.07);
+}
+
+%card-footer-shadow {
+  box-shadow: 0 -1px 1px rgba(0, 0, 0, 0.07);
+}
+
+%box-shadow {
+  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.03);
+}
+
+%box-shadow-bigger {
+  box-shadow: 0px 4px 34px rgba(0, 0, 0, 0.04), 0px 3px 4px rgba(0, 0, 0, 0.1);
+}
+
+%modal-shadow {
+  box-shadow: 0px 4px 34px rgba(0, 0, 0, 0.24), 0px 3px 4px rgba(0, 0, 0, 0.2);
+}
+
+%inner-shadow {
+  box-shadow: inset 0 20px 12px -20px rgba(0, 0, 0, 0.07);
+}
+
+%tfx {
+  transition: all 0.1s;
+}
+
+%input-box-shadow {
+  box-shadow: 0px 0px 0px 3px hsla(var(--hub-hsl), 0.2);
+}
+
+%input-hover-border {
+  border: 1px solid var(--text-light);
+}
+
+%input-focus-border {
+  border: 1px solid var(--hub);
+
+}

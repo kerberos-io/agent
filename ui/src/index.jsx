@@ -7,9 +7,10 @@ import { routerMiddleware, ConnectedRouter } from 'connected-react-router';
 import { Provider } from 'react-redux';
 import { composeWithDevTools } from 'redux-devtools-extension';
 import thunk from 'redux-thunk';
+import { Redirect } from 'react-router';
 import rootReducer from './reducers';
 import App from './App';
-import './index.css';
+import './index.scss';
 import Login from './pages/Login/Login';
 import Install from './pages/Install/Install';
 import Dashboard from './pages/Dashboard/Dashboard';
@@ -61,6 +62,7 @@ ReactDOM.render(
         <Route path="/login" component={RequireGuest(Login)} />
         <App>
           <Route exact path="/" component={RequireAuth(Dashboard)} />
+          <Route exact path="/" render={() => <Redirect to="/dashboard" />} />
         </App>
       </Switch>
     </ConnectedRouter>
