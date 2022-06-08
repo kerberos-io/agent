@@ -8,7 +8,6 @@ export default function RequireAuth(ComposedComponent) {
   class Auth extends React.Component {
     componentDidMount() {
       const { isAuthenticated, redirect } = this.props;
-      console.log(isAuthenticated);
       if (!isAuthenticated) {
         redirect();
       }
