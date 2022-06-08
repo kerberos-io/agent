@@ -26,12 +26,12 @@ export default function RequireAuth(ComposedComponent) {
     }
   }
 
-  const mapStateToProps = (state) => ({
+  const mapStateToProps = state => ({
     isAuthenticated: state.auth.loggedIn,
     isInstalled: state.auth.installed,
   });
 
-  const mapDispatchToProps = (dispatch) =>
+  const mapDispatchToProps = dispatch =>
     bindActionCreators(
       {
         redirectLogin: () => push('/login'),

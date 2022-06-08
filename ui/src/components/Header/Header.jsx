@@ -9,7 +9,7 @@ export default function Header() {
       <div className={styles.left}>
         <img src={LogoSVG} alt="Kerberos.io logo" />
         <h1>
-          Opensource Agent<span className={styles.version}>v3.0</span>
+          Kerberos Agent<span className={styles.version}>v3.0</span>
         </h1>
       </div>
       <div className={styles.center}>

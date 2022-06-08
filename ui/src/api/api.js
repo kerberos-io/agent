@@ -5,7 +5,7 @@ const axiosBase = axios.create({
   baseURL: config.API_URL,
 });
 
-axiosBase.interceptors.request.use((request) => {
+axiosBase.interceptors.request.use(request => {
   request.headers.Authorization = `Bearer ${localStorage.getItem('token')}`;
   return request;
 });
@@ -29,7 +29,7 @@ export function getAPI(baseURL) {
   const a = axios.create({
     baseURL,
   });
-  axiosBase.interceptors.request.use((request) => {
+  axiosBase.interceptors.request.use(request => {
     request.headers.Authorization = `Bearer ${getToken()}`;
     return request;
   });

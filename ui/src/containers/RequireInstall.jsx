@@ -7,12 +7,8 @@ import PropTypes from 'prop-types';
 export default function RequireInstall(ComposedComponent) {
   class Install extends React.Component {
     componentDidMount() {
-      const {
-        isAuthenticated,
-        isInstalled,
-        redirectDashboard,
-        redirectLogin,
-      } = this.props;
+      const { isAuthenticated, isInstalled, redirectDashboard, redirectLogin } =
+        this.props;
       if (isInstalled) {
         if (isAuthenticated) {
           redirectDashboard();
@@ -28,12 +24,12 @@ export default function RequireInstall(ComposedComponent) {
     }
   }
 
-  const mapStateToProps = (state) => ({
+  const mapStateToProps = state => ({
     isAuthenticated: state.auth.loggedIn,
     isInstalled: state.auth.installed,
   });
 
-  const mapDispatchToProps = (dispatch) =>
+  const mapDispatchToProps = dispatch =>
     bindActionCreators(
       {
         redirectDashboard: () => push('/'),

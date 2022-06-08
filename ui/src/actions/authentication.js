@@ -6,7 +6,7 @@ export const login = (username, password) =>
     doLogin(
       username,
       password,
-      (data) => {
+      data => {
         // mark interface as logged in.
         dispatch({
           type: 'LOGIN',
@@ -17,7 +17,7 @@ export const login = (username, password) =>
         });
         dispatch(push('/'));
       },
-      (error) => {
+      error => {
         dispatch({
           type: 'LOGIN_FAILED',
           error: error.message,
@@ -29,14 +29,14 @@ export const login = (username, password) =>
 export const checkIfInstalled = () =>
   function dispatcher(dispatch) {
     doCheckIfInstalled(
-      (data) => {
+      data => {
         // Todo..
         dispatch({
           type: 'INSTALLED',
           installed: data,
         });
       },
-      (error) => {
+      error => {
         // Todo..
         dispatch({
           type: 'INSTALLED_ERROR',
