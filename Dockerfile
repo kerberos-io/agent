@@ -1,4 +1,4 @@
-FROM kerberos/debian-opencv-ffmpeg:1.0.0 AS builder
+FROM kerberos/debian-opencv-ffmpeg:1.0.2309512445 AS builder
 MAINTAINER Kerberos.io
 
 ENV GOROOT=/usr/local/go
@@ -9,9 +9,9 @@ ENV GOSUMDB=off
 ##############################################################################
 # Copy all the relevant source code in the Docker image, so we can build this.
 
-RUN mkdir -p /go/src/github.com/kerberos-io/opensource
-COPY machinery /go/src/github.com/kerberos-io/opensource/machinery
-COPY web /go/src/github.com/kerberos-io/opensource/web
+RUN mkdir -p /go/src/github.com/kerberos-io/agent
+COPY machinery /go/src/github.com/kerberos-io/agent/machinery
+COPY web /go/src/github.com/kerberos-io/agent/web
 
 ########################
 # Download NPM and Yarns
@@ -24,24 +24,24 @@ RUN apt-get update && apt-get install -y curl && curl -sL https://deb.nodesource
 ###########
 # Build Web
 
-RUN cd /go/src/github.com/kerberos-io/opensource/web && \
+RUN cd /go/src/github.com/kerberos-io/agent/web && \
     npm install && yarn build
     # this will move the /build directory to ../machinery/www
 
 ##################
 # Build Machinery
 
-RUN cd /go/src/github.com/kerberos-io/opensource/machinery && \
+RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
    go mod download && \
    go build main.go && \
-	 mkdir -p /opensource && \
-	 mv main /opensource && \
-	 mv www /opensource && \
-	 mkdir -p /opensource/data/cloud && \
-	 mkdir -p /opensource/data/snapshots && \
-	 mkdir -p /opensource/data/log && \
-	 mkdir -p /opensource/data/recordings && \
-	 mkdir -p /opensource/data/config && \
+	 mkdir -p /agent && \
+	 mv main /agent && \
+	 mv www /agent && \
+	 mkdir -p /agent/data/cloud && \
+	 mkdir -p /agent/data/snapshots && \
+	 mkdir -p /agent/data/log && \
+	 mkdir -p /agent/data/recordings && \
+	 mkdir -p /agent/data/config && \
 	 rm -rf /go/src/gitlab.com/
 
  ####################################
@@ -49,12 +49,12 @@ RUN cd /go/src/github.com/kerberos-io/opensource/machinery && \
  # Later, it will be copied as the / (root) of the output image.
 
  WORKDIR /dist
- RUN cp -r /opensource ./
+ RUN cp -r /agent ./
 
  ####################################
  # This will collect dependent libraries so they're later copied to the final image
 
- RUN ldd /opensource/main | tr -s '[:blank:]' '\n' | grep '^/' | \
+ RUN ldd /agent/main | tr -s '[:blank:]' '\n' | grep '^/' | \
      xargs -I % sh -c 'mkdir -p $(dirname ./%); cp % ./%;'
  RUN mkdir -p lib64 && cp /lib64/ld-linux-x86-64.so.2 lib64/
  RUN mkdir -p ./usr/lib
@@ -62,7 +62,7 @@ RUN cd /go/src/github.com/kerberos-io/opensource/machinery && \
  		 cp -r /usr/local/lib/libavformat* ./usr/lib && \
  		 cp -r /usr/local/lib/libswscale* ./usr/lib && \
 		 cp -r /usr/local/lib/libswresample* ./usr/lib
- RUN ldd /opensource/main
+ RUN ldd /agent/main
 
  FROM alpine:latest
 
@@ -85,6 +85,11 @@ RUN cd /go/src/github.com/kerberos-io/opensource/machinery && \
  ADD ./scripts/supervisor.conf /etc/supervisord.conf
  ADD ./scripts/run.sh /run.sh
  RUN chmod 755 /run.sh && chmod +x /run.sh
+
+ # Install Bento4
+RUN cd && wget https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && \
+ unzip Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && rm Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && \
+ cp ~/Bento4-SDK-1-6-0-639.x86_64-unknown-linux/bin/mp4fragment /usr/bin/
 
  ######################################
  # By default the app runs on port 8080
