@@ -1525,10 +1525,10 @@
     "@jridgewell/resolve-uri" "^3.0.3"
     "@jridgewell/sourcemap-codec" "^1.4.10"
 
-"@kerberos-io/ui@1.59.0":
-  version "1.59.0"
-  resolved "https://registry.yarnpkg.com/@kerberos-io/ui/-/ui-1.59.0.tgz#89370dab3c653a785bb3f54d8a017738ab4ef18b"
-  integrity sha512-RqCO2jIHg/nIaJSutKGqwRWIeWopOpIGGk8d4Xec3ESpV5jcLgKhn1O09uqsxlvXD81yL9r1NDOtpKphiWmtGg==
+"@kerberos-io/ui@1.60.0":
+  version "1.60.0"
+  resolved "https://registry.yarnpkg.com/@kerberos-io/ui/-/ui-1.60.0.tgz#36e831859e2a65362e1df3d917a4018c812b607f"
+  integrity sha512-loVX/5GroFA+ZWRIEZ/P7b9QtPoKuZYmxnIazwiBk1aIoddb6U2AHJuAWlRTjaGPFcbdyP1MiP4SSIad8hxKgg==
   dependencies:
     "@svgr/webpack" "^5.5.0"
     "@types/react-router-dom" "^5.1.7"
@@ -4688,6 +4688,11 @@ etag@~1.8.1:
   version "1.8.1"
   resolved "https://registry.yarnpkg.com/etag/-/etag-1.8.1.tgz#41ae2eeb65efa62268aebfea83ac7d79299b0887"
   integrity sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==
+
+eve@~0.5.1:
+  version "0.5.4"
+  resolved "https://registry.yarnpkg.com/eve/-/eve-0.5.4.tgz#67d080b9725291d7e389e34c26860dd97f1debaa"
+  integrity sha512-aqprQ9MAOh1t66PrHxDFmMXPlgNO6Uv1uqvxmwjprQV50jaQ2RqO7O1neY4PJwC+hMnkyMDphu2AQPOPZdjQog==
 
 eventemitter3@^4.0.0:
   version "4.0.7"
@@ -8825,6 +8830,20 @@ slice-ansi@^4.0.0:
     astral-regex "^2.0.0"
     is-fullwidth-code-point "^3.0.0"
 
+snapsvg-cjs@0.0.6:
+  version "0.0.6"
+  resolved "https://registry.yarnpkg.com/snapsvg-cjs/-/snapsvg-cjs-0.0.6.tgz#3b2f56af2573d3d364c3ed5bf8885745f4d2dde1"
+  integrity sha512-7NNvoGrc3BQvWz5rWK1DsD5/Vni4STswz5B3JrBADboQWcN8OBVGjYVJFPT5JkUXb2iVnEflZANhufEpEcTHXw==
+  dependencies:
+    snapsvg "0.5.1"
+
+snapsvg@0.5.1:
+  version "0.5.1"
+  resolved "https://registry.yarnpkg.com/snapsvg/-/snapsvg-0.5.1.tgz#0caf52c79189a290746fc446cc5e863f6bdddfe3"
+  integrity sha512-CjwWYsL7+CCk1vCk9BBKGYS4WJVDfJAOMWU+Zhzf8wf6pAm/xT34wnpaMPAgcgCNkxuU6OkQPPd8wGuRCY9aNw==
+  dependencies:
+    eve "~0.5.1"
+
 sockjs@^0.3.24:
   version "0.3.24"
   resolved "https://registry.yarnpkg.com/sockjs/-/sockjs-0.3.24.tgz#c9bc8995f33a111bea0395ec30aa3206bdb5ccce"
@@ -9598,6 +9617,13 @@ vary@~1.1.2:
   version "1.1.2"
   resolved "https://registry.yarnpkg.com/vary/-/vary-1.1.2.tgz#2299f02c6ded30d4a5961b0b9f74524a18f634fc"
   integrity sha1-IpnwLG3tMNSllhsLn3RSShj2NPw=
+
+vott-ct@^2.3.2:
+  version "2.3.2"
+  resolved "https://registry.yarnpkg.com/vott-ct/-/vott-ct-2.3.2.tgz#b26296068e05578048acee7f7f89c6402663e44f"
+  integrity sha512-58OYwRFmdc12bKVcoCgXo6Uk6vRMEh73bUCjqL4zxJyYa4BAKfL2vh4VHeHCGqmuO8Bj1KbLevSeqgVCuuC3vw==
+  dependencies:
+    snapsvg-cjs "0.0.6"
 
 w3c-hr-time@^1.0.2:
   version "1.0.2"

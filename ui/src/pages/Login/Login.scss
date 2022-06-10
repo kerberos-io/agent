@@ -1,0 +1,45 @@
+@import "../../app.variables";
+
+.login-body {
+  display: flex;
+  justify-content: center;
+  padding: 0 0 size(10) 0;
+
+  .block-generic {
+    .block-header {
+      padding: 5px size(2);
+
+      div {
+        display: flex;
+        height: size(3);
+        align-items: center;
+
+        h4 {
+          margin: 0 0 0 size(1);
+          padding: 0;
+        }
+      }
+
+    }
+
+    .block-body {
+      padding: size(2) size(5) size(3) size(5);
+
+      .generic-input {
+        width: size(26);
+        cursor: auto;
+
+        &:first-child {
+          margin: 0 0 size(1) 0;
+        }
+      }
+    }
+
+    .block-footer {
+      padding: size(1) size(2);
+      min-height: 0;
+
+    }
+  }
+}
+

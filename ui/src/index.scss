@@ -88,6 +88,54 @@
 */
 
 
+@font-face {
+  font-family: 'Inter';
+  font-style:  normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Inter/Inter-Regular.woff2?v=3.18") format("woff2"),
+  url("/fonts/Inter/Inter-Regular.woff?v=3.18") format("woff");
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style:  normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/Inter/Inter-Medium.woff2?v=3.18") format("woff2"),
+  url("/fonts/Inter/Inter-Medium.woff?v=3.18") format("woff");
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style:  normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/Inter/Inter-SemiBold.woff2?v=3.18") format("woff2"),
+  url("/fonts/Inter/Inter-SemiBold.woff?v=3.18") format("woff");
+}
+
+/* -------------------------------------------------------
+Variable font.
+Usage:
+
+  body {
+    font-family: 'Inter', sans-serif; // use regular Inter font by default..
+    @supports (font-variation-settings: normal) {
+      font-family: 'Inter var', sans-serif; // ..but if supported, use variable Inter font instead (all-in-one)
+    }
+  }
+
+
+*/
+@font-face {
+  font-family: 'Inter var';
+  font-weight: 100 900;
+  font-display: swap;
+  font-style: normal;
+  font-named-instance: 'Regular';
+  src: url("/fonts/Inter/Inter-roman.var.woff2?v=3.18") format("woff2");
+}
 
 body {
   box-sizing: border-box;

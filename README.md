@@ -22,7 +22,7 @@
 
 Kerberos Agent is a cutting edge video surveillance management system made available as Open Source under the MIT License. This means that all the source code is available for you or your company, and you can use, transform and distribute the source code; as long you keep a reference of the original license. Kerberos Agent can be used for commercial usage (which was not the case for v2). Read more [about the license here](LICENSE).
 
-![login-ossag](https://user-images.githubusercontent.com/1546779/172066784-4d9cefc6-9599-4d2e-bc65-e1f2862b7409.png)    
+![login-agent](./assets/img/agent-login.png)
     
 ## Work In Progress
 
@@ -84,7 +84,7 @@ The `web` is a **React** project which is the main entry point for an end user t
 
 This will start a webserver and launches the web app on port `3000`.
 
-![signin-to-agent](https://user-images.githubusercontent.com/1546779/111135333-d02d4a00-857c-11eb-8426-e65076ed111c.gif)
+![login-agent](./assets/img/agent-login.gif)
 
 ### Machinery
 

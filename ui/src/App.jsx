@@ -39,14 +39,17 @@ class App extends React.Component {
           <Navigation>
             <NavigationSection title="management" />
             <NavigationGroup>
-              <NavigationItem title="Settings" icon="api" link="settings" />
               <NavigationItem
-                title="Cameras"
-                icon="cameras"
-                link="deployments"
+                title="Dashboard"
+                icon="dashboard"
+                link="dashboard"
               />
-              <NavigationItem title="Nodes" icon="counting" link="nodes" />
-              <NavigationItem title="Pods" icon="counting" link="pods" />
+              <NavigationItem title="Recordings" icon="media" link="media" />
+              <NavigationItem
+                title="Settings"
+                icon="preferences"
+                link="settings"
+              />
             </NavigationGroup>
             <NavigationSection title="help & support" />
             <NavigationGroup>

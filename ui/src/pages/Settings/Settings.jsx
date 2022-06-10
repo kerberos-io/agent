@@ -1,18 +1,14 @@
 import React from 'react';
 import { Breadcrumb } from '@kerberos-io/ui';
 // import { Link } from 'react-router-dom';
-import styles from './Dashboard.scss';
+import styles from './Settings.scss';
 
 // eslint-disable-next-line react/prefer-stateless-function
-class Dashboard extends React.Component {
+class Settings extends React.Component {
   render() {
     return (
       <div className={styles.dashboard}>
-        <Breadcrumb
-          title="Dashboard"
-          level1="Overview of your video surveilance"
-          level1Link=""
-        >
+        <Breadcrumb title="Settings" level1="Onboard your camera" level1Link="">
           {/* <Link to="/deployments">
             <Button
               label="Add Kerberos Agent"
@@ -25,4 +21,4 @@ class Dashboard extends React.Component {
     );
   }
 }
-export default Dashboard;
+export default Settings;

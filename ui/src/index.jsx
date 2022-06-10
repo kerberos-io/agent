@@ -12,9 +12,9 @@ import rootReducer from './reducers';
 import App from './App';
 import './index.scss';
 import Login from './pages/Login/Login';
-import Install from './pages/Install/Install';
 import Dashboard from './pages/Dashboard/Dashboard';
-import RequireInstall from './containers/RequireInstall';
+import Media from './pages/Media/Media';
+import Settings from './pages/Settings/Settings';
 import RequireAuth from './containers/RequireAuth';
 import RequireGuest from './containers/RequireGuest';
 
@@ -58,12 +58,13 @@ ReactDOM.render(
   <Provider store={store}>
     <ConnectedRouter history={history}>
       <Switch>
-        <Route path="/install" component={RequireInstall(Install)} />
         <Route path="/login" component={RequireGuest(Login)} />
         <App>
           <Route exact path="/" component={RequireAuth(Dashboard)} />
           <Route exact path="/dashboard" component={RequireAuth(Dashboard)} />
           <Route exact path="/" render={() => <Redirect to="/dashboard" />} />
+          <Route exact path="/media" component={RequireAuth(Media)} />
+          <Route exact path="/settings" component={RequireAuth(Settings)} />
         </App>
       </Switch>
     </ConnectedRouter>

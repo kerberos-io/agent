@@ -15,7 +15,7 @@ import { withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { login, resetLogin } from '../../actions';
 import config from '../../config';
-import './Login.module.scss';
+import './Login.scss';
 
 class Login extends React.Component {
   constructor() {
@@ -52,7 +52,7 @@ class Login extends React.Component {
       <LandingLayout
         title="Kerberos Agent"
         version={config.VERSION}
-        description="Scale your Kerberos Agents"
+        description="Video surveillance for everyone"
       >
         <section className="login-body">
           <Block>
