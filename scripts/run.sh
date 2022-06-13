@@ -2,8 +2,8 @@
 
 autoremoval() {
   partition=/dev/
-  imagedir=/opensource/data/recordings
-  clouddir=/opensource/data/cloud
+  imagedir=/agent/data/recordings
+  clouddir=/agent/data/cloud
 
   while :
   do
