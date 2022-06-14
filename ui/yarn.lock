@@ -1525,10 +1525,10 @@
     "@jridgewell/resolve-uri" "^3.0.3"
     "@jridgewell/sourcemap-codec" "^1.4.10"
 
-"@kerberos-io/ui@1.60.0":
-  version "1.60.0"
-  resolved "https://registry.yarnpkg.com/@kerberos-io/ui/-/ui-1.60.0.tgz#36e831859e2a65362e1df3d917a4018c812b607f"
-  integrity sha512-loVX/5GroFA+ZWRIEZ/P7b9QtPoKuZYmxnIazwiBk1aIoddb6U2AHJuAWlRTjaGPFcbdyP1MiP4SSIad8hxKgg==
+"@kerberos-io/ui@1.64.0":
+  version "1.64.0"
+  resolved "https://registry.yarnpkg.com/@kerberos-io/ui/-/ui-1.64.0.tgz#a1bfca4fc02d1bddd8def36dd25e1f713904b9a5"
+  integrity sha512-ggFeq9vnolwSAOfsdfZ5LC9RbZNupEhYZHMYTyOtJ6bKzsOKg0ZF4/DvdijancaBhHIA+kSVI6TmLexg9b4fLQ==
   dependencies:
     "@svgr/webpack" "^5.5.0"
     "@types/react-router-dom" "^5.1.7"
@@ -8242,7 +8242,7 @@ react-scripts@^5.0.1:
   optionalDependencies:
     fsevents "^2.3.2"
 
-react-tooltip@4.2.21:
+react-tooltip@4.2.21, react-tooltip@^4.2.21:
   version "4.2.21"
   resolved "https://registry.yarnpkg.com/react-tooltip/-/react-tooltip-4.2.21.tgz#840123ed86cf33d50ddde8ec8813b2960bfded7f"
   integrity sha512-zSLprMymBDowknr0KVDiJ05IjZn9mQhhg4PRsqln0OZtURAJ1snt1xi5daZfagsh6vfsziZrc9pErPTDY1ACig==

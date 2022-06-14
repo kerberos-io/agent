@@ -4,7 +4,7 @@
   "private": false,
   "dependencies": {
     "@giantmachines/redux-websocket": "^1.5.1",
-    "@kerberos-io/ui": "1.60.0",
+    "@kerberos-io/ui": "1.64.0",
     "@material-ui/core": "^4.11.2",
     "@testing-library/jest-dom": "^5.11.4",
     "@testing-library/react": "^11.1.0",
@@ -26,6 +26,7 @@
     "react-router-dom": "^5.2.0",
     "react-router-redux": "^4.0.8",
     "react-scripts": "^5.0.1",
+    "react-tooltip": "^4.2.21",
     "redux": "^4.0.5",
     "redux-devtools-extension": "^2.13.8",
     "redux-thunk": "^2.3.0",
