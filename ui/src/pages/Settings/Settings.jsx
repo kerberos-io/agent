@@ -307,20 +307,6 @@ class Settings extends React.Component {
       }
     }
 
-    console.log(loading);
-    console.log(verifyPersistenceMessage);
-    console.log(verifyPersistenceError);
-    console.log(verifyPersistenceSuccess);
-    console.log(persistenceError);
-    console.log(persistenceSuccess);
-    console.log(verifyHubSuccess);
-    console.log(stunturnError);
-    console.log(stunturnSuccess);
-    console.log(mqttError);
-    console.log(mqttSuccess);
-    console.log(generalError);
-    console.log(generalSuccess);
-
     return (
       <div id="settings">
         <Breadcrumb
@@ -686,13 +672,13 @@ class Settings extends React.Component {
                   <h4>Kerberos Hub</h4>
                 </BlockHeader>
                 <BlockBody>
-                  {false && (
+                  {loadingHub && (
                     <InfoBar
                       type="loading"
                       message="Verifying your Kerberos Hub settings."
                     />
                   )}
-                  {false && (
+                  {verifyHubSuccess && (
                     <InfoBar
                       type="success"
                       message="Kerberos Hub settings are successfully verified."
