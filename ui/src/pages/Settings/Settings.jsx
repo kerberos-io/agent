@@ -9,10 +9,13 @@ import {
   BlockBody,
   BlockFooter,
   InfoBar,
-  InfoBox,
   Dropdown,
+  Tabs,
+  Tab,
+  Icon,
+  Toggle,
 } from '@kerberos-io/ui';
-// import { Link } from 'react-router-dom';
+import ImageCanvas from '../../components/ImageCanvas/ImageCanvas';
 import './Settings.scss';
 import timezones from './timezones';
 
@@ -26,10 +29,19 @@ class Settings extends React.Component {
     super();
     this.state = {
       search: '',
+      custom: {
+        s3: {},
+        kstorage: {},
+        capture: {
+          ipcamera: {},
+        },
+      },
+
       global: {
         s3: {},
         kstorage: {},
       },
+      selectedTab: 'overview',
       mqttSuccess: false,
       mqttError: false,
       stunturnSuccess: false,
@@ -102,6 +114,30 @@ class Settings extends React.Component {
     this.savePersistenceSettings = this.savePersistenceSettings.bind(this);
     this.verifyPersistenceSettings = this.verifyPersistenceSettings.bind(this);
     this.verifyHubSettings = this.verifyHubSettings.bind(this);
+    this.changeTab = this.changeTab.bind(this);
+    this.calculateTimetable = this.calculateTimetable.bind(this);
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    // const { service, container } = this.props;
+    const { open } = this.state;
+    if (prevState.open !== open && open) {
+      // this.props.dispatchGetConfig(service);
+      // Cache the current timetable
+      // const { custom } = container;
+      // this.calculateTimetable(custom.timetable);
+    }
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener('keydown', this.escFunction, false);
+    clearInterval(this.interval);
+  }
+
+  changeTab(tab) {
+    this.setState({
+      selectedTab: tab,
+    });
   }
 
   changeValue() {
@@ -156,9 +192,23 @@ class Settings extends React.Component {
     console.log(this);
   }
 
+  calculateTimetable(timetable) {
+    this.timetable = timetable;
+    for (let i = 0; i < timetable.length; i += 1) {
+      const time = timetable[i];
+      const { start1, start2, end1, end2 } = time;
+      this.timetable[i].start1Full = this.convertSecondsToHourMinute(start1);
+      this.timetable[i].start2Full = this.convertSecondsToHourMinute(start2);
+      this.timetable[i].end1Full = this.convertSecondsToHourMinute(end1);
+      this.timetable[i].end2Full = this.convertSecondsToHourMinute(end2);
+    }
+  }
+
   render() {
     const {
+      selectedTab,
       search,
+      custom,
       global,
       generalSuccess,
       generalError,
@@ -180,12 +230,44 @@ class Settings extends React.Component {
       loadingHub,
     } = this.state;
 
+    const snapshot = 'data:image/png;base64,';
     // Determine which section(s) to be shown, depending on the searching criteria.
-    let showGeneralSection = true;
-    let showMQTTSection = true;
-    let showSTUNTURNSection = true;
-    let showKerberosHubSection = true;
-    let showPersistenceSection = true;
+    let showOverviewSection = false;
+    let showRecordingSection = false;
+    let showCameraSection = false;
+    let showStreamingSection = false;
+    let showConditionsHubSection = false;
+    let showPersistenceSection = false;
+
+    switch (selectedTab) {
+      case 'all':
+        showOverviewSection = true;
+        showCameraSection = true;
+        showRecordingSection = true;
+        showStreamingSection = true;
+        showConditionsHubSection = true;
+        showPersistenceSection = true;
+        break;
+      case 'overview':
+        showOverviewSection = true;
+        break;
+      case 'camera':
+        showCameraSection = true;
+        break;
+      case 'recording':
+        showRecordingSection = true;
+        break;
+      case 'streaming':
+        showStreamingSection = true;
+        break;
+      case 'conditions':
+        showConditionsHubSection = true;
+        break;
+      case 'persistence':
+        showPersistenceSection = true;
+        break;
+      default:
+    }
 
     if (search !== '' && search !== null) {
       if (this.tags) {
@@ -201,17 +283,20 @@ class Settings extends React.Component {
           });
 
           switch (section) {
-            case 'general':
-              showGeneralSection = match;
+            case 'overview':
+              showOverviewSection = match;
               break;
-            case 'mqtt':
-              showMQTTSection = match;
+            case 'camera':
+              showCameraSection = match;
               break;
-            case 'stun-turn':
-              showSTUNTURNSection = match;
+            case 'recording':
+              showRecordingSection = match;
               break;
-            case 'kerberos-hub':
-              showKerberosHubSection = match;
+            case 'streaming':
+              showStreamingSection = match;
+              break;
+            case 'conditions':
+              showConditionsHubSection = match;
               break;
             case 'persistence':
               showPersistenceSection = match;
@@ -222,10 +307,6 @@ class Settings extends React.Component {
       }
     }
 
-    console.log(showGeneralSection);
-    console.log(showPersistenceSection);
-    console.log(showSTUNTURNSection);
-    console.log(showMQTTSection);
     console.log(loading);
     console.log(verifyPersistenceMessage);
     console.log(verifyPersistenceError);
@@ -247,90 +328,299 @@ class Settings extends React.Component {
           level1="Onboard your camera"
           level1Link=""
         />
-
-        <ControlBar>
-          <Input
-            iconleft="search"
-            onChange={() => {}}
-            placeholder="Search settings..."
-            layout="controlbar"
-            type="text"
-          />
+        <ControlBar type="row">
+          <Tabs>
+            <Tab
+              label="All"
+              value="all"
+              active={selectedTab === 'all'}
+              onClick={() => this.changeTab('all')}
+              icon={<Icon label="list" />}
+            />
+            <Tab
+              label="Overview"
+              value="overview"
+              active={selectedTab === 'overview'}
+              onClick={() => this.changeTab('overview')}
+              icon={<Icon label="dashboard" />}
+            />
+            <Tab
+              label="Camera"
+              value="camera"
+              active={selectedTab === 'camera'}
+              onClick={() => this.changeTab('camera')}
+              icon={<Icon label="cameras" />}
+            />
+            <Tab
+              label="Recording"
+              value="recording"
+              active={selectedTab === 'recording'}
+              onClick={() => this.changeTab('recording')}
+              icon={<Icon label="refresh" />}
+            />
+            <Tab
+              label="Streaming"
+              value="streaming"
+              active={selectedTab === 'streaming'}
+              onClick={() => this.changeTab('streaming')}
+              icon={<Icon label="livestream" />}
+            />
+            <Tab
+              label="Conditions"
+              value="conditions"
+              active={selectedTab === 'conditions'}
+              onClick={() => this.changeTab('conditions')}
+              icon={<Icon label="activity" />}
+            />
+            <Tab
+              label="Persistence"
+              value="persistence"
+              active={selectedTab === 'persistence'}
+              onClick={() => this.changeTab('persistence')}
+              icon={<Icon label="cloud" />}
+            />
+          </Tabs>
         </ControlBar>
-
-        <div className="info">
-          <InfoBox
-            image="info-surveillance"
-            title="Settings"
-            description="Configure the Kerberos Agent as you wish. Specify the type of camera, region of interest, cloud storage and much more."
-          />
-        </div>
 
         <div className="stats grid-container --two-columns">
           <div>
-            {showMQTTSection && (
+            {/* General settings block */}
+            {showOverviewSection && (
               <Block>
                 <BlockHeader>
-                  <h4>MQTT</h4>
+                  <h4>General</h4>
                 </BlockHeader>
                 <BlockBody>
-                  {mqttSuccess && (
+                  {generalSuccess && (
                     <InfoBar
                       type="success"
-                      message="MQTT settings are successfully saved."
+                      message="General settings are successfully saved."
                     />
                   )}
-                  {mqttError && (
+                  {generalError && (
                     <InfoBar
                       type="alert"
                       message="Something went wrong while saving."
                     />
                   )}
                   <p>
-                    A MQTT broker is used to communicate from{' '}
-                    <a
-                      href="https://doc.kerberos.io/hub/first-things-first/"
-                      rel="noopener noreferrer"
-                      target="_blank"
-                    >
-                      Kerberos Hub
-                    </a>{' '}
-                    to the Kerberos Agent, to achieve for example livestreaming
-                    or ONVIF (PTZ) capabilities.
+                    General settings allow you to configure your Kerberos Agents
+                    on a higher level.
+                  </p>
+                  <Input label="key" disabled value={custom.key} />
+
+                  <Input label="camera name" value={custom.name} />
+
+                  <Dropdown
+                    isRadio
+                    label="Timezone"
+                    placeholder="Select a timezone"
+                    items={this.timezones}
+                    selected={[global.timezone]}
+                    shorten
+                    shortenType="end"
+                    shortenMaxLength={35}
+                    onChange={this.changeTimezone}
+                  />
+                </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label="Save"
+                    type="default"
+                    icon="pencil"
+                    onClick={this.saveGeneralSettings}
+                  />
+                </BlockFooter>
+              </Block>
+            )}
+
+            {/* General settings block */}
+            {showCameraSection && (
+              <Block>
+                <BlockHeader>
+                  <h4>Camera</h4>
+                </BlockHeader>
+                <BlockBody>
+                  {generalSuccess && (
+                    <InfoBar
+                      type="success"
+                      message="General settings are successfully saved."
+                    />
+                  )}
+                  {generalError && (
+                    <InfoBar
+                      type="alert"
+                      message="Something went wrong while saving."
+                    />
+                  )}
+                  <p>
+                    General settings allow you to configure your Kerberos Agents
+                    on a higher level.
                   </p>
                   <Input
-                    label="Broker Uri"
-                    value={global.mqtturi}
-                    onChange={(value) => this.changeValue('mqtturi', value)}
-                  />
-                  <Input
-                    label="Username"
-                    value={global.mqtt_username}
+                    label="RTSP URL"
+                    value={custom.capture.ipcamera.rtsp}
+                    placeholder="The IP camera address"
                     onChange={(value) =>
-                      this.changeValue('mqtt_username', value)
+                      this.onUpdateField(
+                        'capture.ipcamera',
+                        'rtsp',
+                        value,
+                        custom.capture.ipcamera
+                      )
                     }
                   />
+
                   <Input
-                    label="Password"
-                    value={global.mqtt_password}
+                    label="onvif xaddr"
+                    value={custom.capture.ipcamera.onvif_xaddr}
+                    placeholder="http://x.x.x.x/onvif/device_service"
                     onChange={(value) =>
-                      this.changeValue('mqtt_password', value)
+                      this.onUpdateField(
+                        'capture.ipcamera',
+                        'onvif_xaddr',
+                        value,
+                        custom.capture.ipcamera
+                      )
+                    }
+                  />
+
+                  <Input
+                    label="username"
+                    value={custom.capture.ipcamera.onvif_username}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'capture.ipcamera',
+                        'onvif_username',
+                        value,
+                        custom.capture.ipcamera
+                      )
+                    }
+                  />
+
+                  <Input
+                    label="password"
+                    value={custom.capture.ipcamera.onvif_password}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'capture.ipcamera',
+                        'onvif_password',
+                        value,
+                        custom.capture.ipcamera
+                      )
+                    }
+                  />
+
+                  <hr />
+                </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label="Save"
+                    type="default"
+                    icon="pencil"
+                    onClick={this.saveGeneralSettings}
+                  />
+                </BlockFooter>
+              </Block>
+            )}
+
+            {/* General settings block */}
+            {showRecordingSection && (
+              <Block>
+                <BlockHeader>
+                  <h4>Recording</h4>
+                </BlockHeader>
+                <BlockBody>
+                  {generalSuccess && (
+                    <InfoBar
+                      type="success"
+                      message="General settings are successfully saved."
+                    />
+                  )}
+                  {generalError && (
+                    <InfoBar
+                      type="alert"
+                      message="Something went wrong while saving."
+                    />
+                  )}
+                  <p>
+                    General settings allow you to configure your Kerberos Agents
+                    on a higher level.
+                  </p>
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={custom.capture.continuous === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle(
+                          'capture',
+                          'continuous',
+                          event,
+                          custom.capture
+                        )
+                      }
+                    />
+                    <div>
+                      <span>Continuous recording</span>
+                      <p>Make 24/7 or motion based recordings.</p>
+                    </div>
+                  </div>
+
+                  <Input
+                    label="video duration (seconds)"
+                    value={custom.capture.maxlengthrecording}
+                    placeholder="The maximum duration of a recording."
+                    onChange={(value) =>
+                      this.onUpdateNumberField(
+                        'capture',
+                        'maxlengthrecording',
+                        value,
+                        custom.capture
+                      )
+                    }
+                  />
+
+                  <Input
+                    label="pre recording (seconds)"
+                    value={custom.capture.prerecording}
+                    placeholder="Seconds before an event occurred."
+                    onChange={(value) =>
+                      this.onUpdateNumberField(
+                        'capture',
+                        'prerecording',
+                        value,
+                        custom.capture
+                      )
+                    }
+                  />
+
+                  <Input
+                    label="post recording (seconds)"
+                    value={custom.capture.postrecording}
+                    placeholder="Seconds after an event occurred."
+                    onChange={(value) =>
+                      this.onUpdateNumberField(
+                        'capture',
+                        'postrecording',
+                        value,
+                        custom.capture
+                      )
                     }
                   />
                 </BlockBody>
                 <BlockFooter>
                   <Button
                     label="Save"
-                    onClick={this.saveMQTTSettings}
                     type="default"
                     icon="pencil"
+                    onClick={this.saveGeneralSettings}
                   />
                 </BlockFooter>
               </Block>
             )}
 
             {/* STUN/TURN block */}
-            {showSTUNTURNSection && (
+            {showStreamingSection && (
               <Block>
                 <BlockHeader>
                   <h4>STUN/TURN for WebRTC</h4>
@@ -389,10 +679,8 @@ class Settings extends React.Component {
                 </BlockFooter>
               </Block>
             )}
-          </div>
 
-          <div>
-            {showKerberosHubSection && (
+            {showPersistenceSection && (
               <Block>
                 <BlockHeader>
                   <h4>Kerberos Hub</h4>
@@ -480,6 +768,699 @@ class Settings extends React.Component {
                     icon="pencil"
                   />
                 </BlockFooter>
+              </Block>
+            )}
+
+            {/* Conditions block */}
+            {showConditionsHubSection && (
+              <Block>
+                <BlockHeader>
+                  <h4>Region Of Interest</h4>
+                </BlockHeader>
+                <BlockBody>
+                  <p>
+                    By defining one or more regions, motion will be tracked only
+                    in the regions you have defined.
+                  </p>
+                  {custom.region && (
+                    <ImageCanvas
+                      image={snapshot}
+                      polygons={custom.region.polygon}
+                      rendered={false}
+                      onAddRegion={this.onAddRegion}
+                      onUpdateRegion={this.onUpdateRegion}
+                      onDeleteRegion={this.onDeleteRegion}
+                    />
+                  )}
+                </BlockBody>
+              </Block>
+            )}
+          </div>
+
+          <div>
+            {showOverviewSection && (
+              <Block>
+                <BlockHeader>
+                  <h4>MQTT</h4>
+                </BlockHeader>
+                <BlockBody>
+                  {mqttSuccess && (
+                    <InfoBar
+                      type="success"
+                      message="MQTT settings are successfully saved."
+                    />
+                  )}
+                  {mqttError && (
+                    <InfoBar
+                      type="alert"
+                      message="Something went wrong while saving."
+                    />
+                  )}
+                  <p>
+                    A MQTT broker is used to communicate from{' '}
+                    <a
+                      href="https://doc.kerberos.io/hub/first-things-first/"
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      Kerberos Hub
+                    </a>{' '}
+                    to the Kerberos Agent, to achieve for example livestreaming
+                    or ONVIF (PTZ) capabilities.
+                  </p>
+                  <Input
+                    label="Broker Uri"
+                    value={global.mqtturi}
+                    onChange={(value) => this.changeValue('mqtturi', value)}
+                  />
+                  <Input
+                    label="Username"
+                    value={global.mqtt_username}
+                    onChange={(value) =>
+                      this.changeValue('mqtt_username', value)
+                    }
+                  />
+                  <Input
+                    label="Password"
+                    value={global.mqtt_password}
+                    onChange={(value) =>
+                      this.changeValue('mqtt_password', value)
+                    }
+                  />
+                </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label="Save"
+                    onClick={this.saveMQTTSettings}
+                    type="default"
+                    icon="pencil"
+                  />
+                </BlockFooter>
+              </Block>
+            )}
+
+            {/* STUN/TURN block */}
+            {showStreamingSection && (
+              <Block>
+                <BlockHeader>
+                  <h4>Forwarding and transcoding</h4>
+                </BlockHeader>
+                <BlockBody>
+                  {stunturnSuccess && (
+                    <InfoBar
+                      type="success"
+                      message="STUN/TURN settings are successfully saved."
+                    />
+                  )}
+                  {stunturnError && (
+                    <InfoBar
+                      type="alert"
+                      message="Something went wrong while saving."
+                    />
+                  )}
+
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={custom.capture.forwardwebrtc === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle(
+                          'capture',
+                          'forwardwebrtc',
+                          event,
+                          custom.capture
+                        )
+                      }
+                    />
+                    <div>
+                      <span>Forwarding to WebRTC broker</span>
+                      <p>Forward h264 stream through MQTT</p>
+                    </div>
+                  </div>
+
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={custom.capture.transcodingwebrtc === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle(
+                          'capture',
+                          'transcodingwebrtc',
+                          event,
+                          custom.capture
+                        )
+                      }
+                    />
+                    <div>
+                      <span>Transcode stream</span>
+                      <p>Convert stream to a lower resolution</p>
+                    </div>
+                  </div>
+
+                  <Input
+                    label="Downscale resolution (in % or original resolution)"
+                    value={custom.capture.transcodingresolution}
+                    placeholder="The % of the original resolution."
+                    onChange={(value) =>
+                      this.onUpdateNumberField(
+                        'capture',
+                        'transcodingresolution',
+                        value,
+                        custom.capture
+                      )
+                    }
+                  />
+                </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label="Save"
+                    onClick={this.saveSTUNTURNSettings}
+                    type="default"
+                    icon="pencil"
+                  />
+                </BlockFooter>
+              </Block>
+            )}
+
+            {/* General settings block */}
+            {showRecordingSection && (
+              <Block>
+                <BlockHeader>
+                  <h4>Fragmented recordings</h4>
+                </BlockHeader>
+                <BlockBody>
+                  {generalSuccess && (
+                    <InfoBar
+                      type="success"
+                      message="General settings are successfully saved."
+                    />
+                  )}
+                  {generalError && (
+                    <InfoBar
+                      type="alert"
+                      message="Something went wrong while saving."
+                    />
+                  )}
+
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={custom.capture.fragmented === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle(
+                          'capture',
+                          'fragmented',
+                          event,
+                          custom.capture
+                        )
+                      }
+                    />
+                    <div>
+                      <span>Enable fragmentation</span>
+                      <p>
+                        Recordings can be be made fragmented. This is required
+                        for HLS.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Input
+                    label="fragmented duration"
+                    value={custom.capture.fragmentedduration}
+                    placeholder="Duration of a single fragment."
+                    onChange={(value) =>
+                      this.onUpdateNumberField(
+                        'capture',
+                        'fragmentedduration',
+                        value,
+                        custom.capture
+                      )
+                    }
+                  />
+                </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label="Save"
+                    type="default"
+                    icon="pencil"
+                    onClick={this.saveGeneralSettings}
+                  />
+                </BlockFooter>
+              </Block>
+            )}
+
+            {/* Conditions block */}
+            {showConditionsHubSection && (
+              <Block>
+                <BlockHeader>
+                  <h4>Time Of Interest</h4>
+                </BlockHeader>
+                <BlockBody>
+                  <div className="grid-2">
+                    {this.timetable && this.timetable.length > 0 && (
+                      <div>
+                        <h3>Time Of Interest</h3>
+                        <p>
+                          Only make recordings between specific time intervals
+                          (based on Timezone).
+                        </p>
+
+                        <div className="toggle-wrapper">
+                          <Toggle
+                            on={custom.time === 'true'}
+                            disabled={false}
+                            onClick={(event) =>
+                              this.onUpdateToggle('', 'time', event, custom)
+                            }
+                          />
+                          <div>
+                            <span>Enabled</span>
+                            <p>If enabled you can specify time windows.</p>
+                          </div>
+                        </div>
+
+                        <span className="time-of-interest">Sunday</span>
+                        <div className="grid-4">
+                          <Input
+                            placeholder="00:00"
+                            value={this.timetable[0].start1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                0,
+                                'start1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:00"
+                            value={this.timetable[0].end1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                0,
+                                'end1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:01"
+                            value={this.timetable[0].start2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                0,
+                                'start2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="23:59"
+                            value={this.timetable[0].end2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                0,
+                                'end2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                        </div>
+
+                        <span className="time-of-interest">Monday</span>
+                        <div className="grid-4">
+                          <Input
+                            placeholder="00:00"
+                            value={this.timetable[1].start1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                1,
+                                'start1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:00"
+                            value={this.timetable[1].end1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                1,
+                                'end1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:01"
+                            value={this.timetable[1].start2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                1,
+                                'start2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="23:59"
+                            value={this.timetable[1].end2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                1,
+                                'end2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                        </div>
+
+                        <span className="time-of-interest">Tuesday</span>
+                        <div className="grid-4">
+                          <Input
+                            placeholder="00:00"
+                            value={this.timetable[2].start1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                2,
+                                'start1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:00"
+                            value={this.timetable[2].end1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                2,
+                                'end1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:01"
+                            value={this.timetable[2].start2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                2,
+                                'start2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="23:59"
+                            value={this.timetable[2].end2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                2,
+                                'end2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                        </div>
+
+                        <span className="time-of-interest">Wednesday</span>
+                        <div className="grid-4">
+                          <Input
+                            placeholder="00:00"
+                            value={this.timetable[3].start1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                3,
+                                'start1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:00"
+                            value={this.timetable[3].end1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                3,
+                                'end1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:01"
+                            value={this.timetable[3].start2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                3,
+                                'start2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="23:59"
+                            value={this.timetable[3].end2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                3,
+                                'end2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                        </div>
+
+                        <span className="time-of-interest">Thursday</span>
+                        <div className="grid-4">
+                          <Input
+                            placeholder="00:00"
+                            value={this.timetable[4].start1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                4,
+                                'start1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:00"
+                            value={this.timetable[4].end1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                4,
+                                'end1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:01"
+                            value={this.timetable[4].start2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                4,
+                                'start2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="23:59"
+                            value={this.timetable[4].end2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                4,
+                                'end2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                        </div>
+
+                        <span className="time-of-interest">Friday</span>
+                        <div className="grid-4">
+                          <Input
+                            placeholder="00:00"
+                            value={this.timetable[5].start1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                5,
+                                'start1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:00"
+                            value={this.timetable[5].end1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                5,
+                                'end1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:01"
+                            value={this.timetable[5].start2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                5,
+                                'start2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="23:59"
+                            value={this.timetable[5].end2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                5,
+                                'end2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                        </div>
+
+                        <span className="time-of-interest">Saturday</span>
+                        <div className="grid-4">
+                          <Input
+                            placeholder="00:00"
+                            value={this.timetable[6].start1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                6,
+                                'start1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:00"
+                            value={this.timetable[6].end1Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                6,
+                                'end1',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="12:01"
+                            value={this.timetable[6].start2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                6,
+                                'start2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                          <Input
+                            placeholder="23:59"
+                            value={this.timetable[6].end2Full}
+                            onChange={(event) => {
+                              this.onUpdateTimeline(
+                                'timetable',
+                                6,
+                                'end2',
+                                event,
+                                custom.timetable
+                              );
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </BlockBody>
+              </Block>
+            )}
+
+            {/* Conditions block */}
+            {showConditionsHubSection && (
+              <Block>
+                <BlockHeader>
+                  <h4>External Condition</h4>
+                </BlockHeader>
+                <BlockBody>
+                  <p>
+                    Depending on an external webservice recording can be enabled
+                    or disabled.
+                  </p>
+                  <Input
+                    label="Condition URI"
+                    value={custom.condition_uri}
+                    placeholder={
+                      global.condition_uri
+                        ? global.condition_uri
+                        : 'The API for conditional recording (GET request).'
+                    }
+                    onChange={(value) =>
+                      this.onUpdateField('', 'condition_uri', value, custom)
+                    }
+                  />
+                </BlockBody>
               </Block>
             )}
 

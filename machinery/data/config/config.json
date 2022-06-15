@@ -9,11 +9,11 @@
 			"fps": ""
 		},
 		"usbcamera": {
-			"rtsp": "",
+			"device": "",
 			"fps": ""
 		},
 		"raspicamera": {
-			"rtsp": "",
+			"device": "",
 			"fps": ""
 		},
 		"continuous": "false",

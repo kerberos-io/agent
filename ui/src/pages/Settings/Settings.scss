@@ -1,5 +1,16 @@
 #settings {
-    .generic-input, .dropdown-wrapper {
+    .tab.active {
+        box-shadow: 0 3px var(--oss) inset;
+    }
+    .control-bar .tab.active {
+        background: hsla(var(--oss-hsl), 0.1);
+        color: var(--oss);
+    }
+
+    h3, hr {
+        width: 100%;
+    }
+    .generic-input, .dropdown-wrapper, p {
         width: 100%;
     }
     .block-generic {
@@ -14,5 +25,20 @@
     }
     .block-footer .button:first-child {
         margin-right: 6px;
+    }
+    .toggle-wrapper {
+        display: flex;
+        align-items: center;
+        justify-items: flex-start;
+        padding: 9px 0 18px;
+        width: 100%;
+
+        p {
+            margin: 0;
+        }
+
+        .toggle {
+            margin-right: 20px;
+        }        
     }
 }

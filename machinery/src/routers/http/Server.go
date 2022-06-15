@@ -59,6 +59,8 @@ func StartServer(name string, port string) {
 	// Add static routes to UI
 	r.Use(static.Serve("/", static.LocalFile("./www", true)))
 	r.Use(static.Serve("/dashboard", static.LocalFile("./www", true)))
+	r.Use(static.Serve("/media", static.LocalFile("./www", true)))
+	r.Use(static.Serve("/settings", static.LocalFile("./www", true)))
 	r.Use(static.Serve("/login", static.LocalFile("./www", true)))
 
 	// Run the api on port

@@ -1,0 +1,46 @@
+
+#controls div {
+    margin: 20px 0;
+}
+
+#canvasToolsDiv {
+    display: grid;
+    height: 300px;
+    grid-template-columns: 64px 1fr;
+    grid-template-rows: 100%;
+    margin:0;
+    background: rgb(64,64,64);
+}
+
+#toolbarDiv {
+    grid-row: 1;
+    grid-column: 1/2;
+    z-index: 10;
+}
+
+#toolbarDiv svg {
+    width: 64px;
+    height: 100%;
+    margin-right:5px;
+    background: #666;
+    box-shadow: 0 0 0.5px #999, 5px 0px 10px -5px rgb(0,0,0);
+}
+
+#selectionDiv {
+    grid-row: 1;
+    grid-column: 2/3;
+    justify-self: center;
+    align-self: center;
+    margin: 5px;
+    width: calc(100% - 10px);
+    height: calc(100% - 10px);
+    background: rgb(64,64,64);
+}
+
+#editorDiv svg {
+    box-shadow: 0px 0px 0.25px #999, 0px 0px 10px rgb(0,0,0);
+}
+
+.react-swipeable-view-container .MuiBox-root {
+  padding: 0 !important;
+}
