@@ -141,55 +141,55 @@ class Settings extends React.Component {
   }
 
   changeValue() {
-    console.log(this);
+    // console.log(this);
   }
 
   changeVaultValue() {
-    console.log(this);
+    // console.log(this);
   }
 
   changeS3Value() {
-    console.log(this);
+    // console.log(this);
   }
 
   changeStorageType() {
-    console.log(this);
+    // console.log(this);
   }
 
   changeTimezone() {
-    console.log(this);
+    // console.log(this);
   }
 
   filterSettings() {
-    console.log(this);
+    // console.log(this);
   }
 
   saveGeneralSettings() {
-    console.log(this);
+    // console.log(this);
   }
 
   saveSTUNTURNSettings() {
-    console.log(this);
+    // console.log(this);
   }
 
   saveMQTTSettings() {
-    console.log(this);
+    // console.log(this);
   }
 
   saveHubSettings() {
-    console.log(this);
+    // console.log(this);
   }
 
   savePersistenceSettings() {
-    console.log(this);
+    // console.log(this);
   }
 
   verifyPersistenceSettings() {
-    console.log(this);
+    // console.log(this);
   }
 
   verifyHubSettings() {
-    console.log(this);
+    // console.log(this);
   }
 
   calculateTimetable(timetable) {

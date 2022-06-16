@@ -17,6 +17,7 @@
   },
   "plugins": ["react"],
   "rules": {
+    "class-methods-use-this": "off",
     "jsx-a11y/label-has-associated-control": [
       "error",
       {
