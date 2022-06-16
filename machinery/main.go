@@ -10,8 +10,8 @@ import (
 )
 
 var log = components.Logging{
-	"logrus",
-	"warning",
+	Logger: "logrus",
+	Level:  "warning",
 }
 
 func main() {
