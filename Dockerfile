@@ -112,4 +112,4 @@ EXPOSE 8080
 HEALTHCHECK CMD curl --fail http://localhost:8080 || exit 1   
 
 WORKDIR /
-CMD ["sh", "run.sh"]
+CMD ["/agent/main", "run", "opensource", "8080"]
