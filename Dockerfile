@@ -70,7 +70,6 @@ FROM alpine:latest
 # Protect by non-root user.
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
 
 #################################
 # Copy files from previous images
@@ -80,8 +79,8 @@ COPY --chown=0:0 --from=builder /usr/local/go/lib/time/zoneinfo.zip /zoneinfo.zi
 
 ENV ZONEINFO=/zoneinfo.zip
 
-RUN apk update && apk add ca-certificates && \
-	apk add --no-cache tzdata && rm -rf /var/cache/apk/*
+RUN apk update && apk add ca-certificates --no-cache && \
+	apk add tzdata --no-cache && rm -rf /var/cache/apk/*
 
 ####################################
 # ADD supervisor and STARTUP script
@@ -96,6 +95,11 @@ RUN chmod 755 /run.sh && chmod +x /run.sh
 RUN cd && wget https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && \
 	unzip Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && rm Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && \
 	cp ~/Bento4-SDK-1-6-0-639.x86_64-unknown-linux/bin/mp4fragment /usr/bin/
+
+###################
+# Run non-root user
+
+USER appuser
 
 ######################################
 # By default the app runs on port 8080
