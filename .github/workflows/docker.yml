@@ -13,12 +13,17 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Build and push
+    - name: Build
       uses: docker/build-push-action@v3
       with:
-        push: true
+        push: false
         tags: kerberos/agent:beta
     - name: Scan
       uses: Azure/container-scan@v0
       with:
         image-name: kerberos/agent:beta
+    - name: Push
+      uses: docker/build-push-action@v3
+      with:
+        push: true
+        tags: kerberos/agent:beta
