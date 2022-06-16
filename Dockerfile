@@ -111,4 +111,5 @@ EXPOSE 8080
 
 HEALTHCHECK CMD curl --fail http://localhost:8080 || exit 1   
 
-CMD ["sh", "/run.sh"]
+WORKDIR /
+CMD ["sh", "run.sh"]
