@@ -66,7 +66,11 @@ RUN ldd /agent/main
 
 FROM alpine:latest
 
-RUN useradd -d /home/dockle -m -s /bin/bash kerberosio
+############################
+# Protect by non-root user.
+
+RUN mkdir -p /home/kerberosio
+RUN useradd -d /home/kerberosio -m -s /bin/bash kerberosio
 USER kerberosio
 
 #################################
