@@ -3,35 +3,58 @@ package models
 //Config is the highlevel struct which contains all the configuration of
 //your Kerberos Open Source instance.
 type Config struct {
-	Type      string       `json:"type" binding:"required"`
-	Key       string       `json:"key"`
-	Name      string       `json:"name"`
-	Timezone  string       `json:"timezone,omitempty" bson:"timezone,omitempty"`
-	Capture   Capture      `json:"capture"`
-	Timetable []*Timetable `json:"timetable"`
-	Region    *Region      `json:"region"`
-	Cloud     string       `json:"cloud,omitempty" bson:"cloud,omitempty"`
-	KStorage  *KStorage    `json:"kstorage,omitempty" bson:"kstorage,omitempty"`
-	MQTTURI   string       `json:"mqtturi,omitempty" bson:"mqtturi,omitempty"`
+	Type          string       `json:"type" binding:"required"`
+	Key           string       `json:"key"`
+	Name          string       `json:"name"`
+	Timezone      string       `json:"timezone,omitempty" bson:"timezone,omitempty"`
+	Capture       Capture      `json:"capture"`
+	Timetable     []*Timetable `json:"timetable"`
+	Region        *Region      `json:"region"`
+	Cloud         string       `json:"cloud,omitempty" bson:"cloud,omitempty"`
+	S3            *S3          `json:"s3,omitempty" bson:"s3,omitempty"`
+	KStorage      *KStorage    `json:"kstorage,omitempty" bson:"kstorage,omitempty"`
+	MQTTURI       string       `json:"mqtturi,omitempty" bson:"mqtturi,omitempty"`
+	MQTTUsername  string       `json:"mqtt_username,omitempty" bson:"mqtt_username"`
+	MQTTPassword  string       `json:"mqtt_password,omitempty" bson:"mqtt_password"`
+	STUNURI       string       `json:"stunuri,omitempty" bson:"stunuri"`
+	TURNURI       string       `json:"turnuri,omitempty" bson:"turnuri"`
+	TURNUsername  string       `json:"turn_username,omitempty" bson:"turn_username"`
+	TURNPassword  string       `json:"turn_password,omitempty" bson:"turn_password"`
+	HeartbeatURI  string       `json:"heartbeaturi,omitempty" bson:"heartbeaturi"` /*obsolete*/
+	HubURI        string       `json:"hub_uri,omitempty" bson:"hub_uri"`
+	HubKey        string       `json:"hub_key,omitempty" bson:"hub_key"`
+	HubPrivateKey string       `json:"hub_private_key,omitempty" bson:"hub_private_key"`
+	HubSite       string       `json:"hub_site,omitempty" bson:"hub_site"`
+	ConditionURI  string       `json:"condition_uri,omitempty" bson:"condition_uri"`
 }
 
 //Capture defines which camera type (Id) you are using (IP, USB or Raspberry Pi camera),
 //and also contains recording specific parameters.
 type Capture struct {
-	Name               string      `json:"name"`
-	IPCamera           IPCamera    `json:"ipcamera"`
-	USBCamera          USBCamera   `json:"usbcamera"`
-	RaspiCamera        RaspiCamera `json:"raspicamera"`
-	Continuous         string      `json:"continuous,omitempty"`
-	PostRecording      int64       `json:"postrecording"`
-	PreRecording       int         `json:"prerecording"`
-	MaxLengthRecording int64       `json:"maxlengthrecording"`
+	Name                  string      `json:"name"`
+	IPCamera              IPCamera    `json:"ipcamera"`
+	USBCamera             USBCamera   `json:"usbcamera"`
+	RaspiCamera           RaspiCamera `json:"raspicamera"`
+	Continuous            string      `json:"continuous,omitempty"`
+	PostRecording         int64       `json:"postrecording"`
+	PreRecording          int         `json:"prerecording"`
+	MaxLengthRecording    int64       `json:"maxlengthrecording"`
+	TranscodingWebRTC     string      `json:"transcodingwebrtc"`
+	TranscodingResolution int64       `json:"transcodingresolution"`
+	ForwardWebRTC         string      `json:"forwardwebrtc"`
+	Fragmented            string      `json:"fragmented,omitempty" bson:"fragmented,omitempty"`
+	FragmentedDuration    int64       `json:"fragmentedduration,omitempty" bson:"fragmentedduration,omitempty"`
 }
 
 //IPCamera configuration, such as the RTSP url of the IPCamera and the FPS.
+//Also includes ONVIF integration
 type IPCamera struct {
-	RTSP string `json:"rtsp"`
-	FPS  string `json:"fps"`
+	RTSP          string `json:"rtsp"`
+	FPS           string `json:"fps"`
+	ONVIF         bool   `json:"onvif,omitempty" bson:"onvif"`
+	ONVIFXAddr    string `json:"onvif_xaddr,omitempty" bson:"onvif_xaddr"`
+	ONVIFUsername string `json:"onvif_username,omitempty" bson:"onvif_username"`
+	ONVIFPassword string `json:"onvif_password,omitempty" bson:"onvif_password"`
 }
 
 //USBCamera configuration, such as the device path (/dev/video*)
@@ -81,6 +104,17 @@ type Timetable struct {
 	End1   int `json:"end1"`
 	Start2 int `json:"start2"`
 	End2   int `json:"end2"`
+}
+
+//S3 integration
+type S3 struct {
+	Proxy     string `json:"proxy,omitempty" bson:"proxy,omitempty"`
+	ProxyURI  string `json:"proxyuri,omitempty" bson:"proxyuri,omitempty"`
+	Bucket    string `json:"bucket,omitempty" bson:"bucket,omitempty"`
+	Region    string `json:"region,omitempty" bson:"region,omitempty"`
+	Username  string `json:"username,omitempty" bson:"username,omitempty"`
+	Publickey string `json:"publickey,omitempty" bson:"publickey,omitempty"`
+	Secretkey string `json:"secretkey,omitempty" bson:"secretkey,omitempty"`
 }
 
 //KStorage contains the credentials of the Kerberos Storage/Kerberos Cloud instance.

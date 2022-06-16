@@ -7,16 +7,26 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
-func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware) *gin.RouterGroup {
+func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, config *models.Config, customConfig *models.Config, globalConfig *models.Config) *gin.RouterGroup {
 	api := r.Group("/api")
 	{
 		api.POST("/login", authMiddleware.LoginHandler)
 		api.GET("/install", GetInstallation)
 		api.POST("/install", UpdateInstallation)
 
+		api.GET("/config", func(c *gin.Context) {
+			c.JSON(200, gin.H{
+				"config":   config,
+				"custom":   customConfig,
+				"global":   globalConfig,
+				"snapshot": components.GetSnapshot(),
+			})
+		})
+
 		api.Use(authMiddleware.MiddlewareFunc())
 		{
 			// Secured endpoints..
+
 		}
 	}
 	return api

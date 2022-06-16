@@ -10,10 +10,13 @@ require (
 	github.com/gin-contrib/pprof v1.3.0
 	github.com/gin-gonic/contrib v0.0.0-20201101042839-6a891bf89f19
 	github.com/gin-gonic/gin v1.8.1
-	github.com/kerberos-io/opensource/machinery v0.0.0-20220607142132-de5206a631e1
+	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
+	github.com/sirupsen/logrus v1.8.1
 	github.com/swaggo/files v0.0.0-20210815190702-a29dd2bc99b2
 	github.com/swaggo/gin-swagger v1.4.3
 	github.com/swaggo/swag v1.8.2
+	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
 require (

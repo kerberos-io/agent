@@ -2,20 +2,28 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 
+	"github.com/kerberos-io/agent/machinery/src/components"
+	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/routers"
 )
 
+var log = components.Logging{
+	"logrus",
+	"warning",
+}
+
 func main() {
 
-	const VERSION = 3.0
+	const VERSION = "3.0"
 	action := os.Args[1]
+
+	log.Init()
 
 	switch action {
 	case "version":
-		log.Printf("%s: %0.1f\n", "You are currrently running Kerberos Agent", VERSION)
+		log.Info("You are currrently running Kerberos Agent " + VERSION)
 	case "pending-upload":
 		name := os.Args[2]
 		fmt.Println(name)
@@ -26,8 +34,26 @@ func main() {
 		{
 			name := os.Args[2]
 			port := os.Args[3]
+
+			// Read the config on start, and pass it to the other
+			// function and features. Please note that this might be changed
+			// when saving or updating the configuration through the REST api or MQTT handler.
+			var config models.Config
+			var customConfig models.Config
+			var globalConfig models.Config
+
+			// Open this configuration either from Kerberos Agent or Kerberos Factory.
+			components.OpenConfig(name, log, &config, &customConfig, &globalConfig)
+
+			// Start a MQTT listener.
 			routers.StartMqttListener(name)
-			routers.StartWebserver(name, port)
+
+			// Start the REST API.
+			routers.StartWebserver(name, port, &config, &customConfig, &globalConfig)
+
+			// Start the real shizzle: The machinery.
+			// routers.StartMachinery(name, config)
+
 		}
 	default:
 		fmt.Println("Sorry I don't understand :(")

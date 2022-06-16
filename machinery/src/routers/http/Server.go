@@ -10,6 +10,7 @@ import (
 	"log"
 
 	_ "github.com/kerberos-io/agent/machinery/docs"
+	"github.com/kerberos-io/agent/machinery/src/models"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -32,7 +33,7 @@ import (
 // @in header
 // @name Authorization
 
-func StartServer(name string, port string) {
+func StartServer(name string, port string, config *models.Config, customConfig *models.Config, globalConfig *models.Config) {
 
 	// Initialize REST API
 	r := gin.Default()
@@ -54,7 +55,7 @@ func StartServer(name string, port string) {
 	}
 
 	// Add all routes
-	AddRoutes(r, authMiddleware)
+	AddRoutes(r, authMiddleware, config, customConfig, globalConfig)
 
 	// Add static routes to UI
 	r.Use(static.Serve("/", static.LocalFile("./www", true)))
