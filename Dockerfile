@@ -69,9 +69,8 @@ FROM alpine:latest
 ############################
 # Protect by non-root user.
 
-RUN mkdir -p /home/kerberosio
-RUN useradd -d /home/kerberosio -m -s /bin/bash kerberosio
-USER kerberosio
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
 
 #################################
 # Copy files from previous images
