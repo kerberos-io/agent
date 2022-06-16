@@ -17,4 +17,5 @@ export LD_LIBRARY_PATH=/lib:/usr/lib:/usr/local/lib && ldconfig
 
 autoremoval &
 
-/usr/bin/supervisord -n -c /etc/supervisord.conf
+#/usr/bin/supervisord -n -c /etc/supervisord.conf
+/agent/main run opensource 8080
