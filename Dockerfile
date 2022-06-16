@@ -83,15 +83,7 @@ ENV ZONEINFO=/zoneinfo.zip
 RUN apk update && apk add ca-certificates --no-cache && \
 	apk add tzdata --no-cache && apk add curl --no-cache && rm -rf /var/cache/apk/*
 
-####################################
-# ADD supervisor and STARTUP script
-# NOTE: actually this is not needed, as we could simply run a single binary.
-
-RUN apk add supervisor --no-cache && mkdir -p /var/log/supervisor/
-COPY ./scripts/supervisor.conf /etc/supervisord.conf
-COPY ./scripts/run.sh /run.sh
-RUN chmod 755 /run.sh && chmod +x /run.sh
-
+#################
 # Install Bento4
 RUN cd && wget https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && \
 	unzip Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && rm Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && \
