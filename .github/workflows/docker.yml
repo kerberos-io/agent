@@ -2,7 +2,7 @@ name: Docker
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, develop ]
 
 jobs:
   build:
@@ -18,3 +18,7 @@ jobs:
       with:
         push: true
         tags: kerberos/agent:beta
+    - name: Scan
+      uses: Azure/container-scan@v0
+      with:
+        image-name: kerberos/agent:beta
