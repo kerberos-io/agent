@@ -1,5 +1,5 @@
 FROM kerberos/debian-opencv-ffmpeg:1.0.2309512445 AS builder
-MAINTAINER Kerberos.io
+LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
@@ -65,6 +65,9 @@ RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
 RUN ldd /agent/main
 
 FROM alpine:latest
+
+RUN useradd -d /home/dockle -m -s /bin/bash kerberosio
+USER kerberosio
 
 #################################
 # Copy files from previous images
