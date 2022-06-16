@@ -80,7 +80,7 @@ COPY --chown=0:0 --from=builder /usr/local/go/lib/time/zoneinfo.zip /zoneinfo.zi
 ENV ZONEINFO=/zoneinfo.zip
 
 RUN apk update && apk add ca-certificates --no-cache && \
-	apk add tzdata --no-cache && rm -rf /var/cache/apk/*
+	apk add tzdata --no-cache && apk add curl --no-cache && rm -rf /var/cache/apk/*
 
 ####################################
 # ADD supervisor and STARTUP script
@@ -105,5 +105,10 @@ USER appuser
 # By default the app runs on port 8080
 
 EXPOSE 8080
+
+######################################
+# Check if agent is still running
+
+HEALTHCHECK CMD curl --fail http://localhost:8080 || exit 1   
 
 CMD ["sh", "/run.sh"]
