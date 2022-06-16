@@ -31,12 +31,12 @@
     "redux-devtools-extension": "^2.13.8",
     "redux-thunk": "^2.3.0",
     "typeface-roboto": "^1.1.13",
-    "vott-ct": "^2.3.2",
+    "vott-ct": "^2.2.27",
     "web-vitals": "^0.2.4"
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build && rm -rf ../machinery/www && mv build ../machinery/www",
+    "build": "GENERATE_SOURCEMAP=false react-scripts build && rm -rf ../machinery/www && mv build ../machinery/www",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "lint": "eslint --debug 'src/**/*.{js,jsx,ts,tsx}'",
