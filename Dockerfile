@@ -81,9 +81,9 @@ RUN apk update && apk add ca-certificates && \
 # ADD supervisor and STARTUP script
 # NOTE: actually this is not needed, as we could simply run a single binary.
 
-RUN apk add supervisor && mkdir -p /var/log/supervisor/
-ADD ./scripts/supervisor.conf /etc/supervisord.conf
-ADD ./scripts/run.sh /run.sh
+RUN apk add supervisor --no-cache && mkdir -p /var/log/supervisor/
+COPY ./scripts/supervisor.conf /etc/supervisord.conf
+COPY ./scripts/run.sh /run.sh
 RUN chmod 755 /run.sh && chmod +x /run.sh
 
 # Install Bento4
