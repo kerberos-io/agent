@@ -1,5 +1,3 @@
 general:
-  vulnerabilities:
-    - CVE-2020-26160  
   bestPracticeViolations:
     - CIS-DI-0005
