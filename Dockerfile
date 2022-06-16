@@ -37,6 +37,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv www /agent && \
+	mv data /agent && \
 	mkdir -p /agent/data/cloud && \
 	mkdir -p /agent/data/snapshots && \
 	mkdir -p /agent/data/log && \
@@ -111,5 +112,8 @@ EXPOSE 8080
 
 HEALTHCHECK CMD curl --fail http://localhost:8080 || exit 1   
 
-WORKDIR /
+###################################################
+# Leeeeettttt'ssss goooooo!!!
+# Run the shizzle from the right working directory.
+WORKDIR /agent
 CMD ["/agent/main", "run", "opensource", "8080"]
