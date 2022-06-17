@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        architecture: [amd64, arm64]
     steps:
     - name: Login to DockerHub
       uses: docker/login-action@v2
@@ -24,6 +27,6 @@ jobs:
     - name: Available platforms
       run: echo ${{ steps.buildx.outputs.platforms }}
     - name: Run Buildx
-      run: docker buildx build --platform linux/amd64 -t kerberos/agent-dev:$(echo $GITHUB_SHA | cut -c1-7) --push . 
+      run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-dev:arch-${{matrix.architecture}}-$(echo $GITHUB_SHA | cut -c1-7) --push . 
     - name: Create new and append to manifest
-      run: docker buildx imagetools create -t kerberos/agent:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-dev:$(echo $GITHUB_SHA | cut -c1-7)
+      run: docker buildx imagetools create -t kerberos/agent-dev:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-dev:arch-${{matrix.architecture}}-$(echo $GITHUB_SHA | cut -c1-7)
