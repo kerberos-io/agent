@@ -1,8 +1,9 @@
-name: Docker Development build
+name: Docker Nightly build
 
 on:
-  push:
-    branches: [ develop ]
+  # Triggers the workflow every day at 9PM (CET).
+  schedule:
+    - cron: "0 21 * * *"
 
 jobs:
   build:
@@ -27,6 +28,6 @@ jobs:
     - name: Available platforms
       run: echo ${{ steps.buildx.outputs.platforms }}
     - name: Run Buildx
-      run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-dev:arch-${{matrix.architecture}}-$(echo $GITHUB_SHA | cut -c1-7) --push . 
+      run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-${{matrix.architecture}}-$(echo $GITHUB_SHA | cut -c1-7) --push . 
     - name: Create new and append to manifest
-      run: docker buildx imagetools create -t kerberos/agent-dev:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-dev:arch-${{matrix.architecture}}-$(echo $GITHUB_SHA | cut -c1-7)
+      run: docker buildx imagetools create -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-${{matrix.architecture}}-$(echo $GITHUB_SHA | cut -c1-7)
