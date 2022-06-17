@@ -59,7 +59,7 @@ Kerberos.io is a cutting edge video surveillance system with a strong focus on u
 - Multi camera support: IP Cameras (MJPEG/H264), USB cameras, Raspberry Pi Cameras.
 - Single camera per instance (e.g. One Docker container per camera).
 - Cloud integration through Webhooks, MQTT, etc.
-- Cloud storage through Kerberos Cloud.
+- Cloud storage through Kerberos Hub.
 - MIT License
 
 ### Kerberos Factory (part of [Kerberos Enterprise suite](https://doc.kerberos.io/enterprise/first-things-first/))
