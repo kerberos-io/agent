@@ -57,8 +57,13 @@ RUN cp -r /agent ./
 
 RUN ldd /agent/main | tr -s '[:blank:]' '\n' | grep '^/' | \
 	xargs -I % sh -c 'mkdir -p $(dirname ./%); cp % ./%;'
-RUN mkdir -p lib64 && cp /lib64/ld-linux-x86-64.so.2 lib64/ 2> /dev/null
-RUN mkdir -p lib && cp /lib/ld-linux-aarch64.so.1 lib/ 2> /dev/null 
+
+################################
+# We need to move the correct ld
+
+RUN [[ -f /lib64/ld-linux-x86-64.so.2 ]] && $(mkdir -p lib64 && cp /lib64/ld-linux-x86-64.so.2 lib64/)
+RUN [[ -f /lib/ld-linux-aarch64.so.1 ]] && $(mkdir -p lib && cp /lib/ld-linux-aarch64.so.1 lib/)
+
 RUN mkdir -p ./usr/lib
 RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
 	cp -r /usr/local/lib/libavformat* ./usr/lib && \
