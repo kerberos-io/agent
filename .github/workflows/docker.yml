@@ -7,23 +7,26 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        architecture: [amd64, arm64, armv7, armv6]
     steps:
     - name: Login to DockerHub
       uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Build
-      uses: docker/build-push-action@v3
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Set up Docker Buildx
+      id: buildx
+      uses: crazy-max/ghaction-docker-buildx@v3
       with:
-        push: false
-        tags: kerberos/agent:beta
-    - name: Scan
-      uses: Azure/container-scan@v0
-      with:
-        image-name: kerberos/agent:beta
-    - name: Push
-      uses: docker/build-push-action@v3
-      with:
-        push: true
-        tags: kerberos/agent:beta
+        buildx-version: latest
+        qemu-version: latest
+    - name: Available platforms
+      run: echo ${{ steps.buildx.outputs.platforms }}
+    - name: Run Buildx
+      run: docker buildx build --platform linux/amd64 -t kerberos/agent-multiarch:${{matrix.architecture}}-$(echo $GITHUB_SHA | cut -c1-7) --push . 
+    - name: Create new and append to manifest
+      run: docker buildx imagetools create -t kerberos/agent:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-multiarch:${{matrix.architecture}}-$(echo $GITHUB_SHA | cut -c1-7)

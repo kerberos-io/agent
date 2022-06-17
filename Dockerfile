@@ -1,4 +1,4 @@
-FROM kerberos/debian-opencv-ffmpeg:1.0.2309512445 AS builder
+FROM kerberos/base:e4b4057 AS builder
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
