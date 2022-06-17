@@ -57,7 +57,7 @@ RUN cp -r /agent ./
 
 RUN ldd /agent/main | tr -s '[:blank:]' '\n' | grep '^/' | \
 	xargs -I % sh -c 'mkdir -p $(dirname ./%); cp % ./%;'
-RUN mkdir -p lib64 && cp /lib64/ld-linux-x86-64.so.2 lib64/
+#RUN mkdir -p lib64 && cp /lib64/ld-linux-x86-64.so.2 lib64/
 RUN mkdir -p ./usr/lib
 RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
 	cp -r /usr/local/lib/libavformat* ./usr/lib && \
