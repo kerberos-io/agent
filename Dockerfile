@@ -63,7 +63,6 @@ RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
 	cp -r /usr/local/lib/libavformat* ./usr/lib && \
 	cp -r /usr/local/lib/libswscale* ./usr/lib && \
 	cp -r /usr/local/lib/libswresample* ./usr/lib
-RUN ldd /agent/main
 
 FROM alpine:latest
 
