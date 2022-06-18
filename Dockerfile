@@ -61,8 +61,8 @@ RUN ldd /agent/main | tr -s '[:blank:]' '\n' | grep '^/' | \
 ################################
 # We need to move the correct ld
 
-RUN [ -f /lib64/ld-linux-x86-64.so.2 ] && $(mkdir -p lib64 && cp -r /lib64 .) || echo "nothing to do here x86"
-RUN [ -f /lib/ld-linux-aarch64.so.1 ] && $(mkdir -p lib && cp -r /lib .) || echo "nothing to do here arm64"
+RUN [ -f /lib64/ld-linux-x86-64.so.2 ] && $(mkdir -p lib64 && cp -r /lib64 lib64) || echo "nothing to do here x86"
+RUN [ -f /lib/ld-linux-aarch64.so.1 ] && $(mkdir -p lib && cp -r /lib lib) || echo "nothing to do here arm64"
 
 RUN mkdir -p ./usr/lib
 RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
