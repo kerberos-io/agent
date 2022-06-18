@@ -1,4 +1,4 @@
-FROM kerberos/base:e4b4057 AS builder
+FROM kerberos/base:caeb5bf AS builder
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
