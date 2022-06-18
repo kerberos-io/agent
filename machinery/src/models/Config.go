@@ -6,6 +6,7 @@ type Config struct {
 	Type          string       `json:"type" binding:"required"`
 	Key           string       `json:"key"`
 	Name          string       `json:"name"`
+	Time          string       `json:"time,omitempty" bson:"time"`
 	Timezone      string       `json:"timezone,omitempty" bson:"timezone,omitempty"`
 	Capture       Capture      `json:"capture"`
 	Timetable     []*Timetable `json:"timetable"`
