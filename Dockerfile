@@ -16,16 +16,16 @@ COPY ui /go/src/github.com/kerberos-io/agent/ui
 ########################
 # Download NPM and Yarns
 
-#RUN apt-get update && apt-get install -y curl && curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
-#	curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
-#	echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
-#	apt update && apt install yarn -y
+RUN apt-get update && apt-get install -y curl && curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
+	curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add - && \
+	echo "deb https://dl.yarnpkg.com/debian/ stable main" | tee /etc/apt/sources.list.d/yarn.list && \
+	apt update && apt install yarn -y
 
 ###########
 # Build Web
 
-#RUN cd /go/src/github.com/kerberos-io/agent/ui && \
-#	npm install && yarn build
+RUN cd /go/src/github.com/kerberos-io/agent/ui && \
+	npm install && yarn build
 # this will move the /build directory to ../machinery/www
 
 ##################
@@ -36,7 +36,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go build main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
-	#mv www /agent && \
+	mv www /agent && \
 	mv data /agent && \
 	mkdir -p /agent/data/cloud && \
 	mkdir -p /agent/data/snapshots && \
@@ -52,16 +52,17 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 WORKDIR /dist
 RUN cp -r /agent ./
 
-####################################
-# This will collect dependent libraries so they're later copied to the final image
+####################################################################################
+# This will collect dependent libraries so they're later copied to the final image.
 
 RUN /agent/main version
 RUN ldd /agent/main | tr -s '[:blank:]' '\n'
 RUN ldd /agent/main | tr -s '[:blank:]' '\n' | grep '^/' | \
 	xargs -I % sh -c 'mkdir -p $(dirname ./%); cp % ./%;'
 
-################################
-# We need to move the correct ld
+##########################################################
+# LDD doesnt always work in docker buildx (no idea why..)
+# Therefore we are moving some libraries manually
 
 RUN [ -f /lib64/ld-linux-x86-64.so.2 ] && $(mkdir -p lib64 && cp /lib64/ld-linux-x86-64.so.2 lib64/) || echo "nothing to do here x86"
 RUN [ -f /lib/ld-linux-aarch64.so.1 ] && $(mkdir -p lib/aarch64-linux-gnu && cp /lib/ld-linux-aarch64.so.1 lib/ && cp /lib/aarch64-linux-gnu/* lib/aarch64-linux-gnu/) || echo "nothing to do here arm64"
