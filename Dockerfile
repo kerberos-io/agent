@@ -56,6 +56,7 @@ RUN cp -r /agent ./
 # This will collect dependent libraries so they're later copied to the final image
 
 RUN /agent/main version
+RUN ldd /agent/main | tr -s '[:blank:]' '\n'
 RUN ldd /agent/main | tr -s '[:blank:]' '\n' | grep '^/' | \
 	xargs -I % sh -c 'mkdir -p $(dirname ./%); cp % ./%;'
 
