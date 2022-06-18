@@ -36,7 +36,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go build main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
-	mv www /agent && \
+	#mv www /agent && \
 	mv data /agent && \
 	mkdir -p /agent/data/cloud && \
 	mkdir -p /agent/data/snapshots && \
