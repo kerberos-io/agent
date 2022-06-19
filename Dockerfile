@@ -70,10 +70,11 @@ RUN ldd /agent/main | tr -s '[:blank:]' '\n' | grep '^/' | \
 # LDD doesnt always work in docker buildx (no idea why..)
 # Therefore we are moving some libraries manually
 
-RUN [ -f /lib64/ld-linux-x86-64.so.2 ] && $(mkdir -p lib64 && cp /lib64/ld-linux-x86-64.so.2 lib64/) || echo "nothing to do here x86"
-RUN [ -f /lib/ld-linux-aarch64.so.1 ] && $(mkdir -p lib/aarch64-linux-gnu && cp /lib/ld-linux-aarch64.so.1 lib/ && cp /lib/aarch64-linux-gnu/* lib/aarch64-linux-gnu/) || echo "nothing to do here arm64"
-
 RUN mkdir -p ./usr/lib
+
+RUN [ -f /lib64/ld-linux-x86-64.so.2 ] && $(mkdir -p lib64 && cp /lib64/ld-linux-x86-64.so.2 lib64/) || echo "nothing to do here x86"
+RUN [ -f /lib/ld-linux-aarch64.so.1 ] && $(mkdir -p lib/aarch64-linux-gnu && cp /lib/ld-linux-aarch64.so.1 lib/ && cp /lib/aarch64-linux-gnu/* lib/aarch64-linux-gnu/ && cp /usr/lib/aarch64-linux-gnu/libopencv* ./usr/lib ) || echo "nothing to do here arm64"
+
 RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
 	cp -r /usr/local/lib/libavformat* ./usr/lib && \
 	cp -r /usr/local/lib/libavfilter* ./usr/lib && \
