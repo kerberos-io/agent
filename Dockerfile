@@ -81,7 +81,9 @@ RUN [ -f /lib64/ld-linux-x86-64.so.2 ] && $(mkdir -p lib64 && \
 RUN [ -f /lib/ld-linux-aarch64.so.1 ] && $(mkdir -p lib/aarch64-linux-gnu && \
 	cp /lib/ld-linux-aarch64.so.1 lib/ && \
 	cp /lib/aarch64-linux-gnu/lib* lib/aarch64-linux-gnu/ && \
-	cp /usr/lib/aarch64-linux-gnu/lib* usr/lib ) || echo "nothing to do here arm64"
+	cp /usr/lib/aarch64-linux-gnu/libopencv* usr/lib && \
+	cp /usr/lib/aarch64-linux-gnu/libstdc* usr/lib && \
+	cp /usr/lib/aarch64-linux-gnu/libx264* usr/lib ) || echo "nothing to do here arm64"
 
 RUN [ -f /usr/lib/arm-linux-gnueabihf/vfp/neon/libvpx.so.6 ] && \ 
 	$(cp /usr/lib/arm-linux-gnueabihf/vfp/neon/libvpx.so.6 ./usr/lib/) || echo "nothing to do here armv7"
@@ -106,7 +108,7 @@ FROM alpine:latest
 ############################
 # Protect by non-root user.
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup -S kerberosio && adduser -S agent -G kerberosio
 
 #################################
 # Copy files from previous images
@@ -128,12 +130,18 @@ RUN cd && wget https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-639.x86_64-u
 ##################
 # Try running agent
 
-RUN /agent/main version
+RUN mv /agent/* /home/agent/
+RUN /home/agent/main version
+
+###########################
+# Set permissions correctly
+
+RUN chown -R agent:kerberosio /home/agent/data
 
 ###################
 # Run non-root user
 
-USER appuser
+USER agent
 
 ######################################
 # By default the app runs on port 8080
@@ -148,5 +156,5 @@ HEALTHCHECK CMD curl --fail http://localhost:8080 || exit 1
 ###################################################
 # Leeeeettttt'ssss goooooo!!!
 # Run the shizzle from the right working directory.
-WORKDIR /agent
-CMD ["/agent/main", "run", "opensource", "8080"]
+WORKDIR /home/agent
+CMD ["./main", "run", "opensource", "8080"]
