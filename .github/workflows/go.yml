@@ -10,7 +10,9 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    container:
+      image: kerberos/base:6e68480
 
     strategy:
       matrix:
@@ -23,8 +25,6 @@ jobs:
         go-version: ${{ matrix.go-version }}
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
-    - name: Download opencv
-      run: sudo apt install libavcodec-dev libavfilter-dev libavformat-dev libswscale-dev libopencv-dev ffmpeg -y
     - name: Get dependencies
       run: cd machinery && go mod download
     - name: Build
