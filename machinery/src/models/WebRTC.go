@@ -2,7 +2,7 @@ package models
 
 type SDPPayload struct {
 	Cuuid    string `json:"cuuid"`
-	Sdp      string `json:"sdp`
+	Sdp      string `json:"sdp"`
 	CloudKey string `json:"cloud_key"`
 }
 
