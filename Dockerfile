@@ -6,6 +6,9 @@ ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:$GOROOT/bin:/usr/local/lib:$PATH
 ENV GOSUMDB=off
 
+##########################################
+# Installing some additional dependencies.
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
 	git build-essential cmake pkg-config unzip libgtk2.0-dev \
 	curl ca-certificates libcurl4-openssl-dev libssl-dev \
@@ -80,6 +83,9 @@ RUN [ -f /lib/ld-linux-aarch64.so.1 ] && $(mkdir -p lib/aarch64-linux-gnu && \
 	cp /lib/aarch64-linux-gnu/lib* lib/aarch64-linux-gnu/ && \
 	cp /usr/lib/aarch64-linux-gnu/lib* usr/lib ) || echo "nothing to do here arm64"
 
+RUN [ -f /usr/lib/arm-linux-gnueabihf/vfp/neon/libvpx.so.6 ] && \ 
+	$(cp /usr/lib/arm-linux-gnueabihf/vfp/neon/libvpx.so.6 ./usr/lib/) || echo "nothing to do here armv7"
+
 RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
 	cp -r /usr/local/lib/libavformat* ./usr/lib && \
 	cp -r /usr/local/lib/libavfilter* ./usr/lib && \
@@ -89,6 +95,11 @@ RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
 	cp -r /usr/local/lib/libswscale* ./usr/lib && \
 	cp -r /usr/local/lib/libswresample* ./usr/lib && \
 	cp -r /usr/local/lib/libpostproc* ./usr/lib
+
+# As mentioned before, above is really a hack as LDD
+# doesn't work always in docker buildx. You might not need this 
+# when doing a local build.
+################################################################
 
 FROM alpine:latest
 
