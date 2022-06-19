@@ -2,10 +2,13 @@
 	"type": "template",
 	"key": "",
 	"name": "camera",
+	"mqtturi": "tcp://mqtt.kerberos.io",
+	"mqtt_username": "yourusername",
+	"mqtt_password": "yourpassword",
 	"capture": {
 		"id": "ipcamera",
 		"ipcamera": {
-			"rtsp": "",
+			"rtsp": "rtsp://admin:thiemenimke2017@192.168.1.69:554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif",
 			"fps": ""
 		},
 		"usbcamera": {

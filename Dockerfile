@@ -1,10 +1,17 @@
-FROM kerberos/base:caeb5bf AS builder
+FROM kerberos/base:6e68480 AS builder
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
-ENV PATH=$GOPATH/bin:$GOROOT/bin:$PATH
+ENV PATH=$GOPATH/bin:$GOROOT/bin:/usr/local/lib:$PATH
 ENV GOSUMDB=off
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	git build-essential cmake pkg-config unzip libgtk2.0-dev \
+	curl ca-certificates libcurl4-openssl-dev libssl-dev \
+	libavcodec-dev libavformat-dev libswscale-dev libtbb2 libtbb-dev \
+	libjpeg-dev libpng-dev libtiff-dev libdc1394-22-dev && \
+	rm -rf /var/lib/apt/lists/*
 
 ##############################################################################
 # Copy all the relevant source code in the Docker image, so we can build this.
@@ -69,8 +76,13 @@ RUN [ -f /lib/ld-linux-aarch64.so.1 ] && $(mkdir -p lib/aarch64-linux-gnu && cp 
 RUN mkdir -p ./usr/lib
 RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
 	cp -r /usr/local/lib/libavformat* ./usr/lib && \
+	cp -r /usr/local/lib/libavfilter* ./usr/lib && \
+	cp -r /usr/local/lib/libavutil* ./usr/lib && \
+	cp -r /usr/local/lib/libavresample* ./usr/lib && \
+	cp -r /usr/local/lib/libavdevice* ./usr/lib && \
 	cp -r /usr/local/lib/libswscale* ./usr/lib && \
-	cp -r /usr/local/lib/libswresample* ./usr/lib
+	cp -r /usr/local/lib/libswresample* ./usr/lib && \
+	cp -r /usr/local/lib/libpostproc* ./usr/lib
 
 FROM alpine:latest
 

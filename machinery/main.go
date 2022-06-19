@@ -24,12 +24,15 @@ func main() {
 	switch action {
 	case "version":
 		log.Info("You are currrently running Kerberos Agent " + VERSION)
+
 	case "pending-upload":
 		name := os.Args[2]
 		fmt.Println(name)
+
 	case "discover":
 		timeout := os.Args[2]
 		fmt.Println(timeout)
+
 	case "run":
 		{
 			name := os.Args[2]
@@ -45,15 +48,14 @@ func main() {
 			// Open this configuration either from Kerberos Agent or Kerberos Factory.
 			components.OpenConfig(name, log, &config, &customConfig, &globalConfig)
 
+			// Bootstrapping the agent
+			components.Bootstrap(&config, log)
+
 			// Start a MQTT listener.
 			routers.StartMqttListener(name)
 
 			// Start the REST API.
 			routers.StartWebserver(name, port, &config, &customConfig, &globalConfig)
-
-			// Start the real shizzle: The machinery.
-			// routers.StartMachinery(name, config)
-
 		}
 	default:
 		fmt.Println("Sorry I don't understand :(")

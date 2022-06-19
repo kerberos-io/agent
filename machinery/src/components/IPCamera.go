@@ -42,7 +42,7 @@ func GetVideoDecoder(streams []av.CodecData) *ffmpeg.VideoDecoder {
 	return dec
 }
 
-func HandleStream(log Logging, queue *pubsub.Queue, stopHandleStream <-chan int64, packetsRead *atomic.Value, packetsBuffer chan<- av.Packet, packetsRealtime chan<- av.Packet, packetsRealtimeStream chan<- av.Packet, webrtcPacketsRealtimeStream chan<- av.Packet, infile av.DemuxCloser) {
+func HandleStream(log Logging, queue *pubsub.Queue, stopHandleStream <-chan int64, packetsRead *atomic.Value, infile av.DemuxCloser) {
 	var err error
 loop:
 	for {
@@ -108,7 +108,7 @@ loop:
 	}
 }
 
-func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, packets <-chan av.Packet, motion chan int64, devicename string, config models.Config, streams []av.CodecData) {
+func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, motion chan int64, devicename string, config *models.Config, streams []av.CodecData) {
 	log.Info("Start recording routine")
 
 	recordingPeriod := config.Capture.PostRecording         // number of seconds to record.

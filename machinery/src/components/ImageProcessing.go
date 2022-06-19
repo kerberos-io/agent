@@ -94,7 +94,7 @@ func ToRGB8(img image.YCbCr) (gocv.Mat, error) {
 	return gocv.NewMatFromBytes(y, x, gocv.MatTypeCV8UC3, bytes)
 }
 
-func ProcessMotion(log Logging, motionCursor *pubsub.QueueCursor, config models.Config, name string, mqc mqtt.Client, packets <-chan av.Packet, motion chan<- int64, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func ProcessMotion(log Logging, motionCursor *pubsub.QueueCursor, config *models.Config, name string, mqc mqtt.Client, motion chan<- int64, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
 
 	if config.Capture.Continuous == "true" {
 
