@@ -23,6 +23,8 @@ jobs:
         go-version: ${{ matrix.go-version }}
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
+    - name: Download opencv
+      run: apt install libopencv-dev python3-opencv
     - name: Get dependencies
       run: cd machinery && go mod download
     - name: Build
