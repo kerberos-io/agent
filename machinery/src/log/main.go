@@ -1,4 +1,4 @@
-package components
+package log
 
 import (
 	"os"
@@ -7,6 +7,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
+
+// The logging library being used everywhere.
+var Log = Logging{
+	Logger: "logrus",
+	Level:  "debug",
+}
 
 // -----------------
 // This a gologging
@@ -47,7 +53,7 @@ func ConfigureLogrus() {
 	logrus.SetOutput(os.Stdout)
 
 	// Only log the warning severity or above.
-	logrus.SetLevel(logrus.InfoLevel)
+	logrus.SetLevel(logrus.DebugLevel)
 }
 
 func NewLogger(logger string, level string) *Logging {

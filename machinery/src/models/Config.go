@@ -1,5 +1,14 @@
 package models
 
+// A struct which contains the global, local and merged config.
+type Configuration struct {
+	Name         string
+	Port         string
+	Config       Config
+	CustomConfig Config
+	GlobalConfig Config
+}
+
 //Config is the highlevel struct which contains all the configuration of
 //your Kerberos Open Source instance.
 type Config struct {

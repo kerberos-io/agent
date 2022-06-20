@@ -1,6 +1,7 @@
 package components
 
 import (
+	"fmt"
 	"image"
 	"io/ioutil"
 	"os"
@@ -11,10 +12,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/joy4/av/pubsub"
 
-	mqtt "github.com/eclipse/paho.mqtt.golang"
 	geo "github.com/kellydunn/golang-geo"
 	"github.com/kerberos-io/joy4/av"
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
@@ -94,15 +95,17 @@ func ToRGB8(img image.YCbCr) (gocv.Mat, error) {
 	return gocv.NewMatFromBytes(y, x, gocv.MatTypeCV8UC3, bytes)
 }
 
-func ProcessMotion(log Logging, motionCursor *pubsub.QueueCursor, config *models.Config, name string, mqc mqtt.Client, motion chan<- int64, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex, wg *sync.WaitGroup) {
+	log.Log.Debug("ProcessMotion: started")
+	config := configuration.Config
 
 	if config.Capture.Continuous == "true" {
 
-		log.Info("Disabled Detecting motion...")
+		log.Log.Info("Disabled Detecting motion...")
 
 	} else {
 
-		log.Info("Start Detecting motion...")
+		log.Log.Info("Start Detecting motion...")
 
 		key := ""
 		if config.Cloud == "s3" && config.S3.Publickey != "" {
@@ -223,14 +226,15 @@ func ProcessMotion(log Logging, motionCursor *pubsub.QueueCursor, config *models
 
 						} else {
 							detectMotion = false
-							log.Debug("Disabled: not within time interval.")
+							log.Log.Debug("Disabled: not within time interval.")
 						}
 					}
 
-					if detectMotion && FindMotion(matArray, coordinatesToCheck, log) {
+					if detectMotion && FindMotion(matArray, coordinatesToCheck) {
 						// TODO create object for motion
-						mqc.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
-						motion <- time.Now().Unix()
+						//mqc.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
+						fmt.Println(key)
+						communication.HandleMotion <- strconv.FormatInt(time.Now().Unix(), 10)
 					}
 				}
 
@@ -247,11 +251,14 @@ func ProcessMotion(log Logging, motionCursor *pubsub.QueueCursor, config *models
 		}
 		runtime.GC()
 		debug.FreeOSMemory()
-		log.Info("Stopped motion")
+		log.Log.Info("Stopped motion")
 	}
+
+	wg.Done()
+	log.Log.Debug("ProcessMotion: finished")
 }
 
-func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int, log Logging) bool {
+func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int) bool {
 
 	h1 := gocv.NewMat()
 	gocv.AbsDiff(*matArray[2], *matArray[0], &h1)
@@ -284,7 +291,7 @@ func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int, log Logging) 
 
 	eroded.Close()
 
-	log.Info("Number of changes detected:" + strconv.Itoa(changes))
+	log.Log.Info("Number of changes detected:" + strconv.Itoa(changes))
 
 	if changes > 75 {
 		return true

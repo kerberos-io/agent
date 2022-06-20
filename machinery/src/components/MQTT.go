@@ -8,6 +8,7 @@ import (
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
@@ -15,8 +16,7 @@ var (
 	CandidateArrays map[string](chan string)
 )
 
-func ConfigureMQTT(log Logging,
-	config *models.Config,
+func ConfigureMQTT(config *models.Config,
 	livestreamChan chan int64,
 	webrtcChan chan models.SDPPayload,
 	webrtcKeepAlive chan string,
@@ -31,8 +31,8 @@ func ConfigureMQTT(log Logging,
 	if mqtt_username != "" || mqtt_password != "" {
 		opts.SetUsername(mqtt_username)
 		opts.SetPassword(mqtt_password)
-		log.Info("MQTT: set username " + mqtt_username)
-		log.Info("MQTT: set password " + mqtt_password)
+		log.Log.Info("MQTT: set username " + mqtt_username)
+		log.Log.Info("MQTT: set password " + mqtt_password)
 	}
 
 	opts.SetCleanSession(true)
@@ -62,29 +62,29 @@ func ConfigureMQTT(log Logging,
 			randomKerberosHubKey = config.Key
 		}
 		opts.SetClientID(randomKerberosHubKey)
-		log.Info("MQTT: set ClientID " + randomKerberosHubKey)
+		log.Log.Info("MQTT: set ClientID " + randomKerberosHubKey)
 		rand.Seed(time.Now().UnixNano())
 		CandidateArrays = make(map[string](chan string))
 
 		opts.OnConnect = func(c mqtt.Client) {
 
 			// Create a subscription for the MQTT livestream.
-			log.Info("MQTT " + randomKerberosHubKey + ": connected to " + mqttURL)
+			log.Log.Info("MQTT " + randomKerberosHubKey + ": connected to " + mqttURL)
 			topicRequest := "kerberos/" + key + "/device/" + config.Key + "/request-live"
-			log.Info("MQTT: sending logs to " + topicRequest)
+			log.Log.Info("MQTT: sending logs to " + topicRequest)
 			c.Subscribe(topicRequest, 0, func(c mqtt.Client, msg mqtt.Message) {
 				select {
 				case livestreamChan <- time.Now().Unix():
 				default:
 				}
-				log.Info("Livestream " + randomKerberosHubKey + ": received request to livestream.")
+				log.Log.Info("Livestream " + randomKerberosHubKey + ": received request to livestream.")
 				msg.Ack()
 			})
 
 			// Create a subscription for the WEBRTC livestream.
 			topicRequestWebRtc := config.Key + "/register"
 			c.Subscribe(topicRequestWebRtc, 0, func(c mqtt.Client, msg mqtt.Message) {
-				log.Info("Webrtc " + randomKerberosHubKey + ": received request to setup webrtc.")
+				log.Log.Info("Webrtc " + randomKerberosHubKey + ": received request to setup webrtc.")
 				var sdp models.SDPPayload
 				json.Unmarshal(msg.Payload(), &sdp)
 				select {
@@ -98,14 +98,14 @@ func ConfigureMQTT(log Logging,
 			c.Subscribe(topicKeepAlive, 0, func(c mqtt.Client, msg mqtt.Message) {
 				alive := string(msg.Payload())
 				webrtcKeepAlive <- alive
-				log.Info("WEBRTC (Forward): Received keepalive: " + alive)
+				log.Log.Info("WEBRTC (Forward): Received keepalive: " + alive)
 			})
 
 			topicPeers := fmt.Sprintf("kerberos/webrtc/peers/%s", config.Key)
 			c.Subscribe(topicPeers, 0, func(c mqtt.Client, msg mqtt.Message) {
 				peerCount := string(msg.Payload())
 				webrtcPeers <- peerCount
-				log.Info("WEBRTC (Forward): Number of peers listening: " + peerCount)
+				log.Log.Info("WEBRTC (Forward): Number of peers listening: " + peerCount)
 			})
 
 			//candidates := make(chan string)
@@ -121,7 +121,7 @@ func ConfigureMQTT(log Logging,
 						CandidateArrays[key] = val
 						channel = val
 					}
-					log.Info("WEBRTC (Remote): " + string(msg.Payload()))
+					log.Log.Info("WEBRTC (Remote): " + string(msg.Payload()))
 					channel <- string(msg.Payload())
 				}
 			})
@@ -132,20 +132,20 @@ func ConfigureMQTT(log Logging,
 				var onvifAction models.OnvifAction
 				json.Unmarshal(msg.Payload(), &onvifAction)
 				onvifActions <- onvifAction
-				log.Info("Onvif (action): Received an action - " + onvifAction.Action)
+				log.Log.Info("Onvif (action): Received an action - " + onvifAction.Action)
 			})
 		}
 	}
 	mqc := mqtt.NewClient(opts)
 	if token := mqc.Connect(); token.WaitTimeout(5 * time.Second) {
 		if token.Error() != nil {
-			log.Error("MQTT: unable to establish mqtt broker connection, error was: " + token.Error().Error())
+			log.Log.Error("MQTT: unable to establish mqtt broker connection, error was: " + token.Error().Error())
 		}
 	}
 	return mqc
 }
 
-func DisconnectMQTT(log Logging, config models.Config, mqc mqtt.Client) {
+func DisconnectMQTT(config models.Config, mqc mqtt.Client) {
 	//topicRequest := "kerberos/" + config.S3.Publickey + "/device/" + config.Key + "/request-live"
 	//mqc.Unsubscribe(topicRequest)
 	mqc.Disconnect(1000)

@@ -1,10 +1,16 @@
 {
 	"type": "template",
-	"key": "",
+	"key": "0x123-a-test-agent",
 	"name": "camera",
 	"mqtturi": "tcp://mqtt.kerberos.io",
 	"mqtt_username": "yourusername",
 	"mqtt_password": "yourpassword",
+	"timezone": "Europe/Brussels",
+	"stunuri": "stun:turn.kerberos.io:8443",
+	"turnuri": "turn:turn.kerberos.io:8443",
+	"turn_username": "username1",
+	"turn_password": "password1",
+	"heartbeaturi": "https://api.cloud.kerberos.io/devices/heartbeat",
 	"capture": {
 		"id": "ipcamera",
 		"ipcamera": {
@@ -22,7 +28,12 @@
 		"continuous": "false",
 		"postrecording": 10,
 		"prerecording": 5,
-		"maxlengthrecording": 10
+		"maxlengthrecording":60,
+		"forwardwebrtc": "",
+		"transcodingwebrtc": "false",
+		"transcodingresolution": 25,
+		"fragmented": "false",
+		"fragmentedduration": 1
 	},
 	"timetable": [
 		{
@@ -79,11 +90,10 @@
 	},
 	"cloud": "kstorage",
 	"kstorage": {
-		"uri": "",
-		"cloud_key": "",
-		"access_key": "",
-		"secret_access_key": "",
+		"uri": "https://staging.api.vault.kerberos.live",
+		"access_key": "ABCDEFGHI!@#$%12345",
+		"secret_access_key": "JKLMNOPQRSTUVWXYZ!@#$%67890",
 		"provider": "",
-		"directory": ""
+		"directory": "youruser"
 	}
 }

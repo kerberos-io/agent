@@ -5,9 +5,10 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
-	"sync/atomic"
+	"sync"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/joy4/av/pubsub"
 	"github.com/kerberos-io/joy4/format/mp4"
@@ -42,7 +43,9 @@ func GetVideoDecoder(streams []av.CodecData) *ffmpeg.VideoDecoder {
 	return dec
 }
 
-func HandleStream(log Logging, queue *pubsub.Queue, stopHandleStream <-chan int64, packetsRead *atomic.Value, infile av.DemuxCloser) {
+func HandleStream(infile av.DemuxCloser, queue *pubsub.Queue, communication *models.Communication, wg *sync.WaitGroup) {
+
+	log.Log.Debug("HandleStream: started")
 	var err error
 loop:
 	for {
@@ -50,15 +53,15 @@ loop:
 		// This will check if we need to stop the thread,
 		// because of a reconfiguration.
 		select {
-		case <-stopHandleStream:
+		case <-communication.HandleStream:
 			break loop
 		default:
 		}
 
 		var pkt av.Packet
 		if pkt, err = infile.ReadPacket(); err != nil { // sometimes this throws an end of file..
-			log.Info(strconv.Itoa(len(pkt.Data)))
-			log.Error(err.Error())
+			log.Log.Info(strconv.Itoa(len(pkt.Data)))
+			log.Log.Error(err.Error())
 			if err.Error() == "EOF" {
 				time.Sleep(30 * time.Second)
 			}
@@ -72,7 +75,7 @@ loop:
 			// This will check if we need to stop the thread,
 			// because of a reconfiguration.
 			select {
-			case <-stopHandleStream:
+			case <-communication.HandleStream:
 				break loop
 			default:
 			}
@@ -91,9 +94,9 @@ loop:
 
 				// Increment packets, so we know the device
 				// is not blocking.
-				r := packetsRead.Load().(int64)
-				log.Info("HandleStream: packet size " + strconv.Itoa(len(pkt.Data)))
-				packetsRead.Store((r + 1) % 1000)
+				r := communication.PackageCounter.Load().(int64)
+				log.Log.Info("HandleStream: packet size " + strconv.Itoa(len(pkt.Data)))
+				communication.PackageCounter.Store((r + 1) % 1000)
 
 				/*select {
 				case packetsRealtime <- pkt:
@@ -106,10 +109,12 @@ loop:
 			}
 		}
 	}
+	wg.Done()
+	log.Log.Debug("HandleStream: finished")
 }
 
-func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, motion chan int64, devicename string, config *models.Config, streams []av.CodecData) {
-	log.Info("Start recording routine")
+func RecordStream(recordingCursor *pubsub.QueueCursor, motion chan int64, devicename string, config *models.Config, streams []av.CodecData) {
+	log.Log.Debug("RecordStream: started")
 
 	recordingPeriod := config.Capture.PostRecording         // number of seconds to record.
 	maxRecordingPeriod := config.Capture.MaxLengthRecording // maximum number of seconds to record.
@@ -123,7 +128,7 @@ func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, motion chan 
 	if config.Capture.Continuous == "true" {
 
 		// Do not do anything!
-		log.Info("Start continuous recording ")
+		log.Log.Info("Start continuous recording ")
 
 		loc, _ := time.LoadLocation(config.Timezone)
 		now = time.Now().Unix()
@@ -155,15 +160,15 @@ func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, motion chan 
 
 				// This will write the trailer a well.
 				if err := myMuxer.WriteTrailer(); err != nil {
-					log.Error(err.Error())
+					log.Log.Error(err.Error())
 				}
 
-				log.Info("Recording finished: file save: " + name)
+				log.Log.Info("Recording finished: file save: " + name)
 				file.Close()
 
 				// Check if need to convert to fragmented using bento
 				if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
-					CreateFragmentedMP4(log, fullName, config.Capture.FragmentedDuration)
+					CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
 				}
 
 				// Create a symbol link.
@@ -199,7 +204,7 @@ func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, motion chan 
 						(currentTimeInSeconds >= start2 && currentTimeInSeconds <= end2) {
 
 					} else {
-						log.Debug("Disabled: no continuous recording at this moment. Not within specified time interval.")
+						log.Log.Debug("Disabled: no continuous recording at this moment. Not within specified time interval.")
 						time.Sleep(5 * time.Second)
 						continue
 					}
@@ -223,35 +228,35 @@ func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, motion chan 
 				fullName = "./data/recordings/" + name
 
 				// Running...
-				log.Info("Recording started")
+				log.Log.Info("Recording started")
 
 				file, err = os.Create(fullName)
 				if err == nil {
 					myMuxer = mp4.NewMuxer(file)
 				}
 
-				log.Info("Recording starting: composing recording")
-				log.Info("Recording starting: write header")
+				log.Log.Info("Recording starting: composing recording")
+				log.Log.Info("Recording starting: write header")
 
 				// Creating the file, might block sometimes.
 				if err := myMuxer.WriteHeader(streams); err != nil {
-					log.Error(err.Error())
+					log.Log.Error(err.Error())
 				}
 
 				if err := myMuxer.WritePacket(pkt); err != nil {
-					log.Error(err.Error())
+					log.Log.Error(err.Error())
 				}
 
 			} else if start {
 				if err := myMuxer.WritePacket(pkt); err != nil {
-					log.Error(err.Error())
+					log.Log.Error(err.Error())
 				}
 			}
 		}
 
 	} else {
 
-		log.Info("Start motion based recording ")
+		log.Log.Info("Start motion based recording ")
 
 		var myMuxer *mp4.Muxer
 		var file *os.File
@@ -277,7 +282,7 @@ func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, motion chan 
 			fullName := "./data/recordings/" + name
 
 			// Running...
-			log.Info("Recording started")
+			log.Log.Info("Recording started")
 			file, err = os.Create(fullName)
 			if err == nil {
 				myMuxer = mp4.NewMuxer(file)
@@ -285,11 +290,11 @@ func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, motion chan 
 
 			start := false
 
-			log.Info("Recording starting: composing recording")
-			log.Info("Recording starting: write header")
+			log.Log.Info("Recording starting: composing recording")
+			log.Log.Info("Recording starting: write header")
 			// Creating the file, might block sometimes.
 			if err := myMuxer.WriteHeader(streams); err != nil {
-				log.Error(err.Error())
+				log.Log.Error(err.Error())
 			}
 
 			// Get as much packets we need.
@@ -306,26 +311,26 @@ func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, motion chan 
 				select {
 				case <-motion:
 					timestamp = now
-					log.Info("Recording expanding: motion detected while recording. Expanding recording.")
+					log.Log.Info("Recording expanding: motion detected while recording. Expanding recording.")
 				default:
 				}
 				if timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod {
 					break
 				}
 				if pkt.IsKeyFrame {
-					log.Info("Recording writing: write frames")
+					log.Log.Info("Recording writing: write frames")
 					start = true
 				}
 				if start {
 					if err := myMuxer.WritePacket(pkt); err != nil {
-						log.Error(err.Error())
+						log.Log.Error(err.Error())
 					}
 				}
 			}
 
 			// This will write the trailer as well.
 			myMuxer.WriteTrailer()
-			log.Info("Recording finished: file save: " + name)
+			log.Log.Info("Recording finished: file save: " + name)
 			file.Close()
 			myMuxer = nil
 			runtime.GC()
@@ -333,7 +338,7 @@ func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, motion chan 
 
 			// Check if need to convert to fragmented using bento
 			if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
-				CreateFragmentedMP4(log, fullName, config.Capture.FragmentedDuration)
+				CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
 			}
 
 			// Create a symbol linc.
@@ -342,5 +347,5 @@ func RecordStream(log Logging, recordingCursor *pubsub.QueueCursor, motion chan 
 		}
 	}
 
-	log.Info("Stopped recording")
+	log.Log.Debug("RecordStream: finished")
 }

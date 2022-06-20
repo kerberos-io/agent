@@ -5,25 +5,21 @@ import (
 	"os"
 
 	"github.com/kerberos-io/agent/machinery/src/components"
+	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/routers"
 )
-
-var log = components.Logging{
-	Logger: "logrus",
-	Level:  "warning",
-}
 
 func main() {
 
 	const VERSION = "3.0"
 	action := os.Args[1]
 
-	log.Init()
+	log.Log.Init()
 
 	switch action {
 	case "version":
-		log.Info("You are currrently running Kerberos Agent " + VERSION)
+		log.Log.Info("You are currrently running Kerberos Agent " + VERSION)
 
 	case "pending-upload":
 		name := os.Args[2]
@@ -41,21 +37,24 @@ func main() {
 			// Read the config on start, and pass it to the other
 			// function and features. Please note that this might be changed
 			// when saving or updating the configuration through the REST api or MQTT handler.
-			var config models.Config
-			var customConfig models.Config
-			var globalConfig models.Config
+			var configuration models.Configuration
+			configuration.Name = name
+			configuration.Port = port
 
 			// Open this configuration either from Kerberos Agent or Kerberos Factory.
-			components.OpenConfig(name, log, &config, &customConfig, &globalConfig)
+			components.OpenConfig(&configuration)
 
 			// Bootstrapping the agent
-			components.Bootstrap(&config, log)
+			communication := models.Communication{
+				HandleBootstrap: make(chan string, 1),
+			}
+			go components.Bootstrap(&configuration, &communication)
 
 			// Start a MQTT listener.
 			routers.StartMqttListener(name)
 
 			// Start the REST API.
-			routers.StartWebserver(name, port, &config, &customConfig, &globalConfig)
+			routers.StartWebserver(&configuration, &communication)
 		}
 	default:
 		fmt.Println("Sorry I don't understand :(")

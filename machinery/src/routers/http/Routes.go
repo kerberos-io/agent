@@ -7,7 +7,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
-func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, config *models.Config, customConfig *models.Config, globalConfig *models.Config) *gin.RouterGroup {
+func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuration *models.Configuration, communication *models.Communication) *gin.RouterGroup {
 	api := r.Group("/api")
 	{
 		api.POST("/login", authMiddleware.LoginHandler)
@@ -16,10 +16,24 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, config *mode
 
 		api.GET("/config", func(c *gin.Context) {
 			c.JSON(200, gin.H{
-				"config":   config,
-				"custom":   customConfig,
-				"global":   globalConfig,
+				"config":   configuration.Config,
+				"custom":   configuration.CustomConfig,
+				"global":   configuration.GlobalConfig,
 				"snapshot": components.GetSnapshot(),
+			})
+		})
+
+		api.GET("/restart", func(c *gin.Context) {
+			communication.HandleBootstrap <- "restart"
+			c.JSON(200, gin.H{
+				"restarted": true,
+			})
+		})
+
+		api.GET("/stop", func(c *gin.Context) {
+			communication.HandleBootstrap <- "stop"
+			c.JSON(200, gin.H{
+				"stopped": true,
 			})
 		})
 

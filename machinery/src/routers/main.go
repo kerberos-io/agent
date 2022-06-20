@@ -6,8 +6,8 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/routers/mqtt"
 )
 
-func StartWebserver(name string, port string, config *models.Config, customConfig *models.Config, globalConfig *models.Config) {
-	http.StartServer(name, port, config, customConfig, globalConfig)
+func StartWebserver(configuration *models.Configuration, communication *models.Communication) {
+	http.StartServer(configuration, communication)
 }
 
 func StartMqttListener(name string) {

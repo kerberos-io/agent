@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/database"
+	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -61,7 +62,7 @@ func ReadUserConfig() (userConfig models.User) {
 	return
 }
 
-func OpenConfig(name string, log Logging, config *models.Config, customConfig *models.Config, globalConfig *models.Config) {
+func OpenConfig(configuration *models.Configuration) {
 
 	// We are checking which deployment this is running, so we can load
 	// into the configuration as expected.
@@ -75,17 +76,17 @@ func OpenConfig(name string, log Logging, config *models.Config, customConfig *m
 		for {
 			jsonFile, err := os.Open("./data/config/config.json")
 			if err != nil {
-				log.Error("Config file is not found " + "./data/config/config.json" + ", trying again in 5s.")
+				log.Log.Error("Config file is not found " + "./data/config/config.json" + ", trying again in 5s.")
 				time.Sleep(5 * time.Second)
 			} else {
-				log.Info("Successfully Opened config.json from " + name)
+				log.Log.Info("Successfully Opened config.json from " + configuration.Name)
 				byteValue, _ := ioutil.ReadAll(jsonFile)
-				err = json.Unmarshal(byteValue, config)
+				err = json.Unmarshal(byteValue, &configuration.Config)
 				jsonFile.Close()
 				if err != nil {
 					fmt.Println("JSON file not valid: " + err.Error())
 				} else {
-					err = json.Unmarshal(byteValue, customConfig)
+					err = json.Unmarshal(byteValue, &configuration.CustomConfig)
 					if err != nil {
 						fmt.Println("JSON file not valid: " + err.Error())
 					} else {
@@ -110,24 +111,24 @@ func OpenConfig(name string, log Logging, config *models.Config, customConfig *m
 
 		collection.Find(bson.M{
 			"type": "global",
-		}).One(&globalConfig)
+		}).One(&configuration.GlobalConfig)
 
 		collection.Find(bson.M{
 			"type": "config",
 			"name": os.Getenv("DEPLOYMENT_NAME"),
-		}).One(&customConfig)
+		}).One(&configuration.CustomConfig)
 
 		// We will merge both configs in a single config file.
 		// Read again from database but this store overwrite the same object.
 
 		collection.Find(bson.M{
 			"type": "global",
-		}).One(&config)
+		}).One(&configuration.Config)
 
 		collection.Find(bson.M{
 			"type": "config",
 			"name": os.Getenv("DEPLOYMENT_NAME"),
-		}).One(&config)
+		}).One(&configuration.Config)
 
 	}
 	return

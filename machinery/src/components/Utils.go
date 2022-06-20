@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+
+	"github.com/kerberos-io/agent/machinery/src/log"
 )
 
 const letterBytes = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -20,10 +22,10 @@ func CountDigits(i int64) (count int) {
 	return count
 }
 
-func ReadDirectory(log Logging, directory string) ([]os.FileInfo, error) {
+func ReadDirectory(directory string) ([]os.FileInfo, error) {
 	ff, err := ioutil.ReadDir(directory)
 	if err != nil {
-		log.Error(err.Error())
+		log.Log.Error(err.Error())
 		return []os.FileInfo{}, nil
 	}
 	return ff, err
@@ -37,21 +39,21 @@ func RandStringBytesRmndr(n int) string {
 	return string(b)
 }
 
-func CreateFragmentedMP4(log Logging, fullName string, fragmentedDuration int64) {
+func CreateFragmentedMP4(fullName string, fragmentedDuration int64) {
 	path, _ := os.Getwd()
 	duration := fragmentedDuration * 1000
 	cmd := exec.Command("mp4fragment", "--fragment-duration", strconv.FormatInt(duration, 10), fullName, fullName+"f.mp4")
 	cmd.Dir = path
-	log.Info(cmd.String())
+	log.Log.Info(cmd.String())
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
-		log.Error(fmt.Sprint(err) + ": " + stderr.String())
+		log.Log.Error(fmt.Sprint(err) + ": " + stderr.String())
 	} else {
-		log.Info("Created Fragmented: " + out.String())
+		log.Log.Info("Created Fragmented: " + out.String())
 	}
 
 	// We will swap the files.

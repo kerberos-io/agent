@@ -33,7 +33,7 @@ import (
 // @in header
 // @name Authorization
 
-func StartServer(name string, port string, config *models.Config, customConfig *models.Config, globalConfig *models.Config) {
+func StartServer(configuration *models.Configuration, communication *models.Communication) {
 
 	// Initialize REST API
 	r := gin.Default()
@@ -55,7 +55,7 @@ func StartServer(name string, port string, config *models.Config, customConfig *
 	}
 
 	// Add all routes
-	AddRoutes(r, authMiddleware, config, customConfig, globalConfig)
+	AddRoutes(r, authMiddleware, configuration, communication)
 
 	// Add static routes to UI
 	r.Use(static.Serve("/", static.LocalFile("./www", true)))
@@ -65,7 +65,7 @@ func StartServer(name string, port string, config *models.Config, customConfig *
 	r.Use(static.Serve("/login", static.LocalFile("./www", true)))
 
 	// Run the api on port
-	err = r.Run(":" + port)
+	err = r.Run(":" + configuration.Port)
 	if err != nil {
 		log.Fatal(err)
 	}

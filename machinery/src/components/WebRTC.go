@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -13,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/joy4/av/pubsub"
 
@@ -72,7 +72,7 @@ func CreateWebRTC(name string, stunServers []string, turnServers []string, turnS
 func (w WebRTC) DecodeSessionDescription(data string) ([]byte, error) {
 	sd, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
-		log.Println("DecodeString error", err)
+		log.Log.Error("DecodeString error: " + err.Error())
 		return []byte{}, err
 	}
 	return sd, nil
@@ -86,7 +86,7 @@ func (w WebRTC) CreateOffer(sd []byte) pionWebRTC.SessionDescription {
 	return offer
 }
 
-func InitializeWebRTCConnection(track *pionWebRTC.TrackLocalStaticSample, config models.Config, m models.SDPPayload, c mqtt.Client, log Logging, candidates chan string) {
+func InitializeWebRTCConnection(track *pionWebRTC.TrackLocalStaticSample, config models.Config, m models.SDPPayload, c mqtt.Client, candidates chan string) {
 
 	name := config.Key
 	stunServers := []string{config.STUNURI}
@@ -152,13 +152,13 @@ func InitializeWebRTCConnection(track *pionWebRTC.TrackLocalStaticSample, config
 				atomic.AddInt64(&peerConnectionCount, 1)
 			} else if connectionState == pionWebRTC.ICEConnectionStateChecking {
 				for candidate := range candidates {
-					log.Info("WEBRTC (Remote): received candidate.")
+					log.Log.Info("WEBRTC (Remote): received candidate.")
 					if candidateErr := peerConnection.AddICECandidate(pionWebRTC.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
 					}
 				}
 			}
-			log.Info("WEBRTC: connection state changed to: " + connectionState.String())
-			log.Info("WEBRTC: Number of peers connected (" + strconv.FormatInt(peerConnectionCount, 10) + ")")
+			log.Log.Info("WEBRTC: connection state changed to: " + connectionState.String())
+			log.Log.Info("WEBRTC: Number of peers connected (" + strconv.FormatInt(peerConnectionCount, 10) + ")")
 		})
 
 		offer := w.CreateOffer(sd)
@@ -189,13 +189,13 @@ func InitializeWebRTCConnection(track *pionWebRTC.TrackLocalStaticSample, config
 			defer candidatesMux.Unlock()
 
 			topic := fmt.Sprintf("%s/%s/candidate/edge", name, m.Cuuid)
-			log.Info("WEBRTC (LOCAL): Send candidate to " + topic)
+			log.Log.Info("WEBRTC (LOCAL): Send candidate to " + topic)
 			candiInit := candidate.ToJSON()
 			sdpmid := "0"
 			candiInit.SDPMid = &sdpmid
 			candi, err := json.Marshal(candiInit)
 			if err == nil {
-				log.Info("WEBRTC (LOCAL):" + string(candi))
+				log.Log.Info("WEBRTC (LOCAL):" + string(candi))
 				token := c.Publish(topic, 2, false, candi)
 				token.Wait()
 			}
@@ -205,7 +205,7 @@ func InitializeWebRTCConnection(track *pionWebRTC.TrackLocalStaticSample, config
 
 		if err == nil {
 			topic := fmt.Sprintf("%s/%s/answer", name, m.Cuuid)
-			log.Info("WEBRTC (LOCAL): Send SDP answer to " + topic)
+			log.Log.Info("WEBRTC (LOCAL): Send SDP answer to " + topic)
 			c.Publish(topic, 2, false, []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP))))
 		}
 	}
@@ -216,7 +216,7 @@ func NewVideoTrack() *pionWebRTC.TrackLocalStaticSample {
 	return outboundVideoTrack
 }
 
-func WriteToTrack(key string, keepalive chan string, peers chan string, forwardWebRTC string, transcodingWebRTC string, transcodingResolution int64, log Logging, track *pionWebRTC.TrackLocalStaticSample, livestreamCursor *pubsub.QueueCursor, packets chan av.Packet, codecs []av.CodecData, mqc mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func WriteToTrack(key string, keepalive chan string, peers chan string, forwardWebRTC string, transcodingWebRTC string, transcodingResolution int64, track *pionWebRTC.TrackLocalStaticSample, livestreamCursor *pubsub.QueueCursor, packets chan av.Packet, codecs []av.CodecData, mqc mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
 
 	// Make peerconnection map
 	peerConnections = make(map[string]*pionWebRTC.PeerConnection)
@@ -225,10 +225,10 @@ func WriteToTrack(key string, keepalive chan string, peers chan string, forwardW
 	// Later when we read a packet we need to figure out which track to send it to.
 	videoIdx := -1
 	audioIdx := -1
-	log.Info("WEBRTC: listing codecs.")
+	log.Log.Info("WEBRTC: listing codecs.")
 	for i, codec := range codecs {
-		log.Info("WEBRTC: codec - " + codec.Type().String() + " found.")
-		log.Info(codec.Type().String())
+		log.Log.Info("WEBRTC: codec - " + codec.Type().String() + " found.")
+		log.Log.Info(codec.Type().String())
 		if codec.Type().String() == "H264" && videoIdx < 0 {
 			videoIdx = i
 		} else if codec.Type().String() == "PCM_MULAW" && audioIdx < 0 {
@@ -237,18 +237,18 @@ func WriteToTrack(key string, keepalive chan string, peers chan string, forwardW
 	}
 
 	if videoIdx == -1 {
-		log.Error("WEBRTC: no video codec found.")
+		log.Log.Error("WEBRTC: no video codec found.")
 	} else {
 		annexbNALUStartCode := func() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
 
 		if transcodingWebRTC == "true" {
 			if videoIdx > -1 {
-				log.Info("WEBRTC: successfully using a transcoder.")
+				log.Log.Info("WEBRTC: successfully using a transcoder.")
 			} else {
 				//trans = nil
 			}
 		} else {
-			log.Info("WEBRTC: not using a transcoder.")
+			log.Log.Info("WEBRTC: not using a transcoder.")
 			//trans = nil
 		}
 
@@ -344,10 +344,10 @@ func WriteToTrack(key string, keepalive chan string, peers chan string, forwardW
 					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
 					pkt.Data = append(codecData.(h264parser.CodecData).SPS(), pkt.Data...)
 					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
-					log.Info("WEBRTC: Sending keyframe")
+					log.Log.Info("WEBRTC: Sending keyframe")
 
 					if forwardWebRTC == "true" {
-						log.Info("WEBRTC: Sending keep a live to remote broker.")
+						log.Log.Info("WEBRTC: Sending keep a live to remote broker.")
 						topic := fmt.Sprintf("kerberos/webrtc/keepalive/%s", key)
 						mqc.Publish(topic, 2, false, "1")
 					}
@@ -363,7 +363,7 @@ func WriteToTrack(key string, keepalive chan string, peers chan string, forwardW
 							topic := fmt.Sprintf("kerberos/webrtc/packets/%s", key)
 							mqc.Publish(topic, 0, false, samplePacket)
 						} else {
-							log.Info("WEBRTC: Error marshalling frame, " + err.Error())
+							log.Log.Info("WEBRTC: Error marshalling frame, " + err.Error())
 						}
 					} else {
 						if err := track.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
@@ -372,7 +372,7 @@ func WriteToTrack(key string, keepalive chan string, peers chan string, forwardW
 					}
 				}
 			case audioIdx:
-				log.Info("WEBRTC: not writing audio for the moment.")
+				log.Log.Info("WEBRTC: not writing audio for the moment.")
 			}
 		}
 	}
@@ -384,5 +384,5 @@ func WriteToTrack(key string, keepalive chan string, peers chan string, forwardW
 	close(peers)
 	close(keepalive)
 	peerConnectionCount = 0
-	log.Info("WEBRTC: stop writing to track.")
+	log.Log.Info("WEBRTC: stop writing to track.")
 }
