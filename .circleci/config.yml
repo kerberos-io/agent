@@ -5,7 +5,7 @@ version: 2
 jobs:
   machinery:
     docker:
-      - image: circleci/golang:1.17
+      - image: kerberos/base:6e68480
     working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
     steps:
       - checkout
