@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -22,7 +23,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	packageCounter.Store(int64(0))
 	communication.PackageCounter = &packageCounter
 	communication.HandleStream = make(chan string, 1)
-	communication.HandleMotion = make(chan string, 1)
+	communication.HandleMotion = make(chan int64, 1)
 	communication.HandleUpload = make(chan string, 1)
 	communication.HandleHeartBeat = make(chan string, 1)
 	communication.HandleLiveSD = make(chan int64, 1)
@@ -48,10 +49,11 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 	config := configuration.Config
 
+	// Currently only support H264 encoded cameras, this will change.
 	// Establishing the camera connection
 	log.Log.Info("RunAgent: opening RTSP stream")
 	rtspUrl := config.Capture.IPCamera.RTSP
-	infile, streams, err := OpenRTSP(rtspUrl)
+	infile, streams, err := capture.OpenRTSP(rtspUrl)
 
 	//var decoder *ffmpeg.VideoDecoder
 	var queue *pubsub.Queue
@@ -62,7 +64,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// At some routines we will need to decode the image.
 		// Make sure its properly locked as we only have a single decoder.
 		var decoderMutex sync.Mutex
-		decoder := GetVideoDecoder(streams)
+		decoder := capture.GetVideoDecoder(streams)
 
 		// Create a packet queue, which is filled by the HandleStream routing
 		// and consumed by all other routines: motion, livestream, etc.
@@ -77,7 +79,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		go cloud.HandleHeartBeat(configuration, communication)
 
 		// Handle the camera stream
-		go HandleStream(infile, queue, communication) //, &wg)
+		go capture.HandleStream(infile, queue, communication) //, &wg)
 
 		// Handle processing of motion
 		motionCursor := queue.Oldest()
@@ -86,6 +88,10 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// Handle livestream SD (low resolution over MQTT)
 		livestreamCursor := queue.Oldest()
 		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
+
+		// Handle recording
+		recordingCursor := queue.Oldest()
+		go capture.HandleRecordStream(recordingCursor, configuration, communication, streams)
 
 		//-----------
 		// This will go into a blocking state, once this channel is triggered

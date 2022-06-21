@@ -234,7 +234,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					if detectMotion && FindMotion(matArray, coordinatesToCheck) {
 						mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
 						fmt.Println(key)
-						communication.HandleMotion <- strconv.FormatInt(time.Now().Unix(), 10)
+						communication.HandleMotion <- time.Now().Unix()
 					}
 				}
 
