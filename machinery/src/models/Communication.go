@@ -2,6 +2,8 @@ package models
 
 import (
 	"sync/atomic"
+
+	"github.com/tevino/abool"
 )
 
 // The communication struct that is managing
@@ -18,4 +20,5 @@ type Communication struct {
 	HandleLiveHDHandshake chan SDPPayload
 	HandleLiveHDPeers     chan string
 	HandleONVIF           chan OnvifAction
+	IsConfiguring         *abool.AtomicBool
 }

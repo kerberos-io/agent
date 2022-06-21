@@ -69,20 +69,20 @@ func UploadS3(configuration *models.Configuration, fileName string, directory st
 	//numberOfChanges := fileParts[4]
 	token, _ := strconv.Atoi(fileParts[5])
 
-	log.Log.Info("Upload started for: " + fileName)
+	log.Log.Info("UploadS3: Upload started for " + fileName)
 	fullname := "data/recordings/" + fileName
 
 	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
 	defer file.Close()
 	if err != nil {
-		log.Log.Error("ERROR: " + err.Error())
+		log.Log.Error("UploadS3: " + err.Error())
 		os.Remove(directory + "/" + fileName)
 		return false
 	}
 
 	fileInfo, err := file.Stat()
 	if err != nil {
-		log.Log.Error("ERROR: " + err.Error())
+		log.Log.Error("UploadS3: " + err.Error())
 		os.Remove(directory + "/" + fileName)
 		return false
 	}
@@ -108,10 +108,10 @@ func UploadS3(configuration *models.Configuration, fileName string, directory st
 		})
 
 	if err != nil {
-		log.Log.Error("Uploading Failed: " + err.Error())
+		log.Log.Error("UploadS3: Uploading Failed, " + err.Error())
 		return false
 	} else {
-		log.Log.Info("Upload Finished: file has been uploaded to bucket: " + strconv.FormatInt(n, 10))
+		log.Log.Info("UploadS3: Upload Finished, file has been uploaded to bucket: " + strconv.FormatInt(n, 10))
 		os.Remove(directory + "/" + fileName)
 		return true
 	}

@@ -11,7 +11,9 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	routers "github.com/kerberos-io/agent/machinery/src/routers/mqtt"
 	"github.com/kerberos-io/joy4/av/pubsub"
+	"github.com/tevino/abool"
 )
 
 func Bootstrap(configuration *models.Configuration, communication *models.Communication) {
@@ -27,6 +29,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	communication.HandleUpload = make(chan string, 1)
 	communication.HandleHeartBeat = make(chan string, 1)
 	communication.HandleLiveSD = make(chan int64, 1)
+	communication.IsConfiguring = abool.New()
 
 	// Before starting the agent, we have a control goroutine, that might
 	// do several checks to see if the agent is still operational.
@@ -73,7 +76,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		queue.WriteHeader(streams)
 
 		// Configure a MQTT client which helps for a bi-directional communication
-		mqttClient := ConfigureMQTT(configuration, communication)
+		mqttClient := routers.ConfigureMQTT(configuration, communication)
 
 		// Handle heartbeats
 		go cloud.HandleHeartBeat(configuration, communication)
@@ -93,7 +96,10 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		recordingCursor := queue.Oldest()
 		go capture.HandleRecordStream(recordingCursor, configuration, communication, streams)
 
-		//-----------
+		// Handle Upload to cloud
+		go cloud.HandleUpload(configuration, communication)
+
+		//-------------------------------------------------------------------
 		// This will go into a blocking state, once this channel is triggered
 		// the agent will cleanup and restart.
 		status = <-communication.HandleBootstrap
@@ -101,9 +107,10 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// Here we are cleaning up everything!
 		communication.HandleStream <- "stop"
 		communication.HandleHeartBeat <- "stop"
+		communication.HandleUpload <- "stop"
 		infile.Close()
 		queue.Close()
-		DisconnectMQTT(mqttClient)
+		routers.DisconnectMQTT(mqttClient)
 
 	} else {
 		time.Sleep(time.Second * 2)
@@ -125,7 +132,11 @@ func ControlAgent(communication *models.Communication) {
 		for {
 			packetsR := packageCounter.Load().(int64)
 			if packetsR == previousPacket {
-				occurence = occurence + 1
+				// If we are already reconfiguring,
+				// we dont need to check if the stream is blocking.
+				if !communication.IsConfiguring.IsSet() {
+					occurence = occurence + 1
+				}
 			} else {
 				occurence = 0
 			}

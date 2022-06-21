@@ -36,7 +36,9 @@ func PendingUpload() {
 	}
 }
 
-func StartUpload(configuration *models.Configuration, communication *models.Communication) {
+func HandleUpload(configuration *models.Configuration, communication *models.Communication) {
+
+	log.Log.Debug("HandleUpload: started")
 
 	config := configuration.Config
 	watchDirectory := "./data/cloud/"
@@ -74,6 +76,8 @@ loop:
 		}
 		time.Sleep(1 * time.Second)
 	}
+
+	log.Log.Debug("HandleUpload: finished")
 }
 
 func HandleHeartBeat(configuration *models.Configuration, communication *models.Communication) {

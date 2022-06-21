@@ -18,7 +18,7 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string, d
 		config.KStorage.Provider == "" ||
 		config.KStorage.Directory == "" ||
 		config.KStorage.URI == "" {
-		log.Log.Info("Kerberos Vault: not properly configured.")
+		log.Log.Info("UploadKerberosVault: Kerberos Vault not properly configured.")
 	}
 
 	//fmt.Println("Uploading...")
@@ -32,18 +32,19 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string, d
 	// - Token
 
 	// KerberosCloud, this means storage is disabled and proxy enabled.
-	log.Log.Info("Uploading to Kerberos Vault")
+	log.Log.Info("UploadKerberosVault: Uploading to Kerberos Vault (" + config.KStorage.URI + ")")
 
-	log.Log.Info("Upload started for: " + fileName)
+	log.Log.Info("UploadKerberosVault: Upload started for " + fileName)
 	fullname := "data/recordings/" + fileName
 
 	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
-	defer file.Close()
 	if err != nil {
-		log.Log.Info("Upload Failed: file doesn't exists anymore.")
+		log.Log.Info("UploadKerberosVault: Upload Failed, file doesn't exists anymore.")
 		os.Remove(directory + "/" + fileName)
 		return false
 	}
+
+	defer file.Close()
 
 	publicKey := config.KStorage.CloudKey
 	// This is the new way ;)
@@ -51,7 +52,6 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string, d
 		publicKey = config.HubKey
 	}
 
-	log.Log.Info(config.KStorage.URI)
 	req, err := http.NewRequest("POST", config.KStorage.URI+"/storage", file)
 	if err != nil {
 		log.Log.Error("Error reading request. " + err.Error())
@@ -79,18 +79,18 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string, d
 			body, err := ioutil.ReadAll(resp.Body)
 			if err == nil {
 				if resp.StatusCode == 200 {
-					log.Log.Info("Upload Finished: " + resp.Status + ", " + string(body))
+					log.Log.Info("UploadKerberosVault: Upload Finished, " + resp.Status + ", " + string(body))
 					// We will remove the file from disk as well
 					os.Remove(fullname)
 					os.Remove(directory + "/" + fileName)
 				} else {
-					log.Log.Info("Upload Failed: " + resp.Status + ", " + string(body))
+					log.Log.Info("UploadKerberosVault: Upload Failed, " + resp.Status + ", " + string(body))
 				}
 				resp.Body.Close()
 			}
 		}
 	} else {
-		log.Log.Info("Upload Failed: " + err.Error())
+		log.Log.Info("UploadKerberosVault: Upload Failed, " + err.Error())
 	}
 	return true
 }

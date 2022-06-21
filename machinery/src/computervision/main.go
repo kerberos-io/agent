@@ -102,11 +102,11 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 
 	if config.Capture.Continuous == "true" {
 
-		log.Log.Info("Disabled Detecting motion...")
+		log.Log.Info("ProcessMotion: Continuous recording, so no motion detection.")
 
 	} else {
 
-		log.Log.Info("Start Detecting motion...")
+		log.Log.Info("ProcessMotion: Motion detection enabled.")
 
 		key := ""
 		if config.Cloud == "s3" && config.S3.Publickey != "" {
@@ -227,7 +227,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 
 						} else {
 							detectMotion = false
-							log.Log.Debug("Disabled: not within time interval.")
+							log.Log.Debug("ProcessMotion: Time interval not valid, disabling motion detection.")
 						}
 					}
 
@@ -251,7 +251,6 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 		}
 		runtime.GC()
 		debug.FreeOSMemory()
-		log.Log.Info("Stopped motion")
 	}
 
 	log.Log.Debug("ProcessMotion: finished")
