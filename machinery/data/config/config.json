@@ -8,7 +8,6 @@
 	"timezone": "Europe/Brussels",
 	"stunuri": "stun:turn.kerberos.io:8443",
 	"turnuri": "turn:turn.kerberos.io:8443",
-	"turn_username": "xxx",
 	"turn_password": "xxx",
 	"capture": {
 		"id": "ipcamera",
