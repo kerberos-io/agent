@@ -3,3 +3,4 @@ ui/build
 .idea
 machinery/www
 yarn.lock
+machinery/data/config/config.json
