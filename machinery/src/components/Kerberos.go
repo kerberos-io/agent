@@ -19,6 +19,8 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	var packageCounter atomic.Value
 	packageCounter.Store(int64(0))
 	communication.PackageCounter = &packageCounter
+	communication.HandleStream = make(chan string, 1)
+	communication.HandleMotion = make(chan string, 1)
 
 	// Before starting the agent, we have a control goroutine, that might
 	// do several checks to see if the agent is still operational.
@@ -26,30 +28,20 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 
 	// Run the agent and fire up all the other
 	// goroutines which do image capture, motion detection, onvif, etc.
+
 	for {
-		go RunAgent(configuration, communication)
-		message := <-communication.HandleBootstrap
-		if message == "restart" {
-			StopAgent(configuration, communication)
-		} else {
-			StopAgent(configuration, communication)
+		status := RunAgent(configuration, communication)
+		if status == "stop" {
 			break
 		}
-		// Depending on the message, you might do other funky shizzle..
-		// else if message == "stop" {
-		//	StopAgent(configuration, communication)
-		//	break
-		//}
 	}
 	log.Log.Debug("Bootstrap: finished")
 }
 
-func RunAgent(configuration *models.Configuration, communication *models.Communication) {
+func RunAgent(configuration *models.Configuration, communication *models.Communication) string {
 	log.Log.Debug("RunAgent: started")
 
 	config := configuration.Config
-	communication.HandleStream = make(chan string, 1)
-	communication.HandleMotion = make(chan string, 1)
 
 	// Establishing the camera connection
 	log.Log.Info("RunAgent: opening RTSP stream")
@@ -61,41 +53,35 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 	if err == nil {
 
-		wg := sync.WaitGroup{}
-
+		//wg := sync.WaitGroup{}
 		queue = pubsub.NewQueue()
 		queue.SetMaxGopCount(5) // GOP time frame is set to 5.
 		queue.WriteHeader(streams)
 
 		// Start handling the stream
-		wg.Add(1)
-		go HandleStream(infile, queue, communication, &wg)
+		go HandleStream(infile, queue, communication) //, &wg)
 
 		// Start processing of motion
-		wg.Add(1)
 		motionCursor := queue.Oldest()
 		var decoderMutex sync.Mutex
 		decoder := GetVideoDecoder(streams)
-		go ProcessMotion(motionCursor, configuration, communication, decoder, &decoderMutex, &wg)
-
-		wg.Wait()
+		go ProcessMotion(motionCursor, configuration, communication, decoder, &decoderMutex)
 
 	} else {
 		log.Log.Error("Something went wrong while opening RTSP: " + err.Error())
 	}
 
+	// This will go into a blocking state, once this channel is triggered
+	// the agent will cleanup and restart.
+	status := <-communication.HandleBootstrap
+
 	// Here we are cleaning up everything!
+	communication.HandleStream <- "stop"
 	infile.Close()
 	queue.Close()
-
 	log.Log.Debug("RunAgent: finished")
-}
 
-func StopAgent(configuration *models.Configuration, communication *models.Communication) {
-	log.Log.Debug("StopAgent: started")
-	communication.HandleStream <- "stop"
-	communication.HandleMotion <- "stop"
-	log.Log.Debug("StopAgent: finished")
+	return status
 }
 
 func ControlAgent(communication *models.Communication) {

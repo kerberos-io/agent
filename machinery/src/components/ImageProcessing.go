@@ -95,7 +95,7 @@ func ToRGB8(img image.YCbCr) (gocv.Mat, error) {
 	return gocv.NewMatFromBytes(y, x, gocv.MatTypeCV8UC3, bytes)
 }
 
-func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex, wg *sync.WaitGroup) {
+func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) { //, wg *sync.WaitGroup) {
 	log.Log.Debug("ProcessMotion: started")
 	config := configuration.Config
 
@@ -254,7 +254,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 		log.Log.Info("Stopped motion")
 	}
 
-	wg.Done()
+	//wg.Done()
 	log.Log.Debug("ProcessMotion: finished")
 }
 

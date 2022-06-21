@@ -5,7 +5,6 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -43,7 +42,7 @@ func GetVideoDecoder(streams []av.CodecData) *ffmpeg.VideoDecoder {
 	return dec
 }
 
-func HandleStream(infile av.DemuxCloser, queue *pubsub.Queue, communication *models.Communication, wg *sync.WaitGroup) {
+func HandleStream(infile av.DemuxCloser, queue *pubsub.Queue, communication *models.Communication) { //, wg *sync.WaitGroup) {
 
 	log.Log.Debug("HandleStream: started")
 	var err error
@@ -109,7 +108,9 @@ loop:
 			}
 		}
 	}
-	wg.Done()
+	//wg.Done()
+
+	queue.Close()
 	log.Log.Debug("HandleStream: finished")
 }
 
