@@ -10,7 +10,6 @@
 	"turnuri": "turn:turn.kerberos.io:8443",
 	"turn_username": "username1",
 	"turn_password": "password1",
-	"heartbeaturi": "https://api.cloud.kerberos.io/devices/heartbeat",
 	"capture": {
 		"id": "ipcamera",
 		"ipcamera": {
@@ -89,11 +88,15 @@
 		"polygon": []
 	},
 	"cloud": "kstorage",
+	"hub_uri": "https://api.cloud.kerberos.io",
+	"hub_key": "AKIA5V6EGLUWUUWHY3QB",
+	"hub_private_key": "pH/pfQhZ7c2jbBqnFBEGE1Z86VDaS8uGjF7bSC/6",
+	"hub_site": "",
 	"kstorage": {
 		"uri": "https://staging.api.vault.kerberos.live",
 		"access_key": "ABCDEFGHI!@#$%12345",
 		"secret_access_key": "JKLMNOPQRSTUVWXYZ!@#$%67890",
 		"provider": "",
-		"directory": "youruser"
+		"directory": "cedricve"
 	}
 }

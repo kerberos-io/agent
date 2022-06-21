@@ -9,4 +9,6 @@ type Communication struct {
 	HandleBootstrap chan string
 	HandleStream    chan string
 	HandleMotion    chan string
+	HandleUpload    chan string
+	HandleHeartBeat chan string
 }

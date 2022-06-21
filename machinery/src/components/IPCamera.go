@@ -9,6 +9,7 @@ import (
 
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/joy4/av/pubsub"
 	"github.com/kerberos-io/joy4/format/mp4"
 
@@ -169,7 +170,7 @@ func RecordStream(recordingCursor *pubsub.QueueCursor, motion chan int64, device
 
 				// Check if need to convert to fragmented using bento
 				if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
-					CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
+					utils.CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
 				}
 
 				// Create a symbol link.
@@ -339,7 +340,7 @@ func RecordStream(recordingCursor *pubsub.QueueCursor, motion chan int64, device
 
 			// Check if need to convert to fragmented using bento
 			if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
-				CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
+				utils.CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
 			}
 
 			// Create a symbol linc.

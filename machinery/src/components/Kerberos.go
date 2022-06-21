@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/cloud"
+	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/joy4/av/pubsub"
@@ -21,6 +23,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	communication.PackageCounter = &packageCounter
 	communication.HandleStream = make(chan string, 1)
 	communication.HandleMotion = make(chan string, 1)
+	communication.HandleUpload = make(chan string, 1)
 
 	// Before starting the agent, we have a control goroutine, that might
 	// do several checks to see if the agent is still operational.
@@ -50,6 +53,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 	//var decoder *ffmpeg.VideoDecoder
 	var queue *pubsub.Queue
+	status := "not started"
 
 	if err == nil {
 
@@ -58,27 +62,34 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		queue.SetMaxGopCount(5) // GOP time frame is set to 5.
 		queue.WriteHeader(streams)
 
-		// Start handling the stream
+		// Handle the camera stream
 		go HandleStream(infile, queue, communication) //, &wg)
 
-		// Start processing of motion
+		// Handle processing of motion
 		motionCursor := queue.Oldest()
 		var decoderMutex sync.Mutex
 		decoder := GetVideoDecoder(streams)
-		go ProcessMotion(motionCursor, configuration, communication, decoder, &decoderMutex)
+		go computervision.ProcessMotion(motionCursor, configuration, communication, decoder, &decoderMutex)
+
+		// Handle heartbeats
+		go cloud.HandleHeartBeat(configuration, communication)
+
+		//-----------
+		// This will go into a blocking state, once this channel is triggered
+		// the agent will cleanup and restart.
+		status = <-communication.HandleBootstrap
+
+		// Here we are cleaning up everything!
+		communication.HandleStream <- "stop"
+		communication.HandleHeartBeat <- "stop"
+		infile.Close()
+		queue.Close()
 
 	} else {
+		time.Sleep(time.Second * 2)
 		log.Log.Error("Something went wrong while opening RTSP: " + err.Error())
 	}
 
-	// This will go into a blocking state, once this channel is triggered
-	// the agent will cleanup and restart.
-	status := <-communication.HandleBootstrap
-
-	// Here we are cleaning up everything!
-	communication.HandleStream <- "stop"
-	infile.Close()
-	queue.Close()
 	log.Log.Debug("RunAgent: finished")
 
 	return status
