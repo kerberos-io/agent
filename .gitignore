@@ -3,4 +3,6 @@ ui/build
 .idea
 machinery/www
 yarn.lock
-machinery/data/config/config.json
+machinery/data/config
+machinery/data/cloud
+machinery/data/recordings

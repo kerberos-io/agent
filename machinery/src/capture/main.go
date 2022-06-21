@@ -52,6 +52,7 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 		//for pkt := range packets {
 		var cursorError error
 		var pkt av.Packet
+		recordingStatus := "idle"
 
 		for cursorError == nil {
 
@@ -84,6 +85,8 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 				myMuxer = nil
 				runtime.GC()
 				debug.FreeOSMemory()
+
+				recordingStatus = "idle"
 			}
 
 			// If not yet started and a keyframe, let's make a recording
@@ -151,6 +154,8 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 					log.Log.Error(err.Error())
 				}
 
+				recordingStatus = "started"
+
 			} else if start {
 				if err := myMuxer.WritePacket(pkt); err != nil {
 					log.Log.Error(err.Error())
@@ -158,6 +163,36 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 			}
 		}
 
+		// We might have interrupted the recording while restarting the agent.
+		// If this happens we need to check to properly close the recording.
+		if cursorError != nil {
+			if recordingStatus == "started" {
+				// This will write the trailer a well.
+				if err := myMuxer.WriteTrailer(); err != nil {
+					log.Log.Error(err.Error())
+				}
+
+				log.Log.Info("HandleRecordStream: Recording finished: file save: " + name)
+				file.Close()
+
+				// Check if need to convert to fragmented using bento
+				if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
+					utils.CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
+				}
+
+				// Create a symbol link.
+				fc, _ := os.Create("./data/cloud/" + name)
+				fc.Close()
+
+				// Cleanup muxer
+				start = false
+				myMuxer = nil
+				runtime.GC()
+				debug.FreeOSMemory()
+
+				recordingStatus = "idle"
+			}
+		}
 	} else {
 
 		log.Log.Info("HandleRecordStream: Start motion based recording ")

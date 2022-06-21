@@ -185,6 +185,6 @@ func MQTTListenerHandleONVIF(mqttClient mqtt.Client, hubKey string, configuratio
 	})
 }
 
-func DisconnectMQTT(config models.Config, mqc mqtt.Client) {
-	mqc.Disconnect(1000)
+func DisconnectMQTT(mqttClient mqtt.Client) {
+	mqttClient.Disconnect(1000)
 }

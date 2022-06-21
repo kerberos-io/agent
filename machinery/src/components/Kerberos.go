@@ -103,6 +103,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		communication.HandleHeartBeat <- "stop"
 		infile.Close()
 		queue.Close()
+		DisconnectMQTT(mqttClient)
 
 	} else {
 		time.Sleep(time.Second * 2)
