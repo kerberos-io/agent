@@ -50,9 +50,6 @@ func main() {
 			}
 			go components.Bootstrap(&configuration, &communication)
 
-			// Start a MQTT listener.
-			routers.StartMqttListener(name)
-
 			// Start the REST API.
 			routers.StartWebserver(&configuration, &communication)
 		}

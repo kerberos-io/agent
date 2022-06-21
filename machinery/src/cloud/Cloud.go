@@ -131,7 +131,7 @@ loop:
 			"key" : "%s",
 			"hash" : "826133658",
 			"version" : "3.0.0",
-			"cpuid" : "Serial: 00000000d71d1e62",
+			"cpuid" : "Serial: xxx",
 			"clouduser" : "%s",
 			"cloudpublickey" : "%s",
 			"cameraname" : "%s",
@@ -195,7 +195,10 @@ loop:
 	log.Log.Debug("HandleHeartBeat: finished")
 }
 
-func SendLiveStream(configuration *models.Configuration, livestreamChan chan int64, livestreamCursor *pubsub.QueueCursor, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+
+	log.Log.Debug("HandleLiveStreamSD: finished")
+
 	config := configuration.Config
 	key := ""
 	if config.Cloud == "s3" && config.S3.Publickey != "" {
@@ -217,34 +220,33 @@ func SendLiveStream(configuration *models.Configuration, livestreamChan chan int
 	var pkt av.Packet
 
 	for cursorError == nil {
-
 		pkt, cursorError = livestreamCursor.ReadPacket()
-
 		if len(pkt.Data) == 0 || !pkt.IsKeyFrame {
 			continue
 		}
 		now := time.Now().Unix()
 		select {
-		case <-livestreamChan:
+		case <-communication.HandleLiveSD:
 			lastLivestreamRequest = now
 		default:
 		}
 		if now-lastLivestreamRequest > 3 {
 			continue
 		}
-		log.Log.Info("Livestream: sending base64 encoded images to cloud.")
-		//sendImage(topic, mqc, pkt, decoder, decoderMutex)
-		log.Log.Info(topic)
+		log.Log.Info("HandleLiveStreamSD: Sending base64 encoded images to MQTT.")
+		sendImage(topic, mqttClient, pkt, decoder, decoderMutex)
 	}
+
+	log.Log.Debug("HandleLiveStreamSD: finished")
 }
 
-func sendImage(topic string, mqc mqtt.Client, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func sendImage(topic string, mqttClient mqtt.Client, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
 	mat := computervision.GetRGBImage(pkt, decoder, decoderMutex)
 	buffer, err := gocv.IMEncode(gocv.JPEGFileExt, mat)
 	mat.Close()
 	if err == nil {
 		encoded := base64.StdEncoding.EncodeToString(buffer.GetBytes())
-		mqc.Publish(topic, 0, false, encoded)
+		mqttClient.Publish(topic, 0, false, encoded)
 	}
 	runtime.GC()
 	debug.FreeOSMemory()

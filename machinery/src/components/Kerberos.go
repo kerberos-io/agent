@@ -24,6 +24,8 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	communication.HandleStream = make(chan string, 1)
 	communication.HandleMotion = make(chan string, 1)
 	communication.HandleUpload = make(chan string, 1)
+	communication.HandleHeartBeat = make(chan string, 1)
+	communication.HandleLiveSD = make(chan int64, 1)
 
 	// Before starting the agent, we have a control goroutine, that might
 	// do several checks to see if the agent is still operational.
@@ -57,22 +59,33 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 	if err == nil {
 
-		//wg := sync.WaitGroup{}
+		// At some routines we will need to decode the image.
+		// Make sure its properly locked as we only have a single decoder.
+		var decoderMutex sync.Mutex
+		decoder := GetVideoDecoder(streams)
+
+		// Create a packet queue, which is filled by the HandleStream routing
+		// and consumed by all other routines: motion, livestream, etc.
 		queue = pubsub.NewQueue()
 		queue.SetMaxGopCount(5) // GOP time frame is set to 5.
 		queue.WriteHeader(streams)
+
+		// Configure a MQTT client which helps for a bi-directional communication
+		mqttClient := ConfigureMQTT(configuration, communication)
+
+		// Handle heartbeats
+		go cloud.HandleHeartBeat(configuration, communication)
 
 		// Handle the camera stream
 		go HandleStream(infile, queue, communication) //, &wg)
 
 		// Handle processing of motion
 		motionCursor := queue.Oldest()
-		var decoderMutex sync.Mutex
-		decoder := GetVideoDecoder(streams)
-		go computervision.ProcessMotion(motionCursor, configuration, communication, decoder, &decoderMutex)
+		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
-		// Handle heartbeats
-		go cloud.HandleHeartBeat(configuration, communication)
+		// Handle livestream SD (low resolution over MQTT)
+		livestreamCursor := queue.Oldest()
+		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
 		//-----------
 		// This will go into a blocking state, once this channel is triggered
@@ -110,7 +123,7 @@ func ControlAgent(communication *models.Communication) {
 				occurence = 0
 			}
 
-			log.Log.Info("Number of packets read " + strconv.FormatInt(packetsR, 10))
+			log.Log.Info("ControlAgent: Number of packets read " + strconv.FormatInt(packetsR, 10))
 			// After 15 seconds without activity this is thrown..
 			if occurence == 3 {
 				log.Log.Info("Main: Restarting machinery.")

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/joy4/av/pubsub"
@@ -95,7 +96,7 @@ func ToRGB8(img image.YCbCr) (gocv.Mat, error) {
 	return gocv.NewMatFromBytes(y, x, gocv.MatTypeCV8UC3, bytes)
 }
 
-func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) { //, wg *sync.WaitGroup) {
+func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) { //, wg *sync.WaitGroup) {
 	log.Log.Debug("ProcessMotion: started")
 	config := configuration.Config
 
@@ -231,8 +232,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					}
 
 					if detectMotion && FindMotion(matArray, coordinatesToCheck) {
-						// TODO create object for motion
-						//mqc.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
+						mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
 						fmt.Println(key)
 						communication.HandleMotion <- strconv.FormatInt(time.Now().Unix(), 10)
 					}
@@ -254,7 +254,6 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 		log.Log.Info("Stopped motion")
 	}
 
-	//wg.Done()
 	log.Log.Debug("ProcessMotion: finished")
 }
 
@@ -287,14 +286,9 @@ func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int) bool {
 			changes++
 		}
 	}
-	//gocv.IMWrite("./data/debug/"+ strconv.Itoa(changes)  +".png", eroded)
-
 	eroded.Close()
 
-	log.Log.Info("Number of changes detected:" + strconv.Itoa(changes))
+	log.Log.Info("FindMotion: Number of changes detected:" + strconv.Itoa(changes))
 
-	if changes > 75 {
-		return true
-	}
-	return false
+	return changes > 75
 }
