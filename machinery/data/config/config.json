@@ -3,17 +3,17 @@
 	"key": "0x123-a-test-agent",
 	"name": "camera",
 	"mqtturi": "tcp://mqtt.kerberos.io",
-	"mqtt_username": "yourusername",
-	"mqtt_password": "yourpassword",
+	"mqtt_username": "xxx",
+	"mqtt_password": "xxx",
 	"timezone": "Europe/Brussels",
 	"stunuri": "stun:turn.kerberos.io:8443",
 	"turnuri": "turn:turn.kerberos.io:8443",
-	"turn_username": "username1",
-	"turn_password": "password1",
+	"turn_username": "xxx",
+	"turn_password": "xxx",
 	"capture": {
 		"id": "ipcamera",
 		"ipcamera": {
-			"rtsp": "rtsp://admin:thiemenimke2017@192.168.1.69:554/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif",
+			"rtsp": "xxx",
 			"fps": ""
 		},
 		"usbcamera": {
@@ -89,14 +89,14 @@
 	},
 	"cloud": "kstorage",
 	"hub_uri": "https://api.cloud.kerberos.io",
-	"hub_key": "AKIA5V6EGLUWUUWHY3QB",
-	"hub_private_key": "pH/pfQhZ7c2jbBqnFBEGE1Z86VDaS8uGjF7bSC/6",
+	"hub_key": "xxx",
+	"hub_private_key": "xxx",
 	"hub_site": "",
 	"kstorage": {
 		"uri": "https://staging.api.vault.kerberos.live",
-		"access_key": "ABCDEFGHI!@#$%12345",
-		"secret_access_key": "JKLMNOPQRSTUVWXYZ!@#$%67890",
+		"access_key": "xxx",
+		"secret_access_key": "xxx",
 		"provider": "",
-		"directory": "cedricve"
+		"directory": "xxx"
 	}
 }
