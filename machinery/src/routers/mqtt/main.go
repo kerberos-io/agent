@@ -88,9 +88,6 @@ func ConfigureMQTT(configuration *models.Configuration, communication *models.Co
 			// Create a subscription to listen to the number of WEBRTC peers.
 			MQTTListenerHandleLiveHDPeers(c, hubKey, configuration, communication)
 
-			// Create a subscription to listen for WEBRTC candidates.
-			MQTTListenerHandleLiveHDCandidates(c, hubKey, configuration, communication)
-
 			// Create a susbcription to listen for ONVIF actions: e.g. PTZ, Zoom, etc.
 			MQTTListenerHandleONVIF(c, hubKey, configuration, communication)
 		}
@@ -149,26 +146,6 @@ func MQTTListenerHandleLiveHDPeers(mqttClient mqtt.Client, hubKey string, config
 		peerCount := string(msg.Payload())
 		communication.HandleLiveHDPeers <- peerCount
 		log.Log.Info("MQTTListenerHandleLiveHDPeers: Number of peers listening: " + peerCount)
-	})
-}
-
-func MQTTListenerHandleLiveHDCandidates(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, communication *models.Communication) {
-	config := configuration.Config
-	topicCandidates := "candidate/cloud"
-	mqttClient.Subscribe(topicCandidates, 0, func(c mqtt.Client, msg mqtt.Message) {
-		var candidate models.Candidate
-		json.Unmarshal(msg.Payload(), &candidate)
-		if candidate.CloudKey == config.Key {
-			key := candidate.CloudKey + "/" + candidate.Cuuid
-			channel, ok := webrtc.CandidateArrays[key]
-			if !ok {
-				val := make(chan string, 30)
-				webrtc.CandidateArrays[key] = val
-				channel = val
-			}
-			log.Log.Info("MQTTListenerHandleLiveHDCandidates: " + string(msg.Payload()))
-			channel <- string(msg.Payload())
-		}
 	})
 }
 

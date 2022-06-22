@@ -280,10 +280,7 @@ func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 		for handshake := range communication.HandleLiveHDHandshake {
 			log.Log.Info("HandleLiveStreamHD: setting up a peer connection.")
 			key := config.Key + "/" + handshake.Cuuid
-			_, ok := webrtc.CandidateArrays[key]
-			if !ok {
-				webrtc.CandidateArrays[key] = make(chan string, 30)
-			}
+			webrtc.CandidateArrays[key] = make(chan string, 30)
 			webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, track, handshake, webrtc.CandidateArrays[key])
 		}
 	}

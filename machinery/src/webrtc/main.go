@@ -155,7 +155,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				atomic.AddInt64(&peerConnectionCount, 1)
 			} else if connectionState == pionWebRTC.ICEConnectionStateChecking {
 				for candidate := range candidates {
-					log.Log.Info("WEBRTC (Remote): received candidate.")
+					log.Log.Info("InitializeWebRTCConnection: Received candidate.")
 					if candidateErr := peerConnection.AddICECandidate(pionWebRTC.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
 					}
 				}
