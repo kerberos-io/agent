@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"sort"
 	"time"
 
+	"github.com/InVisionApp/conjungo"
 	"github.com/kerberos-io/agent/machinery/src/database"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -121,14 +123,35 @@ func OpenConfig(configuration *models.Configuration) {
 		// We will merge both configs in a single config file.
 		// Read again from database but this store overwrite the same object.
 
-		collection.Find(bson.M{
-			"type": "global",
-		}).One(&configuration.Config)
+		opts := conjungo.NewOptions()
+		opts.SetTypeMergeFunc(
+			reflect.TypeOf(""),
+			func(t, s reflect.Value, o *conjungo.Options) (reflect.Value, error) {
+				targetStr, _ := t.Interface().(string)
+				sourceStr, _ := s.Interface().(string)
+				finalStr := targetStr
+				if sourceStr != "" {
+					finalStr = sourceStr
+				}
+				return reflect.ValueOf(finalStr), nil
+			},
+		)
 
-		collection.Find(bson.M{
-			"type": "config",
-			"name": os.Getenv("DEPLOYMENT_NAME"),
-		}).One(&configuration.Config)
+		// Merge Config toplevel
+		conjungo.Merge(&configuration.Config, configuration.GlobalConfig, opts)
+		conjungo.Merge(&configuration.Config, configuration.CustomConfig, opts)
+
+		// Merge Kerberos Vault settings
+		var kerberosvault models.KStorage
+		conjungo.Merge(&kerberosvault, configuration.GlobalConfig.KStorage, opts)
+		conjungo.Merge(&kerberosvault, configuration.CustomConfig.KStorage, opts)
+		configuration.Config.KStorage = &kerberosvault
+
+		// Merge Kerberos S3 settings
+		var s3 models.S3
+		conjungo.Merge(&s3, configuration.GlobalConfig.S3, opts)
+		conjungo.Merge(&s3, configuration.CustomConfig.S3, opts)
+		configuration.Config.S3 = &s3
 
 	}
 	return

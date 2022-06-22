@@ -53,7 +53,7 @@ func ConfigureLogrus() {
 	logrus.SetOutput(os.Stdout)
 
 	// Only log the warning severity or above.
-	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetLevel(logrus.InfoLevel)
 }
 
 func NewLogger(logger string, level string) *Logging {

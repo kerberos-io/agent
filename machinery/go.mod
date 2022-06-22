@@ -3,6 +3,7 @@ module github.com/kerberos-io/agent/machinery
 go 1.18
 
 require (
+	github.com/InVisionApp/conjungo v1.1.0
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 	github.com/appleboy/gin-jwt/v2 v2.8.0
 	github.com/cedricve/go-onvif v0.0.0-20200222191200-567e8ce298f6
