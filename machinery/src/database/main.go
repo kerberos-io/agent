@@ -16,7 +16,7 @@ type DB struct {
 
 var _init_ctx sync.Once
 var _instance *DB
-var DatabaseName = "Kerberos"
+var DatabaseName = "KerberosFactory"
 
 func New() *mgo.Session {
 	host := os.Getenv("MONGODB_HOST")
