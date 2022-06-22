@@ -25,6 +25,7 @@ import (
 )
 
 var (
+	CandidatesMutex     sync.Mutex
 	CandidateArrays     map[string](chan string)
 	peerConnectionCount int64
 	peerConnections     map[string]*pionWebRTC.PeerConnection
@@ -176,14 +177,12 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 		} else if err = peerConnection.SetLocalDescription(answer); err != nil {
 			panic(err)
 		}
-		//<-gatherCompletePromise
 
 		// When an ICE candidate is available send to the other Pion instance
 		// the other Pion instance will add this candidate by calling AddICECandidate
 		var candidatesMux sync.Mutex
 		peerConnection.OnICECandidate(func(candidate *pionWebRTC.ICECandidate) {
 
-			//fmt.Println("BEEN HERE YOLO !!!!!")
 			if candidate == nil {
 				return
 			}
