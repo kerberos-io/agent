@@ -159,16 +159,16 @@ func MQTTListenerHandleLiveHDCandidates(mqttClient mqtt.Client, hubKey string, c
 		var candidate models.Candidate
 		json.Unmarshal(msg.Payload(), &candidate)
 		if candidate.CloudKey == config.Key {
-			webrtc.CandidatesMutex.Lock()
 			key := candidate.CloudKey + "/" + candidate.Cuuid
 			candidatesExists := false
 			var channel chan string
 			for !candidatesExists {
+				webrtc.CandidatesMutex.Lock()
 				channel, candidatesExists = webrtc.CandidateArrays[key]
+				webrtc.CandidatesMutex.Unlock()
 			}
 			log.Log.Info("MQTTListenerHandleLiveHDCandidates: " + string(msg.Payload()))
 			channel <- string(msg.Payload())
-			webrtc.CandidatesMutex.Unlock()
 		}
 	})
 }
