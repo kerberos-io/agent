@@ -100,7 +100,7 @@ func OpenConfig(configuration *models.Configuration) {
 			jsonFile.Close()
 		}
 
-	} else if os.Getenv("DEPLOYMENT") == "factory" {
+	} else if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
 
 		// Factory deployment means that configuration is stored in MongoDB
 		// Multiple agents have there configuration stored, and can benefit from
