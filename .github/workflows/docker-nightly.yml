@@ -3,7 +3,7 @@ name: Docker Nightly build
 on:
   # Triggers the workflow every day at 9PM (CET).
   schedule:
-    - cron: "0 21 * * *"
+    - cron: "0 22 * * *"
 
 jobs:
   build-amd64:
