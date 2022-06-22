@@ -69,38 +69,7 @@ func OpenConfig(configuration *models.Configuration) {
 	// We are checking which deployment this is running, so we can load
 	// into the configuration as expected.
 
-	if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
-
-		// Local deployment means we do a stand-alone installation
-		// Configuration is stored into a json file, and there is only 1 agent.
-
-		// Open device config
-		for {
-			jsonFile, err := os.Open("./data/config/config.json")
-			if err != nil {
-				log.Log.Error("Config file is not found " + "./data/config/config.json" + ", trying again in 5s.")
-				time.Sleep(5 * time.Second)
-			} else {
-				log.Log.Info("Successfully Opened config.json from " + configuration.Name)
-				byteValue, _ := ioutil.ReadAll(jsonFile)
-				err = json.Unmarshal(byteValue, &configuration.Config)
-				jsonFile.Close()
-				if err != nil {
-					fmt.Println("JSON file not valid: " + err.Error())
-				} else {
-					err = json.Unmarshal(byteValue, &configuration.CustomConfig)
-					if err != nil {
-						fmt.Println("JSON file not valid: " + err.Error())
-					} else {
-						break
-					}
-				}
-				time.Sleep(5 * time.Second)
-			}
-			jsonFile.Close()
-		}
-
-	} else if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
+	if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
 
 		// Factory deployment means that configuration is stored in MongoDB
 		// Multiple agents have there configuration stored, and can benefit from
@@ -153,6 +122,38 @@ func OpenConfig(configuration *models.Configuration) {
 		conjungo.Merge(&s3, configuration.CustomConfig.S3, opts)
 		configuration.Config.S3 = &s3
 
+	} else if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
+
+		// Local deployment means we do a stand-alone installation
+		// Configuration is stored into a json file, and there is only 1 agent.
+
+		// Open device config
+		for {
+			jsonFile, err := os.Open("./data/config/config.json")
+			if err != nil {
+				log.Log.Error("Config file is not found " + "./data/config/config.json" + ", trying again in 5s.")
+				time.Sleep(5 * time.Second)
+			} else {
+				log.Log.Info("Successfully Opened config.json from " + configuration.Name)
+				byteValue, _ := ioutil.ReadAll(jsonFile)
+				err = json.Unmarshal(byteValue, &configuration.Config)
+				jsonFile.Close()
+				if err != nil {
+					fmt.Println("JSON file not valid: " + err.Error())
+				} else {
+					err = json.Unmarshal(byteValue, &configuration.CustomConfig)
+					if err != nil {
+						fmt.Println("JSON file not valid: " + err.Error())
+					} else {
+						break
+					}
+				}
+				time.Sleep(5 * time.Second)
+			}
+			jsonFile.Close()
+		}
+
 	}
+
 	return
 }
