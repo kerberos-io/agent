@@ -13,6 +13,8 @@ github.com/appleboy/gin-jwt/v2 v2.8.0 h1:Glo7cb9eBR+hj8Y7WzgfkOlqCaNLjP+RV4dNO3f
 github.com/appleboy/gin-jwt/v2 v2.8.0/go.mod h1:KsK7E8HTvRg3vOiumTsr/ntNTHbZ3IbHLe4Eto31p7k=
 github.com/appleboy/gofight/v2 v2.1.2 h1:VOy3jow4vIK8BRQJoC/I9muxyYlJ2yb9ht2hZoS3rf4=
 github.com/appleboy/gofight/v2 v2.1.2/go.mod h1:frW+U1QZEdDgixycTj4CygQ48yLTUhplt43+Wczp3rw=
+github.com/beevik/etree v1.1.0 h1:T0xke/WvNtMoCqgzPhkX2r4rjY3GDZFi+FjpRZY2Jbs=
+github.com/beevik/etree v1.1.0/go.mod h1:r8Aw8JqVegEf0w2fDnATrX9VpkMcyFeM0FhwO62wh+A=
 github.com/cedricve/go-onvif v0.0.0-20200222191200-567e8ce298f6 h1:bzFZYgZD5vf4PWaa2GjOh90HG88uKi2a+B6VnQcDlCA=
 github.com/cedricve/go-onvif v0.0.0-20200222191200-567e8ce298f6/go.mod h1:nBrjN2nMHendp0Cvb/6GaJ1v92Qv/kzqxWtNBnKJEK0=
 github.com/cheekybits/genny v1.0.0/go.mod h1:+tQajlRqAUrPI7DOSpB0XAqZYtQakVtB7wXkRAgjxjQ=
@@ -28,6 +30,8 @@ github.com/deepch/vdk v0.0.17/go.mod h1:KqQ/KU3hOc4a62l/jPRH5Hiz5fhTq5cGCl8IqeCx
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/eclipse/paho.mqtt.golang v1.4.1 h1:tUSpviiL5G3P9SZZJPC4ZULZJsxQKXxfENpMvdbAXAI=
 github.com/eclipse/paho.mqtt.golang v1.4.1/go.mod h1:JGt0RsEwEX+Xa/agj90YJ9d9DH2b7upDZMK9HRbFvCA=
+github.com/elgs/gostrgen v0.0.0-20161222160715-9d61ae07eeae h1:3KvK2DmA7TxQ6PZ2f0rWbdqjgJhRcqgbY70bBeE4clI=
+github.com/elgs/gostrgen v0.0.0-20161222160715-9d61ae07eeae/go.mod h1:wruC5r2gHdr/JIUs5Rr1V45YtsAzKXZxAnn/5rPC97g=
 github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 h1:Yzb9+7DPaBjB8zlTR87/ElzFsnQfuHnVUVqpZZIcV5Y=
 github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5/go.mod h1:a2zkGnVExMxdzMo3M0Hi/3sEU+cWnZpSni0O6/Yb/P0=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
@@ -78,6 +82,7 @@ github.com/go-playground/validator/v10 v10.10.0/go.mod h1:74x4gJWsvQexRdW8Pn3dXS
 github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0/go.mod h1:fyg7847qk6SyHyPtNmDHnmrv/HOrqktSC+C9fM+CJOE=
 github.com/goccy/go-json v0.9.7 h1:IcB+Aqpx/iMHu5Yooh7jEzJk1JZ7Pjtmys2ukPr7EeM=
 github.com/goccy/go-json v0.9.7/go.mod h1:6MelG93GURQebXPDq3khkgXZkazVtN9CRI+MGFi0w8I=
+github.com/gofrs/uuid v3.2.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
 github.com/gofrs/uuid v4.2.0+incompatible h1:yyYWMnhkhrKwwr8gAOcOCYxOOscHgDS9yZgBrnJfGa0=
 github.com/gofrs/uuid v4.2.0+incompatible/go.mod h1:b2aQJv3Z4Fp6yNu3cdSllBxTCLRxnplIgP/c0N/04lM=
 github.com/golang-jwt/jwt/v4 v4.2.0 h1:besgBTC8w8HjP6NzQdxwKH9Z5oQMZ24ThTrHp3cZ8eU=
@@ -121,6 +126,8 @@ github.com/kellydunn/golang-geo v0.7.0 h1:A5j0/BvNgGwY6Yb6inXQxzYwlPHc6WVZR+Mrar
 github.com/kellydunn/golang-geo v0.7.0/go.mod h1:YYlQPJ+DPEzrHx8kT3oPHC/NjyvCCXE+IuKGKdrjrcU=
 github.com/kerberos-io/joy4 v1.0.32 h1:rQcMEnc9sDpbRj4sh5+X807yPEhhKDa8gKUCJKMhJ5k=
 github.com/kerberos-io/joy4 v1.0.32/go.mod h1:nZp4AjvKvTOXRrmDyAIOw+Da+JA5OcSo/JundGfOlFU=
+github.com/kerberos-io/onvif v0.0.3 h1:Jcc6kKO2hyhaBddQyXyKAhqkrzeX53UH6WKoASXSBoc=
+github.com/kerberos-io/onvif v0.0.3/go.mod h1:Hr2dJOH2LM5SpYKk17gYZ1CMjhGhUl+QlT5kwYogrW0=
 github.com/klauspost/cpuid v1.2.3 h1:CCtW0xUnWGVINKvE/WWOYKdsPV6mawAtvQuSl8guwQs=
 github.com/klauspost/cpuid v1.2.3/go.mod h1:Pj4uuM528wm8OyEC2QMXAi2YiTZ96dNQPGgoMS4s3ek=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=

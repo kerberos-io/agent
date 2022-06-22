@@ -13,6 +13,7 @@ import (
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/joy4/av/pubsub"
@@ -23,16 +24,9 @@ import (
 	"gocv.io/x/gocv"
 )
 
-func DecodeImage(pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
-	decoderMutex.Lock()
-	img, err := decoder.Decode(pkt.Data)
-	decoderMutex.Unlock()
-	return img, err
-}
-
 func GetRGBImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) gocv.Mat {
 	var rgb gocv.Mat
-	img, err := DecodeImage(pkt, dec, decoderMutex)
+	img, err := capture.DecodeImage(pkt, dec, decoderMutex)
 	if err == nil && img != nil {
 		rgb, _ = ToRGB8(img.Image)
 		gocv.Resize(rgb, &rgb, image.Pt(rgb.Cols()/4, rgb.Rows()/4), 0, 0, gocv.InterpolationArea)
@@ -42,7 +36,7 @@ func GetRGBImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mut
 
 func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) gocv.Mat {
 	var gray gocv.Mat
-	img, err := DecodeImage(pkt, dec, decoderMutex)
+	img, err := capture.DecodeImage(pkt, dec, decoderMutex)
 
 	// Check if we need to scale down.
 	width := img.Width()

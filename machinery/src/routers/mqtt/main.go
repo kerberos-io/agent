@@ -1,4 +1,4 @@
-package routers
+package mqtt
 
 import (
 	"encoding/json"
@@ -10,10 +10,7 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-)
-
-var (
-	CandidateArrays map[string](chan string)
+	"github.com/kerberos-io/agent/machinery/src/webrtc"
 )
 
 func ConfigureMQTT(configuration *models.Configuration, communication *models.Communication) mqtt.Client {
@@ -61,6 +58,7 @@ func ConfigureMQTT(configuration *models.Configuration, communication *models.Co
 		rand.Seed(time.Now().UnixNano())
 		random := rand.Intn(100)
 		mqttClientID := config.Key + strconv.Itoa(random) // this random int is to avoid conflicts.
+
 		// This is a worked-around.
 		// current S3 (Kerberos Hub SAAS) is using a secured MQTT, where the client id,
 		// should match the kerberos hub key.
@@ -71,7 +69,7 @@ func ConfigureMQTT(configuration *models.Configuration, communication *models.Co
 		opts.SetClientID(mqttClientID)
 		log.Log.Info("ConfigureMQTT: Set ClientID " + mqttClientID)
 		rand.Seed(time.Now().UnixNano())
-		CandidateArrays = make(map[string](chan string))
+		webrtc.CandidateArrays = make(map[string](chan string))
 
 		opts.OnConnect = func(c mqtt.Client) {
 
@@ -162,10 +160,10 @@ func MQTTListenerHandleLiveHDCandidates(mqttClient mqtt.Client, hubKey string, c
 		json.Unmarshal(msg.Payload(), &candidate)
 		if candidate.CloudKey == config.Key {
 			key := candidate.CloudKey + "/" + candidate.Cuuid
-			channel, ok := CandidateArrays[key]
+			channel, ok := webrtc.CandidateArrays[key]
 			if !ok {
 				val := make(chan string, 30)
-				CandidateArrays[key] = val
+				webrtc.CandidateArrays[key] = val
 				channel = val
 			}
 			log.Log.Info("MQTTListenerHandleLiveHDCandidates: " + string(msg.Payload()))

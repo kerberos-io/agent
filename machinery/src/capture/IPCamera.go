@@ -2,6 +2,7 @@ package capture
 
 import (
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -38,6 +39,13 @@ func GetVideoDecoder(streams []av.CodecData) *ffmpeg.VideoDecoder {
 	return dec
 }
 
+func DecodeImage(pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
+	decoderMutex.Lock()
+	img, err := decoder.Decode(pkt.Data)
+	decoderMutex.Unlock()
+	return img, err
+}
+
 func HandleStream(infile av.DemuxCloser, queue *pubsub.Queue, communication *models.Communication) { //, wg *sync.WaitGroup) {
 
 	log.Log.Debug("HandleStream: started")
@@ -55,8 +63,7 @@ loop:
 
 		var pkt av.Packet
 		if pkt, err = infile.ReadPacket(); err != nil { // sometimes this throws an end of file..
-			log.Log.Info(strconv.Itoa(len(pkt.Data)))
-			log.Log.Error(err.Error())
+			log.Log.Error("HandleStream: " + err.Error())
 			if err.Error() == "EOF" {
 				time.Sleep(30 * time.Second)
 			}
@@ -75,16 +82,6 @@ loop:
 			default:
 			}
 
-			/*select {
-			case packetsBuffer <- pkt:
-			default:
-			}
-
-			select {
-			case webrtcPacketsRealtimeStream <- pkt:
-			default:
-			}*/
-
 			if pkt.IsKeyFrame {
 
 				// Increment packets, so we know the device
@@ -92,19 +89,9 @@ loop:
 				r := communication.PackageCounter.Load().(int64)
 				log.Log.Info("HandleStream: packet size " + strconv.Itoa(len(pkt.Data)))
 				communication.PackageCounter.Store((r + 1) % 1000)
-
-				/*select {
-				case packetsRealtime <- pkt:
-				default:
-				}
-				select {
-				case packetsRealtimeStream <- pkt:
-				default:
-				}*/
 			}
 		}
 	}
-	//wg.Done()
 
 	queue.Close()
 	log.Log.Debug("HandleStream: finished")

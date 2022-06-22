@@ -11,6 +11,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/onvif"
 	routers "github.com/kerberos-io/agent/machinery/src/routers/mqtt"
 	"github.com/kerberos-io/joy4/av/pubsub"
 	"github.com/tevino/abool"
@@ -29,6 +30,8 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	communication.HandleUpload = make(chan string, 1)
 	communication.HandleHeartBeat = make(chan string, 1)
 	communication.HandleLiveSD = make(chan int64, 1)
+	communication.HandleLiveHDKeepalive = make(chan string, 1)
+	communication.HandleLiveHDPeers = make(chan string, 1)
 	communication.IsConfiguring = abool.New()
 
 	// Before starting the agent, we have a control goroutine, that might
@@ -76,6 +79,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		queue.WriteHeader(streams)
 
 		// Configure a MQTT client which helps for a bi-directional communication
+		communication.HandleONVIF = make(chan models.OnvifAction, 1)
 		mqttClient := routers.ConfigureMQTT(configuration, communication)
 
 		// Handle heartbeats
@@ -92,12 +96,20 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		livestreamCursor := queue.Oldest()
 		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
-		// Handle recording
+		// Handle livestream HD (high resolution over WEBRTC)
+		livestreamHDCursor := queue.Oldest()
+		communication.HandleLiveHDHandshake = make(chan models.SDPPayload, 1)
+		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, streams, decoder, &decoderMutex)
+
+		// Handle recording, will write an mp4 to disk.
 		recordingCursor := queue.Oldest()
 		go capture.HandleRecordStream(recordingCursor, configuration, communication, streams)
 
-		// Handle Upload to cloud
+		// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)
 		go cloud.HandleUpload(configuration, communication)
+
+		// Handle ONVIF actions
+		go onvif.HandleONVIFActions(configuration, communication)
 
 		//-------------------------------------------------------------------
 		// This will go into a blocking state, once this channel is triggered
@@ -110,6 +122,8 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		communication.HandleUpload <- "stop"
 		infile.Close()
 		queue.Close()
+		close(communication.HandleONVIF)
+		close(communication.HandleLiveHDHandshake)
 		routers.DisconnectMQTT(mqttClient)
 
 	} else {
@@ -142,6 +156,7 @@ func ControlAgent(communication *models.Communication) {
 			}
 
 			log.Log.Info("ControlAgent: Number of packets read " + strconv.FormatInt(packetsR, 10))
+
 			// After 15 seconds without activity this is thrown..
 			if occurence == 3 {
 				log.Log.Info("Main: Restarting machinery.")

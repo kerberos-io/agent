@@ -15,6 +15,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.2.0
 	github.com/kellydunn/golang-geo v0.7.0
 	github.com/kerberos-io/joy4 v1.0.32
+	github.com/kerberos-io/onvif v0.0.3
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pion/webrtc/v3 v3.1.41
@@ -33,7 +34,9 @@ require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
+	github.com/beevik/etree v1.1.0 // indirect
 	github.com/clbanning/mxj v1.8.4 // indirect
+	github.com/elgs/gostrgen v0.0.0-20161222160715-9d61ae07eeae // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect

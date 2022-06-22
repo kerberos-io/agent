@@ -3,6 +3,7 @@ package cloud
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -23,6 +24,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
+	"github.com/kerberos-io/agent/machinery/src/webrtc"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/host"
 )
@@ -219,7 +221,6 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 
 	lastLivestreamRequest := int64(0)
 
-	//for pkt := range packets {
 	var cursorError error
 	var pkt av.Packet
 
@@ -256,32 +257,34 @@ func sendImage(topic string, mqttClient mqtt.Client, pkt av.Packet, decoder *ffm
 	debug.FreeOSMemory()
 }
 
-/*func SendWebRTCStream(config components.Config, livestreamCursor *pubsub.QueueCursor, packets chan av.Packet, mqc mqtt.Client, codecs []av.CodecData, log components.Logging, webrtcChan chan components.SDPPayload, webrtcKeepAlive chan string, webrtcPeers chan string, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, codecs []av.CodecData, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+
+	config := configuration.Config
 
 	// Should create a track here.
-	track := components.NewVideoTrack()
-	go components.WriteToTrack(config.Key, webrtcKeepAlive, webrtcPeers, config.Capture.ForwardWebRTC, config.Capture.TranscodingWebRTC, config.Capture.TranscodingResolution, log, track, livestreamCursor, packets, codecs, mqc, decoder, decoderMutex)
+	track := webrtc.NewVideoTrack()
+	go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, track, codecs, decoder, decoderMutex)
 
 	if config.Capture.ForwardWebRTC == "true" {
 		// We get a request with an offer, but we'll forward it.
-		for m := range webrtcChan {
+		for m := range communication.HandleLiveHDHandshake {
 			// Forward SDP
 			m.CloudKey = config.Key
 			request, err := json.Marshal(m)
 			if err == nil {
-				mqc.Publish("kerberos/webrtc/request", 2, false, request)
+				mqttClient.Publish("kerberos/webrtc/request", 2, false, request)
 			}
 		}
 	} else {
-		log.Info("WebRTC (Direct): Waiting for peer connections.")
-		for m := range webrtcChan {
-			log.Info("WebRTC (Direct): setting up a peer connection.")
-			key := config.Key + "/" + m.Cuuid
-			_, ok := components.CandidateArrays[key]
+		log.Log.Info("HandleLiveStreamHD: Waiting for peer connections.")
+		for handshake := range communication.HandleLiveHDHandshake {
+			log.Log.Info("HandleLiveStreamHD: setting up a peer connection.")
+			key := config.Key + "/" + handshake.Cuuid
+			_, ok := webrtc.CandidateArrays[key]
 			if !ok {
-				components.CandidateArrays[key] = make(chan string, 30)
+				webrtc.CandidateArrays[key] = make(chan string, 30)
 			}
-			components.InitializeWebRTCConnection(track, config, m, mqc, log, components.CandidateArrays[key])
+			webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, track, handshake, webrtc.CandidateArrays[key])
 		}
 	}
-}*/
+}
