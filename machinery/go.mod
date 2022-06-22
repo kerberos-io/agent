@@ -15,7 +15,7 @@ require (
 	github.com/gin-gonic/gin v1.8.1
 	github.com/golang-jwt/jwt/v4 v4.2.0
 	github.com/kellydunn/golang-geo v0.7.0
-	github.com/kerberos-io/joy4 v1.0.32
+	github.com/kerberos-io/joy4 v1.0.33
 	github.com/kerberos-io/onvif v0.0.3
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7

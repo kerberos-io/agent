@@ -31,10 +31,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 
 			// Save into file
 			var conf models.Config
-			var confMap map[string]interface{}
-			c.BindJSON(&confMap)
-			inrec, _ := json.Marshal(confMap)
-			json.Unmarshal(inrec, &conf)
+			c.BindJSON(&conf)
 
 			if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
 				res, _ := json.MarshalIndent(conf, "", "\t")
@@ -52,16 +49,15 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 				}, &conf)
 			}
 
-			configuration.Config = conf       // HACK
-			configuration.CustomConfig = conf // HACK
+			select {
+			case communication.HandleBootstrap <- "restart":
+			default:
+			}
 
-			communication.HandleBootstrap <- "restart"
 			communication.IsConfiguring.UnSet()
 
 			c.JSON(200, gin.H{
-				"data":   "☄ Reconfiguring",
-				"config": conf,
-				"custom": conf,
+				"data": "☄ Reconfiguring",
 			})
 		} else {
 			c.JSON(200, gin.H{

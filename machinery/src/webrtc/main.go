@@ -372,7 +372,7 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 					}
 				}
 			case audioIdx:
-				log.Log.Info("WriteToTrack: not writing audio for the moment.")
+				//log.Log.Info("WriteToTrack: not writing audio for the moment.")
 			}
 		}
 	}

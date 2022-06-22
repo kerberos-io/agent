@@ -46,6 +46,8 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 		if status == "stop" {
 			break
 		}
+		// We will re open the configuration, might have changed :O!
+		OpenConfig(configuration)
 	}
 	log.Log.Debug("Bootstrap: finished")
 }
