@@ -206,6 +206,7 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 
 			now = time.Now().Unix()
 			timestamp = now
+			startRecording = now // we mark the current time when the record started.
 
 			// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 			// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
@@ -216,7 +217,6 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 			// - Number of changes
 			// - Token
 
-			startRecording = time.Now().Unix() // we mark the current time when the record started.ss
 			s := strconv.FormatInt(startRecording, 10) + "_" + "6" + "-" + "967003" + "_" + config.Name + "_" + "200-200-400-400" + "_" + "24" + "_" + "769"
 			name := s + ".mp4"
 			fullName := "./data/recordings/" + name
@@ -246,6 +246,9 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 			for cursorError == nil {
 
 				pkt, cursorError = recordingCursor.ReadPacket()
+				if cursorError != nil {
+					log.Log.Error("HandleRecordStream: " + cursorError.Error())
+				}
 
 				now := time.Now().Unix()
 				select {
@@ -255,6 +258,7 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 				default:
 				}
 				if timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod {
+					log.Log.Info("HandleRecordStream: closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", recordingPeriod: " + strconv.FormatInt(recordingPeriod, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 					break
 				}
 				if pkt.IsKeyFrame {
