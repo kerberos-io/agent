@@ -42,6 +42,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	// goroutines which do image capture, motion detection, onvif, etc.
 
 	for {
+		// This will blocking until receiving a signal to be restarted, reconfigured, stopped, etc.
 		status := RunAgent(configuration, communication)
 		if status == "stop" {
 			break
@@ -113,7 +114,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// Handle ONVIF actions
 		go onvif.HandleONVIFActions(configuration, communication)
 
-		//-------------------------------------------------------------------
+		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		// This will go into a blocking state, once this channel is triggered
 		// the agent will cleanup and restart.
 		status = <-communication.HandleBootstrap
@@ -127,6 +128,10 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		close(communication.HandleONVIF)
 		close(communication.HandleLiveHDHandshake)
 		routers.DisconnectMQTT(mqttClient)
+
+		// Waiting for some seconds to make sure everything is properly closed.
+		time.Sleep(time.Second * 5)
+		log.Log.Info("RunAgent: waiting 5 seconds to make sure everything is properly closed.")
 
 	} else {
 		time.Sleep(time.Second * 2)

@@ -1,12 +1,12 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "This is the API for using and configure Kerberos Open source.",
-        "title": "Swagger Kerberos Open Source API",
+        "description": "This is the API for using and configure Kerberos Agent.",
+        "title": "Swagger Kerberos Agent API",
         "termsOfService": "https://kerberos.io",
         "contact": {
             "name": "API Support",
-            "url": "https://www.kerberos.io/support",
+            "url": "https://www.kerberos.io",
             "email": "support@kerberos.io"
         },
         "license": {
@@ -16,52 +16,7 @@
         "version": "1.0"
     },
     "basePath": "/",
-    "paths": {
-        "/api/install": {
-            "get": {
-                "description": "Get to know if the system was installed before or not.",
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "Get to know if the system was installed before or not.",
-                "operationId": "web.getinstallation",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.APIResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "If not yet installed, initiate the user configuration.",
-                "produces": [
-                    "application/json"
-                ],
-                "summary": "If not yet installed, initiate the user configuration.",
-                "operationId": "web.updateinstallation",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.APIResponse"
-                        }
-                    }
-                }
-            }
-        }
-    },
-    "definitions": {
-        "models.APIResponse": {
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "object"
-                }
-            }
-        }
-    },
+    "paths": {},
     "securityDefinitions": {
         "Bearer": {
             "type": "apiKey",
