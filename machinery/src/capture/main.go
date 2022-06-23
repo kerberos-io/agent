@@ -1,3 +1,4 @@
+// Connecting to different camera sources and make it recording to disk.
 package capture
 
 import (

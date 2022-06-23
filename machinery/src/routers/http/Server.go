@@ -15,13 +15,13 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-// @title Swagger Kerberos Open Source API
+// @title Swagger Kerberos Agent API
 // @version 1.0
-// @description This is the API for using and configure Kerberos Open source.
+// @description This is the API for using and configure Kerberos Agent.
 // @termsOfService https://kerberos.io
 
 // @contact.name API Support
-// @contact.url https://www.kerberos.io/support
+// @contact.url https://www.kerberos.io
 // @contact.email support@kerberos.io
 
 // @license.name Apache 2.0 - Commons Clause

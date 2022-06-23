@@ -1,46 +1,17 @@
 basePath: /
-definitions:
-  models.APIResponse:
-    properties:
-      data:
-        type: object
-    type: object
 info:
   contact:
     email: support@kerberos.io
     name: API Support
-    url: https://www.kerberos.io/support
-  description: This is the API for using and configure Kerberos Open source.
+    url: https://www.kerberos.io
+  description: This is the API for using and configure Kerberos Agent.
   license:
     name: Apache 2.0 - Commons Clause
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   termsOfService: https://kerberos.io
-  title: Swagger Kerberos Open Source API
+  title: Swagger Kerberos Agent API
   version: "1.0"
-paths:
-  /api/install:
-    get:
-      description: Get to know if the system was installed before or not.
-      operationId: web.getinstallation
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      summary: Get to know if the system was installed before or not.
-    post:
-      description: If not yet installed, initiate the user configuration.
-      operationId: web.updateinstallation
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      summary: If not yet installed, initiate the user configuration.
+paths: {}
 securityDefinitions:
   Bearer:
     in: header

@@ -40,6 +40,7 @@ func ConfigureMQTT(configuration *models.Configuration, communication *models.Co
 	// properly. More information here: github.com/eclipse/paho.mqtt.golang.
 	opts.SetCleanSession(true)
 	opts.SetConnectRetry(true)
+	opts.SetAutoReconnect(true)
 	opts.SetConnectTimeout(30 * time.Second)
 
 	hubKey := ""
@@ -55,6 +56,7 @@ func ConfigureMQTT(configuration *models.Configuration, communication *models.Co
 	}
 
 	if hubKey != "" {
+
 		rand.Seed(time.Now().UnixNano())
 		random := rand.Intn(100)
 		mqttClientID := config.Key + strconv.Itoa(random) // this random int is to avoid conflicts.
