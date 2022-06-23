@@ -132,8 +132,8 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		decoder.Close()
 
 		// Waiting for some seconds to make sure everything is properly closed.
-		time.Sleep(time.Second * 5)
-		log.Log.Info("RunAgent: waiting 5 seconds to make sure everything is properly closed.")
+		time.Sleep(time.Second * 1)
+		log.Log.Info("RunAgent: waiting 1 second to make sure everything is properly closed.")
 
 	} else {
 		time.Sleep(time.Second * 2)
