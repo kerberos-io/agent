@@ -33,10 +33,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			var conf models.Config
 			c.BindJSON(&conf)
 
-			if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
-				res, _ := json.MarshalIndent(conf, "", "\t")
-				ioutil.WriteFile("./data/config/config.json", res, 0644)
-			} else if os.Getenv("DEPLOYMENT") == "factory" {
+			if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
 				// Write to mongodb
 				session := database.New().Copy()
 				defer session.Close()
@@ -47,6 +44,9 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 					"type": "config",
 					"name": os.Getenv("DEPLOYMENT_NAME"),
 				}, &conf)
+			} else if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
+				res, _ := json.MarshalIndent(conf, "", "\t")
+				ioutil.WriteFile("./data/config/config.json", res, 0644)
 			}
 
 			select {
