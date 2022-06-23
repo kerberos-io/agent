@@ -132,12 +132,11 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		decoder.Close()
 
 		// Waiting for some seconds to make sure everything is properly closed.
-		time.Sleep(time.Second * 1)
 		log.Log.Info("RunAgent: waiting 1 second to make sure everything is properly closed.")
-
+		time.Sleep(time.Second * 1)
 	} else {
-		time.Sleep(time.Second * 2)
 		log.Log.Error("Something went wrong while opening RTSP: " + err.Error())
+		time.Sleep(time.Second * 3)
 	}
 
 	log.Log.Debug("RunAgent: finished")
