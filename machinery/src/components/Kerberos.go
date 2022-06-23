@@ -26,7 +26,6 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	packageCounter.Store(int64(0))
 	communication.PackageCounter = &packageCounter
 	communication.HandleStream = make(chan string, 1)
-	communication.HandleMotion = make(chan int64, 1)
 	communication.HandleUpload = make(chan string, 1)
 	communication.HandleHeartBeat = make(chan string, 1)
 	communication.HandleLiveSD = make(chan int64, 1)
@@ -93,6 +92,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// Handle processing of motion
 		motionCursor := queue.Oldest()
+		communication.HandleMotion = make(chan int64, 1)
 		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
 		// Handle livestream SD (low resolution over MQTT)
@@ -127,6 +127,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		queue.Close()
 		close(communication.HandleONVIF)
 		close(communication.HandleLiveHDHandshake)
+		close(communication.HandleMotion)
 		routers.DisconnectMQTT(mqttClient)
 
 		// Waiting for some seconds to make sure everything is properly closed.
