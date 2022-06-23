@@ -129,6 +129,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		close(communication.HandleLiveHDHandshake)
 		close(communication.HandleMotion)
 		routers.DisconnectMQTT(mqttClient)
+		decoder.Close()
 
 		// Waiting for some seconds to make sure everything is properly closed.
 		time.Sleep(time.Second * 5)
