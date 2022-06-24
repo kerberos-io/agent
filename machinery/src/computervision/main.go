@@ -38,31 +38,32 @@ func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex)
 	var gray gocv.Mat
 	img, err := capture.DecodeImage(pkt, dec, decoderMutex)
 
-	// Check if we need to scale down.
-	width := img.Width()
-	height := img.Height()
-	newWidth := width
-	newHeight := height
-
-	// Try minify twice.
-	scaleFactor := 1.0
-	if newWidth > 800 {
-		newWidth = width / 2
-		newHeight = height / 2
-		scaleFactor *= 2
-	}
-	if newWidth > 800 {
-		newWidth = width / 2
-		newHeight = height / 2
-		scaleFactor *= 2
-	}
-	if newWidth > 800 {
-		newWidth = width / 2
-		newHeight = height / 2
-		scaleFactor *= 2
-	}
-
 	if err == nil && img != nil {
+
+		// Check if we need to scale down.
+		width := img.Width()
+		height := img.Height()
+		newWidth := width
+		newHeight := height
+	
+		// Try minify twice.
+		scaleFactor := 1.0
+		if newWidth > 800 {
+			newWidth = width / 2
+			newHeight = height / 2
+			scaleFactor *= 2
+		}
+		if newWidth > 800 {
+			newWidth = width / 2
+			newHeight = height / 2
+			scaleFactor *= 2
+		}
+		if newWidth > 800 {
+			newWidth = width / 2
+			newHeight = height / 2
+			scaleFactor *= 2
+		}	
+
 		im := img.Image
 		rgb, _ := ToRGB8(im)
 		img.Free()
