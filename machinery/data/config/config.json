@@ -2,7 +2,6 @@
 	"type": "template",
 	"key": "0x123-a-test-agent",
 	"name": "camera",
-	"mqtturi": "tcp://mqtt.kerberos.io",
 	"mqtt_username": "xxx",
 	"mqtt_password": "xxx",
 	"timezone": "Europe/Brussels",

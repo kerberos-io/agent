@@ -50,7 +50,8 @@ func main() {
 
 			now := time.Now().Unix()
 			saveFile := "./data/capture-test/" + strconv.FormatInt(now, 10) + ".mp4"
-			writer, err := gocv.VideoWriterFile(saveFile, "mp4v", 15, buf.Cols(), buf.Rows(), true)
+			fps := 20.0 // webcam.Get(gocv.VideoCaptureFPS)
+			writer, err := gocv.VideoWriterFile(saveFile, "X264", fps, buf.Cols(), buf.Rows(), true)
 			if err != nil {
 				fmt.Println(err)
 				fmt.Printf("error opening video writer device: %v\n", saveFile)
