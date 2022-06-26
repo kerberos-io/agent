@@ -109,7 +109,7 @@ FROM alpine:latest
 ############################
 # Protect by non-root user.
 
-RUN addgroup -S kerberosio && adduser -S agent -G kerberosio
+RUN addgroup -S kerberosio && adduser -S agent -G kerberosio && addgroup agent video
 
 #################################
 # Copy files from previous images
