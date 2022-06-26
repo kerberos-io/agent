@@ -51,6 +51,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	mkdir -p /agent/data/snapshots && \
 	mkdir -p /agent/data/log && \
 	mkdir -p /agent/data/recordings && \
+	mkdir -p /agent/data/capture-test && \
 	mkdir -p /agent/data/config && \
 	rm -rf /go/src/gitlab.com/
 

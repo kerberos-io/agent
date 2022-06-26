@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -46,7 +48,8 @@ func main() {
 
 		if ok {
 
-			saveFile := "./data/webcam/video.mp4"
+			now := time.Now().Unix()
+			saveFile := "./data/capture-test/" + strconv.FormatInt(now, 10) + ".mp4"
 			writer, err := gocv.VideoWriterFile(saveFile, "mp4v", 15, buf.Cols(), buf.Rows(), true)
 			if err != nil {
 				fmt.Println(err)
