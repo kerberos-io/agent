@@ -8,6 +8,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/routers"
+	"gocv.io/x/gocv"
 )
 
 func main() {
@@ -28,6 +29,52 @@ func main() {
 	case "discover":
 		timeout := os.Args[2]
 		fmt.Println(timeout)
+
+	case "webcam-test":
+
+		deviceID := os.Args[2]
+		webcam, err := gocv.OpenVideoCapture(deviceID)
+		if err != nil {
+			fmt.Printf("Error opening video capture device: %v\n", deviceID)
+			return
+		}
+		defer webcam.Close()
+		buf := gocv.NewMat()
+		defer buf.Close()
+
+		ok := webcam.Read(&buf)
+
+		if ok {
+
+			saveFile := "./data/webcam/video.mp4"
+			writer, err := gocv.VideoWriterFile(saveFile, "mp4v", 15, buf.Cols(), buf.Rows(), true)
+			if err != nil {
+				fmt.Println(err)
+				fmt.Printf("error opening video writer device: %v\n", saveFile)
+				return
+			}
+			defer writer.Close()
+
+			window := gocv.NewWindow("Hello")
+			fmt.Printf("Start reading device: %v\n", deviceID)
+			for i := 0; i < 100; i++ {
+				if ok := webcam.Read(&buf); !ok {
+					fmt.Printf("Device closed: %v\n", deviceID)
+					return
+				}
+				if buf.Empty() {
+					continue
+				}
+
+				writer.Write(buf)
+				window.IMShow(buf)
+				window.WaitKey(1)
+
+				fmt.Printf("Read frame %d\n", i+1)
+			}
+
+		}
+		fmt.Println("Done.")
 
 	case "run":
 		{
