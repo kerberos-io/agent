@@ -59,7 +59,7 @@ func main() {
 			}
 			defer writer.Close()
 
-			window := gocv.NewWindow("Hello")
+			//window := gocv.NewWindow("Hello")
 			fmt.Printf("Start reading device: %v\n", deviceID)
 			for i := 0; i < 100; i++ {
 				if ok := webcam.Read(&buf); !ok {
@@ -71,8 +71,8 @@ func main() {
 				}
 
 				writer.Write(buf)
-				window.IMShow(buf)
-				window.WaitKey(1)
+				//window.IMShow(buf)
+				//window.WaitKey(1)
 
 				fmt.Printf("Read frame %d\n", i+1)
 			}
