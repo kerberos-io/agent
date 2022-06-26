@@ -40,7 +40,7 @@ func ConfigureMQTT(configuration *models.Configuration, communication *models.Co
 	// properly. More information here: github.com/eclipse/paho.mqtt.golang.
 	opts.SetCleanSession(true)
 	opts.SetConnectRetry(true)
-	opts.SetAutoReconnect(true)
+	//opts.SetAutoReconnect(true)
 	opts.SetConnectTimeout(30 * time.Second)
 
 	hubKey := ""
