@@ -19,6 +19,7 @@ func main() {
 	log.Log.Init()
 
 	switch action {
+
 	case "version":
 		log.Log.Info("You are currrently running Kerberos Agent " + VERSION)
 
