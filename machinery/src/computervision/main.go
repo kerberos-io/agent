@@ -45,7 +45,7 @@ func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex)
 		height := img.Height()
 		newWidth := width
 		newHeight := height
-	
+
 		// Try minify twice.
 		scaleFactor := 1.0
 		if newWidth > 800 {
@@ -62,7 +62,7 @@ func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex)
 			newWidth = width / 2
 			newHeight = height / 2
 			scaleFactor *= 2
-		}	
+		}
 
 		im := img.Image
 		rgb, _ := ToRGB8(im)
@@ -103,12 +103,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 
 		log.Log.Info("ProcessMotion: Motion detection enabled.")
 
-		key := ""
-		if config.Cloud == "s3" && config.S3.Publickey != "" {
-			key = config.S3.Publickey
-		} else if config.Cloud == "kstorage" && config.KStorage.CloudKey != "" {
-			key = config.KStorage.CloudKey
-		}
+		key := config.HubKey
 
 		// Initialise first 2 elements
 		var matArray [3]*gocv.Mat
