@@ -12,7 +12,7 @@ type Communication struct {
 	PackageCounter        *atomic.Value
 	HandleBootstrap       chan string
 	HandleStream          chan string
-	HandleMotion          chan int64
+	HandleMotion          chan MotionDataPartial
 	HandleUpload          chan string
 	HandleHeartBeat       chan string
 	HandleLiveSD          chan int64

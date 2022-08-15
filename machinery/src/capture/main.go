@@ -120,6 +120,7 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 
 				start = true
 				timestamp = now
+				var NumberOfChanges int = <-communication.HandleMotion.NumberOfChanges
 
 				// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 				// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
@@ -131,7 +132,7 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 				// - Token
 
 				startRecording = time.Now().Unix() // we mark the current time when the record started.ss
-				s := strconv.FormatInt(startRecording, 10) + "_" + "6" + "-" + "967003" + "_" + config.Name + "_" + "200-200-400-400" + "_" + "24" + "_" + "769"
+				s := strconv.FormatInt(startRecording, 10) + "_" + "6" + "-" + "967003" + "_" + config.Name + "_" + "200-200-400-400" + "_" + strconv.FormatInt(int64(NumberOfChanges), 10) + "_" + "769"
 				name = s + ".mp4"
 				fullName = "./data/recordings/" + name
 
@@ -208,6 +209,8 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 			timestamp = now
 			startRecording = now // we mark the current time when the record started.
 
+			var NumberOfChanges int = communication.HandleMotion.NumberOfChanges
+
 			// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 			// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
 			// - Timestamp
@@ -217,7 +220,7 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 			// - Number of changes
 			// - Token
 
-			s := strconv.FormatInt(startRecording, 10) + "_" + "6" + "-" + "967003" + "_" + config.Name + "_" + "200-200-400-400" + "_" + "24" + "_" + "769"
+			s := strconv.FormatInt(startRecording, 10) + "_" + "6" + "-" + "967003" + "_" + config.Name + "_" + "200-200-400-400" + "_" + strconv.FormatInt(int64(NumberOfChanges), 10) + "_" + "769"
 			name := s + ".mp4"
 			fullName := "./data/recordings/" + name
 
@@ -255,6 +258,9 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 				case <-communication.HandleMotion:
 					timestamp = now
 					log.Log.Info("HandleRecordStream: motion detected while recording. Expanding recording.")
+
+					NumberOfChanges = <-communication.HandleMotion.NumberOfChanges
+					log.Log.Info("Attempted to save changes to the filename, detected changes to save: " + strconv.FormatInt(int64(NumberOfChanges)))
 				default:
 				}
 				if timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod {
