@@ -120,7 +120,9 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 
 				start = true
 				timestamp = now
-				var NumberOfChanges int = <-communication.HandleMotion.NumberOfChanges
+
+				var receivedMessage = <-communication.HandleMotion
+				var NumberOfChanges = receivedMessage.NumberOfChanges
 
 				// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 				// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
@@ -209,7 +211,8 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 			timestamp = now
 			startRecording = now // we mark the current time when the record started.
 
-			var NumberOfChanges int = communication.HandleMotion.NumberOfChanges
+			var receivedMessage = <-communication.HandleMotion
+			var NumberOfChanges = receivedMessage.NumberOfChanges
 
 			// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 			// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
@@ -259,8 +262,9 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 					timestamp = now
 					log.Log.Info("HandleRecordStream: motion detected while recording. Expanding recording.")
 
-					NumberOfChanges = <-communication.HandleMotion.NumberOfChanges
-					log.Log.Info("Attempted to save changes to the filename, detected changes to save: " + strconv.FormatInt(int64(NumberOfChanges)))
+					var receivedMessage = <-communication.HandleMotion
+					NumberOfChanges = receivedMessage.NumberOfChanges
+					log.Log.Info("Attempted to save changes to the filename, detected changes to save: " + strconv.FormatInt(int64(NumberOfChanges), 10))
 				default:
 				}
 				if timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod {
