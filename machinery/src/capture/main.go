@@ -134,7 +134,14 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 				// - Token
 
 				startRecording = time.Now().Unix() // we mark the current time when the record started.ss
-				s := strconv.FormatInt(startRecording, 10) + "_" + "6" + "-" + "967003" + "_" + config.Name + "_" + "200-200-400-400" + "_" + strconv.FormatInt(int64(NumberOfChanges), 10) + "_" + "769"
+				s := strconv.FormatInt(startRecording, 10) + "_" +
+					"6" + "-" +
+					"967003" + "_" +
+					config.Name + "_" +
+					"200-200-400-400" + "_" +
+					strconv.Itoa(NumberOfChanges) + "_" +
+					"769"
+
 				name = s + ".mp4"
 				fullName = "./data/recordings/" + name
 
@@ -223,7 +230,14 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 			// - Number of changes
 			// - Token
 
-			s := strconv.FormatInt(startRecording, 10) + "_" + "6" + "-" + "967003" + "_" + config.Name + "_" + "200-200-400-400" + "_" + strconv.FormatInt(int64(NumberOfChanges), 10) + "_" + "769"
+			s := strconv.FormatInt(startRecording, 10) + "_" +
+				"6" + "-" +
+				"967003" + "_" +
+				config.Name + "_" +
+				"200-200-400-400" + "_" +
+				strconv.Itoa(NumberOfChanges) + "_" +
+				"769"
+
 			name := s + ".mp4"
 			fullName := "./data/recordings/" + name
 
@@ -264,7 +278,7 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 
 					var receivedMessage = <-communication.HandleMotion
 					NumberOfChanges = receivedMessage.NumberOfChanges
-					log.Log.Info("Attempted to save changes to the filename, detected changes to save: " + strconv.FormatInt(int64(NumberOfChanges), 10))
+					log.Log.Info("Received message with recording data, detected changes to save: " + strconv.Itoa(NumberOfChanges))
 				default:
 				}
 				if timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod {
