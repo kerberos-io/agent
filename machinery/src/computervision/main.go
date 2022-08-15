@@ -221,7 +221,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 						}
 					}
 
-					if detectMotion && FindMotion(matArray, coordinatesToCheck) {
+					if detectMotion && FindMotion(matArray, coordinatesToCheck, config.Capture.PixelChangeThreshold) {
 						mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
 						fmt.Println(key)
 						communication.HandleMotion <- time.Now().Unix()
@@ -246,7 +246,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 	log.Log.Debug("ProcessMotion: finished")
 }
 
-func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int) bool {
+func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int, pixelChangeThreshold int) bool {
 
 	h1 := gocv.NewMat()
 	gocv.AbsDiff(*matArray[2], *matArray[0], &h1)
@@ -279,5 +279,9 @@ func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int) bool {
 
 	log.Log.Info("FindMotion: Number of changes detected:" + strconv.Itoa(changes))
 
-	return changes > 75
+	if pixelChangeThreshold == 0 {
+		pixelChangeThreshold = 75 // Keep hardcoded value of 75 for now if no value is given for changes treshold in config.json
+	}
+
+	return changes > pixelChangeThreshold
 }
