@@ -9,8 +9,8 @@ type Configuration struct {
 	GlobalConfig Config
 }
 
-//Config is the highlevel struct which contains all the configuration of
-//your Kerberos Open Source instance.
+// Config is the highlevel struct which contains all the configuration of
+// your Kerberos Open Source instance.
 type Config struct {
 	Type          string       `json:"type" binding:"required"`
 	Key           string       `json:"key"`
@@ -38,8 +38,8 @@ type Config struct {
 	ConditionURI  string       `json:"condition_uri,omitempty" bson:"condition_uri"`
 }
 
-//Capture defines which camera type (Id) you are using (IP, USB or Raspberry Pi camera),
-//and also contains recording specific parameters.
+// Capture defines which camera type (Id) you are using (IP, USB or Raspberry Pi camera),
+// and also contains recording specific parameters.
 type Capture struct {
 	Name                  string      `json:"name"`
 	IPCamera              IPCamera    `json:"ipcamera"`
@@ -54,10 +54,11 @@ type Capture struct {
 	ForwardWebRTC         string      `json:"forwardwebrtc"`
 	Fragmented            string      `json:"fragmented,omitempty" bson:"fragmented,omitempty"`
 	FragmentedDuration    int64       `json:"fragmentedduration,omitempty" bson:"fragmentedduration,omitempty"`
+	PixelChangeThreshold  int         `json:"pixelChangeThreshold,omitempty"`
 }
 
-//IPCamera configuration, such as the RTSP url of the IPCamera and the FPS.
-//Also includes ONVIF integration
+// IPCamera configuration, such as the RTSP url of the IPCamera and the FPS.
+// Also includes ONVIF integration
 type IPCamera struct {
 	RTSP          string `json:"rtsp"`
 	FPS           string `json:"fps"`
@@ -67,25 +68,25 @@ type IPCamera struct {
 	ONVIFPassword string `json:"onvif_password,omitempty" bson:"onvif_password"`
 }
 
-//USBCamera configuration, such as the device path (/dev/video*)
+// USBCamera configuration, such as the device path (/dev/video*)
 type USBCamera struct {
 	Device string `json:"device"`
 }
 
-//RaspiCamera configuration, such as the device path (/dev/video*)
+// RaspiCamera configuration, such as the device path (/dev/video*)
 type RaspiCamera struct {
 	Device string `json:"device"`
 }
 
-//Region specifies the type (Id) of Region Of Interest (ROI), you
-//would like to use.
+// Region specifies the type (Id) of Region Of Interest (ROI), you
+// would like to use.
 type Region struct {
 	Name      string    `json:"name"`
 	Rectangle Rectangle `json:"rectangle"`
 	Polygon   []Polygon `json:"polygon"`
 }
 
-//Rectangle is defined by a starting point, left top (x1,y1) and end point (x2,y2).
+// Rectangle is defined by a starting point, left top (x1,y1) and end point (x2,y2).
 type Rectangle struct {
 	X1 int `json:"x1"`
 	Y1 int `json:"y1"`
@@ -93,22 +94,22 @@ type Rectangle struct {
 	Y2 int `json:"y2"`
 }
 
-//Polygon is a sequence of coordinates (x,y). The ID specifies an unique identifier,
-//as multiple polygons can be defined.
+// Polygon is a sequence of coordinates (x,y). The ID specifies an unique identifier,
+// as multiple polygons can be defined.
 type Polygon struct {
 	ID          string       `json:"id"`
 	Coordinates []Coordinate `json:"coordinates"`
 }
 
-//Coordinate belongs to a Polygon.
+// Coordinate belongs to a Polygon.
 type Coordinate struct {
 	X float64 `json:"x"`
 	Y float64 `json:"y"`
 }
 
-//Timetable allows you to set a Time Of Intterest (TOI), which limits recording or
-//detection to a predefined time interval. Two tracks can be set, which allows you
-//to give some flexibility.
+// Timetable allows you to set a Time Of Intterest (TOI), which limits recording or
+// detection to a predefined time interval. Two tracks can be set, which allows you
+// to give some flexibility.
 type Timetable struct {
 	Start1 int `json:"start1"`
 	End1   int `json:"end1"`
@@ -116,7 +117,7 @@ type Timetable struct {
 	End2   int `json:"end2"`
 }
 
-//S3 integration
+// S3 integration
 type S3 struct {
 	Proxy     string `json:"proxy,omitempty" bson:"proxy,omitempty"`
 	ProxyURI  string `json:"proxyuri,omitempty" bson:"proxyuri,omitempty"`
@@ -127,8 +128,8 @@ type S3 struct {
 	Secretkey string `json:"secretkey,omitempty" bson:"secretkey,omitempty"`
 }
 
-//KStorage contains the credentials of the Kerberos Storage/Kerberos Cloud instance.
-//By defining KStorage you can make your recordings available in the cloud, at a centrel place.
+// KStorage contains the credentials of the Kerberos Storage/Kerberos Cloud instance.
+// By defining KStorage you can make your recordings available in the cloud, at a centrel place.
 type KStorage struct {
 	URI             string `json:"uri,omitempty" bson:"uri,omitempty"`
 	CloudKey        string `json:"cloud_key,omitempty" bson:"cloud_key,omitempty"`
