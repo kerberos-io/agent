@@ -2,6 +2,8 @@ module github.com/kerberos-io/agent/machinery
 
 go 1.18
 
+//replace github.com/kerberos-io/joy4 v1.0.33 => ../../../../github.com/kerberos-io/joy4
+
 require (
 	github.com/InVisionApp/conjungo v1.1.0
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
