@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import {
   Breadcrumb,
   ControlBar,
@@ -15,10 +16,17 @@ import {
   Icon,
   Toggle,
 } from '@kerberos-io/ui';
+import { withRouter } from 'react-router-dom';
+import { connect } from 'react-redux';
 import ImageCanvas from '../../components/ImageCanvas/ImageCanvas';
 import './Settings.scss';
 import timezones from './timezones';
-import { saveConfig } from '../../actions/agent';
+import {
+  saveConfig,
+  verifyHub,
+  verifyPersistence,
+  getConfig,
+} from '../../actions/agent';
 
 // eslint-disable-next-line react/prefer-stateless-function
 class Settings extends React.Component {
@@ -234,6 +242,7 @@ class Settings extends React.Component {
       verifyPersistenceMessage,
       loading,
       loadingHub,
+      config, // New variables start here
     } = this.state;
 
     const snapshot = 'data:image/png;base64,';
@@ -1625,11 +1634,11 @@ class Settings extends React.Component {
   }
 }
 
-const mapStateToProps = (state, ownProps) => ({
+const mapStateToProps = (state /* , ownProps */) => ({
   config: state.agent.config,
 });
 
-const mapDispatchToProps = (dispatch, ownProps) => ({
+const mapDispatchToProps = (dispatch /* , ownProps */) => ({
   dispatchVerifyHub: (config, success, error) =>
     dispatch(verifyHub(config, success, error)),
   dispatchVerifyPersistence: (config, success, error) =>
@@ -1638,6 +1647,10 @@ const mapDispatchToProps = (dispatch, ownProps) => ({
   dispatchSaveConfig: (config, success, error) =>
     dispatch(saveConfig(config, success, error)),
 });
+
+Settings.propTypes = {
+  dispatchConfig: PropTypes.bool.isRequired,
+};
 
 export default withRouter(
   connect(mapStateToProps, mapDispatchToProps)(Settings)
