@@ -7,7 +7,7 @@ import {
 } from '../api/agent';
 
 export const verifyPersistence = (config, onSuccess, onError) => {
-  return function (dispatch) {
+  return (dispatch) => {
     doVerifyPersistence(
       config,
       () => {
@@ -29,7 +29,7 @@ export const verifyPersistence = (config, onSuccess, onError) => {
 };
 
 export const verifyHub = (config, onSuccess, onError) => {
-  return function (dispatch) {
+  return (dispatch) => {
     doVerifyHub(
       config,
       () => {
@@ -51,7 +51,7 @@ export const verifyHub = (config, onSuccess, onError) => {
 };
 
 export const getKerberosAgentTags = (onSuccess, onError) => {
-  return function (dispatch) {
+  return (dispatch) => {
     doGetKerberosAgentTags(
       (data) => {
         dispatch({
@@ -72,7 +72,7 @@ export const getKerberosAgentTags = (onSuccess, onError) => {
 };
 
 export const getConfig = (service, onSuccess, onError) => {
-  return function (dispatch) {
+  return (dispatch) => {
     doGetConfig(
       service,
       (data) => {
@@ -94,7 +94,7 @@ export const getConfig = (service, onSuccess, onError) => {
 };
 
 export const saveConfig = (service, config, onSuccess, onError) => {
-  return function (dispatch) {
+  return (dispatch) => {
     doSaveConfig(
       service,
       config,
