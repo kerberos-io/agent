@@ -142,7 +142,7 @@ RUN chown -R agent:kerberosio /home/agent/data
 ###################
 # Run non-root user
 
-#USER agent
+USER agent
 
 ######################################
 # By default the app runs on port 8080

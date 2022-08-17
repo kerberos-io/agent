@@ -18,6 +18,7 @@ import {
 import ImageCanvas from '../../components/ImageCanvas/ImageCanvas';
 import './Settings.scss';
 import timezones from './timezones';
+import { saveConfig } from '../../actions/agent';
 
 // eslint-disable-next-line react/prefer-stateless-function
 class Settings extends React.Component {
@@ -116,6 +117,11 @@ class Settings extends React.Component {
     this.verifyHubSettings = this.verifyHubSettings.bind(this);
     this.changeTab = this.changeTab.bind(this);
     this.calculateTimetable = this.calculateTimetable.bind(this);
+  }
+
+  componentDidMount() {
+    const { dispatchConfig } = this.props;
+    dispatchConfig();
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -393,16 +399,16 @@ class Settings extends React.Component {
                     General settings allow you to configure your Kerberos Agents
                     on a higher level.
                   </p>
-                  <Input label="key" disabled value={custom.key} />
+                  <Input label="key" disabled value={config.key} />
 
-                  <Input label="camera name" value={custom.name} />
+                  <Input label="camera name" value={config.name} />
 
                   <Dropdown
                     isRadio
                     label="Timezone"
                     placeholder="Select a timezone"
                     items={this.timezones}
-                    selected={[global.timezone]}
+                    selected={[config.timezone]}
                     shorten
                     shortenType="end"
                     shortenMaxLength={35}
@@ -1618,4 +1624,21 @@ class Settings extends React.Component {
     );
   }
 }
-export default Settings;
+
+const mapStateToProps = (state, ownProps) => ({
+  config: state.agent.config,
+});
+
+const mapDispatchToProps = (dispatch, ownProps) => ({
+  dispatchVerifyHub: (config, success, error) =>
+    dispatch(verifyHub(config, success, error)),
+  dispatchVerifyPersistence: (config, success, error) =>
+    dispatch(verifyPersistence(config, success, error)),
+  dispatchGetConfig: () => dispatch(getConfig()),
+  dispatchSaveConfig: (config, success, error) =>
+    dispatch(saveConfig(config, success, error)),
+});
+
+export default withRouter(
+  connect(mapStateToProps, mapDispatchToProps)(Settings)
+);

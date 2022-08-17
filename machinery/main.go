@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/components"
@@ -16,7 +17,8 @@ func main() {
 	const VERSION = "3.0"
 	action := os.Args[1]
 
-	log.Log.Init()
+	timezone, _ := time.LoadLocation("CET")
+	log.Log.Init(timezone)
 
 	switch action {
 
@@ -50,6 +52,9 @@ func main() {
 
 			// Open this configuration either from Kerberos Agent or Kerberos Factory.
 			components.OpenConfig(&configuration)
+
+			timezone, _ := time.LoadLocation(configuration.Config.Timezone)
+			log.Log.Init(timezone)
 
 			// Bootstrapping the agent
 			communication := models.Communication{
