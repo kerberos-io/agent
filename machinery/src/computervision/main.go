@@ -95,6 +95,9 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 	log.Log.Debug("ProcessMotion: started")
 	config := configuration.Config
 
+	var isPixelChangeThresholdReached = false
+	var changesToReturn = 0
+
 	if config.Capture.Continuous == "true" {
 
 		log.Log.Info("ProcessMotion: Continuous recording, so no motion detection.")
@@ -221,10 +224,19 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 						}
 					}
 
-					if detectMotion && FindMotion(matArray, coordinatesToCheck, config.Capture.PixelChangeThreshold) {
+					// Remember additional information about the result of findmotion
+					isPixelChangeThresholdReached, changesToReturn = FindMotion(matArray, coordinatesToCheck, config.Capture.PixelChangeThreshold)
+
+					if detectMotion && isPixelChangeThresholdReached {
 						mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
 						fmt.Println(key)
-						communication.HandleMotion <- time.Now().Unix()
+
+						//FIXME: In the future MotionDataPartial should be replaced with MotionDataFull
+						dataToPass := models.MotionDataPartial{
+							Timestamp:       time.Now().Unix(),
+							NumberOfChanges: changesToReturn,
+						}
+						communication.HandleMotion <- dataToPass //Save data to the channel
 					}
 				}
 
@@ -246,7 +258,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 	log.Log.Debug("ProcessMotion: finished")
 }
 
-func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int, pixelChangeThreshold int) bool {
+func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {
 
 	h1 := gocv.NewMat()
 	gocv.AbsDiff(*matArray[2], *matArray[0], &h1)
@@ -283,5 +295,6 @@ func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int, pixelChangeTh
 		pixelChangeThreshold = 75 // Keep hardcoded value of 75 for now if no value is given for changes treshold in config.json
 	}
 
-	return changes > pixelChangeThreshold
+	changesDetected = changes                              // Assign final amount of changes to the return variable
+	return changes > pixelChangeThreshold, changesDetected // Return bool ifReachedThreshold AND the amount of changes detected in total
 }

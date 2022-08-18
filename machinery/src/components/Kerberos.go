@@ -92,7 +92,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// Handle processing of motion
 		motionCursor := queue.Oldest()
-		communication.HandleMotion = make(chan int64, 1)
+		communication.HandleMotion = make(chan models.MotionDataPartial, 1)
 		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
 		// Handle livestream SD (low resolution over MQTT)

@@ -9,10 +9,10 @@ export function doGetConfig(onSuccess, onError) {
       }
       return res.data;
     })
-    .then(function (data) {
+    .then((data) => {
       onSuccess(data);
     })
-    .catch(function (error) {
+    .catch((error) => {
       onError(error);
     });
 }
@@ -28,10 +28,10 @@ export function doSaveConfig(config, onSuccess, onError) {
       }
       return res.data;
     })
-    .then(function (data) {
+    .then((data) => {
       onSuccess(data);
     })
-    .catch(function (error) {
+    .catch((error) => {
       onError(error);
     });
 }
@@ -45,10 +45,10 @@ export function doGetKerberosAgentTags(onSuccess, onError) {
       }
       return res.data;
     })
-    .then(function (data) {
+    .then((data) => {
       onSuccess(data);
     })
-    .catch(function (error) {
+    .catch((error) => {
       onError(error);
     });
 }
@@ -64,10 +64,10 @@ export function doVerifyPersistence(config, onSuccess, onError) {
       }
       return res.data;
     })
-    .then(function (data) {
+    .then((data) => {
       onSuccess(data);
     })
-    .catch(function (error) {
+    .catch((error) => {
       onError(error);
     });
 }
@@ -83,10 +83,10 @@ export function doVerifyHub(config, onSuccess, onError) {
       }
       return res.data;
     })
-    .then(function (data) {
+    .then((data) => {
       onSuccess(data);
     })
-    .catch(function (error) {
+    .catch((error) => {
       onError(error);
     });
 }
