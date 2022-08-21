@@ -121,9 +121,6 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 				start = true
 				timestamp = now
 
-				var receivedMessage = <-communication.HandleMotion
-				var NumberOfChanges = receivedMessage.NumberOfChanges
-
 				// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 				// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
 				// - Timestamp
@@ -138,8 +135,7 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 					"6" + "-" +
 					"967003" + "_" +
 					config.Name + "_" +
-					"200-200-400-400" + "_" +
-					strconv.Itoa(NumberOfChanges) + "_" +
+					"200-200-400-400" + "_0_" +
 					"769"
 
 				name = s + ".mp4"
@@ -212,14 +208,13 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 		var file *os.File
 		var err error
 
-		for _ = range communication.HandleMotion {
+		for motion := range communication.HandleMotion {
 
 			now = time.Now().Unix()
 			timestamp = now
 			startRecording = now // we mark the current time when the record started.
 
-			var receivedMessage = <-communication.HandleMotion
-			var NumberOfChanges = receivedMessage.NumberOfChanges
+			numberOfChanges := motion.NumberOfChanges
 
 			// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 			// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
@@ -235,7 +230,7 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 				"967003" + "_" +
 				config.Name + "_" +
 				"200-200-400-400" + "_" +
-				strconv.Itoa(NumberOfChanges) + "_" +
+				strconv.Itoa(numberOfChanges) + "_" +
 				"769"
 
 			name := s + ".mp4"
@@ -272,13 +267,11 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 
 				now := time.Now().Unix()
 				select {
-				case <-communication.HandleMotion:
+				case motion := <-communication.HandleMotion:
 					timestamp = now
 					log.Log.Info("HandleRecordStream: motion detected while recording. Expanding recording.")
-
-					var receivedMessage = <-communication.HandleMotion
-					NumberOfChanges = receivedMessage.NumberOfChanges
-					log.Log.Info("Received message with recording data, detected changes to save: " + strconv.Itoa(NumberOfChanges))
+					numberOfChanges = motion.NumberOfChanges
+					log.Log.Info("Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
 				default:
 				}
 				if timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod {
