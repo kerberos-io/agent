@@ -26,6 +26,7 @@ import {
   verifyHub,
   verifyPersistence,
   getConfig,
+  updateConfig,
 } from '../../actions/agent';
 
 // eslint-disable-next-line react/prefer-stateless-function
@@ -99,6 +100,10 @@ class Settings extends React.Component {
       })
     );
 
+    this.changeTab = this.changeTab.bind(this);
+    this.onUpdateField = this.onUpdateField.bind(this);
+    this.onUpdateToggle = this.onUpdateToggle.bind(this);
+    this.onUpdateTimeline = this.onUpdateTimeline.bind(this);
     this.changeValue = this.changeValue.bind(this);
     this.changeVaultValue = this.changeVaultValue.bind(this);
     this.changeS3Value = this.changeS3Value.bind(this);
@@ -112,7 +117,6 @@ class Settings extends React.Component {
     this.savePersistenceSettings = this.savePersistenceSettings.bind(this);
     this.verifyPersistenceSettings = this.verifyPersistenceSettings.bind(this);
     this.verifyHubSettings = this.verifyHubSettings.bind(this);
-    this.changeTab = this.changeTab.bind(this);
     this.calculateTimetable = this.calculateTimetable.bind(this);
   }
 
@@ -140,6 +144,61 @@ class Settings extends React.Component {
   componentWillUnmount() {
     document.removeEventListener('keydown', this.escFunction, false);
     clearInterval(this.interval);
+  }
+
+  onUpdateField(type, name, event, object) {
+    const { value } = event.target;
+    const { dispatchUpdateConfig } = this.props;
+    dispatchUpdateConfig(type, {
+      ...object,
+      [name]: value,
+    });
+  }
+
+  onUpdateToggle(type, name, event, object) {
+    const { checked } = event.target;
+    const { dispatchUpdateConfig } = this.props;
+    dispatchUpdateConfig(type, {
+      ...object,
+      [name]: checked ? 'true' : 'false',
+    });
+  }
+
+  onUpdateTimeline(type, index, key, event, object) {
+    const { value } = event.target;
+    console.log(object);
+    let seconds = -1;
+    if (value) {
+      const a = value.split(':'); // split it at the colons
+      if (a.length === 2) {
+        if (a[0] <= 24 && a[1] < 60) {
+          seconds = +a[0] * 60 * 60 + +a[1] * 60;
+          this.timetable[index][`${key}Full`] = value;
+        }
+      }
+    }
+
+    console.log(seconds);
+    /* this.props.dispatchUpdateContainer(type, [
+      ...object.slice(0, index),
+      {
+        ...object[index],
+        [key]: seconds,
+      },
+      ...object.slice(index + 1)
+    ]); */
+  }
+
+  calculateTimetable(timetable) {
+    this.timetable = timetable;
+    for (let i = 0; i < timetable.length; i += 1) {
+      const time = timetable[i];
+      const { start1, start2, end1, end2 } = time;
+      this.timetable[i].start1Full = this.convertSecondsToHourMinute(start1);
+      this.timetable[i].start2Full = this.convertSecondsToHourMinute(start2);
+      this.timetable[i].end1Full = this.convertSecondsToHourMinute(end1);
+      this.timetable[i].end2Full = this.convertSecondsToHourMinute(end2);
+    }
   }
 
   changeTab(tab) {
@@ -200,18 +259,6 @@ class Settings extends React.Component {
     // console.log(this);
   }
 
-  calculateTimetable(timetable) {
-    this.timetable = timetable;
-    for (let i = 0; i < timetable.length; i += 1) {
-      const time = timetable[i];
-      const { start1, start2, end1, end2 } = time;
-      this.timetable[i].start1Full = this.convertSecondsToHourMinute(start1);
-      this.timetable[i].start2Full = this.convertSecondsToHourMinute(start2);
-      this.timetable[i].end1Full = this.convertSecondsToHourMinute(end1);
-      this.timetable[i].end2Full = this.convertSecondsToHourMinute(end2);
-    }
-  }
-
   render() {
     const {
       selectedTab,
@@ -234,10 +281,12 @@ class Settings extends React.Component {
       verifyPersistenceMessage,
       loading,
       loadingHub,
-      config, // New variables start here
     } = this.state;
 
-    const snapshot = 'data:image/png;base64,';
+    const { config: c } = this.props;
+    const { config, snapshot } = c;
+
+    const snapshotBase64 = 'data:image/png;base64,';
     // Determine which section(s) to be shown, depending on the searching criteria.
     let showOverviewSection = false;
     let showRecordingSection = false;
@@ -314,7 +363,7 @@ class Settings extends React.Component {
       }
     }
 
-    return (
+    return config ? (
       <div id="settings">
         <Breadcrumb
           title="Settings"
@@ -400,9 +449,9 @@ class Settings extends React.Component {
                     General settings allow you to configure your Kerberos Agents
                     on a higher level.
                   </p>
-                  <Input label="key" disabled value={config.key} />
+                  <Input label="key" disabled defaultValue={config.key} />
 
-                  <Input label="camera name" value={config.name} />
+                  <Input label="camera name" defaultValue={config.name} />
 
                   <Dropdown
                     isRadio
@@ -777,7 +826,7 @@ class Settings extends React.Component {
                   </p>
                   {config.region && (
                     <ImageCanvas
-                      image={snapshot}
+                      image={snapshotBase64 + snapshot}
                       polygons={config.region.polygon}
                       rendered={false}
                       onAddRegion={this.onAddRegion}
@@ -1622,6 +1671,8 @@ class Settings extends React.Component {
           </div>
         </div>
       </div>
+    ) : (
+      <></>
     );
   }
 }
@@ -1636,14 +1687,17 @@ const mapDispatchToProps = (dispatch /* , ownProps */) => ({
   dispatchVerifyPersistence: (config, success, error) =>
     dispatch(verifyPersistence(config, success, error)),
   dispatchGetConfig: (callback) => dispatch(getConfig(callback)),
+  dispatchUpdateConfig: (field, value) => dispatch(updateConfig(field, value)),
   dispatchSaveConfig: (config, success, error) =>
     dispatch(saveConfig(config, success, error)),
 });
 
 Settings.propTypes = {
+  config: PropTypes.objectOf(PropTypes.object).isRequired,
   // dispatchVerifyHub: PropTypes.func.isRequired,
   // dispatchVerifyPersistence: PropTypes.func.isRequired,
   dispatchGetConfig: PropTypes.func.isRequired,
+  dispatchUpdateConfig: PropTypes.func.isRequired,
   // dispatchSaveConfig: PropTypes.func.isRequired,
 };
 

@@ -18,6 +18,8 @@
   "plugins": ["react"],
   "rules": {
     "class-methods-use-this": "off",
+    "react/forbid-prop-types": "off",
+    "no-case-declarations": "off",
     "jsx-a11y/label-has-associated-control": [
       "error",
       {

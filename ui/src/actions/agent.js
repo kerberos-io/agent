@@ -92,6 +92,16 @@ export const getConfig = (onSuccess, onError) => {
   };
 };
 
+export const updateConfig = (field, value) => {
+  return function (dispatch) {
+    dispatch({
+      type: 'UPDATE_CONFIG',
+      field,
+      value,
+    });
+  };
+};
+
 export const saveConfig = (service, config, onSuccess, onError) => {
   return (dispatch) => {
     doSaveConfig(
