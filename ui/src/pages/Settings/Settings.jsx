@@ -119,7 +119,6 @@ class Settings extends React.Component {
   componentDidMount() {
     const { dispatchGetConfig } = this.props;
     dispatchGetConfig((data) => {
-      console.log(data.config);
       this.setState((prevState) => ({
         ...prevState,
         config: data.config,
