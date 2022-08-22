@@ -1,4 +1,4 @@
-const auth = (
+const authentication = (
   state = {
     username: '',
     role: '',
@@ -61,4 +61,4 @@ const auth = (
   }
 };
 
-export default auth;
+export default authentication;

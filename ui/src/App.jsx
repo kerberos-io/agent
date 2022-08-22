@@ -84,7 +84,7 @@ class App extends React.Component {
 }
 
 const mapStateToProps = (state) => ({
-  username: state.auth.username,
+  username: state.authentication.username,
 });
 
 const mapDispatchToProps = (dispatch) => ({

@@ -71,17 +71,16 @@ export const getKerberosAgentTags = (onSuccess, onError) => {
   };
 };
 
-export const getConfig = (service, onSuccess, onError) => {
+export const getConfig = (onSuccess, onError) => {
   return (dispatch) => {
     doGetConfig(
-      service,
-      (data) => {
+      (config) => {
         dispatch({
           type: 'GET_CONFIG',
-          data,
+          config,
         });
         if (onSuccess) {
-          onSuccess();
+          onSuccess(config);
         }
       },
       () => {

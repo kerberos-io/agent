@@ -31,7 +31,7 @@ function getAuthState() {
     // const installed = localStorage.getItem('installed') || null;
     const difference = new Date(expire) - new Date();
     const state = {
-      auth: {
+      authentication: {
         token,
         expire,
         username,

@@ -38,18 +38,7 @@ class Settings extends React.Component {
     super();
     this.state = {
       search: '',
-      custom: {
-        s3: {},
-        kstorage: {},
-        capture: {
-          ipcamera: {},
-        },
-      },
-
-      global: {
-        s3: {},
-        kstorage: {},
-      },
+      config: {},
       selectedTab: 'overview',
       mqttSuccess: false,
       mqttError: false,
@@ -128,8 +117,14 @@ class Settings extends React.Component {
   }
 
   componentDidMount() {
-    const { dispatchConfig } = this.props;
-    dispatchConfig();
+    const { dispatchGetConfig } = this.props;
+    dispatchGetConfig((data) => {
+      console.log(data.config);
+      this.setState((prevState) => ({
+        ...prevState,
+        config: data.config,
+      }));
+    });
   }
 
   componentDidUpdate(prevProps, prevState) {
@@ -138,8 +133,8 @@ class Settings extends React.Component {
     if (prevState.open !== open && open) {
       // this.props.dispatchGetConfig(service);
       // Cache the current timetable
-      // const { custom } = container;
-      // this.calculateTimetable(custom.timetable);
+      // const {  } = container;
+      // this.calculateTimetable(config.timetable);
     }
   }
 
@@ -222,8 +217,6 @@ class Settings extends React.Component {
     const {
       selectedTab,
       search,
-      custom,
-      global,
       generalSuccess,
       generalError,
       mqttSuccess,
@@ -460,54 +453,54 @@ class Settings extends React.Component {
                   </p>
                   <Input
                     label="RTSP URL"
-                    value={custom.capture.ipcamera.rtsp}
+                    value={config.capture.ipcamera.rtsp}
                     placeholder="The IP camera address"
                     onChange={(value) =>
                       this.onUpdateField(
                         'capture.ipcamera',
                         'rtsp',
                         value,
-                        custom.capture.ipcamera
+                        config.capture.ipcamera
                       )
                     }
                   />
 
                   <Input
                     label="onvif xaddr"
-                    value={custom.capture.ipcamera.onvif_xaddr}
+                    value={config.capture.ipcamera.onvif_xaddr}
                     placeholder="http://x.x.x.x/onvif/device_service"
                     onChange={(value) =>
                       this.onUpdateField(
                         'capture.ipcamera',
                         'onvif_xaddr',
                         value,
-                        custom.capture.ipcamera
+                        config.capture.ipcamera
                       )
                     }
                   />
 
                   <Input
                     label="username"
-                    value={custom.capture.ipcamera.onvif_username}
+                    value={config.capture.ipcamera.onvif_username}
                     onChange={(value) =>
                       this.onUpdateField(
                         'capture.ipcamera',
                         'onvif_username',
                         value,
-                        custom.capture.ipcamera
+                        config.capture.ipcamera
                       )
                     }
                   />
 
                   <Input
                     label="password"
-                    value={custom.capture.ipcamera.onvif_password}
+                    value={config.capture.ipcamera.onvif_password}
                     onChange={(value) =>
                       this.onUpdateField(
                         'capture.ipcamera',
                         'onvif_password',
                         value,
-                        custom.capture.ipcamera
+                        config.capture.ipcamera
                       )
                     }
                   />
@@ -550,14 +543,14 @@ class Settings extends React.Component {
                   </p>
                   <div className="toggle-wrapper">
                     <Toggle
-                      on={custom.capture.continuous === 'true'}
+                      on={config.capture.continuous === 'true'}
                       disabled={false}
                       onClick={(event) =>
                         this.onUpdateToggle(
                           'capture',
                           'continuous',
                           event,
-                          custom.capture
+                          config.capture
                         )
                       }
                     />
@@ -569,42 +562,42 @@ class Settings extends React.Component {
 
                   <Input
                     label="video duration (seconds)"
-                    value={custom.capture.maxlengthrecording}
+                    value={config.capture.maxlengthrecording}
                     placeholder="The maximum duration of a recording."
                     onChange={(value) =>
                       this.onUpdateNumberField(
                         'capture',
                         'maxlengthrecording',
                         value,
-                        custom.capture
+                        config.capture
                       )
                     }
                   />
 
                   <Input
                     label="pre recording (seconds)"
-                    value={custom.capture.prerecording}
+                    value={config.capture.prerecording}
                     placeholder="Seconds before an event occurred."
                     onChange={(value) =>
                       this.onUpdateNumberField(
                         'capture',
                         'prerecording',
                         value,
-                        custom.capture
+                        config.capture
                       )
                     }
                   />
 
                   <Input
                     label="post recording (seconds)"
-                    value={custom.capture.postrecording}
+                    value={config.capture.postrecording}
                     placeholder="Seconds after an event occurred."
                     onChange={(value) =>
                       this.onUpdateNumberField(
                         'capture',
                         'postrecording',
                         value,
-                        custom.capture
+                        config.capture
                       )
                     }
                   />
@@ -647,24 +640,24 @@ class Settings extends React.Component {
                   </p>
                   <Input
                     label="STUN server"
-                    value={global.stunuri}
+                    value={config.stunuri}
                     onChange={(value) => this.changeValue('stunuri', value)}
                   />
                   <Input
                     label="TURN server"
-                    value={global.turnuri}
+                    value={config.turnuri}
                     onChange={(value) => this.changeValue('turnuri', value)}
                   />
                   <Input
                     label="Username"
-                    value={global.turn_username}
+                    value={config.turn_username}
                     onChange={(value) =>
                       this.changeValue('turn_username', value)
                     }
                   />
                   <Input
                     label="Password"
-                    value={global.turn_password}
+                    value={config.turn_password}
                     onChange={(value) =>
                       this.changeValue('turn_password', value)
                     }
@@ -730,26 +723,26 @@ class Settings extends React.Component {
                   <Input
                     label="API url"
                     placeholder="The API for Kerberos Hub."
-                    value={global.hub_uri}
+                    value={config.hub_uri}
                     onChange={(value) => this.changeValue('hub_uri', value)}
                   />
                   <Input
                     label="Public key"
                     placeholder="The public key granted to your Kerberos Hub account."
-                    value={global.hub_key}
+                    value={config.hub_key}
                     onChange={(value) => this.changeValue('hub_key', value)}
                   />
                   <Input
                     label="Private key"
                     placeholder="The private key granted to your Kerberos Hub account."
-                    value={global.hub_private_key}
+                    value={config.hub_private_key}
                     onChange={(value) =>
                       this.changeValue('hub_private_key', value)
                     }
                   />
                   <Input
                     label="Site"
-                    value={global.hub_site}
+                    value={config.hub_site}
                     placeholder="The site ID the Kerberos Agents are belonging to in Kerberos Hub."
                     onChange={(value) => this.changeValue('hub_site', value)}
                   />
@@ -783,10 +776,10 @@ class Settings extends React.Component {
                     By defining one or more regions, motion will be tracked only
                     in the regions you have defined.
                   </p>
-                  {custom.region && (
+                  {config.region && (
                     <ImageCanvas
                       image={snapshot}
-                      polygons={custom.region.polygon}
+                      polygons={config.region.polygon}
                       rendered={false}
                       onAddRegion={this.onAddRegion}
                       onUpdateRegion={this.onUpdateRegion}
@@ -831,19 +824,19 @@ class Settings extends React.Component {
                   </p>
                   <Input
                     label="Broker Uri"
-                    value={global.mqtturi}
+                    value={config.mqtturi}
                     onChange={(value) => this.changeValue('mqtturi', value)}
                   />
                   <Input
                     label="Username"
-                    value={global.mqtt_username}
+                    value={config.mqtt_username}
                     onChange={(value) =>
                       this.changeValue('mqtt_username', value)
                     }
                   />
                   <Input
                     label="Password"
-                    value={global.mqtt_password}
+                    value={config.mqtt_password}
                     onChange={(value) =>
                       this.changeValue('mqtt_password', value)
                     }
@@ -882,14 +875,14 @@ class Settings extends React.Component {
 
                   <div className="toggle-wrapper">
                     <Toggle
-                      on={custom.capture.forwardwebrtc === 'true'}
+                      on={config.capture.forwardwebrtc === 'true'}
                       disabled={false}
                       onClick={(event) =>
                         this.onUpdateToggle(
                           'capture',
                           'forwardwebrtc',
                           event,
-                          custom.capture
+                          config.capture
                         )
                       }
                     />
@@ -901,14 +894,14 @@ class Settings extends React.Component {
 
                   <div className="toggle-wrapper">
                     <Toggle
-                      on={custom.capture.transcodingwebrtc === 'true'}
+                      on={config.capture.transcodingwebrtc === 'true'}
                       disabled={false}
                       onClick={(event) =>
                         this.onUpdateToggle(
                           'capture',
                           'transcodingwebrtc',
                           event,
-                          custom.capture
+                          config.capture
                         )
                       }
                     />
@@ -920,14 +913,14 @@ class Settings extends React.Component {
 
                   <Input
                     label="Downscale resolution (in % or original resolution)"
-                    value={custom.capture.transcodingresolution}
+                    value={config.capture.transcodingresolution}
                     placeholder="The % of the original resolution."
                     onChange={(value) =>
                       this.onUpdateNumberField(
                         'capture',
                         'transcodingresolution',
                         value,
-                        custom.capture
+                        config.capture
                       )
                     }
                   />
@@ -965,14 +958,14 @@ class Settings extends React.Component {
 
                   <div className="toggle-wrapper">
                     <Toggle
-                      on={custom.capture.fragmented === 'true'}
+                      on={config.capture.fragmented === 'true'}
                       disabled={false}
                       onClick={(event) =>
                         this.onUpdateToggle(
                           'capture',
                           'fragmented',
                           event,
-                          custom.capture
+                          config.capture
                         )
                       }
                     />
@@ -987,14 +980,14 @@ class Settings extends React.Component {
 
                   <Input
                     label="fragmented duration"
-                    value={custom.capture.fragmentedduration}
+                    value={config.capture.fragmentedduration}
                     placeholder="Duration of a single fragment."
                     onChange={(value) =>
                       this.onUpdateNumberField(
                         'capture',
                         'fragmentedduration',
                         value,
-                        custom.capture
+                        config.capture
                       )
                     }
                   />
@@ -1028,10 +1021,10 @@ class Settings extends React.Component {
 
                         <div className="toggle-wrapper">
                           <Toggle
-                            on={custom.time === 'true'}
+                            on={config.time === 'true'}
                             disabled={false}
                             onClick={(event) =>
-                              this.onUpdateToggle('', 'time', event, custom)
+                              this.onUpdateToggle('', 'time', event, config)
                             }
                           />
                           <div>
@@ -1051,7 +1044,7 @@ class Settings extends React.Component {
                                 0,
                                 'start1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1064,7 +1057,7 @@ class Settings extends React.Component {
                                 0,
                                 'end1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1077,7 +1070,7 @@ class Settings extends React.Component {
                                 0,
                                 'start2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1090,7 +1083,7 @@ class Settings extends React.Component {
                                 0,
                                 'end2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1107,7 +1100,7 @@ class Settings extends React.Component {
                                 1,
                                 'start1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1120,7 +1113,7 @@ class Settings extends React.Component {
                                 1,
                                 'end1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1133,7 +1126,7 @@ class Settings extends React.Component {
                                 1,
                                 'start2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1146,7 +1139,7 @@ class Settings extends React.Component {
                                 1,
                                 'end2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1163,7 +1156,7 @@ class Settings extends React.Component {
                                 2,
                                 'start1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1176,7 +1169,7 @@ class Settings extends React.Component {
                                 2,
                                 'end1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1189,7 +1182,7 @@ class Settings extends React.Component {
                                 2,
                                 'start2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1202,7 +1195,7 @@ class Settings extends React.Component {
                                 2,
                                 'end2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1219,7 +1212,7 @@ class Settings extends React.Component {
                                 3,
                                 'start1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1232,7 +1225,7 @@ class Settings extends React.Component {
                                 3,
                                 'end1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1245,7 +1238,7 @@ class Settings extends React.Component {
                                 3,
                                 'start2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1258,7 +1251,7 @@ class Settings extends React.Component {
                                 3,
                                 'end2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1275,7 +1268,7 @@ class Settings extends React.Component {
                                 4,
                                 'start1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1288,7 +1281,7 @@ class Settings extends React.Component {
                                 4,
                                 'end1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1301,7 +1294,7 @@ class Settings extends React.Component {
                                 4,
                                 'start2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1314,7 +1307,7 @@ class Settings extends React.Component {
                                 4,
                                 'end2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1331,7 +1324,7 @@ class Settings extends React.Component {
                                 5,
                                 'start1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1344,7 +1337,7 @@ class Settings extends React.Component {
                                 5,
                                 'end1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1357,7 +1350,7 @@ class Settings extends React.Component {
                                 5,
                                 'start2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1370,7 +1363,7 @@ class Settings extends React.Component {
                                 5,
                                 'end2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1387,7 +1380,7 @@ class Settings extends React.Component {
                                 6,
                                 'start1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1400,7 +1393,7 @@ class Settings extends React.Component {
                                 6,
                                 'end1',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1413,7 +1406,7 @@ class Settings extends React.Component {
                                 6,
                                 'start2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1426,7 +1419,7 @@ class Settings extends React.Component {
                                 6,
                                 'end2',
                                 event,
-                                custom.timetable
+                                config.timetable
                               );
                             }}
                           />
@@ -1451,14 +1444,14 @@ class Settings extends React.Component {
                   </p>
                   <Input
                     label="Condition URI"
-                    value={custom.condition_uri}
+                    value={config.condition_uri}
                     placeholder={
-                      global.condition_uri
-                        ? global.condition_uri
+                      config.condition_uri
+                        ? config.condition_uri
                         : 'The API for conditional recording (GET request).'
                     }
                     onChange={(value) =>
-                      this.onUpdateField('', 'condition_uri', value, custom)
+                      this.onUpdateField('', 'condition_uri', value, config)
                     }
                   />
                 </BlockBody>
@@ -1522,17 +1515,17 @@ class Settings extends React.Component {
                   <Dropdown
                     isRadio
                     placeholder="Select a persistence"
-                    selected={[global.cloud]}
+                    selected={[config.cloud]}
                     items={this.storageTypes}
                     onChange={this.changeStorageType}
                   />
 
-                  {global.cloud === this.KERBEROS_HUB && (
+                  {config.cloud === this.KERBEROS_HUB && (
                     <>
                       <Input
                         label="Kerberos Hub API URL"
                         placeholder="The API endpoint for uploading your recordings."
-                        value={global.s3.proxyuri}
+                        value={config.s3.proxyuri}
                         onChange={(value) =>
                           this.changeS3Value('proxyuri', value)
                         }
@@ -1540,7 +1533,7 @@ class Settings extends React.Component {
                       <Input
                         label="Region"
                         placeholder="The region we are storing our recordings in."
-                        value={global.s3.region}
+                        value={config.s3.region}
                         onChange={(value) =>
                           this.changeS3Value('region', value)
                         }
@@ -1548,7 +1541,7 @@ class Settings extends React.Component {
                       <Input
                         label="Bucket"
                         placeholder="The bucket we are storing our recordings in."
-                        value={global.s3.bucket}
+                        value={config.s3.bucket}
                         onChange={(value) =>
                           this.changeS3Value('bucket', value)
                         }
@@ -1556,7 +1549,7 @@ class Settings extends React.Component {
                       <Input
                         label="Username/Directory"
                         placeholder="The username of your Kerberos Hub account."
-                        value={global.s3.username}
+                        value={config.s3.username}
                         onChange={(value) =>
                           this.changeS3Value('username', value)
                         }
@@ -1564,12 +1557,12 @@ class Settings extends React.Component {
                     </>
                   )}
 
-                  {global.cloud === this.KERBEROS_VAULT && (
+                  {config.cloud === this.KERBEROS_VAULT && (
                     <>
                       <Input
                         label="Kerberos Vault API URL"
                         placeholder="The Kerberos Vault API"
-                        value={global.kstorage.uri}
+                        value={config.kstorage.uri}
                         onChange={(value) =>
                           this.changeVaultValue('uri', value)
                         }
@@ -1577,7 +1570,7 @@ class Settings extends React.Component {
                       <Input
                         label="Provider"
                         placeholder="The provider to which your recordings will be send."
-                        value={global.kstorage.provider}
+                        value={config.kstorage.provider}
                         onChange={(value) =>
                           this.changeVaultValue('provider', value)
                         }
@@ -1585,7 +1578,7 @@ class Settings extends React.Component {
                       <Input
                         label="Directory"
                         placeholder="Sub directory the recordings will be stored in your provider."
-                        value={global.kstorage.directory}
+                        value={config.kstorage.directory}
                         onChange={(value) =>
                           this.changeVaultValue('directory', value)
                         }
@@ -1593,7 +1586,7 @@ class Settings extends React.Component {
                       <Input
                         label="Access key"
                         placeholder="The access key of your Kerberos Vault account."
-                        value={global.kstorage.access_key}
+                        value={config.kstorage.access_key}
                         onChange={(value) =>
                           this.changeVaultValue('access_key', value)
                         }
@@ -1601,7 +1594,7 @@ class Settings extends React.Component {
                       <Input
                         label="Secret key"
                         placeholder="The secret key of your Kerberos Vault account."
-                        value={global.kstorage.secret_access_key}
+                        value={config.kstorage.secret_access_key}
                         onChange={(value) =>
                           this.changeVaultValue('secret_access_key', value)
                         }
@@ -1643,13 +1636,16 @@ const mapDispatchToProps = (dispatch /* , ownProps */) => ({
     dispatch(verifyHub(config, success, error)),
   dispatchVerifyPersistence: (config, success, error) =>
     dispatch(verifyPersistence(config, success, error)),
-  dispatchGetConfig: () => dispatch(getConfig()),
+  dispatchGetConfig: (callback) => dispatch(getConfig(callback)),
   dispatchSaveConfig: (config, success, error) =>
     dispatch(saveConfig(config, success, error)),
 });
 
 Settings.propTypes = {
-  dispatchConfig: PropTypes.bool.isRequired,
+  // dispatchVerifyHub: PropTypes.func.isRequired,
+  // dispatchVerifyPersistence: PropTypes.func.isRequired,
+  dispatchGetConfig: PropTypes.func.isRequired,
+  // dispatchSaveConfig: PropTypes.func.isRequired,
 };
 
 export default withRouter(
