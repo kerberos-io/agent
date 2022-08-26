@@ -1,21 +1,18 @@
 package http
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"os"
-
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
-	"gopkg.in/mgo.v2/bson"
 
+	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/components"
-	"github.com/kerberos-io/agent/machinery/src/database"
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
 func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuration *models.Configuration, communication *models.Communication) *gin.RouterGroup {
 
+	// This is legacy should be removed in future! Now everything
+	// lives under the /api prefix.
 	r.GET("/config", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"config":   configuration.Config,
@@ -25,37 +22,14 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 		})
 	})
 
+	// This is legacy should be removed in future! Now everything
+	// lives under the /api prefix.
 	r.POST("/config", func(c *gin.Context) {
-		if !communication.IsConfiguring.IsSet() {
-			communication.IsConfiguring.Set()
-
-			// Save into file
-			var conf models.Config
-			err := c.BindJSON(&conf)
+		var config models.Config
+		err := c.BindJSON(&config)
+		if err == nil {
+			err := components.SaveConfig(config, configuration, communication)
 			if err == nil {
-				if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
-					// Write to mongodb
-					session := database.New().Copy()
-					defer session.Close()
-					db := session.DB(database.DatabaseName)
-					collection := db.C("configuration")
-
-					collection.Update(bson.M{
-						"type": "config",
-						"name": os.Getenv("DEPLOYMENT_NAME"),
-					}, &conf)
-				} else if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
-					res, _ := json.MarshalIndent(conf, "", "\t")
-					ioutil.WriteFile("./data/config/config.json", res, 0644)
-				}
-
-				select {
-				case communication.HandleBootstrap <- "restart":
-				default:
-				}
-
-				communication.IsConfiguring.UnSet()
-
 				c.JSON(200, gin.H{
 					"data": "☄ Reconfiguring",
 				})
@@ -66,7 +40,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			}
 		} else {
 			c.JSON(400, gin.H{
-				"data": "☄ Already reconfiguring",
+				"data": "Something went wrong: " + err.Error(),
 			})
 		}
 	})
@@ -84,6 +58,27 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			})
 		})
 
+		api.POST("/config", func(c *gin.Context) {
+			var config models.Config
+			err := c.BindJSON(&config)
+			if err == nil {
+				err := components.SaveConfig(config, configuration, communication)
+				if err == nil {
+					c.JSON(200, gin.H{
+						"data": "☄ Reconfiguring",
+					})
+				} else {
+					c.JSON(200, gin.H{
+						"data": "☄ Reconfiguring",
+					})
+				}
+			} else {
+				c.JSON(400, gin.H{
+					"data": "Something went wrong: " + err.Error(),
+				})
+			}
+		})
+
 		api.GET("/restart", func(c *gin.Context) {
 			communication.HandleBootstrap <- "restart"
 			c.JSON(200, gin.H{
@@ -96,6 +91,14 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			c.JSON(200, gin.H{
 				"stopped": true,
 			})
+		})
+
+		api.POST("/hub/verify", func(c *gin.Context) {
+			cloud.VerifyHub(c)
+		})
+
+		api.POST("/persistence/verify", func(c *gin.Context) {
+			cloud.VerifyPersistence(c)
 		})
 
 		api.Use(authMiddleware.MiddlewareFunc())

@@ -1,7 +1,7 @@
 import API from './api';
 
 export function doGetConfig(onSuccess, onError) {
-  const endpoint = API.get(`config`);
+  const endpoint = API.get(`api/config`);
   endpoint
     .then((res) => {
       if (res.status !== 200) {
@@ -18,7 +18,7 @@ export function doGetConfig(onSuccess, onError) {
 }
 
 export function doSaveConfig(config, onSuccess, onError) {
-  const endpoint = API.post(`config`, {
+  const endpoint = API.post(`api/config`, {
     ...config,
   });
   endpoint
@@ -37,7 +37,7 @@ export function doSaveConfig(config, onSuccess, onError) {
 }
 
 export function doGetKerberosAgentTags(onSuccess, onError) {
-  const endpoint = API.get(`kerberos-agent/tags`);
+  const endpoint = API.get(`api/kerberos-agent/tags`);
   endpoint
     .then((res) => {
       if (res.status !== 200) {
@@ -54,7 +54,7 @@ export function doGetKerberosAgentTags(onSuccess, onError) {
 }
 
 export function doVerifyPersistence(config, onSuccess, onError) {
-  const endpoint = API.post(`persistence/verify`, {
+  const endpoint = API.post(`api/persistence/verify`, {
     ...config,
   });
   endpoint
@@ -73,7 +73,7 @@ export function doVerifyPersistence(config, onSuccess, onError) {
 }
 
 export function doVerifyHub(config, onSuccess, onError) {
-  const endpoint = API.post(`hub/verify`, {
+  const endpoint = API.post(`api/hub/verify`, {
     ...config,
   });
   endpoint

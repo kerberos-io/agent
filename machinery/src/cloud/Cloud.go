@@ -2,12 +2,16 @@ package cloud
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"sync"
 
+	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/joy4/av/pubsub"
+	"github.com/minio/minio-go/v6"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	av "github.com/kerberos-io/joy4/av"
@@ -15,6 +19,7 @@ import (
 	"gocv.io/x/gocv"
 
 	"net/http"
+	"net/url"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -286,5 +291,273 @@ func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 			webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, track, handshake, webrtc.CandidateArrays[key])
 
 		}
+	}
+}
+
+// VerifyHub godoc
+// @Router /api/hub/verify [post]
+// @ID verify-hub
+// @Security Bearer
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @Tags config
+// @Param config body models.Config true "Config"
+// @Summary Will verify the hub connectivity.
+// @Description Will verify the hub connectivity.
+// @Success 200 {object} models.APIResponse
+func VerifyHub(c *gin.Context) {
+
+	var config models.Config
+	err := c.BindJSON(&config)
+
+	if err == nil {
+		hubKey := config.HubKey
+		//hubPrivateKey := config.HubPrivateKey
+		//hubSite := config.HubSite
+		hubURI := config.HubURI
+
+		content := []byte(`{"message": "fake-message"}`)
+		body := bytes.NewReader(content)
+		req, err := http.NewRequest("POST", hubURI+"/queue/test", body)
+		if err == nil {
+			req.Header.Set("X-Kerberos-Cloud-Key", hubKey)
+			client := &http.Client{}
+
+			resp, err := client.Do(req)
+			if err == nil {
+				body, err := ioutil.ReadAll(resp.Body)
+				defer resp.Body.Close()
+				if err == nil {
+					if resp.StatusCode == 200 {
+						c.JSON(200, body)
+					} else {
+						c.JSON(400, models.APIResponse{
+							Data: "Something went wrong while reaching the Kerberos Hub API: " + string(body),
+						})
+					}
+				} else {
+					c.JSON(400, models.APIResponse{
+						Data: "Something went wrong while ready the response body: " + err.Error(),
+					})
+				}
+			} else {
+				c.JSON(400, models.APIResponse{
+					Data: "Something went wrong while reaching to the Kerberos Hub API: " + hubURI,
+				})
+			}
+		} else {
+			c.JSON(400, models.APIResponse{
+				Data: "Something went wrong while creating the HTTP request: " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, models.APIResponse{
+			Data: "Something went wrong while receiving the config " + err.Error(),
+		})
+	}
+}
+
+// VerifyPersistence godoc
+// @Router /api/persistence/verify [post]
+// @ID verify-persistence
+// @Security Bearer
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @Tags config
+// @Param config body models.Config true "Config"
+// @Summary Will verify the persistence.
+// @Description Will verify the persistence.
+// @Success 200 {object} models.APIResponse
+func VerifyPersistence(c *gin.Context) {
+
+	var config models.Config
+	err := c.BindJSON(&config)
+	if err != nil || config.Cloud != "" {
+
+		if config.Cloud == "s3" {
+
+			//fmt.Println("Uploading...")
+			// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
+			// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
+			// - Timestamp
+			// - Size + - + microseconds
+			// - device
+			// - Region
+			// - Number of changes
+			// - Token
+
+			aws_access_key_id := config.S3.Publickey
+			aws_secret_access_key := config.S3.Secretkey
+			aws_region := config.S3.Region
+
+			// This is the new way ;)
+			if config.HubKey != "" {
+				aws_access_key_id = config.HubKey
+			}
+			if config.HubPrivateKey != "" {
+				aws_secret_access_key = config.HubPrivateKey
+			}
+
+			s3Client, err := minio.NewWithRegion("s3.amazonaws.com", aws_access_key_id, aws_secret_access_key, true, aws_region)
+			if err != nil {
+				c.JSON(400, models.APIResponse{
+					Data: "Creation of Kerberos Hub connection failed: " + err.Error(),
+				})
+			} else {
+
+				// Check if we need to use the proxy.
+				if config.S3.ProxyURI != "" {
+					var transport http.RoundTripper = &http.Transport{
+						Proxy: func(*http.Request) (*url.URL, error) {
+							return url.Parse(config.S3.ProxyURI)
+						},
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					}
+					s3Client.SetCustomTransport(transport)
+				}
+
+				deviceKey := "fake-key"
+				devicename := "justatest"
+				coordinates := "200-200-400-400"
+				eventToken := "769"
+
+				timestamp := time.Now().Unix()
+				fileName := strconv.FormatInt(timestamp, 10) + "_6-967003_justatest_200-200-400-400_24_769.mp4"
+				content := []byte("test-file")
+				body := bytes.NewReader(content)
+
+				n, err := s3Client.PutObject(config.S3.Bucket,
+					config.S3.Username+"/"+fileName,
+					body,
+					body.Size(),
+					minio.PutObjectOptions{
+						ContentType:  "video/mp4",
+						StorageClass: "ONEZONE_IA",
+						UserMetadata: map[string]string{
+							"event-timestamp":         strconv.FormatInt(timestamp, 10),
+							"event-microseconds":      deviceKey,
+							"event-instancename":      devicename,
+							"event-regioncoordinates": coordinates,
+							"event-numberofchanges":   deviceKey,
+							"event-token":             eventToken,
+							"productid":               deviceKey,
+							"publickey":               aws_access_key_id,
+							"uploadtime":              "now",
+						},
+					})
+
+				if err != nil {
+					c.JSON(400, models.APIResponse{
+						Data: "Upload of fake recording failed: " + err.Error(),
+					})
+				} else {
+					c.JSON(200, models.APIResponse{
+						Data: "Upload Finished: file has been uploaded to bucket: " + strconv.FormatInt(n, 10),
+					})
+				}
+			}
+		}
+
+		if config.Cloud == "kstorage" {
+
+			uri := config.KStorage.URI
+			accessKey := config.KStorage.AccessKey
+			secretAccessKey := config.KStorage.SecretAccessKey
+			directory := config.KStorage.Directory
+			provider := config.KStorage.Provider
+
+			if err == nil && uri != "" && accessKey != "" && secretAccessKey != "" {
+				var postData = []byte(`{"title":"Buy cheese and bread for breakfast."}`)
+				client := &http.Client{}
+				req, err := http.NewRequest("POST", uri+"/ping", bytes.NewReader(postData))
+
+				req.Header.Add("X-Kerberos-Storage-AccessKey", accessKey)
+				req.Header.Add("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
+				resp, err := client.Do(req)
+
+				if err == nil {
+					body, err := ioutil.ReadAll(resp.Body)
+					defer resp.Body.Close()
+					if err == nil && resp.StatusCode == http.StatusOK {
+
+						if provider != "" || directory != "" {
+
+							hubKey := config.KStorage.CloudKey
+							// This is the new way ;)
+							if config.HubKey != "" {
+								hubKey = config.HubKey
+							}
+
+							// Generate a random name.
+							timestamp := time.Now().Unix()
+							fileName := strconv.FormatInt(timestamp, 10) +
+								"_6-967003_justatest_200-200-400-400_24_769.mp4"
+							content := []byte("test-file")
+							body := bytes.NewReader(content)
+							//fileSize := int64(len(content))
+
+							req, err := http.NewRequest("POST", uri+"/storage", body)
+							if err == nil {
+
+								req.Header.Set("Content-Type", "video/mp4")
+								req.Header.Set("X-Kerberos-Storage-CloudKey", hubKey)
+								req.Header.Set("X-Kerberos-Storage-AccessKey", accessKey)
+								req.Header.Set("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
+								req.Header.Set("X-Kerberos-Storage-Provider", provider)
+								req.Header.Set("X-Kerberos-Storage-FileName", fileName)
+								req.Header.Set("X-Kerberos-Storage-Device", "test")
+								req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
+								req.Header.Set("X-Kerberos-Storage-Directory", directory)
+								client := &http.Client{}
+
+								resp, err := client.Do(req)
+
+								if err == nil {
+									if resp != nil {
+										body, err := ioutil.ReadAll(resp.Body)
+										defer resp.Body.Close()
+										if err == nil {
+											if resp.StatusCode == 200 {
+												c.JSON(200, body)
+											} else {
+												c.JSON(400, models.APIResponse{
+													Data: "Something went wrong while verifying your persistence settings. Make sure your provider is the same as the storage provider in your Kerberos Vault, and the relevant storage provider is configured properly.",
+												})
+											}
+										}
+									}
+								} else {
+									c.JSON(400, models.APIResponse{
+										Data: "Upload of fake recording failed: " + err.Error(),
+									})
+								}
+							} else {
+								c.JSON(400, models.APIResponse{
+									Data: "Something went wrong while creating /storage POST request." + err.Error(),
+								})
+							}
+						} else {
+							c.JSON(400, models.APIResponse{
+								Data: "Provider and/or directory is missing from the request.",
+							})
+						}
+					} else {
+						c.JSON(400, models.APIResponse{
+							Data: "Something went wrong while verifying storage credentials: " + string(body),
+						})
+					}
+				} else {
+					c.JSON(400, models.APIResponse{
+						Data: "Something went wrong while verifying storage credentials:" + err.Error(),
+					})
+				}
+			}
+		}
+	} else {
+		c.JSON(400, models.APIResponse{
+			Data: "No persistence was specified, so do not know what to verify:" + err.Error(),
+		})
 	}
 }

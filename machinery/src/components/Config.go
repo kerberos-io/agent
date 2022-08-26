@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -156,4 +157,52 @@ func OpenConfig(configuration *models.Configuration) {
 	}
 
 	return
+}
+
+func SaveConfig(config models.Config, configuration *models.Configuration, communication *models.Communication) error {
+	if !communication.IsConfiguring.IsSet() {
+		communication.IsConfiguring.Set()
+
+		err := StoreConfig(config)
+		if err != nil {
+			communication.IsConfiguring.UnSet()
+			return err
+		}
+
+		select {
+		case communication.HandleBootstrap <- "restart":
+		default:
+		}
+
+		communication.IsConfiguring.UnSet()
+
+		return nil
+	} else {
+		return errors.New("☄ Already reconfiguring")
+	}
+}
+
+func StoreConfig(config models.Config) error {
+	// Save into database
+	if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
+		// Write to mongodb
+		session := database.New().Copy()
+		defer session.Close()
+		db := session.DB(database.DatabaseName)
+		collection := db.C("configuration")
+
+		err := collection.Update(bson.M{
+			"type": "config",
+			"name": os.Getenv("DEPLOYMENT_NAME"),
+		}, &config)
+		return err
+
+		// Save into file
+	} else if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
+		res, _ := json.MarshalIndent(config, "", "\t")
+		err := ioutil.WriteFile("./data/config/config.json", res, 0644)
+		return err
+	}
+
+	return errors.New("Not able to update config")
 }

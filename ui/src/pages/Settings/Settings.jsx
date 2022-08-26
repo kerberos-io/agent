@@ -104,12 +104,6 @@ class Settings extends React.Component {
     this.onUpdateToggle = this.onUpdateToggle.bind(this);
     this.onUpdateNumberField = this.onUpdateNumberField.bind(this);
     this.onUpdateTimeline = this.onUpdateTimeline.bind(this);
-    this.changeValue = this.changeValue.bind(this);
-    this.changeVaultValue = this.changeVaultValue.bind(this);
-    this.changeS3Value = this.changeS3Value.bind(this);
-    this.changeStorageType = this.changeStorageType.bind(this);
-    this.changeTimezone = this.changeTimezone.bind(this);
-    this.filterSettings = this.filterSettings.bind(this);
     this.verifyPersistenceSettings = this.verifyPersistenceSettings.bind(this);
     this.verifyHubSettings = this.verifyHubSettings.bind(this);
     this.calculateTimetable = this.calculateTimetable.bind(this);
@@ -253,62 +247,14 @@ class Settings extends React.Component {
     });
   }
 
-  changeValue() {
-    // console.log(this);
-  }
-
-  changeVaultValue() {
-    // console.log(this);
-  }
-
-  changeS3Value() {
-    // console.log(this);
-  }
-
-  changeStorageType() {
-    // console.log(this);
-  }
-
-  changeTimezone() {
-    // console.log(this);
-  }
-
-  filterSettings() {
-    // console.log(this);
-  }
-
-  saveGeneralSettings() {
-    // console.log(this);
-  }
-
-  saveSTUNTURNSettings() {
-    // console.log(this);
-  }
-
-  saveMQTTSettings() {
-    // console.log(this);
-  }
-
-  saveHubSettings() {
-    // console.log(this);
-  }
-
-  savePersistenceSettings() {
-    // console.log(this);
-  }
-
-  verifyPersistenceSettings() {
-    // console.log(this);
-  }
-
-  verifyHubSettings() {
-    // console.log(this);
-  }
-
   saveConfig() {
     const { config, dispatchSaveConfig } = this.props;
 
     this.setState({
+      verifyPersistenceSuccess: false,
+      verifyPersistenceError: false,
+      verifyHubSuccess: false,
+      verifyHubError: false,
       configSuccess: false,
       configError: false,
     });
@@ -326,6 +272,97 @@ class Settings extends React.Component {
           this.setState({
             configSuccess: false,
             configError: true,
+          });
+        }
+      );
+    }
+  }
+
+  verifyHubSettings() {
+    const { config, dispatchVerifyHub } = this.props;
+    if (config) {
+      // overriding global for testing.
+      // hub_key: "xxx"
+      // hub_private_key: "xxxx"
+      // hub_site: "testsite"
+      // hub_uri: "https://api.cloud.kerberos.io"
+
+      this.setState({
+        configSuccess: false,
+        configError: false,
+        verifyPersistenceSuccess: false,
+        verifyPersistenceError: false,
+        verifyHubSuccess: false,
+        verifyHubError: false,
+        verifyHubErrorMessage: '',
+        hubSuccess: false,
+        hubError: false,
+        loadingHub: true,
+      });
+
+      // .... test fields
+
+      dispatchVerifyHub(
+        config.config,
+        () => {
+          this.setState({
+            verifyHubSuccess: true,
+            verifyHubError: false,
+            verifyHubErrorMessage: '',
+            hubSuccess: false,
+            hubError: false,
+            loadingHub: false,
+          });
+        },
+        (error) => {
+          this.setState({
+            verifyHubSuccess: false,
+            verifyHubError: true,
+            verifyHubErrorMessage: error,
+            hubSuccess: false,
+            hubError: false,
+            loadingHub: false,
+          });
+        }
+      );
+    }
+  }
+
+  verifyPersistenceSettings() {
+    const { config, dispatchVerifyPersistence } = this.props;
+    if (config) {
+      this.setState({
+        configSuccess: false,
+        configError: false,
+        verifyHubSuccess: false,
+        verifyHubError: false,
+        verifyPersistenceSuccess: false,
+        verifyPersistenceError: false,
+        persistenceSuccess: false,
+        persistenceError: false,
+        loading: true,
+      });
+
+      dispatchVerifyPersistence(
+        config.config,
+        () => {
+          this.setState({
+            verifyPersistenceSuccess: true,
+            verifyPersistenceError: false,
+            verifyPersistenceMessage: '',
+            persistenceSuccess: false,
+            persistenceError: false,
+            loading: false,
+          });
+        },
+        (error) => {
+          this.setState({
+            verifyPersistenceSuccess: false,
+            verifyPersistenceError: true,
+            verifyPersistenceMessage: error,
+            persistenceSuccess: false,
+            persistenceError: false,
+            loading: false,
           });
         }
       );
@@ -1734,8 +1771,8 @@ const mapDispatchToProps = (dispatch /* , ownProps */) => ({
 
 Settings.propTypes = {
   config: PropTypes.objectOf(PropTypes.object).isRequired,
-  // dispatchVerifyHub: PropTypes.func.isRequired,
-  // dispatchVerifyPersistence: PropTypes.func.isRequired,
+  dispatchVerifyHub: PropTypes.func.isRequired,
+  dispatchVerifyPersistence: PropTypes.func.isRequired,
   dispatchGetConfig: PropTypes.func.isRequired,
   dispatchUpdateConfig: PropTypes.func.isRequired,
   dispatchSaveConfig: PropTypes.func.isRequired,
