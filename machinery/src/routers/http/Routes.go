@@ -31,36 +31,41 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 
 			// Save into file
 			var conf models.Config
-			c.BindJSON(&conf)
+			err := c.BindJSON(&conf)
+			if err == nil {
+				if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
+					// Write to mongodb
+					session := database.New().Copy()
+					defer session.Close()
+					db := session.DB(database.DatabaseName)
+					collection := db.C("configuration")
 
-			if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
-				// Write to mongodb
-				session := database.New().Copy()
-				defer session.Close()
-				db := session.DB(database.DatabaseName)
-				collection := db.C("configuration")
+					collection.Update(bson.M{
+						"type": "config",
+						"name": os.Getenv("DEPLOYMENT_NAME"),
+					}, &conf)
+				} else if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
+					res, _ := json.MarshalIndent(conf, "", "\t")
+					ioutil.WriteFile("./data/config/config.json", res, 0644)
+				}
 
-				collection.Update(bson.M{
-					"type": "config",
-					"name": os.Getenv("DEPLOYMENT_NAME"),
-				}, &conf)
-			} else if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
-				res, _ := json.MarshalIndent(conf, "", "\t")
-				ioutil.WriteFile("./data/config/config.json", res, 0644)
+				select {
+				case communication.HandleBootstrap <- "restart":
+				default:
+				}
+
+				communication.IsConfiguring.UnSet()
+
+				c.JSON(200, gin.H{
+					"data": "☄ Reconfiguring",
+				})
+			} else {
+				c.JSON(400, gin.H{
+					"data": "Something went wrong: " + err.Error(),
+				})
 			}
-
-			select {
-			case communication.HandleBootstrap <- "restart":
-			default:
-			}
-
-			communication.IsConfiguring.UnSet()
-
-			c.JSON(200, gin.H{
-				"data": "☄ Reconfiguring",
-			})
 		} else {
-			c.JSON(200, gin.H{
+			c.JSON(400, gin.H{
 				"data": "☄ Already reconfiguring",
 			})
 		}

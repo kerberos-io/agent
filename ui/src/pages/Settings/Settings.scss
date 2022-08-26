@@ -1,4 +1,32 @@
 #settings {
+
+    .message {
+        margin-bottom: 24px;
+    }
+
+    .table-container table {
+        border-spacing: 0 12px;
+        width: 100%;
+        text-align: justify;
+    }
+
+    .time-of-interest {
+        line-height: 48px;
+    }
+
+    .grid-4 {
+        display: grid;
+        grid-template-columns: 24% 24% 24% 24%;
+        grid-column-gap: 2%!important;
+    }
+
+    .dropdown-container .dropdown {
+        top: 68px;
+        width: -webkit-fill-available;
+        max-height: 300px;
+        overflow-y: scroll;
+    }
+
     .tab.active {
         box-shadow: 0 3px var(--oss) inset;
     }

@@ -22,6 +22,9 @@ import ImageCanvas from '../../components/ImageCanvas/ImageCanvas';
 import './Settings.scss';
 import timezones from './timezones';
 import {
+  addRegion,
+  updateRegion,
+  removeRegion,
   saveConfig,
   verifyHub,
   verifyPersistence,
@@ -43,12 +46,8 @@ class Settings extends React.Component {
       selectedTab: 'overview',
       mqttSuccess: false,
       mqttError: false,
-      stunturnSuccess: false,
-      stunturnError: false,
-      generalSuccess: false,
-      generalError: false,
-      hubSuccess: false,
-      hubError: false,
+      configSuccess: false,
+      configError: false,
       verifyHubSuccess: false,
       verifyHubError: false,
       verifyHubErrorMessage: '',
@@ -103,6 +102,7 @@ class Settings extends React.Component {
     this.changeTab = this.changeTab.bind(this);
     this.onUpdateField = this.onUpdateField.bind(this);
     this.onUpdateToggle = this.onUpdateToggle.bind(this);
+    this.onUpdateNumberField = this.onUpdateNumberField.bind(this);
     this.onUpdateTimeline = this.onUpdateTimeline.bind(this);
     this.changeValue = this.changeValue.bind(this);
     this.changeVaultValue = this.changeVaultValue.bind(this);
@@ -110,40 +110,46 @@ class Settings extends React.Component {
     this.changeStorageType = this.changeStorageType.bind(this);
     this.changeTimezone = this.changeTimezone.bind(this);
     this.filterSettings = this.filterSettings.bind(this);
-    this.saveGeneralSettings = this.saveGeneralSettings.bind(this);
-    this.saveSTUNTURNSettings = this.saveSTUNTURNSettings.bind(this);
-    this.saveMQTTSettings = this.saveMQTTSettings.bind(this);
-    this.saveHubSettings = this.saveHubSettings.bind(this);
-    this.savePersistenceSettings = this.savePersistenceSettings.bind(this);
     this.verifyPersistenceSettings = this.verifyPersistenceSettings.bind(this);
     this.verifyHubSettings = this.verifyHubSettings.bind(this);
     this.calculateTimetable = this.calculateTimetable.bind(this);
+    this.saveConfig = this.saveConfig.bind(this);
+    this.onUpdateDropdown = this.onUpdateDropdown.bind(this);
+    this.onAddRegion = this.onAddRegion.bind(this);
+    this.onUpdateRegion = this.onUpdateRegion.bind(this);
+    this.onDeleteRegion = this.onDeleteRegion.bind(this);
   }
 
   componentDidMount() {
     const { dispatchGetConfig } = this.props;
     dispatchGetConfig((data) => {
+      const { config } = data;
       this.setState((prevState) => ({
         ...prevState,
-        config: data.config,
+        config,
       }));
+      this.calculateTimetable(config.timetable);
     });
-  }
-
-  componentDidUpdate(prevProps, prevState) {
-    // const { service, container } = this.props;
-    const { open } = this.state;
-    if (prevState.open !== open && open) {
-      // this.props.dispatchGetConfig(service);
-      // Cache the current timetable
-      // const {  } = container;
-      // this.calculateTimetable(config.timetable);
-    }
   }
 
   componentWillUnmount() {
     document.removeEventListener('keydown', this.escFunction, false);
     clearInterval(this.interval);
+  }
+
+  onAddRegion(device, id, polygon) {
+    const { dispatchAddRegion } = this.props;
+    dispatchAddRegion(id, polygon);
+  }
+
+  onUpdateRegion(device, id, polygon) {
+    const { dispatchUpdateRegion } = this.props;
+    dispatchUpdateRegion(id, polygon);
+  }
+
+  onDeleteRegion(device, id, polygon) {
+    const { dispatchRemoveRegion } = this.props;
+    dispatchRemoveRegion(id, polygon);
   }
 
   onUpdateField(type, name, event, object) {
@@ -164,9 +170,27 @@ class Settings extends React.Component {
     });
   }
 
+  onUpdateDropdown(type, name, value, object) {
+    const { dispatchUpdateConfig } = this.props;
+    dispatchUpdateConfig(type, {
+      ...object,
+      [name]: value,
+    });
+  }
+
+  onUpdateNumberField(type, name, event, object) {
+    const { value } = event.target;
+    let number = parseInt(value, 10);
+    number = Number.isNaN(number) ? 0 : number;
+    const { dispatchUpdateConfig } = this.props;
+    dispatchUpdateConfig(type, {
+      ...object,
+      [name]: number,
+    });
+  }
+
   onUpdateTimeline(type, index, key, event, object) {
     const { value } = event.target;
-    console.log(object);
     let seconds = -1;
     if (value) {
       const a = value.split(':'); // split it at the colons
@@ -178,15 +202,15 @@ class Settings extends React.Component {
       }
     }
 
-    console.log(seconds);
-    /* this.props.dispatchUpdateContainer(type, [
+    const { dispatchUpdateConfig } = this.props;
+    dispatchUpdateConfig(type, [
       ...object.slice(0, index),
       {
         ...object[index],
         [key]: seconds,
       },
-      ...object.slice(index + 1)
-    ]); */
+      ...object.slice(index + 1),
+    ]);
   }
 
   calculateTimetable(timetable) {
@@ -199,6 +223,28 @@ class Settings extends React.Component {
       this.timetable[i].end1Full = this.convertSecondsToHourMinute(end1);
       this.timetable[i].end2Full = this.convertSecondsToHourMinute(end2);
     }
+  }
+
+  convertSecondsToHourMinute(seconds) {
+    let sec = seconds;
+    let hours = Math.floor(sec / 3600);
+    hours = hours.toString();
+    if (hours < 10) {
+      hours = `0${hours}`;
+    }
+    if (hours.length > 2) {
+      hours = hours.slice(0, 2);
+    }
+    sec %= 3600;
+    let minutes = Math.floor(sec / 60);
+    minutes = minutes.toString();
+    if (minutes < 10) {
+      minutes = `0${minutes}`;
+    }
+    if (minutes.length > 2) {
+      minutes = minutes.slice(0, 2);
+    }
+    return `${hours}:${minutes}`;
   }
 
   changeTab(tab) {
@@ -259,23 +305,42 @@ class Settings extends React.Component {
     // console.log(this);
   }
 
+  saveConfig() {
+    const { config, dispatchSaveConfig } = this.props;
+
+    this.setState({
+      configSuccess: false,
+      configError: false,
+    });
+
+    if (config) {
+      dispatchSaveConfig(
+        config.config,
+        () => {
+          this.setState({
+            configSuccess: true,
+            configError: false,
+          });
+        },
+        () => {
+          this.setState({
+            configSuccess: false,
+            configError: true,
+          });
+        }
+      );
+    }
+  }
+
   render() {
     const {
       selectedTab,
       search,
-      generalSuccess,
-      generalError,
-      mqttSuccess,
-      mqttError,
-      stunturnSuccess,
-      stunturnError,
-      hubSuccess,
-      hubError,
+      configSuccess,
+      configError,
       verifyHubSuccess,
       verifyHubError,
       verifyHubErrorMessage,
-      persistenceSuccess,
-      persistenceError,
       verifyPersistenceSuccess,
       verifyPersistenceError,
       verifyPersistenceMessage,
@@ -424,6 +489,47 @@ class Settings extends React.Component {
           </Tabs>
         </ControlBar>
 
+        {configSuccess && (
+          <InfoBar
+            type="success"
+            message="Your configuration have been updated successfully."
+          />
+        )}
+        {configError && (
+          <InfoBar type="alert" message="Something went wrong while saving." />
+        )}
+
+        {loadingHub && (
+          <InfoBar
+            type="loading"
+            message="Verifying your Kerberos Hub settings."
+          />
+        )}
+        {verifyHubSuccess && (
+          <InfoBar
+            type="success"
+            message="Kerberos Hub settings are successfully verified."
+          />
+        )}
+        {verifyHubError && (
+          <InfoBar type="alert" message={verifyHubErrorMessage} />
+        )}
+
+        {loading && (
+          <InfoBar
+            type="loading"
+            message="Verifying your persistence settings."
+          />
+        )}
+        {verifyPersistenceSuccess && (
+          <InfoBar
+            type="success"
+            message="Persistence settings are successfully verified."
+          />
+        )}
+        {verifyPersistenceError && (
+          <InfoBar type="alert" message={verifyPersistenceMessage} />
+        )}
         <div className="stats grid-container --two-columns">
           <div>
             {/* General settings block */}
@@ -433,25 +539,19 @@ class Settings extends React.Component {
                   <h4>General</h4>
                 </BlockHeader>
                 <BlockBody>
-                  {generalSuccess && (
-                    <InfoBar
-                      type="success"
-                      message="General settings are successfully saved."
-                    />
-                  )}
-                  {generalError && (
-                    <InfoBar
-                      type="alert"
-                      message="Something went wrong while saving."
-                    />
-                  )}
                   <p>
                     General settings allow you to configure your Kerberos Agents
                     on a higher level.
                   </p>
                   <Input label="key" disabled defaultValue={config.key} />
 
-                  <Input label="camera name" defaultValue={config.name} />
+                  <Input
+                    label="camera name"
+                    defaultValue={config.name}
+                    onChange={(value) =>
+                      this.onUpdateField('', 'name', value, config)
+                    }
+                  />
 
                   <Dropdown
                     isRadio
@@ -461,8 +561,10 @@ class Settings extends React.Component {
                     selected={[config.timezone]}
                     shorten
                     shortenType="end"
-                    shortenMaxLength={35}
-                    onChange={this.changeTimezone}
+                    shortenMaxLength={30}
+                    onChange={(value) =>
+                      this.onUpdateDropdown('', 'timezone', value[0], config)
+                    }
                   />
                 </BlockBody>
                 <BlockFooter>
@@ -470,7 +572,7 @@ class Settings extends React.Component {
                     label="Save"
                     type="default"
                     icon="pencil"
-                    onClick={this.saveGeneralSettings}
+                    onClick={this.saveConfig}
                   />
                 </BlockFooter>
               </Block>
@@ -483,18 +585,6 @@ class Settings extends React.Component {
                   <h4>Camera</h4>
                 </BlockHeader>
                 <BlockBody>
-                  {generalSuccess && (
-                    <InfoBar
-                      type="success"
-                      message="General settings are successfully saved."
-                    />
-                  )}
-                  {generalError && (
-                    <InfoBar
-                      type="alert"
-                      message="Something went wrong while saving."
-                    />
-                  )}
                   <p>
                     General settings allow you to configure your Kerberos Agents
                     on a higher level.
@@ -552,15 +642,13 @@ class Settings extends React.Component {
                       )
                     }
                   />
-
-                  <hr />
                 </BlockBody>
                 <BlockFooter>
                   <Button
                     label="Save"
                     type="default"
                     icon="pencil"
-                    onClick={this.saveGeneralSettings}
+                    onClick={this.saveConfig}
                   />
                 </BlockFooter>
               </Block>
@@ -573,18 +661,6 @@ class Settings extends React.Component {
                   <h4>Recording</h4>
                 </BlockHeader>
                 <BlockBody>
-                  {generalSuccess && (
-                    <InfoBar
-                      type="success"
-                      message="General settings are successfully saved."
-                    />
-                  )}
-                  {generalError && (
-                    <InfoBar
-                      type="alert"
-                      message="Something went wrong while saving."
-                    />
-                  )}
                   <p>
                     General settings allow you to configure your Kerberos Agents
                     on a higher level.
@@ -655,7 +731,7 @@ class Settings extends React.Component {
                     label="Save"
                     type="default"
                     icon="pencil"
-                    onClick={this.saveGeneralSettings}
+                    onClick={this.saveConfig}
                   />
                 </BlockFooter>
               </Block>
@@ -668,18 +744,6 @@ class Settings extends React.Component {
                   <h4>STUN/TURN for WebRTC</h4>
                 </BlockHeader>
                 <BlockBody>
-                  {stunturnSuccess && (
-                    <InfoBar
-                      type="success"
-                      message="STUN/TURN settings are successfully saved."
-                    />
-                  )}
-                  {stunturnError && (
-                    <InfoBar
-                      type="alert"
-                      message="Something went wrong while saving."
-                    />
-                  )}
                   <p>
                     For full-resolution livestreaming we use the concept of
                     WebRTC. One of the key capabilities is the ICE-candidate
@@ -689,32 +753,36 @@ class Settings extends React.Component {
                   <Input
                     label="STUN server"
                     value={config.stunuri}
-                    onChange={(value) => this.changeValue('stunuri', value)}
+                    onChange={(value) =>
+                      this.onUpdateField('', 'stunuri', value, config)
+                    }
                   />
                   <Input
                     label="TURN server"
                     value={config.turnuri}
-                    onChange={(value) => this.changeValue('turnuri', value)}
+                    onChange={(value) =>
+                      this.onUpdateField('', 'turnuri', value, config)
+                    }
                   />
                   <Input
                     label="Username"
                     value={config.turn_username}
                     onChange={(value) =>
-                      this.changeValue('turn_username', value)
+                      this.onUpdateField('', 'turn_username', value, config)
                     }
                   />
                   <Input
                     label="Password"
                     value={config.turn_password}
                     onChange={(value) =>
-                      this.changeValue('turn_password', value)
+                      this.onUpdateField('', 'turn_password', value, config)
                     }
                   />
                 </BlockBody>
                 <BlockFooter>
                   <Button
                     label="Save"
-                    onClick={this.saveSTUNTURNSettings}
+                    onClick={this.saveConfig}
                     type="default"
                     icon="pencil"
                   />
@@ -728,33 +796,6 @@ class Settings extends React.Component {
                   <h4>Kerberos Hub</h4>
                 </BlockHeader>
                 <BlockBody>
-                  {loadingHub && (
-                    <InfoBar
-                      type="loading"
-                      message="Verifying your Kerberos Hub settings."
-                    />
-                  )}
-                  {verifyHubSuccess && (
-                    <InfoBar
-                      type="success"
-                      message="Kerberos Hub settings are successfully verified."
-                    />
-                  )}
-                  {verifyHubError && (
-                    <InfoBar type="alert" message={verifyHubErrorMessage} />
-                  )}
-                  {hubSuccess && (
-                    <InfoBar
-                      type="success"
-                      message="Kerberos Hub settings are successfully saved."
-                    />
-                  )}
-                  {hubError && (
-                    <InfoBar
-                      type="alert"
-                      message="Something went wrong while saving."
-                    />
-                  )}
                   <p>
                     Kerberos Agents can send heartbeats to a central{' '}
                     <a
@@ -772,27 +813,33 @@ class Settings extends React.Component {
                     label="API url"
                     placeholder="The API for Kerberos Hub."
                     value={config.hub_uri}
-                    onChange={(value) => this.changeValue('hub_uri', value)}
+                    onChange={(value) =>
+                      this.onUpdateField('', 'hub_uri', value, config)
+                    }
                   />
                   <Input
                     label="Public key"
                     placeholder="The public key granted to your Kerberos Hub account."
                     value={config.hub_key}
-                    onChange={(value) => this.changeValue('hub_key', value)}
+                    onChange={(value) =>
+                      this.onUpdateField('', 'hub_key', value, config)
+                    }
                   />
                   <Input
                     label="Private key"
                     placeholder="The private key granted to your Kerberos Hub account."
                     value={config.hub_private_key}
                     onChange={(value) =>
-                      this.changeValue('hub_private_key', value)
+                      this.onUpdateField('', 'hub_private_key', value, config)
                     }
                   />
                   <Input
                     label="Site"
                     value={config.hub_site}
                     placeholder="The site ID the Kerberos Agents are belonging to in Kerberos Hub."
-                    onChange={(value) => this.changeValue('hub_site', value)}
+                    onChange={(value) =>
+                      this.onUpdateField('', 'hub_site', value, config)
+                    }
                   />
                 </BlockBody>
                 <BlockFooter>
@@ -805,7 +852,7 @@ class Settings extends React.Component {
                   />
                   <Button
                     label="Save"
-                    onClick={this.saveHubSettings}
+                    onClick={this.saveConfig}
                     type="default"
                     icon="pencil"
                   />
@@ -835,6 +882,14 @@ class Settings extends React.Component {
                     />
                   )}
                 </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label="Save"
+                    onClick={this.saveConfig}
+                    type="default"
+                    icon="pencil"
+                  />
+                </BlockFooter>
               </Block>
             )}
           </div>
@@ -846,18 +901,6 @@ class Settings extends React.Component {
                   <h4>MQTT</h4>
                 </BlockHeader>
                 <BlockBody>
-                  {mqttSuccess && (
-                    <InfoBar
-                      type="success"
-                      message="MQTT settings are successfully saved."
-                    />
-                  )}
-                  {mqttError && (
-                    <InfoBar
-                      type="alert"
-                      message="Something went wrong while saving."
-                    />
-                  )}
                   <p>
                     A MQTT broker is used to communicate from{' '}
                     <a
@@ -873,27 +916,29 @@ class Settings extends React.Component {
                   <Input
                     label="Broker Uri"
                     value={config.mqtturi}
-                    onChange={(value) => this.changeValue('mqtturi', value)}
+                    onChange={(value) =>
+                      this.onUpdateField('', 'mqtturi', value, config)
+                    }
                   />
                   <Input
                     label="Username"
                     value={config.mqtt_username}
                     onChange={(value) =>
-                      this.changeValue('mqtt_username', value)
+                      this.onUpdateField('', 'mqtt_username', value, config)
                     }
                   />
                   <Input
                     label="Password"
                     value={config.mqtt_password}
                     onChange={(value) =>
-                      this.changeValue('mqtt_password', value)
+                      this.onUpdateField('', 'mqtt_password', value, config)
                     }
                   />
                 </BlockBody>
                 <BlockFooter>
                   <Button
                     label="Save"
-                    onClick={this.saveMQTTSettings}
+                    onClick={this.saveConfig}
                     type="default"
                     icon="pencil"
                   />
@@ -908,19 +953,6 @@ class Settings extends React.Component {
                   <h4>Forwarding and transcoding</h4>
                 </BlockHeader>
                 <BlockBody>
-                  {stunturnSuccess && (
-                    <InfoBar
-                      type="success"
-                      message="STUN/TURN settings are successfully saved."
-                    />
-                  )}
-                  {stunturnError && (
-                    <InfoBar
-                      type="alert"
-                      message="Something went wrong while saving."
-                    />
-                  )}
-
                   <div className="toggle-wrapper">
                     <Toggle
                       on={config.capture.forwardwebrtc === 'true'}
@@ -976,7 +1008,7 @@ class Settings extends React.Component {
                 <BlockFooter>
                   <Button
                     label="Save"
-                    onClick={this.saveSTUNTURNSettings}
+                    onClick={this.saveConfig}
                     type="default"
                     icon="pencil"
                   />
@@ -991,19 +1023,6 @@ class Settings extends React.Component {
                   <h4>Fragmented recordings</h4>
                 </BlockHeader>
                 <BlockBody>
-                  {generalSuccess && (
-                    <InfoBar
-                      type="success"
-                      message="General settings are successfully saved."
-                    />
-                  )}
-                  {generalError && (
-                    <InfoBar
-                      type="alert"
-                      message="Something went wrong while saving."
-                    />
-                  )}
-
                   <div className="toggle-wrapper">
                     <Toggle
                       on={config.capture.fragmented === 'true'}
@@ -1019,10 +1038,7 @@ class Settings extends React.Component {
                     />
                     <div>
                       <span>Enable fragmentation</span>
-                      <p>
-                        Recordings can be be made fragmented. This is required
-                        for HLS.
-                      </p>
+                      <p>Fragmented recordings are required for HLS.</p>
                     </div>
                   </div>
 
@@ -1045,7 +1061,7 @@ class Settings extends React.Component {
                     label="Save"
                     type="default"
                     icon="pencil"
-                    onClick={this.saveGeneralSettings}
+                    onClick={this.saveConfig}
                   />
                 </BlockFooter>
               </Block>
@@ -1061,7 +1077,6 @@ class Settings extends React.Component {
                   <div className="grid-2">
                     {this.timetable && this.timetable.length > 0 && (
                       <div>
-                        <h3>Time Of Interest</h3>
                         <p>
                           Only make recordings between specific time intervals
                           (based on Timezone).
@@ -1476,6 +1491,15 @@ class Settings extends React.Component {
                     )}
                   </div>
                 </BlockBody>
+
+                <BlockFooter>
+                  <Button
+                    label="Save"
+                    onClick={this.saveConfig}
+                    type="default"
+                    icon="pencil"
+                  />
+                </BlockFooter>
               </Block>
             )}
 
@@ -1503,6 +1527,15 @@ class Settings extends React.Component {
                     }
                   />
                 </BlockBody>
+
+                <BlockFooter>
+                  <Button
+                    label="Save"
+                    onClick={this.saveConfig}
+                    type="default"
+                    icon="pencil"
+                  />
+                </BlockFooter>
               </Block>
             )}
 
@@ -1513,33 +1546,6 @@ class Settings extends React.Component {
                   <h4>Persistence</h4>
                 </BlockHeader>
                 <BlockBody>
-                  {loading && (
-                    <InfoBar
-                      type="loading"
-                      message="Verifying your persistence settings."
-                    />
-                  )}
-                  {verifyPersistenceSuccess && (
-                    <InfoBar
-                      type="success"
-                      message="Persistence settings are successfully verified."
-                    />
-                  )}
-                  {verifyPersistenceError && (
-                    <InfoBar type="alert" message={verifyPersistenceMessage} />
-                  )}
-                  {persistenceSuccess && (
-                    <InfoBar
-                      type="success"
-                      message="Persistence settings are successfully saved."
-                    />
-                  )}
-                  {persistenceError && (
-                    <InfoBar
-                      type="alert"
-                      message="Something went wrong while saving your settings."
-                    />
-                  )}
                   <p>
                     Having the ability to store your recordings is the beginning
                     of everything. You can choose between our{' '}
@@ -1565,86 +1571,117 @@ class Settings extends React.Component {
                     placeholder="Select a persistence"
                     selected={[config.cloud]}
                     items={this.storageTypes}
-                    onChange={this.changeStorageType}
+                    onChange={(value) =>
+                      this.onUpdateDropdown('', 'cloud', value[0], config)
+                    }
                   />
-
                   {config.cloud === this.KERBEROS_HUB && (
                     <>
                       <Input
                         label="Kerberos Hub API URL"
                         placeholder="The API endpoint for uploading your recordings."
-                        value={config.s3.proxyuri}
+                        value={config.s3 ? config.s3.proxyuri : ''}
                         onChange={(value) =>
-                          this.changeS3Value('proxyuri', value)
+                          this.onUpdateField('s3', 'proxyuri', value, config.s3)
                         }
                       />
                       <Input
                         label="Region"
                         placeholder="The region we are storing our recordings in."
-                        value={config.s3.region}
+                        value={config.s3 ? config.s3.region : ''}
                         onChange={(value) =>
-                          this.changeS3Value('region', value)
+                          this.onUpdateField('s3', 'region', value, config.s3)
                         }
                       />
                       <Input
                         label="Bucket"
                         placeholder="The bucket we are storing our recordings in."
-                        value={config.s3.bucket}
+                        value={config.s3 ? config.s3.bucket : ''}
                         onChange={(value) =>
-                          this.changeS3Value('bucket', value)
+                          this.onUpdateField('s3', 'bucket', value, config.s3)
                         }
                       />
                       <Input
                         label="Username/Directory"
                         placeholder="The username of your Kerberos Hub account."
-                        value={config.s3.username}
+                        value={config.s3 ? config.s3.username : ''}
                         onChange={(value) =>
-                          this.changeS3Value('username', value)
+                          this.onUpdateField('s3', 'username', value, config.s3)
                         }
                       />
                     </>
                   )}
-
                   {config.cloud === this.KERBEROS_VAULT && (
                     <>
                       <Input
                         label="Kerberos Vault API URL"
                         placeholder="The Kerberos Vault API"
-                        value={config.kstorage.uri}
+                        value={config.kstorage ? config.kstorage.uri : ''}
                         onChange={(value) =>
-                          this.changeVaultValue('uri', value)
+                          this.onUpdateField(
+                            'kstorage',
+                            'uri',
+                            value,
+                            config.kstorage
+                          )
                         }
                       />
                       <Input
                         label="Provider"
                         placeholder="The provider to which your recordings will be send."
-                        value={config.kstorage.provider}
+                        value={config.kstorage ? config.kstorage.provider : ''}
                         onChange={(value) =>
-                          this.changeVaultValue('provider', value)
+                          this.onUpdateField(
+                            'kstorage',
+                            'provider',
+                            value,
+                            config.kstorage
+                          )
                         }
                       />
                       <Input
                         label="Directory"
                         placeholder="Sub directory the recordings will be stored in your provider."
-                        value={config.kstorage.directory}
+                        value={config.kstorage ? config.kstorage.directory : ''}
                         onChange={(value) =>
-                          this.changeVaultValue('directory', value)
+                          this.onUpdateField(
+                            'kstorage',
+                            'directory',
+                            value,
+                            config.kstorage
+                          )
                         }
                       />
                       <Input
                         label="Access key"
                         placeholder="The access key of your Kerberos Vault account."
-                        value={config.kstorage.access_key}
+                        value={
+                          config.kstorage ? config.kstorage.access_key : ''
+                        }
                         onChange={(value) =>
-                          this.changeVaultValue('access_key', value)
+                          this.onUpdateField(
+                            'kstorage',
+                            'access_key',
+                            value,
+                            config.kstorage
+                          )
                         }
                       />
                       <Input
                         label="Secret key"
                         placeholder="The secret key of your Kerberos Vault account."
-                        value={config.kstorage.secret_access_key}
+                        value={
+                          config.kstorage
+                            ? config.kstorage.secret_access_key
+                            : ''
+                        }
                         onChange={(value) =>
-                          this.changeVaultValue('secret_access_key', value)
+                          this.onUpdateField(
+                            'kstorage',
+                            'secret_access_key',
+                            value,
+                            config.kstorage
+                          )
                         }
                       />
                     </>
@@ -1661,7 +1698,7 @@ class Settings extends React.Component {
                   <Button
                     label="Save"
                     type="submit"
-                    onClick={this.savePersistenceSettings}
+                    onClick={this.saveConfig}
                     buttonType="submit"
                     icon="pencil"
                   />
@@ -1690,6 +1727,9 @@ const mapDispatchToProps = (dispatch /* , ownProps */) => ({
   dispatchUpdateConfig: (field, value) => dispatch(updateConfig(field, value)),
   dispatchSaveConfig: (config, success, error) =>
     dispatch(saveConfig(config, success, error)),
+  dispatchAddRegion: (id, polygon) => dispatch(addRegion(id, polygon)),
+  dispatchRemoveRegion: (id, polygon) => dispatch(removeRegion(id, polygon)),
+  dispatchUpdateRegion: (id, polygon) => dispatch(updateRegion(id, polygon)),
 });
 
 Settings.propTypes = {
@@ -1698,7 +1738,10 @@ Settings.propTypes = {
   // dispatchVerifyPersistence: PropTypes.func.isRequired,
   dispatchGetConfig: PropTypes.func.isRequired,
   dispatchUpdateConfig: PropTypes.func.isRequired,
-  // dispatchSaveConfig: PropTypes.func.isRequired,
+  dispatchSaveConfig: PropTypes.func.isRequired,
+  dispatchAddRegion: PropTypes.func.isRequired,
+  dispatchUpdateRegion: PropTypes.func.isRequired,
+  dispatchRemoveRegion: PropTypes.func.isRequired,
 };
 
 export default withRouter(

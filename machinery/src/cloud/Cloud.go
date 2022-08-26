@@ -54,7 +54,7 @@ loop:
 		select {
 		case <-communication.HandleUpload:
 			break loop
-		default:
+		case <-time.After(2 * time.Second):
 		}
 
 		if err == nil {
@@ -76,7 +76,6 @@ loop:
 				}
 			}
 		}
-		time.Sleep(1 * time.Second)
 	}
 
 	log.Log.Debug("HandleUpload: finished")
@@ -117,7 +116,7 @@ loop:
 		select {
 		case <-communication.HandleHeartBeat:
 			break loop
-		default:
+		case <-time.After(30 * time.Second):
 		}
 
 		uptime, _ := host.Uptime()
@@ -194,8 +193,6 @@ loop:
 				log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Vault.")
 			}
 		}
-
-		time.Sleep(30 * time.Second)
 	}
 
 	log.Log.Debug("HandleHeartBeat: finished")

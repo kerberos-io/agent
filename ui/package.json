@@ -4,7 +4,7 @@
   "private": false,
   "dependencies": {
     "@giantmachines/redux-websocket": "^1.5.1",
-    "@kerberos-io/ui": "^1.64.0",
+    "@kerberos-io/ui": "1.66.0",
     "@material-ui/core": "^4.12.4",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^11.2.7",
@@ -12,11 +12,11 @@
     "axios": "^0.21.4",
     "classnames": "^2.3.1",
     "connected-react-router": "^6.9.3",
-    "crypto-browserify": "^3.12.0",
     "eslint-config-prettier": "8.5.*",
     "eslint-plugin-prettier": "4.2.*",
     "eslint-watch": "^7.0.0",
     "history": "4.10.1",
+    "md5": "^2.3.0",
     "prettier": "^2.7.1",
     "prop-types": "^15.8.1",
     "react": "^17.0.1",
@@ -31,8 +31,12 @@
     "redux-devtools-extension": "^2.13.9",
     "redux-thunk": "^2.4.1",
     "typeface-roboto": "^1.1.13",
+    "uuid": "^8.3.2",
     "vott-ct": "^2.3.3",
     "web-vitals": "^0.2.4"
+  },
+  "browser": {
+    "crypto": false
   },
   "scripts": {
     "start": "react-scripts start",

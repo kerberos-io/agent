@@ -5,6 +5,68 @@ const agent = (
   action
 ) => {
   switch (action.type) {
+    case 'ADD_REGION':
+      return {
+        ...state,
+        config: {
+          ...state.config,
+          config: {
+            ...state.config.config,
+            region: {
+              ...state.config.config.region,
+              polygon: state.config.config.region.polygon
+                ? [
+                    {
+                      id: action.id,
+                      coordinates: action.polygon.points,
+                    },
+                    ...state.config.config.region.polygon,
+                  ]
+                : [
+                    {
+                      id: action.id,
+                      coordinates: action.polygon.points,
+                    },
+                  ],
+            },
+          },
+        },
+      };
+    case 'REMOVE_REGION':
+      return {
+        ...state,
+        config: {
+          ...state.config,
+          config: {
+            ...state.config.config,
+            region: {
+              ...state.config.config.region,
+              polygon: state.config.config.region.polygon.filter(
+                (c) => c.id !== action.id
+              ),
+            },
+          },
+        },
+      };
+    case 'UPDATE_REGION':
+      return {
+        ...state,
+        config: {
+          ...state.config,
+          config: {
+            ...state.config.config,
+            region: {
+              ...state.config.config.region,
+              polygon: state.config.config.region.polygon.map((p) =>
+                p.id === action.id
+                  ? { id: action.id, coordinates: action.polygon.points }
+                  : p
+              ),
+            },
+          },
+        },
+      };
+
     case 'GET_CONFIG':
       return {
         ...state,

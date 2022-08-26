@@ -6,6 +6,36 @@ import {
   doGetKerberosAgentTags,
 } from '../api/agent';
 
+export const addRegion = (id, polygon) => {
+  return function (dispatch) {
+    dispatch({
+      type: 'ADD_REGION',
+      id,
+      polygon,
+    });
+  };
+};
+
+export const removeRegion = (id, polygon) => {
+  return function (dispatch) {
+    dispatch({
+      type: 'REMOVE_REGION',
+      id,
+      polygon,
+    });
+  };
+};
+
+export const updateRegion = (id, polygon) => {
+  return function (dispatch) {
+    dispatch({
+      type: 'UPDATE_REGION',
+      id,
+      polygon,
+    });
+  };
+};
+
 export const verifyPersistence = (config, onSuccess, onError) => {
   return (dispatch) => {
     doVerifyPersistence(
