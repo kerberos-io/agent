@@ -40,7 +40,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "GENERATE_SOURCEMAP=false react-scripts build && rm -rf ../machinery/www && mv build ../machinery/www",
+    "build": "GENERATE_SOURCEMAP=false REACT_APP_ENVIRONMENT='production' react-scripts build && rm -rf ../machinery/www && mv build ../machinery/www",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "lint": "eslint --debug 'src/**/*.{js,jsx,ts,tsx}'",
