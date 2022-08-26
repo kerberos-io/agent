@@ -7,7 +7,7 @@ import {
 } from '../api/agent';
 
 export const addRegion = (id, polygon) => {
-  return function (dispatch) {
+  return (dispatch) => {
     dispatch({
       type: 'ADD_REGION',
       id,
@@ -17,7 +17,7 @@ export const addRegion = (id, polygon) => {
 };
 
 export const removeRegion = (id, polygon) => {
-  return function (dispatch) {
+  return (dispatch) => {
     dispatch({
       type: 'REMOVE_REGION',
       id,
@@ -27,7 +27,7 @@ export const removeRegion = (id, polygon) => {
 };
 
 export const updateRegion = (id, polygon) => {
-  return function (dispatch) {
+  return (dispatch) => {
     dispatch({
       type: 'UPDATE_REGION',
       id,
@@ -123,7 +123,7 @@ export const getConfig = (onSuccess, onError) => {
 };
 
 export const updateConfig = (field, value) => {
-  return function (dispatch) {
+  return (dispatch) => {
     dispatch({
       type: 'UPDATE_CONFIG',
       field,

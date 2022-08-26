@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"sync"
 
 	"github.com/gin-gonic/gin"
@@ -137,6 +138,13 @@ loop:
 			onvifEnabled = "true"
 		}
 
+		// Check if the agent is running inside a cluster (Kerberos Factory) or as
+		// an open source agent
+		isEnterprise := "false"
+		if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
+			isEnterprise = "true"
+		}
+
 		var object = fmt.Sprintf(`{
 			"key" : "%s",
 			"hash" : "826133658",
@@ -149,7 +157,7 @@ loop:
 			"docker" : true,
 			"kios" : false,
 			"raspberrypi" : false,
-			"enterprise" : true,
+			"enterprise" : "%s",
 			"board" : "",
 			"disk1size" : "%s",
 			"disk3size" : "%s",
@@ -162,7 +170,7 @@ loop:
 			"timestamp" : 1564747908,
 			"siteID" : "%s",
 			"onvif" : "%s"
-		}`, config.Key, username, key, config.Name, "0", "0", diskPercentUsed, days, config.HubSite, onvifEnabled)
+		}`, config.Key, username, key, config.Name, isEnterprise, "0", "0", diskPercentUsed, days, config.HubSite, onvifEnabled)
 
 		var jsonStr = []byte(object)
 		buffy := bytes.NewBuffer(jsonStr)
