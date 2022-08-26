@@ -139,7 +139,7 @@ This base image contains already a couple of tools, such as Golang, FFmpeg and O
 By running the `docker build` command, you will create the Kerberos Agent Docker image. After building you can simply run the image as a Docker container.
 
     docker build -t kerberos/agent .
-    docker run -p 8080:8080 --name mycamera -d kerberos/agent:edge
+    docker run -p 8080:8080 --name mycamera -d kerberos/agent
 
 ## FAQ
 
