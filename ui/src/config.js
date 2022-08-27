@@ -1,5 +1,4 @@
-const { hostname } = window.location;
-const { protocol } = window.location;
+const { hostname, protocol } = window.location;
 
 const dev = {
   ENV: 'dev',
@@ -8,9 +7,9 @@ const dev = {
 };
 
 const prod = {
-  ENV: 'prod',
+  ENV: process.env.REACT_APP_STAGE,
   HOSTNAME: hostname,
-  API_URL: `${protocol}//${hostname}/api/`,
+  API_URL: `/api`,
 };
 
 const config = process.env.REACT_APP_STAGE === 'production' ? prod : dev;
