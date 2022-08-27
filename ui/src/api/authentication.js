@@ -1,7 +1,7 @@
 import API from './api';
 
 export function doLogin(username, password, onSuccess, onError) {
-  API.post('api/login', {
+  API.post('login', {
     username,
     password,
   })
@@ -26,7 +26,7 @@ export function doLogin(username, password, onSuccess, onError) {
 }
 
 export function doCheckIfInstalled(onSuccess, onError) {
-  API.get('api/installed')
+  API.get('installed')
     .then((res) => {
       if (res.status !== 200) {
         throw new Error(res.data);
