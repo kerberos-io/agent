@@ -1,36 +1,32 @@
 {
-	"type": "template",
-	"key": "0x123-a-test-agent",
+	"type": "",
+	"key": "",
 	"name": "camera",
-	"mqtt_username": "xxx",
-	"mqtt_password": "xxx",
+	"time": "true",
 	"timezone": "Europe/Brussels",
-	"stunuri": "stun:turn.kerberos.io:8443",
-	"turnuri": "turn:turn.kerberos.io:8443",
-	"turn_password": "xxx",
 	"capture": {
-		"id": "ipcamera",
+		"name": "",
 		"ipcamera": {
-			"rtsp": "xxx",
+			"rtsp": "",
+			"sub_rtsp": "",
 			"fps": ""
 		},
 		"usbcamera": {
-			"device": "",
-			"fps": ""
+			"device": ""
 		},
 		"raspicamera": {
-			"device": "",
-			"fps": ""
+			"device": ""
 		},
 		"continuous": "false",
-		"postrecording": 10,
-		"prerecording": 5,
-		"maxlengthrecording":60,
-		"forwardwebrtc": "",
+		"postrecording": 30,
+		"prerecording": 20,
+		"maxlengthrecording": 25,
 		"transcodingwebrtc": "false",
-		"transcodingresolution": 25,
+		"transcodingresolution": 50,
+		"forwardwebrtc": "false",
 		"fragmented": "false",
-		"fragmentedduration": 1
+		"fragmentedduration": 20,
+		"pixelChangeThreshold": 100
 	},
 	"timetable": [
 		{
@@ -41,12 +37,6 @@
 		},
 		{
 			"start1": 0,
-			"end1": 69840,
-			"start2": 70080,
-			"end2": 86400
-		},
-		{
-			"start1": 0,
 			"end1": 43199,
 			"start2": 43200,
 			"end2": 86400
@@ -61,6 +51,12 @@
 			"start1": 0,
 			"end1": 43199,
 			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 46200,
 			"end2": 86400
 		},
 		{
@@ -77,6 +73,7 @@
 		}
 	],
 	"region": {
+		"name": "",
 		"rectangle": {
 			"x1": 0,
 			"y1": 0,
@@ -86,15 +83,30 @@
 		"polygon": []
 	},
 	"cloud": "kstorage",
-	"hub_uri": "https://api.cloud.kerberos.io",
-	"hub_key": "xxx",
-	"hub_private_key": "xxx",
-	"hub_site": "",
+	"s3": {
+		"proxyuri": "http://proxy.kerberos.io",
+		"bucket": "kerberosaccept",
+		"region": "eu-west1",
+		"username": ""
+	},
 	"kstorage": {
-		"uri": "https://staging.api.vault.kerberos.live",
-		"access_key": "xxx",
-		"secret_access_key": "xxx",
+		"uri": "https://api.vault.kerberos.io",
+		"access_key": "",
+		"secret_access_key": "",
 		"provider": "",
-		"directory": "xxx"
-	}
+		"directory": ""
+	},
+	"mqtturi": "tcp://mqtt.kerberos.io:1883",
+	"mqtt_username": "",
+	"mqtt_password": "",
+	"stunuri": "stun:turn.kerberos.io:8443",
+	"turnuri": "turn:turn.kerberos.io:8443",
+	"turn_username": "username1",
+	"turn_password": "password1",
+	"heartbeaturi": "",
+	"hub_uri": "https://api.cloud.kerberos.io",
+	"hub_key": "",
+	"hub_private_key": "",
+	"hub_site": "",
+	"condition_uri": ""
 }
