@@ -4,12 +4,14 @@ const dev = {
   ENV: 'dev',
   HOSTNAME: hostname,
   API_URL: `${protocol}//${hostname}:8080/api`,
+  URL: `${protocol}//${hostname}:8080`,
 };
 
 const prod = {
   ENV: process.env.REACT_APP_ENVIRONMENT,
   HOSTNAME: hostname,
   API_URL: `/api`,
+  URL: `/`,
 };
 
 const config = process.env.REACT_APP_ENVIRONMENT === 'production' ? prod : dev;

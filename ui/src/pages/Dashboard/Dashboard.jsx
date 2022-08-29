@@ -15,6 +15,7 @@ import {
 // import { Link } from 'react-router-dom';
 import './Dashboard.scss';
 import ReactTooltip from 'react-tooltip';
+import config from '../../config';
 
 // eslint-disable-next-line react/prefer-stateless-function
 class Dashboard extends React.Component {
@@ -155,7 +156,7 @@ class Dashboard extends React.Component {
               header="Loading live view"
               text="Hold on we are loading your live view here. If you didn't configure your camera connection, update it on the settings pages."
             />
-            <ImageCard imageSrc="http://localhost:8080/stream?token=xxxx" />
+            <ImageCard imageSrc={`${config.URL}/stream?token=xxxx`} />
           </div>
         </div>
         <ReactTooltip />
