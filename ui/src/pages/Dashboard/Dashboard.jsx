@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Breadcrumb,
   KPI,
-  VideoCard,
+  ImageCard,
   Table,
   TableHeader,
   TableBody,
@@ -10,6 +10,7 @@ import {
   Icon,
   Ellipse,
   Card,
+  SetupBox,
 } from '@kerberos-io/ui';
 // import { Link } from 'react-router-dom';
 import './Dashboard.scss';
@@ -147,13 +148,14 @@ class Dashboard extends React.Component {
           </div>
           <div>
             <h2>Live view</h2>
-            <VideoCard
-              handleClickHD={() => {}}
-              handleClickSD={() => {}}
-              videoSrc="https://www.w3schools.com/html/mov_bbb.mp4"
-              videoStatus="recording"
-              videoStatusTitle="live"
+            <SetupBox
+              btnicon="cameras"
+              btnlabel="Configure connection"
+              dashed
+              header="Loading live view"
+              text="Hold on we are loading your live view here. If you didn't configure your camera connection, update it on the settings pages."
             />
+            <ImageCard imageSrc="http://localhost:8080/stream?token=xxxx" />
           </div>
         </div>
         <ReactTooltip />

@@ -1,6 +1,6 @@
 module github.com/kerberos-io/agent/machinery
 
-go 1.19
+go 1.18
 
 //replace github.com/kerberos-io/joy4 v1.0.33 => ../../../../github.com/kerberos-io/joy4
 
@@ -19,6 +19,7 @@ require (
 	github.com/kerberos-io/joy4 v1.0.33
 	github.com/kerberos-io/onvif v0.0.3
 	github.com/minio/minio-go/v6 v6.0.57
+	github.com/nsmith5/mjpeg v0.0.0-20200913181537-54b8ada0e53e
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pion/webrtc/v3 v3.1.43
 	github.com/shirou/gopsutil v3.21.11+incompatible

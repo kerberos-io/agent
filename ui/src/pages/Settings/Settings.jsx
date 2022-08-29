@@ -580,9 +580,15 @@ class Settings extends React.Component {
                     General settings allow you to configure your Kerberos Agents
                     on a higher level.
                   </p>
-                  <Input label="key" disabled defaultValue={config.key} />
+                  <Input
+                    noPadding
+                    label="key"
+                    disabled
+                    defaultValue={config.key}
+                  />
 
                   <Input
+                    noPadding
                     label="camera name"
                     defaultValue={config.name}
                     onChange={(value) =>
@@ -592,6 +598,7 @@ class Settings extends React.Component {
 
                   <Dropdown
                     isRadio
+                    icon="world"
                     label="Timezone"
                     placeholder="Select a timezone"
                     items={this.timezones}
@@ -627,6 +634,7 @@ class Settings extends React.Component {
                     on a higher level.
                   </p>
                   <Input
+                    noPadding
                     label="RTSP URL"
                     value={config.capture.ipcamera.rtsp}
                     placeholder="The IP camera address"
@@ -641,6 +649,7 @@ class Settings extends React.Component {
                   />
 
                   <Input
+                    noPadding
                     label="onvif xaddr"
                     value={config.capture.ipcamera.onvif_xaddr}
                     placeholder="http://x.x.x.x/onvif/device_service"
@@ -655,6 +664,7 @@ class Settings extends React.Component {
                   />
 
                   <Input
+                    noPadding
                     label="username"
                     value={config.capture.ipcamera.onvif_username}
                     onChange={(value) =>
@@ -668,6 +678,7 @@ class Settings extends React.Component {
                   />
 
                   <Input
+                    noPadding
                     label="password"
                     value={config.capture.ipcamera.onvif_password}
                     onChange={(value) =>
@@ -722,6 +733,7 @@ class Settings extends React.Component {
                   </div>
 
                   <Input
+                    noPadding
                     label="video duration (seconds)"
                     value={config.capture.maxlengthrecording}
                     placeholder="The maximum duration of a recording."
@@ -736,6 +748,7 @@ class Settings extends React.Component {
                   />
 
                   <Input
+                    noPadding
                     label="pre recording (seconds)"
                     value={config.capture.prerecording}
                     placeholder="Seconds before an event occurred."
@@ -750,6 +763,7 @@ class Settings extends React.Component {
                   />
 
                   <Input
+                    noPadding
                     label="post recording (seconds)"
                     value={config.capture.postrecording}
                     placeholder="Seconds after an event occurred."
@@ -788,6 +802,7 @@ class Settings extends React.Component {
                     STUN/TURN.
                   </p>
                   <Input
+                    noPadding
                     label="STUN server"
                     value={config.stunuri}
                     onChange={(value) =>
@@ -795,6 +810,7 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
+                    noPadding
                     label="TURN server"
                     value={config.turnuri}
                     onChange={(value) =>
@@ -802,6 +818,7 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
+                    noPadding
                     label="Username"
                     value={config.turn_username}
                     onChange={(value) =>
@@ -809,6 +826,7 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
+                    noPadding
                     label="Password"
                     value={config.turn_password}
                     onChange={(value) =>
@@ -847,6 +865,7 @@ class Settings extends React.Component {
                     your video landscape.
                   </p>
                   <Input
+                    noPadding
                     label="API url"
                     placeholder="The API for Kerberos Hub."
                     value={config.hub_uri}
@@ -855,6 +874,7 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
+                    noPadding
                     label="Public key"
                     placeholder="The public key granted to your Kerberos Hub account."
                     value={config.hub_key}
@@ -863,6 +883,7 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
+                    noPadding
                     label="Private key"
                     placeholder="The private key granted to your Kerberos Hub account."
                     value={config.hub_private_key}
@@ -871,6 +892,7 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
+                    noPadding
                     label="Site"
                     value={config.hub_site}
                     placeholder="The site ID the Kerberos Agents are belonging to in Kerberos Hub."
@@ -951,6 +973,7 @@ class Settings extends React.Component {
                     or ONVIF (PTZ) capabilities.
                   </p>
                   <Input
+                    noPadding
                     label="Broker Uri"
                     value={config.mqtturi}
                     onChange={(value) =>
@@ -958,6 +981,7 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
+                    noPadding
                     label="Username"
                     value={config.mqtt_username}
                     onChange={(value) =>
@@ -965,6 +989,7 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
+                    noPadding
                     label="Password"
                     value={config.mqtt_password}
                     onChange={(value) =>
@@ -1029,6 +1054,7 @@ class Settings extends React.Component {
                   </div>
 
                   <Input
+                    noPadding
                     label="Downscale resolution (in % or original resolution)"
                     value={config.capture.transcodingresolution}
                     placeholder="The % of the original resolution."
@@ -1080,6 +1106,7 @@ class Settings extends React.Component {
                   </div>
 
                   <Input
+                    noPadding
                     label="fragmented duration"
                     value={config.capture.fragmentedduration}
                     placeholder="Duration of a single fragment."
@@ -1136,6 +1163,7 @@ class Settings extends React.Component {
                         <span className="time-of-interest">Sunday</span>
                         <div className="grid-4">
                           <Input
+                            noPadding
                             placeholder="00:00"
                             value={this.timetable[0].start1Full}
                             onChange={(event) => {
@@ -1149,6 +1177,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:00"
                             value={this.timetable[0].end1Full}
                             onChange={(event) => {
@@ -1162,6 +1191,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:01"
                             value={this.timetable[0].start2Full}
                             onChange={(event) => {
@@ -1175,6 +1205,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="23:59"
                             value={this.timetable[0].end2Full}
                             onChange={(event) => {
@@ -1192,6 +1223,7 @@ class Settings extends React.Component {
                         <span className="time-of-interest">Monday</span>
                         <div className="grid-4">
                           <Input
+                            noPadding
                             placeholder="00:00"
                             value={this.timetable[1].start1Full}
                             onChange={(event) => {
@@ -1205,6 +1237,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:00"
                             value={this.timetable[1].end1Full}
                             onChange={(event) => {
@@ -1218,6 +1251,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:01"
                             value={this.timetable[1].start2Full}
                             onChange={(event) => {
@@ -1231,6 +1265,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="23:59"
                             value={this.timetable[1].end2Full}
                             onChange={(event) => {
@@ -1248,6 +1283,7 @@ class Settings extends React.Component {
                         <span className="time-of-interest">Tuesday</span>
                         <div className="grid-4">
                           <Input
+                            noPadding
                             placeholder="00:00"
                             value={this.timetable[2].start1Full}
                             onChange={(event) => {
@@ -1261,6 +1297,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:00"
                             value={this.timetable[2].end1Full}
                             onChange={(event) => {
@@ -1274,6 +1311,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:01"
                             value={this.timetable[2].start2Full}
                             onChange={(event) => {
@@ -1287,6 +1325,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="23:59"
                             value={this.timetable[2].end2Full}
                             onChange={(event) => {
@@ -1304,6 +1343,7 @@ class Settings extends React.Component {
                         <span className="time-of-interest">Wednesday</span>
                         <div className="grid-4">
                           <Input
+                            noPadding
                             placeholder="00:00"
                             value={this.timetable[3].start1Full}
                             onChange={(event) => {
@@ -1317,6 +1357,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:00"
                             value={this.timetable[3].end1Full}
                             onChange={(event) => {
@@ -1330,6 +1371,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:01"
                             value={this.timetable[3].start2Full}
                             onChange={(event) => {
@@ -1343,6 +1385,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="23:59"
                             value={this.timetable[3].end2Full}
                             onChange={(event) => {
@@ -1360,6 +1403,7 @@ class Settings extends React.Component {
                         <span className="time-of-interest">Thursday</span>
                         <div className="grid-4">
                           <Input
+                            noPadding
                             placeholder="00:00"
                             value={this.timetable[4].start1Full}
                             onChange={(event) => {
@@ -1373,6 +1417,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:00"
                             value={this.timetable[4].end1Full}
                             onChange={(event) => {
@@ -1386,6 +1431,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:01"
                             value={this.timetable[4].start2Full}
                             onChange={(event) => {
@@ -1399,6 +1445,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="23:59"
                             value={this.timetable[4].end2Full}
                             onChange={(event) => {
@@ -1416,6 +1463,7 @@ class Settings extends React.Component {
                         <span className="time-of-interest">Friday</span>
                         <div className="grid-4">
                           <Input
+                            noPadding
                             placeholder="00:00"
                             value={this.timetable[5].start1Full}
                             onChange={(event) => {
@@ -1429,6 +1477,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:00"
                             value={this.timetable[5].end1Full}
                             onChange={(event) => {
@@ -1442,6 +1491,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:01"
                             value={this.timetable[5].start2Full}
                             onChange={(event) => {
@@ -1455,6 +1505,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="23:59"
                             value={this.timetable[5].end2Full}
                             onChange={(event) => {
@@ -1472,6 +1523,7 @@ class Settings extends React.Component {
                         <span className="time-of-interest">Saturday</span>
                         <div className="grid-4">
                           <Input
+                            noPadding
                             placeholder="00:00"
                             value={this.timetable[6].start1Full}
                             onChange={(event) => {
@@ -1485,6 +1537,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:00"
                             value={this.timetable[6].end1Full}
                             onChange={(event) => {
@@ -1498,6 +1551,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="12:01"
                             value={this.timetable[6].start2Full}
                             onChange={(event) => {
@@ -1511,6 +1565,7 @@ class Settings extends React.Component {
                             }}
                           />
                           <Input
+                            noPadding
                             placeholder="23:59"
                             value={this.timetable[6].end2Full}
                             onChange={(event) => {
@@ -1552,6 +1607,7 @@ class Settings extends React.Component {
                     or disabled.
                   </p>
                   <Input
+                    noPadding
                     label="Condition URI"
                     value={config.condition_uri}
                     placeholder={
@@ -1615,6 +1671,7 @@ class Settings extends React.Component {
                   {config.cloud === this.KERBEROS_HUB && (
                     <>
                       <Input
+                        noPadding
                         label="Kerberos Hub API URL"
                         placeholder="The API endpoint for uploading your recordings."
                         value={config.s3 ? config.s3.proxyuri : ''}
@@ -1623,6 +1680,7 @@ class Settings extends React.Component {
                         }
                       />
                       <Input
+                        noPadding
                         label="Region"
                         placeholder="The region we are storing our recordings in."
                         value={config.s3 ? config.s3.region : ''}
@@ -1631,6 +1689,7 @@ class Settings extends React.Component {
                         }
                       />
                       <Input
+                        noPadding
                         label="Bucket"
                         placeholder="The bucket we are storing our recordings in."
                         value={config.s3 ? config.s3.bucket : ''}
@@ -1639,6 +1698,7 @@ class Settings extends React.Component {
                         }
                       />
                       <Input
+                        noPadding
                         label="Username/Directory"
                         placeholder="The username of your Kerberos Hub account."
                         value={config.s3 ? config.s3.username : ''}
@@ -1651,6 +1711,7 @@ class Settings extends React.Component {
                   {config.cloud === this.KERBEROS_VAULT && (
                     <>
                       <Input
+                        noPadding
                         label="Kerberos Vault API URL"
                         placeholder="The Kerberos Vault API"
                         value={config.kstorage ? config.kstorage.uri : ''}
@@ -1664,6 +1725,7 @@ class Settings extends React.Component {
                         }
                       />
                       <Input
+                        noPadding
                         label="Provider"
                         placeholder="The provider to which your recordings will be send."
                         value={config.kstorage ? config.kstorage.provider : ''}
@@ -1677,6 +1739,7 @@ class Settings extends React.Component {
                         }
                       />
                       <Input
+                        noPadding
                         label="Directory"
                         placeholder="Sub directory the recordings will be stored in your provider."
                         value={config.kstorage ? config.kstorage.directory : ''}
@@ -1690,6 +1753,7 @@ class Settings extends React.Component {
                         }
                       />
                       <Input
+                        noPadding
                         label="Access key"
                         placeholder="The access key of your Kerberos Vault account."
                         value={
@@ -1705,6 +1769,7 @@ class Settings extends React.Component {
                         }
                       />
                       <Input
+                        noPadding
                         label="Secret key"
                         placeholder="The secret key of your Kerberos Vault account."
                         value={

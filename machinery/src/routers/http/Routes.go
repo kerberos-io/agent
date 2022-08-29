@@ -1,15 +1,34 @@
 package http
 
 import (
+	"image"
+	"time"
+
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 
 	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/components"
+	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
 func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuration *models.Configuration, communication *models.Communication) *gin.RouterGroup {
+
+	// Streaming handler
+	r.GET("/stream", func(c *gin.Context) {
+
+		imageFunction := func() (image.Image, error) {
+			// We will only send an image once per second.
+			time.Sleep(time.Second * 1)
+			log.Log.Info("AddRoutes (/stream): reading from MJPEG stream")
+			img, err := components.GetImageFromFilePath()
+			return img, err
+		}
+
+		h := components.StartMotionJPEG(imageFunction, 80)
+		h.ServeHTTP(c.Writer, c.Request)
+	})
 
 	// This is legacy should be removed in future! Now everything
 	// lives under the /api prefix.

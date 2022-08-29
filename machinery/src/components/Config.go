@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/png"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -18,6 +20,25 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"gopkg.in/mgo.v2/bson"
 )
+
+func GetImageFromFilePath() (image.Image, error) {
+	snapshotDirectory := "./data/snapshots"
+	files, err := ioutil.ReadDir(snapshotDirectory)
+	if err == nil && len(files) > 1 {
+		sort.Slice(files, func(i, j int) bool {
+			return files[i].ModTime().Before(files[j].ModTime())
+		})
+		filePath := "./data/snapshots/" + files[1].Name()
+		f, err := os.Open(filePath)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		image, _, err := image.Decode(f)
+		return image, err
+	}
+	return nil, errors.New("Could not find a snapshot in " + snapshotDirectory)
+}
 
 func GetSnapshot() string {
 	var snapshot string

@@ -35,7 +35,7 @@ func GetRGBImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mut
 }
 
 func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) gocv.Mat {
-	var gray gocv.Mat
+	var rgb gocv.Mat
 	img, err := capture.DecodeImage(pkt, dec, decoderMutex)
 
 	if err == nil && img != nil {
@@ -65,16 +65,20 @@ func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex)
 		}
 
 		im := img.Image
-		rgb, _ := ToRGB8(im)
+		rgb, _ = ToRGB8(im)
 		img.Free()
 		if scaleFactor > 1 {
 			gocv.Resize(rgb, &rgb, image.Pt(newWidth, newHeight), 0, 0, gocv.InterpolationArea)
 		}
-		gray = gocv.NewMat()
-		gocv.CvtColor(rgb, &gray, gocv.ColorBGRToGray)
-		rgb.Close()
 	}
-	return gray
+	return rgb
+}
+
+func ToGray(rgb gocv.Mat) (gocv.Mat, error) {
+	gray := gocv.NewMat()
+	gocv.CvtColor(rgb, &gray, gocv.ColorBGRToGray)
+	rgb.Close()
+	return gray, nil
 }
 
 func ToRGB8(img image.YCbCr) (gocv.Mat, error) {
@@ -121,7 +125,8 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 			// Check If valid package.
 			if len(pkt.Data) > 0 && pkt.IsKeyFrame {
 				rgb := GetImage(pkt, decoder, decoderMutex)
-				matArray[j] = &rgb
+				gray, _ := ToGray(rgb)
+				matArray[j] = &gray
 				j++
 			}
 			if j == 2 {
@@ -176,22 +181,23 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				}
 
 				rgb := GetImage(pkt, decoder, decoderMutex)
-				matArray[2] = &rgb
+				gray, _ := ToGray(rgb)
+				matArray[2] = &gray
 
 				// Store snapshots (jpg) or hull.
-				if i%3 == 0 {
-					files, err := ioutil.ReadDir("./data/snapshots")
-					if err == nil {
-						sort.Slice(files, func(i, j int) bool {
-							return files[i].ModTime().Before(files[j].ModTime())
-						})
-						if len(files) > 3 {
-							os.Remove("./data/snapshots/" + files[0].Name())
-						}
+				files, err := ioutil.ReadDir("./data/snapshots")
+				if err == nil {
+					sort.Slice(files, func(i, j int) bool {
+						return files[i].ModTime().Before(files[j].ModTime())
+					})
+					if len(files) > 3 {
+						os.Remove("./data/snapshots/" + files[0].Name())
 					}
-					t := strconv.FormatInt(time.Now().Unix(), 10)
-					gocv.IMWrite("./data/snapshots/"+t+".png", rgb)
 				}
+				t := strconv.FormatInt(time.Now().Unix(), 10)
+				snapshotRGB := GetImage(pkt, decoder, decoderMutex)
+				gocv.IMWrite("./data/snapshots/"+t+".png", snapshotRGB)
+				snapshotRGB.Close()
 
 				// Check if continuous recording.
 				if config.Capture.Continuous == "true" {

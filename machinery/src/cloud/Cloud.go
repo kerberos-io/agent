@@ -213,7 +213,7 @@ loop:
 
 func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
 
-	log.Log.Debug("HandleLiveStreamSD: finished")
+	log.Log.Debug("HandleLiveStreamSD: started")
 
 	config := configuration.Config
 	key := ""

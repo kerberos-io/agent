@@ -3,7 +3,7 @@ const { hostname, protocol } = window.location;
 const dev = {
   ENV: 'dev',
   HOSTNAME: hostname,
-  API_URL: `${protocol}//${hostname}:8080/`,
+  API_URL: `${protocol}//${hostname}:8080/api`,
 };
 
 const prod = {
