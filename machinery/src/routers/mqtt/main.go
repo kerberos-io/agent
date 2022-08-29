@@ -45,9 +45,9 @@ func ConfigureMQTT(configuration *models.Configuration, communication *models.Co
 
 	hubKey := ""
 	// This is the old way ;)
-	if config.Cloud == "s3" && config.S3.Publickey != "" {
+	if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
 		hubKey = config.S3.Publickey
-	} else if config.Cloud == "kstorage" && config.KStorage.CloudKey != "" {
+	} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
 		hubKey = config.KStorage.CloudKey
 	}
 	// This is the new way ;)

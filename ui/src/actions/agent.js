@@ -4,6 +4,7 @@ import {
   doVerifyHub,
   doVerifyPersistence,
   doGetKerberosAgentTags,
+  doGetDashboardInformation,
 } from '../api/agent';
 
 export const addRegion = (id, polygon) => {
@@ -87,6 +88,27 @@ export const getKerberosAgentTags = (onSuccess, onError) => {
         dispatch({
           type: 'GET_MACHINERY_TAGS',
           tags: data.data,
+        });
+        if (onSuccess) {
+          onSuccess();
+        }
+      },
+      () => {
+        if (onError) {
+          onError();
+        }
+      }
+    );
+  };
+};
+
+export const GetDashboardInformation = (onSuccess, onError) => {
+  return (dispatch) => {
+    doGetDashboardInformation(
+      (data) => {
+        dispatch({
+          type: 'GET_DASHBOARD',
+          dashboard: data,
         });
         if (onSuccess) {
           onSuccess();

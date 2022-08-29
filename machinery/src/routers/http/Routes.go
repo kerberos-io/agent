@@ -11,24 +11,10 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 )
 
 func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuration *models.Configuration, communication *models.Communication) *gin.RouterGroup {
-
-	// Streaming handler
-	r.GET("/stream", func(c *gin.Context) {
-
-		imageFunction := func() (image.Image, error) {
-			// We will only send an image once per second.
-			time.Sleep(time.Second * 1)
-			log.Log.Info("AddRoutes (/stream): reading from MJPEG stream")
-			img, err := components.GetImageFromFilePath()
-			return img, err
-		}
-
-		h := components.StartMotionJPEG(imageFunction, 80)
-		h.ServeHTTP(c.Writer, c.Request)
-	})
 
 	// This is legacy should be removed in future! Now everything
 	// lives under the /api prefix.
@@ -67,6 +53,35 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 	api := r.Group("/api")
 	{
 		api.POST("/login", authMiddleware.LoginHandler)
+
+		api.GET("/dashboard", func(c *gin.Context) {
+
+			// This will return the timestamp when the last packet was correctyl received
+			// this is to calculate if the camera connection is still working.
+			lastPacketReceived := communication.LastPacketTimer.Load().(int64)
+
+			// The total number of recordings stored in the directory
+			numberOfRecordings := utils.NumberOfFilesInDirectory("./data/recordings")
+
+			c.JSON(200, gin.H{
+				"cameraOnline":       lastPacketReceived,
+				"numberOfRecordings": numberOfRecordings,
+			})
+		})
+
+		// Streaming handler
+		api.GET("/stream", func(c *gin.Context) {
+			// TODO add a token validation!
+			imageFunction := func() (image.Image, error) {
+				// We will only send an image once per second.
+				time.Sleep(time.Second * 1)
+				log.Log.Info("AddRoutes (/stream): reading from MJPEG stream")
+				img, err := components.GetImageFromFilePath()
+				return img, err
+			}
+			h := components.StartMotionJPEG(imageFunction, 80)
+			h.ServeHTTP(c.Writer, c.Request)
+		})
 
 		api.GET("/config", func(c *gin.Context) {
 			c.JSON(200, gin.H{

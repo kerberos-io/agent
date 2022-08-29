@@ -10,6 +10,7 @@ import (
 // all the communication between the different goroutines.
 type Communication struct {
 	PackageCounter        *atomic.Value
+	LastPacketTimer       *atomic.Value
 	HandleBootstrap       chan string
 	HandleStream          chan string
 	HandleMotion          chan MotionDataPartial

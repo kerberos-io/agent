@@ -89,6 +89,7 @@ loop:
 				r := communication.PackageCounter.Load().(int64)
 				log.Log.Info("HandleStream: packet size " + strconv.Itoa(len(pkt.Data)))
 				communication.PackageCounter.Store((r + 1) % 1000)
+				communication.LastPacketTimer.Store(time.Now().Unix())
 			}
 		}
 	}

@@ -1,4 +1,7 @@
 import React from 'react';
+import PropTypes from 'prop-types';
+import { withRouter } from 'react-router-dom';
+import { connect } from 'react-redux';
 import {
   Breadcrumb,
   KPI,
@@ -12,14 +15,53 @@ import {
   Card,
   SetupBox,
 } from '@kerberos-io/ui';
-// import { Link } from 'react-router-dom';
 import './Dashboard.scss';
 import ReactTooltip from 'react-tooltip';
+import { interval } from 'rxjs';
 import config from '../../config';
+import { GetDashboardInformation } from '../../actions/agent';
 
 // eslint-disable-next-line react/prefer-stateless-function
 class Dashboard extends React.Component {
+  constructor() {
+    super();
+    this.state = {
+      liveviewLoaded: false,
+    };
+  }
+
+  componentDidMount() {
+    const { dispatchGetDashboardInformation } = this.props;
+    dispatchGetDashboardInformation();
+
+    const interval$ = interval(2000);
+    this.subscription = interval$.subscribe(() => {
+      dispatchGetDashboardInformation();
+    });
+
+    const liveview = document.getElementsByClassName('videocard-video');
+    if (liveview && liveview.length > 0) {
+      liveview[0].addEventListener('load', () => {
+        this.setState({
+          liveviewLoaded: true,
+        });
+      });
+    }
+  }
+
+  componentWillUnmount() {
+    this.subscription.unsubscribe();
+  }
+
+  getCurrentTimestamp() {
+    return Math.round(Date.now() / 1000);
+  }
+
   render() {
+    const { dashboard } = this.props;
+    const { liveviewLoaded } = this.state;
+    const isCameraOnline =
+      this.getCurrentTimestamp() - dashboard.cameraOnline < 5;
     return (
       <div>
         <Breadcrumb
@@ -38,12 +80,20 @@ class Dashboard extends React.Component {
 
         <div className="stats grid-container --four-columns">
           <KPI number="69" divider="0" footer="Number of days" />
-          <KPI number="1540" divider="0" footer="Total recordings" />
+          <KPI
+            number={
+              dashboard.numberOfRecordings ? dashboard.numberOfRecordings : 0
+            }
+            divider="0"
+            footer="Total recordings"
+          />
           <Card
             title="Camera"
-            subtitle="succesfully connected"
+            subtitle={
+              isCameraOnline ? 'succesfully connected' : 'not connected'
+            }
             footer="IP Camera"
-            icon="circle-check-big"
+            icon={isCameraOnline ? 'circle-check-big' : 'circle-cross-big'}
           />
           <Card
             title="Cloud"
@@ -149,14 +199,18 @@ class Dashboard extends React.Component {
           </div>
           <div>
             <h2>Live view</h2>
-            <SetupBox
-              btnicon="cameras"
-              btnlabel="Configure connection"
-              dashed
-              header="Loading live view"
-              text="Hold on we are loading your live view here. If you didn't configure your camera connection, update it on the settings pages."
-            />
-            <ImageCard imageSrc={`${config.URL}/stream?token=xxxx`} />
+            {!liveviewLoaded && (
+              <SetupBox
+                btnicon="cameras"
+                btnlabel="Configure connection"
+                dashed
+                header="Loading live view"
+                text="Hold on we are loading your live view here. If you didn't configure your camera connection, update it on the settings pages."
+              />
+            )}
+            <div style={{ visibility: liveviewLoaded ? 'visible' : 'hidden' }}>
+              <ImageCard imageSrc={`${config.API_URL}/stream?token=xxxx`} />
+            </div>
           </div>
         </div>
         <ReactTooltip />
@@ -164,4 +218,21 @@ class Dashboard extends React.Component {
     );
   }
 }
-export default Dashboard;
+
+const mapStateToProps = (state /* , ownProps */) => ({
+  dashboard: state.agent.dashboard,
+});
+
+const mapDispatchToProps = (dispatch /* , ownProps */) => ({
+  dispatchGetDashboardInformation: (dashboard, success, error) =>
+    dispatch(GetDashboardInformation(dashboard, success, error)),
+});
+
+Dashboard.propTypes = {
+  dashboard: PropTypes.objectOf(PropTypes.object).isRequired,
+  dispatchGetDashboardInformation: PropTypes.func.isRequired,
+};
+
+export default withRouter(
+  connect(mapStateToProps, mapDispatchToProps)(Dashboard)
+);

@@ -502,13 +502,15 @@ class Settings extends React.Component {
               onClick={() => this.changeTab('recording')}
               icon={<Icon label="refresh" />}
             />
-            <Tab
-              label="Streaming"
-              value="streaming"
-              active={selectedTab === 'streaming'}
-              onClick={() => this.changeTab('streaming')}
-              icon={<Icon label="livestream" />}
-            />
+            {config.offline === 'false' && (
+              <Tab
+                label="Streaming"
+                value="streaming"
+                active={selectedTab === 'streaming'}
+                onClick={() => this.changeTab('streaming')}
+                icon={<Icon label="livestream" />}
+              />
+            )}
             <Tab
               label="Conditions"
               value="conditions"
@@ -516,13 +518,15 @@ class Settings extends React.Component {
               onClick={() => this.changeTab('conditions')}
               icon={<Icon label="activity" />}
             />
-            <Tab
-              label="Persistence"
-              value="persistence"
-              active={selectedTab === 'persistence'}
-              onClick={() => this.changeTab('persistence')}
-              icon={<Icon label="cloud" />}
-            />
+            {config.offline === 'false' && (
+              <Tab
+                label="Persistence"
+                value="persistence"
+                active={selectedTab === 'persistence'}
+                onClick={() => this.changeTab('persistence')}
+                icon={<Icon label="cloud" />}
+              />
+            )}
           </Tabs>
         </ControlBar>
 
@@ -789,7 +793,7 @@ class Settings extends React.Component {
             )}
 
             {/* STUN/TURN block */}
-            {showStreamingSection && (
+            {showStreamingSection && config.offline === 'false' && (
               <Block>
                 <BlockHeader>
                   <h4>STUN/TURN for WebRTC</h4>
@@ -845,7 +849,7 @@ class Settings extends React.Component {
               </Block>
             )}
 
-            {showPersistenceSection && (
+            {showPersistenceSection && config.offline === 'false' && (
               <Block>
                 <BlockHeader>
                   <h4>Kerberos Hub</h4>
@@ -954,7 +958,43 @@ class Settings extends React.Component {
           </div>
 
           <div>
+            {/* General settings block */}
             {showOverviewSection && (
+              <Block>
+                <BlockHeader>
+                  <h4>Advanced configuration</h4>
+                </BlockHeader>
+                <BlockBody>
+                  <p>
+                    Detailed configuration options to enable or disable specific
+                    parts of the Kerberos Agent
+                  </p>
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={config.offline === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle('', 'offline', event, config)
+                      }
+                    />
+                    <div>
+                      <span>Offline mode</span>
+                      <p>Disable all outgoing traffic</p>
+                    </div>
+                  </div>
+                </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label="Save"
+                    type="default"
+                    icon="pencil"
+                    onClick={this.saveConfig}
+                  />
+                </BlockFooter>
+              </Block>
+            )}
+
+            {showStreamingSection && config.offline === 'false' && (
               <Block>
                 <BlockHeader>
                   <h4>MQTT</h4>
@@ -1009,7 +1049,7 @@ class Settings extends React.Component {
             )}
 
             {/* STUN/TURN block */}
-            {showStreamingSection && (
+            {showStreamingSection && config.offline === 'false' && (
               <Block>
                 <BlockHeader>
                   <h4>Forwarding and transcoding</h4>
@@ -1633,7 +1673,7 @@ class Settings extends React.Component {
             )}
 
             {/* Persistence block */}
-            {showPersistenceSection && (
+            {showPersistenceSection && config.offline === 'false' && (
               <Block>
                 <BlockHeader>
                   <h4>Persistence</h4>

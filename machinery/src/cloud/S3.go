@@ -27,6 +27,11 @@ func UploadS3(configuration *models.Configuration, fileName string, directory st
 	// - Number of changes
 	// - Token
 
+	if config.S3 == nil {
+		log.Log.Error("UploadS3: Uploading Failed, as no settings found")
+		return false
+	}
+
 	aws_access_key_id := config.S3.Publickey
 	aws_secret_access_key := config.S3.Secretkey
 	aws_region := config.S3.Region

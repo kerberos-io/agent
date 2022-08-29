@@ -1,6 +1,7 @@
 const agent = (
   state = {
     config: {},
+    dashboard: {},
   },
   action
 ) => {
@@ -110,6 +111,12 @@ const agent = (
             },
           },
         },
+      };
+
+    case 'GET_DASHBOARD':
+      return {
+        ...state,
+        dashboard: action.dashboard,
       };
 
     default:

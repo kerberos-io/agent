@@ -55,6 +55,11 @@ func ReadDirectory(directory string) ([]os.FileInfo, error) {
 	return ff, err
 }
 
+func NumberOfFilesInDirectory(path string) int {
+	files, _ := ioutil.ReadDir(path)
+	return len(files)
+}
+
 func RandStringBytesRmndr(n int) string {
 	b := make([]byte, n)
 	for i := range b {

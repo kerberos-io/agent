@@ -25,6 +25,13 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	var packageCounter atomic.Value
 	packageCounter.Store(int64(0))
 	communication.PackageCounter = &packageCounter
+
+	// This is used when the last packet was received (timestamp),
+	// this metric is used to determine if the camera is still online/connected.
+	var lastPacketTimer atomic.Value
+	packageCounter.Store(int64(0))
+	communication.LastPacketTimer = &lastPacketTimer
+
 	communication.HandleStream = make(chan string, 1)
 	communication.HandleUpload = make(chan string, 1)
 	communication.HandleHeartBeat = make(chan string, 1)
@@ -160,6 +167,7 @@ func ControlAgent(communication *models.Communication) {
 					occurence = occurence + 1
 				}
 			} else {
+
 				occurence = 0
 			}
 
