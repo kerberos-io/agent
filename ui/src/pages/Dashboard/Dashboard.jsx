@@ -51,6 +51,10 @@ class Dashboard extends React.Component {
 
   componentWillUnmount() {
     this.subscription.unsubscribe();
+    const liveview = document.getElementsByClassName('videocard-video');
+    if (liveview && liveview.length > 0) {
+      liveview[0].remove();
+    }
   }
 
   getCurrentTimestamp() {

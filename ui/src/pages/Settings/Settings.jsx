@@ -502,7 +502,7 @@ class Settings extends React.Component {
               onClick={() => this.changeTab('recording')}
               icon={<Icon label="refresh" />}
             />
-            {config.offline === 'false' && (
+            {config.offline !== 'true' && (
               <Tab
                 label="Streaming"
                 value="streaming"
@@ -518,7 +518,7 @@ class Settings extends React.Component {
               onClick={() => this.changeTab('conditions')}
               icon={<Icon label="activity" />}
             />
-            {config.offline === 'false' && (
+            {config.offline !== 'true' && (
               <Tab
                 label="Persistence"
                 value="persistence"
@@ -651,49 +651,6 @@ class Settings extends React.Component {
                       )
                     }
                   />
-
-                  <Input
-                    noPadding
-                    label="onvif xaddr"
-                    value={config.capture.ipcamera.onvif_xaddr}
-                    placeholder="http://x.x.x.x/onvif/device_service"
-                    onChange={(value) =>
-                      this.onUpdateField(
-                        'capture.ipcamera',
-                        'onvif_xaddr',
-                        value,
-                        config.capture.ipcamera
-                      )
-                    }
-                  />
-
-                  <Input
-                    noPadding
-                    label="username"
-                    value={config.capture.ipcamera.onvif_username}
-                    onChange={(value) =>
-                      this.onUpdateField(
-                        'capture.ipcamera',
-                        'onvif_username',
-                        value,
-                        config.capture.ipcamera
-                      )
-                    }
-                  />
-
-                  <Input
-                    noPadding
-                    label="password"
-                    value={config.capture.ipcamera.onvif_password}
-                    onChange={(value) =>
-                      this.onUpdateField(
-                        'capture.ipcamera',
-                        'onvif_password',
-                        value,
-                        config.capture.ipcamera
-                      )
-                    }
-                  />
                 </BlockBody>
                 <BlockFooter>
                   <Button
@@ -793,7 +750,7 @@ class Settings extends React.Component {
             )}
 
             {/* STUN/TURN block */}
-            {showStreamingSection && config.offline === 'false' && (
+            {showStreamingSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
                   <h4>STUN/TURN for WebRTC</h4>
@@ -849,7 +806,7 @@ class Settings extends React.Component {
               </Block>
             )}
 
-            {showPersistenceSection && config.offline === 'false' && (
+            {showPersistenceSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
                   <h4>Kerberos Hub</h4>
@@ -959,6 +916,69 @@ class Settings extends React.Component {
 
           <div>
             {/* General settings block */}
+            {showCameraSection && (
+              <Block>
+                <BlockHeader>
+                  <h4>ONVIF</h4>
+                </BlockHeader>
+                <BlockBody>
+                  <p>Credentials to communicate with ONVIF capabilities.</p>
+
+                  <Input
+                    noPadding
+                    label="onvif xaddr"
+                    value={config.capture.ipcamera.onvif_xaddr}
+                    placeholder="http://x.x.x.x/onvif/device_service"
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'capture.ipcamera',
+                        'onvif_xaddr',
+                        value,
+                        config.capture.ipcamera
+                      )
+                    }
+                  />
+
+                  <Input
+                    noPadding
+                    label="username"
+                    value={config.capture.ipcamera.onvif_username}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'capture.ipcamera',
+                        'onvif_username',
+                        value,
+                        config.capture.ipcamera
+                      )
+                    }
+                  />
+
+                  <Input
+                    noPadding
+                    label="password"
+                    value={config.capture.ipcamera.onvif_password}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'capture.ipcamera',
+                        'onvif_password',
+                        value,
+                        config.capture.ipcamera
+                      )
+                    }
+                  />
+                </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label="Save"
+                    type="default"
+                    icon="pencil"
+                    onClick={this.saveConfig}
+                  />
+                </BlockFooter>
+              </Block>
+            )}
+
+            {/* General settings block */}
             {showOverviewSection && (
               <Block>
                 <BlockHeader>
@@ -994,7 +1014,7 @@ class Settings extends React.Component {
               </Block>
             )}
 
-            {showStreamingSection && config.offline === 'false' && (
+            {showStreamingSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
                   <h4>MQTT</h4>
@@ -1049,7 +1069,7 @@ class Settings extends React.Component {
             )}
 
             {/* STUN/TURN block */}
-            {showStreamingSection && config.offline === 'false' && (
+            {showStreamingSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
                   <h4>Forwarding and transcoding</h4>
@@ -1673,7 +1693,7 @@ class Settings extends React.Component {
             )}
 
             {/* Persistence block */}
-            {showPersistenceSection && config.offline === 'false' && (
+            {showPersistenceSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
                   <h4>Persistence</h4>

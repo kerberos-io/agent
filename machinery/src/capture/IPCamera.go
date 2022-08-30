@@ -64,9 +64,7 @@ loop:
 		var pkt av.Packet
 		if pkt, err = infile.ReadPacket(); err != nil { // sometimes this throws an end of file..
 			log.Log.Error("HandleStream: " + err.Error())
-			if err.Error() == "EOF" {
-				time.Sleep(30 * time.Second)
-			}
+			time.Sleep(30 * time.Second)
 		}
 
 		// Could be that a decode is throwing errors.

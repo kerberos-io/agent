@@ -58,7 +58,10 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 
 			// This will return the timestamp when the last packet was correctyl received
 			// this is to calculate if the camera connection is still working.
-			lastPacketReceived := communication.LastPacketTimer.Load().(int64)
+			lastPacketReceived := int64(0)
+			if communication.LastPacketTimer != nil {
+				lastPacketReceived = communication.LastPacketTimer.Load().(int64)
+			}
 
 			// The total number of recordings stored in the directory
 			numberOfRecordings := utils.NumberOfFilesInDirectory("./data/recordings")
