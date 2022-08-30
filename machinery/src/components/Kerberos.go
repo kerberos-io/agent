@@ -128,8 +128,12 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// Here we are cleaning up everything!
 		communication.HandleStream <- "stop"
-		communication.HandleHeartBeat <- "stop"
-		communication.HandleUpload <- "stop"
+
+		if configuration.Config.Offline != "true" {
+			communication.HandleHeartBeat <- "stop"
+			communication.HandleUpload <- "stop"
+		}
+
 		infile.Close()
 		queue.Close()
 		close(communication.HandleONVIF)

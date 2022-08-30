@@ -10,18 +10,31 @@ import {
   NavigationItem,
   NavigationGroup,
   Profilebar,
+  Icon,
 } from '@kerberos-io/ui';
+import { interval } from 'rxjs';
 import { connect } from 'react-redux';
-import './App.module.scss';
 import logo from './header-minimal-logo-36x36.svg';
 import '@kerberos-io/ui/lib/index.css';
 import { logout } from './actions';
 import config from './config';
+import './App.scss';
+import { GetDashboardInformation } from './actions/agent';
 
 // eslint-disable-next-line react/prefer-stateless-function
 class App extends React.Component {
+  componentDidMount() {
+    const { dispatchGetDashboardInformation } = this.props;
+    dispatchGetDashboardInformation();
+
+    const interval$ = interval(2000);
+    this.subscription = interval$.subscribe(() => {
+      dispatchGetDashboardInformation();
+    });
+  }
+
   render() {
-    const { children, username, dispatchLogout } = this.props;
+    const { children, username, dashboard, dispatchLogout } = this.props;
     return (
       <div id="page-root">
         <Sidebar
@@ -76,6 +89,14 @@ class App extends React.Component {
         </Sidebar>
         <Main>
           <Gradient />
+
+          {dashboard.offlineMode === 'true' && (
+            <div className="warning">
+              <Icon label="info" />
+              Attention! Kerberos is currently running in Offline mode.
+            </div>
+          )}
+
           <MainBody>{children}</MainBody>
         </Main>
       </div>
@@ -85,10 +106,13 @@ class App extends React.Component {
 
 const mapStateToProps = (state) => ({
   username: state.authentication.username,
+  dashboard: state.agent.dashboard,
 });
 
 const mapDispatchToProps = (dispatch) => ({
   dispatchLogout: () => dispatch(logout()),
+  dispatchGetDashboardInformation: (dashboard, success, error) =>
+    dispatch(GetDashboardInformation(dashboard, success, error)),
 });
 
 App.propTypes = {
@@ -96,6 +120,8 @@ App.propTypes = {
   // eslint-disable-next-line react/forbid-prop-types
   children: PropTypes.array.isRequired,
   username: PropTypes.string.isRequired,
+  dashboard: PropTypes.objectOf(PropTypes.object).isRequired,
+  dispatchGetDashboardInformation: PropTypes.func.isRequired,
 };
 
 export default connect(mapStateToProps, mapDispatchToProps)(App);

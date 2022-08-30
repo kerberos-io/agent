@@ -67,6 +67,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			numberOfRecordings := utils.NumberOfFilesInDirectory("./data/recordings")
 
 			c.JSON(200, gin.H{
+				"offlineMode":        configuration.Config.Offline,
 				"cameraOnline":       lastPacketReceived,
 				"numberOfRecordings": numberOfRecordings,
 			})

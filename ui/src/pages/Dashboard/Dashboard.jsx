@@ -17,9 +17,7 @@ import {
 } from '@kerberos-io/ui';
 import './Dashboard.scss';
 import ReactTooltip from 'react-tooltip';
-import { interval } from 'rxjs';
 import config from '../../config';
-import { GetDashboardInformation } from '../../actions/agent';
 
 // eslint-disable-next-line react/prefer-stateless-function
 class Dashboard extends React.Component {
@@ -31,14 +29,6 @@ class Dashboard extends React.Component {
   }
 
   componentDidMount() {
-    const { dispatchGetDashboardInformation } = this.props;
-    dispatchGetDashboardInformation();
-
-    const interval$ = interval(2000);
-    this.subscription = interval$.subscribe(() => {
-      dispatchGetDashboardInformation();
-    });
-
     const liveview = document.getElementsByClassName('videocard-video');
     if (liveview && liveview.length > 0) {
       liveview[0].addEventListener('load', () => {
@@ -50,7 +40,6 @@ class Dashboard extends React.Component {
   }
 
   componentWillUnmount() {
-    this.subscription.unsubscribe();
     const liveview = document.getElementsByClassName('videocard-video');
     if (liveview && liveview.length > 0) {
       liveview[0].remove();
@@ -64,8 +53,27 @@ class Dashboard extends React.Component {
   render() {
     const { dashboard } = this.props;
     const { liveviewLoaded } = this.state;
+
+    // We check if the camera was getting a valid frame
+    // during the last 5 seconds, otherwise we assume the camera is offline.
     const isCameraOnline =
       this.getCurrentTimestamp() - dashboard.cameraOnline < 5;
+
+    // We check if a connection is made to Kerberos Hub, or if Offline mode
+    // has been turned on.
+    let offlineMode = false;
+    let cloudConnection = 'Not connected';
+    if (dashboard.offlineMode === 'true') {
+      offlineMode = true;
+      cloudConnection = 'Offline mode';
+    } else {
+      // TODO check if cloud connection is working
+      // ....
+      //  offlineMode = true | false
+      // cloudConnection = "Not connected" | "Connected"
+    }
+    console.log(offlineMode);
+
     return (
       <div>
         <Breadcrumb
@@ -92,17 +100,17 @@ class Dashboard extends React.Component {
             footer="Total recordings"
           />
           <Card
-            title="Camera"
+            title="IP Camera"
             subtitle={
               isCameraOnline ? 'succesfully connected' : 'not connected'
             }
-            footer="IP Camera"
+            footer="Camera"
             icon={isCameraOnline ? 'circle-check-big' : 'circle-cross-big'}
           />
           <Card
-            title="Cloud"
-            subtitle="Not connected"
-            footer="Kerberos Hub"
+            title="Kerberos Hub"
+            subtitle={cloudConnection}
+            footer="Cloud"
             icon="circle-cross-big"
           />
         </div>
@@ -227,14 +235,10 @@ const mapStateToProps = (state /* , ownProps */) => ({
   dashboard: state.agent.dashboard,
 });
 
-const mapDispatchToProps = (dispatch /* , ownProps */) => ({
-  dispatchGetDashboardInformation: (dashboard, success, error) =>
-    dispatch(GetDashboardInformation(dashboard, success, error)),
-});
+const mapDispatchToProps = (/* dispatch , ownProps */) => ({});
 
 Dashboard.propTypes = {
   dashboard: PropTypes.objectOf(PropTypes.object).isRequired,
-  dispatchGetDashboardInformation: PropTypes.func.isRequired,
 };
 
 export default withRouter(
