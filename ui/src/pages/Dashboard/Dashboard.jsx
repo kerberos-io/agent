@@ -61,10 +61,10 @@ class Dashboard extends React.Component {
 
     // We check if a connection is made to Kerberos Hub, or if Offline mode
     // has been turned on.
-    let offlineMode = false;
+    //let offlineMode = false;
     let cloudConnection = 'Not connected';
     if (dashboard.offlineMode === 'true') {
-      offlineMode = true;
+      //offlineMode = true;
       cloudConnection = 'Offline mode';
     } else {
       // TODO check if cloud connection is working
@@ -72,7 +72,6 @@ class Dashboard extends React.Component {
       //  offlineMode = true | false
       // cloudConnection = "Not connected" | "Connected"
     }
-    console.log(offlineMode);
 
     return (
       <div>
