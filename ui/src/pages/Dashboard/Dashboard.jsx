@@ -78,7 +78,7 @@ class Dashboard extends React.Component {
     // We check if the camera was getting a valid frame
     // during the last 5 seconds, otherwise we assume the camera is offline.
     const isCameraOnline =
-      this.getCurrentTimestamp() - dashboard.cameraOnline < 5;
+      this.getCurrentTimestamp() - dashboard.cameraOnline < 15;
 
     // We check if a connection is made to Kerberos Hub, or if Offline mode
     // has been turned on.

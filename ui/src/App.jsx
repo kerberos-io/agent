@@ -79,6 +79,12 @@ class App extends React.Component {
                 link="https://doc.kerberos.io/agent/announcement"
               />
               <NavigationItem
+                title="UI library"
+                icon="pencil"
+                external
+                link="https://ui.kerberos.io/"
+              />
+              <NavigationItem
                 title="Github"
                 icon="github-nav"
                 external
