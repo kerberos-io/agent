@@ -42,12 +42,7 @@ class App extends React.Component {
     const { children, username, dashboard, dispatchLogout } = this.props;
     return (
       <div id="page-root">
-        <Sidebar
-          logo={logo}
-          title="Kerberos Agent"
-          version={config.VERSION}
-          mobile
-        >
+        <Sidebar logo={logo} title="Kerberos Agent" version="beta 1.0" mobile>
           <Profilebar
             username={username}
             email="support@kerberos.io"
@@ -75,7 +70,7 @@ class App extends React.Component {
                 title="Swagger API docs"
                 icon="api"
                 external
-                link={`${config.API_URL}swagger/index.html`}
+                link={`${config.URL}/swagger/index.html`}
               />
               <NavigationItem
                 title="Documentation"
@@ -98,8 +93,10 @@ class App extends React.Component {
           {dashboard.offlineMode === 'true' && (
             <Link to="/settings">
               <div className="warning">
-                <Icon label="info" />
-                Attention! Kerberos is currently running in Offline mode.
+                <div>
+                  <Icon label="info" />
+                  Attention! Kerberos is currently running in Offline mode.
+                </div>
               </div>
             </Link>
           )}

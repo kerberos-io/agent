@@ -71,15 +71,64 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 				cloudTimestamp = communication.CloudTimestamp.Load().(int64)
 			}
 
-			// The total number of recordings stored in the directory
-			numberOfRecordings := utils.NumberOfFilesInDirectory("./data/recordings")
+			// The total number of recordings stored in the directory.
+			recordingDirectory := "./data/recordings"
+			numberOfRecordings := utils.NumberOfFilesInDirectory(recordingDirectory)
+
+			// All days stored in this agent.
+			days := []string{}
+			latestEvents := []models.Media{}
+			files, err := utils.ReadDirectory(recordingDirectory)
+			if err == nil {
+				events := utils.GetSortedDirectory(files)
+
+				// Get All days
+				days = utils.GetDays(events, recordingDirectory, configuration)
+
+				// Get all latest events
+				latestEvents = utils.GetMediaFormatted(events, recordingDirectory, configuration, 5) // will get 5 latest recordings.
+			}
 
 			c.JSON(200, gin.H{
 				"offlineMode":        configuration.Config.Offline,
 				"cameraOnline":       lastPacketReceived,
 				"cloudOnline":        cloudTimestamp,
 				"numberOfRecordings": numberOfRecordings,
+				"days":               days,
+				"latestEvents":       latestEvents,
 			})
+		})
+
+		api.GET("/latest-events", func(c *gin.Context) {
+			recordingDirectory := "./data/recordings"
+			files, err := utils.ReadDirectory(recordingDirectory)
+			if err == nil {
+				events := utils.GetSortedDirectory(files)
+				fileObjects := utils.GetMediaFormatted(events, recordingDirectory, configuration, 0) // will get all recordings from the directory.
+				c.JSON(200, gin.H{
+					"events": fileObjects,
+				})
+			} else {
+				c.JSON(400, gin.H{
+					"data": "Something went wrong: " + err.Error(),
+				})
+			}
+		})
+
+		api.GET("/days", func(c *gin.Context) {
+			recordingDirectory := "./data/recordings"
+			files, err := utils.ReadDirectory(recordingDirectory)
+			if err == nil {
+				events := utils.GetSortedDirectory(files)
+				days := utils.GetDays(events, recordingDirectory, configuration)
+				c.JSON(200, gin.H{
+					"events": days,
+				})
+			} else {
+				c.JSON(400, gin.H{
+					"data": "Something went wrong: " + err.Error(),
+				})
+			}
 		})
 
 		// Streaming handler

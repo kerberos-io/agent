@@ -7,9 +7,13 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"sort"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/log"
+	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
 const letterBytes = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -53,6 +57,80 @@ func ReadDirectory(directory string) ([]os.FileInfo, error) {
 		return []os.FileInfo{}, nil
 	}
 	return ff, err
+}
+
+func GetSortedDirectory(files []os.FileInfo) []os.FileInfo {
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].ModTime().After(files[j].ModTime())
+	})
+	return files
+}
+
+func GetMediaFormatted(files []os.FileInfo, recordingDirectory string, configuration *models.Configuration, numberOfMedia int) []models.Media {
+	filePaths := []models.Media{}
+	count := 0
+	for _, file := range files {
+		fileName := file.Name()
+		fileParts := strings.Split(fileName, "_")
+		if len(fileParts) == 6 {
+			timestamp := fileParts[0]
+			timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
+			if err == nil {
+				loc, _ := time.LoadLocation(configuration.Config.Timezone)
+				time := time.Unix(timestampInt, 0).In(loc)
+				day := time.Format("02-01-2006")
+				timeString := time.Format("15:04:05")
+
+				media := models.Media{
+					Key:        fileName,
+					Path:       recordingDirectory + "/" + fileName,
+					CameraName: configuration.Config.Name,
+					CameraKey:  configuration.Config.Key,
+					Day:        day,
+					Time:       timeString,
+					Timestamp:  timestamp,
+				}
+				filePaths = append(filePaths, media)
+				count = count + 1
+				if numberOfMedia > 0 && count > numberOfMedia {
+					break
+				}
+			}
+		}
+	}
+	return filePaths
+}
+
+func GetDays(files []os.FileInfo, recordingDirectory string, configuration *models.Configuration) []string {
+	days := []string{}
+	for _, file := range files {
+		fileName := file.Name()
+		fileParts := strings.Split(fileName, "_")
+		if len(fileParts) == 6 {
+			timestamp := fileParts[0]
+			timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
+			if err == nil {
+				loc, _ := time.LoadLocation(configuration.Config.Timezone)
+				time := time.Unix(timestampInt, 0).In(loc)
+				day := time.Format("02-01-2006")
+				days = append(days, day)
+			}
+		}
+	}
+	uniqueDays := Unique(days)
+	return uniqueDays
+}
+
+func Unique(intSlice []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, entry := range intSlice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
 }
 
 func NumberOfFilesInDirectory(path string) int {

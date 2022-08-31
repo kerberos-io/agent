@@ -12,8 +12,13 @@ import {
   TableRow,
   Icon,
   Ellipse,
+  Button,
   Card,
   SetupBox,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
 } from '@kerberos-io/ui';
 import './Dashboard.scss';
 import ReactTooltip from 'react-tooltip';
@@ -25,6 +30,8 @@ class Dashboard extends React.Component {
     super();
     this.state = {
       liveviewLoaded: false,
+      open: false,
+      currentRecording: '',
     };
   }
 
@@ -46,13 +53,27 @@ class Dashboard extends React.Component {
     }
   }
 
+  handleClose() {
+    this.setState({
+      open: false,
+      currentRecording: '',
+    });
+  }
+
   getCurrentTimestamp() {
     return Math.round(Date.now() / 1000);
   }
 
+  openModal(file) {
+    this.setState({
+      open: true,
+      currentRecording: file,
+    });
+  }
+
   render() {
     const { dashboard } = this.props;
-    const { liveviewLoaded } = this.state;
+    const { liveviewLoaded, open, currentRecording } = this.state;
 
     // We check if the camera was getting a valid frame
     // during the last 5 seconds, otherwise we assume the camera is offline.
@@ -70,23 +91,30 @@ class Dashboard extends React.Component {
     }
 
     return (
-      <div>
+      <div id="dashboard">
         <Breadcrumb
           title="Dashboard"
           level1="Overview of your video surveilance"
           level1Link=""
         >
-          {/* <Link to="/deployments">
+          <Link to="/media">
+            <Button label="Watch recordings" icon="media" type="default" />
+          </Link>
+          <Link to="/settings">
             <Button
-              label="Add Kerberos Agent"
-              icon="plus-circle"
-              type="default"
+              label="Configure"
+              icon="preferences"
+              type={isCameraOnline ? 'neutral' : 'default'}
             />
-    </Link> */}
+          </Link>
         </Breadcrumb>
 
         <div className="stats grid-container --four-columns">
-          <KPI number="69" divider="0" footer="Number of days" />
+          <KPI
+            number={dashboard.days ? dashboard.days.length : 0}
+            divider="0"
+            footer="Number of days"
+          />
           <KPI
             number={
               dashboard.numberOfRecordings ? dashboard.numberOfRecordings : 0
@@ -128,87 +156,76 @@ class Dashboard extends React.Component {
                 />
               </TableHeader>
               <TableBody>
-                <TableRow
-                  id="cells1"
-                  bodycells={[
-                    <>
-                      <Ellipse status="success" />{' '}
-                      <p data-tip="10m and 5s ago">19:45:10</p>
-                    </>,
-                    <>
-                      <p>Motion was detected</p>
-                    </>,
-                    <>
-                      <span className="version">Frontdoor</span>&nbsp;
-                      <Icon label="cameras" />
-                    </>,
-                  ]}
-                />
-                <TableRow
-                  id="cells1"
-                  bodycells={[
-                    <>
-                      <Ellipse status="success" />{' '}
-                      <p data-tip="10m and 5s ago">18:23:44</p>
-                    </>,
-                    <>
-                      <p>Motion was detected</p>
-                    </>,
-                    <>
-                      <span>Frontdoor</span>&nbsp;
-                      <Icon label="cameras" />
-                    </>,
-                  ]}
-                />
-                <TableRow
-                  id="cells1"
-                  bodycells={[
-                    <>
-                      <Ellipse status="success" />{' '}
-                      <p data-tip="10m and 5s ago">18:20:29</p>
-                    </>,
-                    <>
-                      <p>Motion was detected</p>
-                    </>,
-                    <>
-                      <span className="version">Frontdoor</span>&nbsp;
-                      <Icon label="cameras" />
-                    </>,
-                  ]}
-                />
-                <TableRow
-                  id="cells1"
-                  bodycells={[
-                    <>
-                      <Ellipse status="success" />{' '}
-                      <p data-tip="10m and 5s ago">15:16:58</p>
-                    </>,
-                    <>
-                      <p>Motion was detected</p>
-                    </>,
-                    <>
-                      <span className="version">Frontdoor</span>&nbsp;
-                      <Icon label="cameras" />
-                    </>,
-                  ]}
-                />
-                <TableRow
-                  id="cells1"
-                  bodycells={[
-                    <>
-                      <Ellipse status="success" />{' '}
-                      <p data-tip="10m and 5s ago">10:05:44</p>
-                    </>,
-                    <>
-                      <p>Motion was detected</p>
-                    </>,
-                    <>
-                      <span className="version">Frontdoor</span>&nbsp;
-                      <Icon label="cameras" />
-                    </>,
-                  ]}
-                />
+                {dashboard.latestEvents &&
+                  dashboard.latestEvents.map((event) => (
+                    <TableRow
+                      key={event.timestamp}
+                      id="cells1"
+                      bodycells={[
+                        <>
+                          <div className="time">
+                            <Ellipse status="success" />{' '}
+                            <p data-tip="10m and 5s ago">{event.time}</p>
+                          </div>
+                        </>,
+                        <>
+                          <p
+                            className="pointer"
+                            onClick={() =>
+                              this.openModal(`${config.URL}/file/${event.key}`)
+                            }
+                          >
+                            Motion was detected
+                          </p>
+                        </>,
+                        <>
+                          <span className="version">{event.camera_name}</span>
+                          &nbsp;
+                          <Icon label="cameras" />
+                        </>,
+                      ]}
+                    />
+                  ))}
               </TableBody>
+              {open && (
+                <Modal>
+                  <ModalHeader
+                    title="View recording"
+                    onClose={() => this.handleClose()}
+                  />
+                  <ModalBody>
+                    <video controls autoPlay>
+                      <source src={currentRecording} type="video/mp4" />
+                    </video>
+                  </ModalBody>
+                  <ModalFooter
+                    right={
+                      <>
+                        <a
+                          href={currentRecording}
+                          download="video"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <Button
+                            label="Download"
+                            icon="download"
+                            type="button"
+                            buttonType="button"
+                          />
+                        </a>
+                        <Button
+                          label="Close"
+                          icon="cross-circle"
+                          type="button"
+                          buttonType="button"
+                          onClick={() => this.handleClose()}
+                        />
+                      </>
+                    }
+                  />
+                </Modal>
+              )}
             </Table>
           </div>
           <div>

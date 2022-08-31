@@ -1,7 +1,31 @@
-hr {
-    margin-top: 50px;
-}
+#dashboard {
 
-.dashed {
-    padding: 20%;
+    hr {
+        margin-top: 50px;
+    }
+    
+    .dashed {
+        padding: 20%;
+    }
+
+    .pointer {
+        cursor: pointer;
+    }
+
+    a {
+        display: flex;
+        color: var(--text);
+
+        &:hover, &:active {
+            color: var(--text);
+        }
+    }
+
+    .time {
+        display: flex;
+        align-items: center;
+        .ellipse-container {
+            margin-right: 8px;
+        }
+    }
 }

@@ -16,7 +16,382 @@
         "version": "1.0"
     },
     "basePath": "/",
-    "paths": {},
+    "paths": {
+        "/api/hub/verify": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Will verify the hub connectivity.",
+                "tags": [
+                    "config"
+                ],
+                "summary": "Will verify the hub connectivity.",
+                "operationId": "verify-hub",
+                "parameters": [
+                    {
+                        "description": "Config",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.Config"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/persistence/verify": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Will verify the persistence.",
+                "tags": [
+                    "config"
+                ],
+                "summary": "Will verify the persistence.",
+                "operationId": "verify-persistence",
+                "parameters": [
+                    {
+                        "description": "Config",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.Config"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "models.APIResponse": {
+            "type": "object",
+            "properties": {
+                "data": {}
+            }
+        },
+        "models.Capture": {
+            "type": "object",
+            "properties": {
+                "continuous": {
+                    "type": "string"
+                },
+                "forwardwebrtc": {
+                    "type": "string"
+                },
+                "fragmented": {
+                    "type": "string"
+                },
+                "fragmentedduration": {
+                    "type": "integer"
+                },
+                "ipcamera": {
+                    "$ref": "#/definitions/models.IPCamera"
+                },
+                "maxlengthrecording": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "pixelChangeThreshold": {
+                    "type": "integer"
+                },
+                "postrecording": {
+                    "type": "integer"
+                },
+                "prerecording": {
+                    "type": "integer"
+                },
+                "raspicamera": {
+                    "$ref": "#/definitions/models.RaspiCamera"
+                },
+                "transcodingresolution": {
+                    "type": "integer"
+                },
+                "transcodingwebrtc": {
+                    "type": "string"
+                },
+                "usbcamera": {
+                    "$ref": "#/definitions/models.USBCamera"
+                }
+            }
+        },
+        "models.Config": {
+            "type": "object",
+            "properties": {
+                "capture": {
+                    "$ref": "#/definitions/models.Capture"
+                },
+                "cloud": {
+                    "type": "string"
+                },
+                "condition_uri": {
+                    "type": "string"
+                },
+                "heartbeaturi": {
+                    "description": "obsolete",
+                    "type": "string"
+                },
+                "hub_key": {
+                    "type": "string"
+                },
+                "hub_private_key": {
+                    "type": "string"
+                },
+                "hub_site": {
+                    "type": "string"
+                },
+                "hub_uri": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "kstorage": {
+                    "$ref": "#/definitions/models.KStorage"
+                },
+                "mqtt_password": {
+                    "type": "string"
+                },
+                "mqtt_username": {
+                    "type": "string"
+                },
+                "mqtturi": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "offline": {
+                    "type": "string"
+                },
+                "region": {
+                    "$ref": "#/definitions/models.Region"
+                },
+                "s3": {
+                    "$ref": "#/definitions/models.S3"
+                },
+                "stunuri": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "string"
+                },
+                "timetable": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Timetable"
+                    }
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "turn_password": {
+                    "type": "string"
+                },
+                "turn_username": {
+                    "type": "string"
+                },
+                "turnuri": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Coordinate": {
+            "type": "object",
+            "properties": {
+                "x": {
+                    "type": "number"
+                },
+                "y": {
+                    "type": "number"
+                }
+            }
+        },
+        "models.IPCamera": {
+            "type": "object",
+            "properties": {
+                "fps": {
+                    "type": "string"
+                },
+                "onvif": {
+                    "type": "boolean"
+                },
+                "onvif_password": {
+                    "type": "string"
+                },
+                "onvif_username": {
+                    "type": "string"
+                },
+                "onvif_xaddr": {
+                    "type": "string"
+                },
+                "rtsp": {
+                    "type": "string"
+                },
+                "sub_rtsp": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.KStorage": {
+            "type": "object",
+            "properties": {
+                "access_key": {
+                    "type": "string"
+                },
+                "cloud_key": {
+                    "type": "string"
+                },
+                "directory": {
+                    "type": "string"
+                },
+                "provider": {
+                    "type": "string"
+                },
+                "secret_access_key": {
+                    "type": "string"
+                },
+                "uri": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Polygon": {
+            "type": "object",
+            "properties": {
+                "coordinates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Coordinate"
+                    }
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.RaspiCamera": {
+            "type": "object",
+            "properties": {
+                "device": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Rectangle": {
+            "type": "object",
+            "properties": {
+                "x1": {
+                    "type": "integer"
+                },
+                "x2": {
+                    "type": "integer"
+                },
+                "y1": {
+                    "type": "integer"
+                },
+                "y2": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.Region": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "polygon": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Polygon"
+                    }
+                },
+                "rectangle": {
+                    "$ref": "#/definitions/models.Rectangle"
+                }
+            }
+        },
+        "models.S3": {
+            "type": "object",
+            "properties": {
+                "bucket": {
+                    "type": "string"
+                },
+                "proxy": {
+                    "type": "string"
+                },
+                "proxyuri": {
+                    "type": "string"
+                },
+                "publickey": {
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "secretkey": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Timetable": {
+            "type": "object",
+            "properties": {
+                "end1": {
+                    "type": "integer"
+                },
+                "end2": {
+                    "type": "integer"
+                },
+                "start1": {
+                    "type": "integer"
+                },
+                "start2": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.USBCamera": {
+            "type": "object",
+            "properties": {
+                "device": {
+                    "type": "string"
+                }
+            }
+        }
+    },
     "securityDefinitions": {
         "Bearer": {
             "type": "apiKey",

@@ -4,8 +4,10 @@ import {
   VideoContainer,
   VideoCard,
   ControlBar,
+  Button,
   Input,
 } from '@kerberos-io/ui';
+import { Link } from 'react-router-dom';
 import styles from './Media.scss';
 
 // eslint-disable-next-line react/prefer-stateless-function
@@ -18,13 +20,9 @@ class Media extends React.Component {
           level1="All your recordings in a single place"
           level1Link=""
         >
-          {/* <Link to="/deployments">
-            <Button
-              label="Add Kerberos Agent"
-              icon="plus-circle"
-              type="default"
-            />
-    </Link> */}
+          <Link to="/settings">
+            <Button label="Configure" icon="preferences" type="default" />
+          </Link>
         </Breadcrumb>
 
         <ControlBar>

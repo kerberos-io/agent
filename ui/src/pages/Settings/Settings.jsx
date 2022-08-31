@@ -16,7 +16,7 @@ import {
   Icon,
   Toggle,
 } from '@kerberos-io/ui';
-import { withRouter } from 'react-router-dom';
+import { Link, withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
 import ImageCanvas from '../../components/ImageCanvas/ImageCanvas';
 import './Settings.scss';
@@ -467,11 +467,11 @@ class Settings extends React.Component {
 
     return config ? (
       <div id="settings">
-        <Breadcrumb
-          title="Settings"
-          level1="Onboard your camera"
-          level1Link=""
-        />
+        <Breadcrumb title="Settings" level1="Onboard your camera" level1Link="">
+          <Link to="/media">
+            <Button label="Watch recordings" icon="media" type="default" />
+          </Link>
+        </Breadcrumb>
         <ControlBar type="row">
           <Tabs>
             <Tab
