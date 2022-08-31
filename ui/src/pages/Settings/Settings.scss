@@ -4,6 +4,16 @@
         margin-bottom: 24px;
     }
 
+
+    .warning-message {
+        width: 100%;
+        margin-top: 12px;
+        .message {
+            margin-bottom: 0;
+        }
+    }
+
+
     .table-container table {
         border-spacing: 0 12px;
         width: 100%;

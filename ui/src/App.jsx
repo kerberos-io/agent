@@ -98,7 +98,7 @@ class App extends React.Component {
 
           {dashboard.offlineMode === 'true' && (
             <Link to="/settings">
-              <div className="warning">
+              <div className="offline-mode">
                 <div>
                   <Icon label="info" />
                   Attention! Kerberos is currently running in Offline mode.

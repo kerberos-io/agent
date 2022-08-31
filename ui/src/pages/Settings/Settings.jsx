@@ -633,9 +633,15 @@ class Settings extends React.Component {
                   <h4>Camera</h4>
                 </BlockHeader>
                 <BlockBody>
+                  <div className="warning-message">
+                    <InfoBar
+                      message="Currently only H264 RTSP streams are supported."
+                      type="info"
+                    />
+                  </div>
                   <p>
-                    General settings allow you to configure your Kerberos Agents
-                    on a higher level.
+                    Camera settings are required to make a connection to your
+                    camera of choice.
                   </p>
                   <Input
                     noPadding
@@ -939,7 +945,11 @@ class Settings extends React.Component {
                   <h4>ONVIF</h4>
                 </BlockHeader>
                 <BlockBody>
-                  <p>Credentials to communicate with ONVIF capabilities.</p>
+                  <p>
+                    Credentials to communicate with ONVIF capabilities. These
+                    are used for PTZ or other capabilities provided by the
+                    camera.
+                  </p>
 
                   <Input
                     noPadding
@@ -1092,6 +1102,10 @@ class Settings extends React.Component {
                   <h4>Forwarding and transcoding</h4>
                 </BlockHeader>
                 <BlockBody>
+                  <p>
+                    Optimisations and enhancements for TURN/STUN communication.
+                  </p>
+
                   <div className="toggle-wrapper">
                     <Toggle
                       on={config.capture.forwardwebrtc === 'true'}
@@ -1130,20 +1144,22 @@ class Settings extends React.Component {
                     </div>
                   </div>
 
-                  <Input
-                    noPadding
-                    label="Downscale resolution (in % or original resolution)"
-                    value={config.capture.transcodingresolution}
-                    placeholder="The % of the original resolution."
-                    onChange={(value) =>
-                      this.onUpdateNumberField(
-                        'capture',
-                        'transcodingresolution',
-                        value,
-                        config.capture
-                      )
-                    }
-                  />
+                  {config.capture.transcodingwebrtc === 'true' && (
+                    <Input
+                      noPadding
+                      label="Downscale resolution (in % or original resolution)"
+                      value={config.capture.transcodingresolution}
+                      placeholder="The % of the original resolution."
+                      onChange={(value) =>
+                        this.onUpdateNumberField(
+                          'capture',
+                          'transcodingresolution',
+                          value,
+                          config.capture
+                        )
+                      }
+                    />
+                  )}
                 </BlockBody>
                 <BlockFooter>
                   <Button
@@ -1163,6 +1179,12 @@ class Settings extends React.Component {
                   <h4>Fragmented recordings</h4>
                 </BlockHeader>
                 <BlockBody>
+                  <p>
+                    When recordings are fragmented they are suitable for an HLS
+                    stream. When turned on the MP4 container will look a bit
+                    different.
+                  </p>
+
                   <div className="toggle-wrapper">
                     <Toggle
                       on={config.capture.fragmented === 'true'}
@@ -1182,20 +1204,22 @@ class Settings extends React.Component {
                     </div>
                   </div>
 
-                  <Input
-                    noPadding
-                    label="fragmented duration"
-                    value={config.capture.fragmentedduration}
-                    placeholder="Duration of a single fragment."
-                    onChange={(value) =>
-                      this.onUpdateNumberField(
-                        'capture',
-                        'fragmentedduration',
-                        value,
-                        config.capture
-                      )
-                    }
-                  />
+                  {config.capture.fragmented === 'true' && (
+                    <Input
+                      noPadding
+                      label="fragment duration"
+                      value={config.capture.fragmentedduration}
+                      placeholder="Duration of a single fragment."
+                      onChange={(value) =>
+                        this.onUpdateNumberField(
+                          'capture',
+                          'fragmentedduration',
+                          value,
+                          config.capture
+                        )
+                      }
+                    />
+                  )}
                 </BlockBody>
                 <BlockFooter>
                   <Button
