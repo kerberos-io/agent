@@ -32,6 +32,12 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	packageCounter.Store(int64(0))
 	communication.LastPacketTimer = &lastPacketTimer
 
+	// This is used to understand if we have a working Kerberos Hub connection
+	// cloudTimestamp will be updated when successfully sending heartbeats.
+	var cloudTimestamp atomic.Value
+	cloudTimestamp.Store(int64(0))
+	communication.CloudTimestamp = &cloudTimestamp
+
 	communication.HandleStream = make(chan string, 1)
 	communication.HandleUpload = make(chan string, 1)
 	communication.HandleHeartBeat = make(chan string, 1)

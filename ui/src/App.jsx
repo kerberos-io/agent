@@ -27,10 +27,14 @@ class App extends React.Component {
     const { dispatchGetDashboardInformation } = this.props;
     dispatchGetDashboardInformation();
 
-    const interval$ = interval(2000);
+    const interval$ = interval(5000);
     this.subscription = interval$.subscribe(() => {
       dispatchGetDashboardInformation();
     });
+  }
+
+  componentWillUnmount() {
+    this.subscription.unsubscribe();
   }
 
   render() {

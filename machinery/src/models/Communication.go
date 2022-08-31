@@ -11,6 +11,7 @@ import (
 type Communication struct {
 	PackageCounter        *atomic.Value
 	LastPacketTimer       *atomic.Value
+	CloudTimestamp        *atomic.Value
 	HandleBootstrap       chan string
 	HandleStream          chan string
 	HandleMotion          chan MotionDataPartial

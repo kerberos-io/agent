@@ -61,16 +61,12 @@ class Dashboard extends React.Component {
 
     // We check if a connection is made to Kerberos Hub, or if Offline mode
     // has been turned on.
-    // let offlineMode = false;
+    const cloudOnline = this.getCurrentTimestamp() - dashboard.cloudOnline < 30;
     let cloudConnection = 'Not connected';
     if (dashboard.offlineMode === 'true') {
-      // offlineMode = true;
       cloudConnection = 'Offline mode';
     } else {
-      // TODO check if cloud connection is working
-      // ....
-      //  offlineMode = true | false
-      // cloudConnection = "Not connected" | "Connected"
+      cloudConnection = cloudOnline ? 'Connected' : 'Not connected';
     }
 
     return (
@@ -100,9 +96,7 @@ class Dashboard extends React.Component {
           />
           <Card
             title="IP Camera"
-            subtitle={
-              isCameraOnline ? 'succesfully connected' : 'not connected'
-            }
+            subtitle={isCameraOnline ? 'Connected' : 'not connected'}
             footer="Camera"
             icon={isCameraOnline ? 'circle-check-big' : 'circle-cross-big'}
           />
@@ -110,7 +104,7 @@ class Dashboard extends React.Component {
             title="Kerberos Hub"
             subtitle={cloudConnection}
             footer="Cloud"
-            icon="circle-cross-big"
+            icon={cloudOnline ? 'circle-check-big' : 'circle-cross-big'}
           />
         </div>
         <hr />

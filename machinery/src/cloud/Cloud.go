@@ -126,13 +126,6 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 
 	loop:
 		for {
-			// This will check if we need to stop the thread,
-			// because of a reconfiguration.
-			select {
-			case <-communication.HandleHeartBeat:
-				break loop
-			case <-time.After(30 * time.Second):
-			}
 
 			uptime, _ := host.Uptime()
 			days := strconv.Itoa(int(uptime / (60 * 60 * 24)))
@@ -149,9 +142,9 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 
 			// Check if the agent is running inside a cluster (Kerberos Factory) or as
 			// an open source agent
-			isEnterprise := "false"
+			isEnterprise := false
 			if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
-				isEnterprise = "true"
+				isEnterprise = true
 			}
 
 			var object = fmt.Sprintf(`{
@@ -166,7 +159,7 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 			"docker" : true,
 			"kios" : false,
 			"raspberrypi" : false,
-			"enterprise" : "%s",
+			"enterprise" : %t,
 			"board" : "",
 			"disk1size" : "%s",
 			"disk3size" : "%s",
@@ -192,6 +185,7 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				resp.Body.Close()
 			}
 			if err == nil && resp.StatusCode == 200 {
+				communication.CloudTimestamp.Store(time.Now().Unix())
 				log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Hub.")
 			} else {
 				log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Hub.")
@@ -214,6 +208,14 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				} else {
 					log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Vault.")
 				}
+			}
+
+			// This will check if we need to stop the thread,
+			// because of a reconfiguration.
+			select {
+			case <-communication.HandleHeartBeat:
+				break loop
+			case <-time.After(15 * time.Second):
 			}
 		}
 	}
