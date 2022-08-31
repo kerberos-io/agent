@@ -1,7 +1,6 @@
 package computervision
 
 import (
-	"fmt"
 	"image"
 	"io/ioutil"
 	"os"
@@ -234,8 +233,10 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					isPixelChangeThresholdReached, changesToReturn = FindMotion(matArray, coordinatesToCheck, config.Capture.PixelChangeThreshold)
 
 					if detectMotion && isPixelChangeThresholdReached {
-						mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
-						fmt.Println(key)
+
+						if mqttClient != nil {
+							mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
+						}
 
 						//FIXME: In the future MotionDataPartial should be replaced with MotionDataFull
 						dataToPass := models.MotionDataPartial{
