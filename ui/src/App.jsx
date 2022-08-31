@@ -14,12 +14,13 @@ import {
 } from '@kerberos-io/ui';
 import { interval } from 'rxjs';
 import { connect } from 'react-redux';
-import logo from './header-minimal-logo-36x36.svg';
-import '@kerberos-io/ui/lib/index.css';
+import { Link } from 'react-router-dom';
 import { logout } from './actions';
 import config from './config';
-import './App.scss';
 import { GetDashboardInformation } from './actions/agent';
+import logo from './header-minimal-logo-36x36.svg';
+import '@kerberos-io/ui/lib/index.css';
+import './App.scss';
 
 // eslint-disable-next-line react/prefer-stateless-function
 class App extends React.Component {
@@ -95,10 +96,12 @@ class App extends React.Component {
           <Gradient />
 
           {dashboard.offlineMode === 'true' && (
-            <div className="warning">
-              <Icon label="info" />
-              Attention! Kerberos is currently running in Offline mode.
-            </div>
+            <Link to="/settings">
+              <div className="warning">
+                <Icon label="info" />
+                Attention! Kerberos is currently running in Offline mode.
+              </div>
+            </Link>
           )}
 
           <MainBody>{children}</MainBody>

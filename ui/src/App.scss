@@ -14,3 +14,11 @@
         padding-right: size(1);
     }
 }
+a {
+    display: flex;
+    color: var(--text);
+
+    &:hover, &:active {
+        color: var(--text);
+    }
+}

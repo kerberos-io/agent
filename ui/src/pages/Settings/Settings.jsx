@@ -695,7 +695,7 @@ class Settings extends React.Component {
 
                   <Input
                     noPadding
-                    label="video duration (seconds)"
+                    label="max video duration (seconds)"
                     value={config.capture.maxlengthrecording}
                     placeholder="The maximum duration of a recording."
                     onChange={(value) =>
@@ -708,35 +708,52 @@ class Settings extends React.Component {
                     }
                   />
 
-                  <Input
-                    noPadding
-                    label="pre recording (seconds)"
-                    value={config.capture.prerecording}
-                    placeholder="Seconds before an event occurred."
-                    onChange={(value) =>
-                      this.onUpdateNumberField(
-                        'capture',
-                        'prerecording',
-                        value,
-                        config.capture
-                      )
-                    }
-                  />
-
-                  <Input
-                    noPadding
-                    label="post recording (seconds)"
-                    value={config.capture.postrecording}
-                    placeholder="Seconds after an event occurred."
-                    onChange={(value) =>
-                      this.onUpdateNumberField(
-                        'capture',
-                        'postrecording',
-                        value,
-                        config.capture
-                      )
-                    }
-                  />
+                  {config.capture.continuous !== 'true' && (
+                    <>
+                      <Input
+                        noPadding
+                        label="pre recording (seconds)"
+                        value={config.capture.prerecording}
+                        placeholder="Seconds before an event occurred."
+                        onChange={(value) =>
+                          this.onUpdateNumberField(
+                            'capture',
+                            'prerecording',
+                            value,
+                            config.capture
+                          )
+                        }
+                      />
+                      <Input
+                        noPadding
+                        label="post recording (seconds)"
+                        value={config.capture.postrecording}
+                        placeholder="Seconds after an event occurred."
+                        onChange={(value) =>
+                          this.onUpdateNumberField(
+                            'capture',
+                            'postrecording',
+                            value,
+                            config.capture
+                          )
+                        }
+                      />
+                      <Input
+                        noPadding
+                        label="Recording threshold (pixels)"
+                        value={config.capture.pixelChangeThreshold}
+                        placeholder="The number of pixels changed to record"
+                        onChange={(value) =>
+                          this.onUpdateNumberField(
+                            'capture',
+                            'pixelChangeThreshold',
+                            value,
+                            config.capture
+                          )
+                        }
+                      />
+                    </>
+                  )}
                 </BlockBody>
                 <BlockFooter>
                   <Button
@@ -1721,6 +1738,7 @@ class Settings extends React.Component {
                   </p>
                   <Dropdown
                     isRadio
+                    icon="cloud"
                     placeholder="Select a persistence"
                     selected={[config.cloud]}
                     items={this.storageTypes}

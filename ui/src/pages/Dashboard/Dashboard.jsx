@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { withRouter } from 'react-router-dom';
+import { Link, withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
 import {
   Breadcrumb,
@@ -94,18 +94,27 @@ class Dashboard extends React.Component {
             divider="0"
             footer="Total recordings"
           />
-          <Card
-            title="IP Camera"
-            subtitle={isCameraOnline ? 'Connected' : 'not connected'}
-            footer="Camera"
-            icon={isCameraOnline ? 'circle-check-big' : 'circle-cross-big'}
-          />
-          <Card
-            title="Kerberos Hub"
-            subtitle={cloudConnection}
-            footer="Cloud"
-            icon={cloudOnline ? 'circle-check-big' : 'circle-cross-big'}
-          />
+
+          <Link to="/settings">
+            <Card
+              title="IP Camera"
+              subtitle={isCameraOnline ? 'Connected' : 'not connected'}
+              footer="Camera"
+              icon={isCameraOnline ? 'circle-check-big' : 'circle-cross-big'}
+            />
+          </Link>
+          <Link to="/settings">
+            <Card
+              title="Kerberos Hub"
+              subtitle={cloudConnection}
+              footer="Cloud"
+              icon={
+                cloudOnline && dashboard.offlineMode !== 'true'
+                  ? 'circle-check-big'
+                  : 'circle-cross-big'
+              }
+            />
+          </Link>
         </div>
         <hr />
         <div className="stats grid-container --two-columns">
