@@ -11,6 +11,8 @@
 
     > div {
         padding: size(1.5) size(4);
+        display: flex;
+        align-items: center;
     }
 
     svg {

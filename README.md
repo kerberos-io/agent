@@ -97,6 +97,10 @@ This will start a webserver and launches the web app on port `3000`.
 
 ![login-agent](./assets/img/agent-login.gif)
 
+Once signed in you'll see the dashboard page showing up. After successfull configuration of your agent, you'll should see a live view and possible events recorded to disk.
+
+![dashboard-agent](./assets/img/agent-dashboard.png)
+
 ### Machinery
 
 The `machinery` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent which is doing all the heavy lifting with camera processing and other kinds of logic, on the other hand it acts as a webserver (Rest API) that allows communication from the web (React) or any other custom application. The API is documented using `swagger`.
@@ -107,7 +111,7 @@ You can simply run the `machinery` using following commands.
     cd machinery
     go run main.go run mycameraname 8080
 
-This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/), as it comes with all the debugging and linting features builtin.
+This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/) or [Visual Studio Code](https://code.visualstudio.com/), as it comes with all the debugging and linting features builtin.
 
 ![run-in-goland](https://user-images.githubusercontent.com/1546779/111139940-0a4d1a80-8582-11eb-8985-ceaf7359f4ee.gif)
 
@@ -139,7 +143,40 @@ This base image contains already a couple of tools, such as Golang, FFmpeg and O
 By running the `docker build` command, you will create the Kerberos Agent Docker image. After building you can simply run the image as a Docker container.
 
     docker build -t kerberos/agent .
-    docker run -p 8080:8080 --name mycamera -d kerberos/agent:edge
+
+## Running as a container
+
+We are creating Docker images as part of our CI/CD process. You'll find our Docker images on [Docker hub](https://hub.docker.com/r/kerberos/agent). Pick a specific tag of choice, or use latest. Once done run below command, this will open the web interface of your Kerberos agent on port 8080.  
+    
+    docker run -p 8080:8080 --name mycamera -d kerberos/agent:latest
+
+Or for a develop build:
+
+    docker run -p 8080:8080 --name mycamera -d kerberos/agent-dev:latest
+
+Feel free to use another port if your host system already has a workload running on `8080`. For example `8082`.
+
+    docker run -p 8082:8080 --name mycamera -d kerberos/agent:latest
+
+## Attach a volume
+
+By default your Kerberos agent will store all its configuration and recordings inside the container. It might be interesting to store both configuration and your recordings outside the container, on your local disk. This helps persisting your storage even after you decide to wipe out your Kerberos agent.
+
+You attach a volume to your container by leveraging the `-v` option. To mount your own configuration file, execute as following:
+
+1. Decide where you would like to store your configuration and recordings; create a new directory for the config file and recordings folder accordingly.
+
+        mkdir agent
+        mkdir agent/config
+        mkdir agent/recordings
+
+2. Once you have located your desired directory, copy the latest [`config.json`](https://github.com/kerberos-io/agent/blob/master/machinery/data/config/config.json) file into your config directory.
+
+        wget https://raw.githubusercontent.com/kerberos-io/agent/master/machinery/data/config/config.json -O agent/config/config.json
+
+3. Run the docker command as following to attach your config directory and recording directory.
+
+        docker run -p 8080:8080 --name mycamera -v $(pwd)/agent/config:/home/agent/data/config  -v $(pwd)/agent/recordings:/home/agent/data/recordings -d kerberos/agent:latest
 
 ## FAQ
 

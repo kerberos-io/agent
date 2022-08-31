@@ -42,7 +42,7 @@ class App extends React.Component {
     const { children, username, dashboard, dispatchLogout } = this.props;
     return (
       <div id="page-root">
-        <Sidebar logo={logo} title="Kerberos Agent" version="beta 1.0" mobile>
+        <Sidebar logo={logo} title="Kerberos Agent" version="v1-beta" mobile>
           <Profilebar
             username={username}
             email="support@kerberos.io"

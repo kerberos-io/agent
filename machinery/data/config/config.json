@@ -1,9 +1,10 @@
 {
 	"type": "",
 	"key": "",
-	"name": "camera",
+	"name": "agent",
 	"time": "true",
-	"timezone": "Europe/Brussels",
+	"offline": "true",
+	"timezone": "Africa/Ceuta",
 	"capture": {
 		"name": "",
 		"ipcamera": {
@@ -18,15 +19,15 @@
 			"device": ""
 		},
 		"continuous": "false",
-		"postrecording": 30,
-		"prerecording": 20,
-		"maxlengthrecording": 25,
-		"transcodingwebrtc": "false",
-		"transcodingresolution": 50,
-		"forwardwebrtc": "false",
+		"postrecording": 20,
+		"prerecording": 10,
+		"maxlengthrecording": 30,
+		"transcodingwebrtc": "",
+		"transcodingresolution": 0,
+		"forwardwebrtc": "",
 		"fragmented": "false",
-		"fragmentedduration": 20,
-		"pixelChangeThreshold": 100
+		"fragmentedduration": 8,
+		"pixelChangeThreshold": 150
 	},
 	"timetable": [
 		{
@@ -56,7 +57,7 @@
 		{
 			"start1": 0,
 			"end1": 43199,
-			"start2": 46200,
+			"start2": 43200,
 			"end2": 86400
 		},
 		{
@@ -82,7 +83,7 @@
 		},
 		"polygon": []
 	},
-	"cloud": "kstorage",
+	"cloud": "s3",
 	"s3": {
 		"proxyuri": "http://proxy.kerberos.io",
 		"bucket": "kerberosaccept",
@@ -90,7 +91,7 @@
 		"username": ""
 	},
 	"kstorage": {
-		"uri": "https://api.vault.kerberos.io",
+		"uri": "",
 		"access_key": "",
 		"secret_access_key": "",
 		"provider": "",
