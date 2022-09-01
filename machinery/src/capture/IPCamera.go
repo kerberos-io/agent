@@ -65,9 +65,7 @@ loop:
 		if pkt, err = infile.ReadPacket(); err != nil { // sometimes this throws an end of file..
 			log.Log.Error("HandleStream: " + err.Error())
 			if err.Error() == "EOF" {
-				time.Sleep(10 * time.Second)
-			} else {
-				time.Sleep(1 * time.Second)
+				time.Sleep(30 * time.Second)
 			}
 		}
 
