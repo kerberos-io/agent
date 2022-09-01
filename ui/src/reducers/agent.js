@@ -2,6 +2,8 @@ const agent = (
   state = {
     config: {},
     dashboard: {},
+    events: [],
+    eventfilter: {},
   },
   action
 ) => {
@@ -117,6 +119,17 @@ const agent = (
       return {
         ...state,
         dashboard: action.dashboard,
+      };
+
+    case 'GET_EVENTS':
+      const { timestamp_offset_end } = action.filter;
+      return {
+        ...state,
+        events:
+          timestamp_offset_end === 0
+            ? [...action.events]
+            : [...state.events, ...action.events],
+        eventfilter: action.eventfilter,
       };
 
     default:

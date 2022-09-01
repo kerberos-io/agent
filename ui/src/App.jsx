@@ -17,7 +17,7 @@ import { connect } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { logout } from './actions';
 import config from './config';
-import { GetDashboardInformation } from './actions/agent';
+import { getDashboardInformation } from './actions/agent';
 import logo from './header-minimal-logo-36x36.svg';
 import '@kerberos-io/ui/lib/index.css';
 import './App.scss';
@@ -80,7 +80,7 @@ class App extends React.Component {
               />
               <NavigationItem
                 title="UI library"
-                icon="pencil"
+                icon="paint"
                 external
                 link="https://ui.kerberos.io/"
               />
@@ -122,7 +122,7 @@ const mapStateToProps = (state) => ({
 const mapDispatchToProps = (dispatch) => ({
   dispatchLogout: () => dispatch(logout()),
   dispatchGetDashboardInformation: (dashboard, success, error) =>
-    dispatch(GetDashboardInformation(dashboard, success, error)),
+    dispatch(getDashboardInformation(dashboard, success, error)),
 });
 
 App.propTypes = {

@@ -107,3 +107,20 @@ export function doGetDashboardInformation(onSuccess, onError) {
       onError(error);
     });
 }
+
+export function doGetEvents(eventfilter, onSuccess, onError) {
+  const endpoint = API.post(`latest-events`, eventfilter);
+  endpoint
+    .then((res) => {
+      if (res.status !== 200) {
+        throw new Error(res.data);
+      }
+      return res.data;
+    })
+    .then((data) => {
+      onSuccess(data);
+    })
+    .catch((error) => {
+      onError(error);
+    });
+}

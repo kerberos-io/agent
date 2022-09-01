@@ -66,7 +66,7 @@ func GetSortedDirectory(files []os.FileInfo) []os.FileInfo {
 	return files
 }
 
-func GetMediaFormatted(files []os.FileInfo, recordingDirectory string, configuration *models.Configuration, numberOfMedia int) []models.Media {
+func GetMediaFormatted(files []os.FileInfo, recordingDirectory string, configuration *models.Configuration, eventFilter models.EventFilter) []models.Media {
 	filePaths := []models.Media{}
 	count := 0
 	for _, file := range files {
@@ -76,10 +76,22 @@ func GetMediaFormatted(files []os.FileInfo, recordingDirectory string, configura
 			timestamp := fileParts[0]
 			timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
 			if err == nil {
+
+				// If we have an offset we will check if we should skip or not
+				if eventFilter.TimestampOffsetEnd > 0 {
+					// Medias are sorted from new to older. TimestampOffsetEnd holds the oldest
+					// timestamp of the previous batch of events. By doing this check, we make sure
+					// to skip the previous batch.
+					if timestampInt >= eventFilter.TimestampOffsetEnd {
+						continue
+					}
+				}
+
 				loc, _ := time.LoadLocation(configuration.Config.Timezone)
 				time := time.Unix(timestampInt, 0).In(loc)
 				day := time.Format("02-01-2006")
 				timeString := time.Format("15:04:05")
+				shortDay := time.Format("Jan _2")
 
 				media := models.Media{
 					Key:        fileName,
@@ -87,12 +99,13 @@ func GetMediaFormatted(files []os.FileInfo, recordingDirectory string, configura
 					CameraName: configuration.Config.Name,
 					CameraKey:  configuration.Config.Key,
 					Day:        day,
+					ShortDay:   shortDay,
 					Time:       timeString,
 					Timestamp:  timestamp,
 				}
 				filePaths = append(filePaths, media)
 				count = count + 1
-				if numberOfMedia > 0 && count > numberOfMedia {
+				if eventFilter.NumberOfElements > 0 && count >= eventFilter.NumberOfElements {
 					break
 				}
 			}

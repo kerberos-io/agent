@@ -5,6 +5,7 @@ import {
   doVerifyPersistence,
   doGetKerberosAgentTags,
   doGetDashboardInformation,
+  doGetEvents,
 } from '../api/agent';
 
 export const addRegion = (id, polygon) => {
@@ -102,13 +103,36 @@ export const getKerberosAgentTags = (onSuccess, onError) => {
   };
 };
 
-export const GetDashboardInformation = (onSuccess, onError) => {
+export const getDashboardInformation = (onSuccess, onError) => {
   return (dispatch) => {
     doGetDashboardInformation(
       (data) => {
         dispatch({
           type: 'GET_DASHBOARD',
           dashboard: data,
+        });
+        if (onSuccess) {
+          onSuccess();
+        }
+      },
+      () => {
+        if (onError) {
+          onError();
+        }
+      }
+    );
+  };
+};
+
+export const getEvents = (eventfilter, onSuccess, onError) => {
+  return (dispatch) => {
+    doGetEvents(
+      eventfilter,
+      (data) => {
+        dispatch({
+          type: 'GET_EVENTS',
+          events: data.events,
+          filter: eventfilter,
         });
         if (onSuccess) {
           onSuccess();

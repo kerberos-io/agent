@@ -86,7 +86,9 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 				days = utils.GetDays(events, recordingDirectory, configuration)
 
 				// Get all latest events
-				latestEvents = utils.GetMediaFormatted(events, recordingDirectory, configuration, 5) // will get 5 latest recordings.
+				var eventFilter models.EventFilter
+				eventFilter.NumberOfElements = 5
+				latestEvents = utils.GetMediaFormatted(events, recordingDirectory, configuration, eventFilter) // will get 5 latest recordings.
 			}
 
 			c.JSON(200, gin.H{
@@ -99,15 +101,28 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			})
 		})
 
-		api.GET("/latest-events", func(c *gin.Context) {
-			recordingDirectory := "./data/recordings"
-			files, err := utils.ReadDirectory(recordingDirectory)
+		api.POST("/latest-events", func(c *gin.Context) {
+			var eventFilter models.EventFilter
+			err := c.BindJSON(&eventFilter)
 			if err == nil {
-				events := utils.GetSortedDirectory(files)
-				fileObjects := utils.GetMediaFormatted(events, recordingDirectory, configuration, 0) // will get all recordings from the directory.
-				c.JSON(200, gin.H{
-					"events": fileObjects,
-				})
+				// Default to 10 if no limit is set.
+				if eventFilter.NumberOfElements == 0 {
+					eventFilter.NumberOfElements = 10
+				}
+				recordingDirectory := "./data/recordings"
+				files, err := utils.ReadDirectory(recordingDirectory)
+				if err == nil {
+					events := utils.GetSortedDirectory(files)
+					// We will get all recordings from the directory (as defined by the filter).
+					fileObjects := utils.GetMediaFormatted(events, recordingDirectory, configuration, eventFilter)
+					c.JSON(200, gin.H{
+						"events": fileObjects,
+					})
+				} else {
+					c.JSON(400, gin.H{
+						"data": "Something went wrong: " + err.Error(),
+					})
+				}
 			} else {
 				c.JSON(400, gin.H{
 					"data": "Something went wrong: " + err.Error(),
