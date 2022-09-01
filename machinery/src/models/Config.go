@@ -48,7 +48,7 @@ type Capture struct {
 	RaspiCamera           RaspiCamera `json:"raspicamera"`
 	Continuous            string      `json:"continuous,omitempty"`
 	PostRecording         int64       `json:"postrecording"`
-	PreRecording          int         `json:"prerecording"`
+	PreRecording          int64       `json:"prerecording"`
 	MaxLengthRecording    int64       `json:"maxlengthrecording"`
 	TranscodingWebRTC     string      `json:"transcodingwebrtc"`
 	TranscodingResolution int64       `json:"transcodingresolution"`

@@ -21,6 +21,7 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 	log.Log.Debug("HandleRecordStream: started")
 
 	config := configuration.Config
+	//preRecording := config.Capture.PreRecording
 	recordingPeriod := config.Capture.PostRecording         // number of seconds to record.
 	maxRecordingPeriod := config.Capture.MaxLengthRecording // maximum number of seconds to record.
 
@@ -274,7 +275,8 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 					log.Log.Info("Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
 				default:
 				}
-				if timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod {
+
+				if timestamp+recordingPeriod-now < 0 || now-startRecording > maxRecordingPeriod {
 					log.Log.Info("HandleRecordStream: closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", recordingPeriod: " + strconv.FormatInt(recordingPeriod, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 					break
 				}

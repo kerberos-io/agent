@@ -89,8 +89,11 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// Create a packet queue, which is filled by the HandleStream routing
 		// and consumed by all other routines: motion, livestream, etc.
+		if config.Capture.PreRecording <= 0 {
+			config.Capture.PreRecording = 1
+		}
 		queue = pubsub.NewQueue()
-		queue.SetMaxGopCount(5) // GOP time frame is set to 5.
+		queue.SetMaxGopCount(int(config.Capture.PreRecording)) // GOP time frame is set to prerecording.
 		queue.WriteHeader(streams)
 
 		// Configure a MQTT client which helps for a bi-directional communication
