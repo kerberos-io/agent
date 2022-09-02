@@ -87,8 +87,11 @@ func ToRGB8(img image.YCbCr) (gocv.Mat, error) {
 	bytes := make([]byte, 0, x*y*3)
 	for j := bounds.Min.Y; j < bounds.Max.Y; j++ {
 		for i := bounds.Min.X; i < bounds.Max.X; i++ {
-			r, g, b, _ := img.At(i, j).RGBA()
-			bytes = append(bytes, byte(b>>8), byte(g>>8), byte(r>>8))
+			iy := img.At(i, j)
+			if iy != nil {
+				r, g, b, _ := iy.RGBA()
+				bytes = append(bytes, byte(b>>8), byte(g>>8), byte(r>>8))
+			}
 		}
 	}
 	return gocv.NewMatFromBytes(y, x, gocv.MatTypeCV8UC3, bytes)
