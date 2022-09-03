@@ -13,11 +13,13 @@ import {
   Icon,
 } from '@kerberos-io/ui';
 import { interval } from 'rxjs';
+import { withTranslation } from 'react-i18next';
 import { connect } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { logout } from './actions';
 import config from './config';
 import { getDashboardInformation } from './actions/agent';
+import LanguageSelect from './components/LanguageSelect/LanguageSelect';
 import logo from './header-minimal-logo-36x36.svg';
 import '@kerberos-io/ui/lib/index.css';
 import './App.scss';
@@ -39,6 +41,7 @@ class App extends React.Component {
   }
 
   render() {
+    const { t } = this.props;
     const { children, username, dashboard, dispatchLogout } = this.props;
     return (
       <div id="page-root">
@@ -46,40 +49,44 @@ class App extends React.Component {
           <Profilebar
             username={username}
             email="support@kerberos.io"
-            userrole="admin"
+            userrole={t('navigation.admin')}
             logout={dispatchLogout}
           />
           <Navigation>
-            <NavigationSection title="management" />
+            <NavigationSection title={t('navigation.management')} />
             <NavigationGroup>
               <NavigationItem
-                title="Dashboard"
+                title={t('navigation.dashboard')}
                 icon="dashboard"
                 link="dashboard"
               />
-              <NavigationItem title="Recordings" icon="media" link="media" />
               <NavigationItem
-                title="Settings"
+                title={t('navigation.recordings')}
+                icon="media"
+                link="media"
+              />
+              <NavigationItem
+                title={t('navigation.settings')}
                 icon="preferences"
                 link="settings"
               />
             </NavigationGroup>
-            <NavigationSection title="help & support" />
+            <NavigationSection title={t('navigation.help_support')} />
             <NavigationGroup>
               <NavigationItem
-                title="Swagger API docs"
+                title={t('navigation.swagger')}
                 icon="api"
                 external
                 link={`${config.URL}/swagger/index.html`}
               />
               <NavigationItem
-                title="Documentation"
+                title={t('navigation.documentation')}
                 icon="book"
                 external
                 link="https://doc.kerberos.io/agent/announcement"
               />
               <NavigationItem
-                title="UI library"
+                title={t('navigation.ui_library')}
                 icon="paint"
                 external
                 link="https://ui.kerberos.io/"
@@ -90,6 +97,10 @@ class App extends React.Component {
                 external
                 link="https://github.com/kerberos-io/agent"
               />
+            </NavigationGroup>
+            <NavigationSection title={t('navigation.layout')} />
+            <NavigationGroup>
+              <LanguageSelect />
             </NavigationGroup>
           </Navigation>
         </Sidebar>
@@ -126,6 +137,7 @@ const mapDispatchToProps = (dispatch) => ({
 });
 
 App.propTypes = {
+  t: PropTypes.func.isRequired,
   dispatchLogout: PropTypes.func.isRequired,
   // eslint-disable-next-line react/forbid-prop-types
   children: PropTypes.array.isRequired,
@@ -134,4 +146,6 @@ App.propTypes = {
   dispatchGetDashboardInformation: PropTypes.func.isRequired,
 };
 
-export default connect(mapStateToProps, mapDispatchToProps)(App);
+export default withTranslation()(
+  connect(mapStateToProps, mapDispatchToProps)(App)
+);

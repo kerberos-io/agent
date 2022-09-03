@@ -1,0 +1,20 @@
+{
+  "navigation": {
+    "profile": "",
+    "admin": "",
+    "management": "",
+    "dashboard": "",
+    "recordings": "",
+    "settings": "",
+    "help_support": "",
+    "swagger": "",
+    "documentation": "",
+    "ui_library": "",
+    "layout": "",
+    "languages": {
+      "english": "",
+      "dutch": "",
+      "french": ""
+    }
+  }
+}
