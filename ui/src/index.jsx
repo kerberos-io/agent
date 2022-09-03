@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { Route, Switch } from 'react-router-dom';
-import i18next from 'i18next';
 import { createStore, applyMiddleware } from 'redux';
 import { createBrowserHistory } from 'history';
 import { routerMiddleware, ConnectedRouter } from 'connected-react-router';
@@ -26,11 +25,6 @@ const history = createBrowserHistory();
 // So we know if the user is still signed in.
 function getAuthState() {
   try {
-    const language = localStorage.getItem('language') || null;
-    // Set language
-    console.log(language);
-    i18next.changeLanguage('nl');
-
     const token = localStorage.getItem('token') || null;
     const expire = localStorage.getItem('expire') || null;
     const username = localStorage.getItem('username') || null;
