@@ -1261,425 +1261,429 @@ class Settings extends React.Component {
                           </div>
                         </div>
 
-                        <span className="time-of-interest">Sunday</span>
-                        <div className="grid-4">
-                          <Input
-                            noPadding
-                            placeholder="00:00"
-                            value={this.timetable[0].start1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                0,
-                                'start1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:00"
-                            value={this.timetable[0].end1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                0,
-                                'end1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:01"
-                            value={this.timetable[0].start2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                0,
-                                'start2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="23:59"
-                            value={this.timetable[0].end2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                0,
-                                'end2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                        </div>
+                        {config.time === 'true' && (
+                          <div>
+                            <span className="time-of-interest">Sunday</span>
+                            <div className="grid-4">
+                              <Input
+                                noPadding
+                                placeholder="00:00"
+                                value={this.timetable[0].start1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    0,
+                                    'start1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:00"
+                                value={this.timetable[0].end1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    0,
+                                    'end1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:01"
+                                value={this.timetable[0].start2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    0,
+                                    'start2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="23:59"
+                                value={this.timetable[0].end2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    0,
+                                    'end2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                            </div>
 
-                        <span className="time-of-interest">Monday</span>
-                        <div className="grid-4">
-                          <Input
-                            noPadding
-                            placeholder="00:00"
-                            value={this.timetable[1].start1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                1,
-                                'start1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:00"
-                            value={this.timetable[1].end1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                1,
-                                'end1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:01"
-                            value={this.timetable[1].start2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                1,
-                                'start2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="23:59"
-                            value={this.timetable[1].end2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                1,
-                                'end2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                        </div>
+                            <span className="time-of-interest">Monday</span>
+                            <div className="grid-4">
+                              <Input
+                                noPadding
+                                placeholder="00:00"
+                                value={this.timetable[1].start1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    1,
+                                    'start1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:00"
+                                value={this.timetable[1].end1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    1,
+                                    'end1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:01"
+                                value={this.timetable[1].start2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    1,
+                                    'start2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="23:59"
+                                value={this.timetable[1].end2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    1,
+                                    'end2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                            </div>
 
-                        <span className="time-of-interest">Tuesday</span>
-                        <div className="grid-4">
-                          <Input
-                            noPadding
-                            placeholder="00:00"
-                            value={this.timetable[2].start1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                2,
-                                'start1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:00"
-                            value={this.timetable[2].end1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                2,
-                                'end1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:01"
-                            value={this.timetable[2].start2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                2,
-                                'start2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="23:59"
-                            value={this.timetable[2].end2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                2,
-                                'end2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                        </div>
+                            <span className="time-of-interest">Tuesday</span>
+                            <div className="grid-4">
+                              <Input
+                                noPadding
+                                placeholder="00:00"
+                                value={this.timetable[2].start1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    2,
+                                    'start1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:00"
+                                value={this.timetable[2].end1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    2,
+                                    'end1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:01"
+                                value={this.timetable[2].start2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    2,
+                                    'start2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="23:59"
+                                value={this.timetable[2].end2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    2,
+                                    'end2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                            </div>
 
-                        <span className="time-of-interest">Wednesday</span>
-                        <div className="grid-4">
-                          <Input
-                            noPadding
-                            placeholder="00:00"
-                            value={this.timetable[3].start1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                3,
-                                'start1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:00"
-                            value={this.timetable[3].end1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                3,
-                                'end1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:01"
-                            value={this.timetable[3].start2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                3,
-                                'start2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="23:59"
-                            value={this.timetable[3].end2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                3,
-                                'end2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                        </div>
+                            <span className="time-of-interest">Wednesday</span>
+                            <div className="grid-4">
+                              <Input
+                                noPadding
+                                placeholder="00:00"
+                                value={this.timetable[3].start1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    3,
+                                    'start1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:00"
+                                value={this.timetable[3].end1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    3,
+                                    'end1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:01"
+                                value={this.timetable[3].start2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    3,
+                                    'start2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="23:59"
+                                value={this.timetable[3].end2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    3,
+                                    'end2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                            </div>
 
-                        <span className="time-of-interest">Thursday</span>
-                        <div className="grid-4">
-                          <Input
-                            noPadding
-                            placeholder="00:00"
-                            value={this.timetable[4].start1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                4,
-                                'start1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:00"
-                            value={this.timetable[4].end1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                4,
-                                'end1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:01"
-                            value={this.timetable[4].start2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                4,
-                                'start2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="23:59"
-                            value={this.timetable[4].end2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                4,
-                                'end2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                        </div>
+                            <span className="time-of-interest">Thursday</span>
+                            <div className="grid-4">
+                              <Input
+                                noPadding
+                                placeholder="00:00"
+                                value={this.timetable[4].start1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    4,
+                                    'start1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:00"
+                                value={this.timetable[4].end1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    4,
+                                    'end1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:01"
+                                value={this.timetable[4].start2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    4,
+                                    'start2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="23:59"
+                                value={this.timetable[4].end2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    4,
+                                    'end2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                            </div>
 
-                        <span className="time-of-interest">Friday</span>
-                        <div className="grid-4">
-                          <Input
-                            noPadding
-                            placeholder="00:00"
-                            value={this.timetable[5].start1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                5,
-                                'start1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:00"
-                            value={this.timetable[5].end1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                5,
-                                'end1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:01"
-                            value={this.timetable[5].start2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                5,
-                                'start2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="23:59"
-                            value={this.timetable[5].end2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                5,
-                                'end2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                        </div>
+                            <span className="time-of-interest">Friday</span>
+                            <div className="grid-4">
+                              <Input
+                                noPadding
+                                placeholder="00:00"
+                                value={this.timetable[5].start1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    5,
+                                    'start1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:00"
+                                value={this.timetable[5].end1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    5,
+                                    'end1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:01"
+                                value={this.timetable[5].start2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    5,
+                                    'start2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="23:59"
+                                value={this.timetable[5].end2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    5,
+                                    'end2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                            </div>
 
-                        <span className="time-of-interest">Saturday</span>
-                        <div className="grid-4">
-                          <Input
-                            noPadding
-                            placeholder="00:00"
-                            value={this.timetable[6].start1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                6,
-                                'start1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:00"
-                            value={this.timetable[6].end1Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                6,
-                                'end1',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="12:01"
-                            value={this.timetable[6].start2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                6,
-                                'start2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                          <Input
-                            noPadding
-                            placeholder="23:59"
-                            value={this.timetable[6].end2Full}
-                            onChange={(event) => {
-                              this.onUpdateTimeline(
-                                'timetable',
-                                6,
-                                'end2',
-                                event,
-                                config.timetable
-                              );
-                            }}
-                          />
-                        </div>
+                            <span className="time-of-interest">Saturday</span>
+                            <div className="grid-4">
+                              <Input
+                                noPadding
+                                placeholder="00:00"
+                                value={this.timetable[6].start1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    6,
+                                    'start1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:00"
+                                value={this.timetable[6].end1Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    6,
+                                    'end1',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="12:01"
+                                value={this.timetable[6].start2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    6,
+                                    'start2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                              <Input
+                                noPadding
+                                placeholder="23:59"
+                                value={this.timetable[6].end2Full}
+                                onChange={(event) => {
+                                  this.onUpdateTimeline(
+                                    'timetable',
+                                    6,
+                                    'end2',
+                                    event,
+                                    config.timetable
+                                  );
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

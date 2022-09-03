@@ -136,13 +136,10 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		status = <-communication.HandleBootstrap
 
 		// Here we are cleaning up everything!
-		communication.HandleStream <- "stop"
-
 		if configuration.Config.Offline != "true" {
 			communication.HandleHeartBeat <- "stop"
 			communication.HandleUpload <- "stop"
 		}
-
 		infile.Close()
 		queue.Close()
 		close(communication.HandleONVIF)
@@ -150,10 +147,11 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		close(communication.HandleMotion)
 		routers.DisconnectMQTT(mqttClient)
 		decoder.Close()
+		communication.HandleStream <- "stop"
 
 		// Waiting for some seconds to make sure everything is properly closed.
-		log.Log.Info("RunAgent: waiting 1 second to make sure everything is properly closed.")
-		time.Sleep(time.Second * 1)
+		log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")
+		time.Sleep(time.Second * 3)
 	} else {
 		log.Log.Error("Something went wrong while opening RTSP: " + err.Error())
 		time.Sleep(time.Second * 3)
