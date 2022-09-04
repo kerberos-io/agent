@@ -6,9 +6,6 @@ import translationEN from './locales/en/translation.json';
 import translationNL from './locales/nl/translation.json';
 import translationFR from './locales/fr/translation.json';
 
-const fallbackLng = ['en'];
-const availableLanguages = ['en', 'ar', 'fr'];
-
 const resources = {
   en: {
     translation: translationEN,
@@ -27,16 +24,8 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    fallbackLng,
-
-    detection: {
-      checkWhitelist: true,
-    },
-
-    debug: false,
-
-    whitelist: availableLanguages,
-
+    fallbackLng: 'en',
+    debug: true,
     interpolation: {
       escapeValue: false,
     },
