@@ -9,7 +9,7 @@ import { Icon } from '@kerberos-io/ui';
 import './LanguageSelect.scss';
 
 const LanguageSelect = () => {
-  const selected = localStorage.getItem('i18nextLng') || 'en=US';
+  const selected = localStorage.getItem('i18nextLng') || 'en-US';
   const { t } = useTranslation();
 
   const languageMap = {
