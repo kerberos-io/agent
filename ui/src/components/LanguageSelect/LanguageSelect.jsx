@@ -9,11 +9,11 @@ import { Icon } from '@kerberos-io/ui';
 import './LanguageSelect.scss';
 
 const LanguageSelect = () => {
-  const selected = localStorage.getItem('i18nextLng') || 'en-US';
+  const selected = localStorage.getItem('i18nextLng') || 'en';
   const { t } = useTranslation();
 
   const languageMap = {
-    'en-US': {
+    en: {
       label: t('navigation.languages.english'),
       dir: 'ltr',
       active: true,
