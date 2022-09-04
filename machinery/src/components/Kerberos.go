@@ -93,7 +93,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 			config.Capture.PreRecording = 1
 		}
 		queue = pubsub.NewQueue()
-		queue.SetMaxGopCount(int(config.Capture.PreRecording)) // GOP time frame is set to prerecording.
+		queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording.
 		queue.WriteHeader(streams)
 
 		// Configure a MQTT client which helps for a bi-directional communication
@@ -107,16 +107,16 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		go capture.HandleStream(infile, queue, communication) //, &wg)
 
 		// Handle processing of motion
-		motionCursor := queue.Oldest()
+		motionCursor := queue.Latest()
 		communication.HandleMotion = make(chan models.MotionDataPartial, 1)
 		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
 		// Handle livestream SD (low resolution over MQTT)
-		livestreamCursor := queue.Oldest()
+		livestreamCursor := queue.Latest()
 		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
 		// Handle livestream HD (high resolution over WEBRTC)
-		livestreamHDCursor := queue.Oldest()
+		livestreamHDCursor := queue.Latest()
 		communication.HandleLiveHDHandshake = make(chan models.SDPPayload, 1)
 		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, streams, decoder, &decoderMutex)
 
