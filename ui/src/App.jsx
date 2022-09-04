@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { withTranslation } from 'react-i18next';
 import {
   Main,
   MainBody,
@@ -13,7 +14,6 @@ import {
   Icon,
 } from '@kerberos-io/ui';
 import { interval } from 'rxjs';
-import { withTranslation } from 'react-i18next';
 import { connect } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { logout } from './actions';

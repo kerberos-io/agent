@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom';
 import { Route, Switch } from 'react-router-dom';
 import { createStore, applyMiddleware } from 'redux';
@@ -17,7 +17,7 @@ import Media from './pages/Media/Media';
 import Settings from './pages/Settings/Settings';
 import RequireAuth from './containers/RequireAuth';
 import RequireGuest from './containers/RequireGuest';
-import './i18nextConf';
+import './i18n';
 
 const history = createBrowserHistory();
 
@@ -55,18 +55,22 @@ const store = createStore(
   composeWithDevTools(applyMiddleware(thunk, routerMiddleware(history)))
 );
 
+const Loader = () => <div>loading...</div>;
+
 ReactDOM.render(
   <Provider store={store}>
     <ConnectedRouter history={history}>
       <Switch>
         <Route path="/login" component={RequireGuest(Login)} />
-        <App>
-          <Route exact path="/" component={RequireAuth(Dashboard)} />
-          <Route exact path="/dashboard" component={RequireAuth(Dashboard)} />
-          <Route exact path="/" render={() => <Redirect to="/dashboard" />} />
-          <Route exact path="/media" component={RequireAuth(Media)} />
-          <Route exact path="/settings" component={RequireAuth(Settings)} />
-        </App>
+        <Suspense fallback={<Loader />}>
+          <App>
+            <Route exact path="/" component={RequireAuth(Dashboard)} />
+            <Route exact path="/dashboard" component={RequireAuth(Dashboard)} />
+            <Route exact path="/" render={() => <Redirect to="/dashboard" />} />
+            <Route exact path="/media" component={RequireAuth(Media)} />
+            <Route exact path="/settings" component={RequireAuth(Settings)} />
+          </App>
+        </Suspense>
       </Switch>
     </ConnectedRouter>
   </Provider>,
