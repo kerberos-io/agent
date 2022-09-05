@@ -530,12 +530,26 @@ class Settings extends React.Component {
           </Tabs>
         </ControlBar>
 
+        {showPersistenceSection && config.offline !== 'true' && (
+          <a
+            href="https://app-demo.kerberos.io"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <InfoBar
+              type="info"
+              message="Have a look at our Kerberos Hub demo environment, to see Kerberos Hub in action!"
+            />
+          </a>
+        )}
+
         {configSuccess && (
           <InfoBar
             type="success"
             message="Your configuration have been updated successfully."
           />
         )}
+
         {configError && (
           <InfoBar type="alert" message="Something went wrong while saving." />
         )}
@@ -677,8 +691,8 @@ class Settings extends React.Component {
                 </BlockHeader>
                 <BlockBody>
                   <p>
-                    General settings allow you to configure your Kerberos Agents
-                    on a higher level.
+                    Specify how you would like to make recordings. Having a
+                    continuous 24/7 setup or a motion based recording.
                   </p>
                   <div className="toggle-wrapper">
                     <Toggle
@@ -1748,21 +1762,21 @@ class Settings extends React.Component {
                     Having the ability to store your recordings is the beginning
                     of everything. You can choose between our{' '}
                     <a
-                      href="https://doc.kerberos.io/hub/license/"
+                      href="https://doc.kerberos.io/hub/first-things-first/"
                       rel="noopener noreferrer"
                       target="_blank"
                     >
                       Kerberos Hub (SAAS offering)
-                    </a>{' '}
-                    or your own{' '}
+                    </a>
+                    ,{' '}
                     <a
                       href="https://doc.kerberos.io/vault/first-things-first/"
                       rel="noopener noreferrer"
                       target="_blank"
                     >
                       Kerberos Vault
-                    </a>{' '}
-                    deployment.
+                    </a>
+                    , or a 3rd party provider.
                   </p>
                   <Dropdown
                     isRadio

@@ -40,9 +40,14 @@ class App extends React.Component {
     this.subscription.unsubscribe();
   }
 
+  getCurrentTimestamp() {
+    return Math.round(Date.now() / 1000);
+  }
+
   render() {
     const { t } = this.props;
     const { children, username, dashboard, dispatchLogout } = this.props;
+    const cloudOnline = this.getCurrentTimestamp() - dashboard.cloudOnline < 30;
     return (
       <div id="page-root">
         <Sidebar logo={logo} title="Kerberos Agent" version="v1-beta" mobile>
@@ -86,6 +91,12 @@ class App extends React.Component {
                 link="https://doc.kerberos.io/agent/announcement"
               />
               <NavigationItem
+                title="Kerberos Hub"
+                icon="cloud"
+                external
+                link="https://app.kerberos.io"
+              />
+              <NavigationItem
                 title={t('navigation.ui_library')}
                 icon="paint"
                 external
@@ -106,6 +117,18 @@ class App extends React.Component {
         </Sidebar>
         <Main>
           <Gradient />
+
+          {!cloudOnline && (
+            <a href="https://app.kerberos.io" target="_blank" rel="noreferrer">
+              <div className="cloud-not-installed">
+                <div>
+                  <Icon label="cloud" />
+                  Activate Kerberos Hub, and make your cameras and recordings
+                  available through a secured cloud!
+                </div>
+              </div>
+            </a>
+          )}
 
           {dashboard.offlineMode === 'true' && (
             <Link to="/settings">
