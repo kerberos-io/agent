@@ -8,14 +8,13 @@ i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
-    lng: 'en',
     fallbackLng: 'en',
     debug: false,
     interpolation: {
       escapeValue: false,
     },
     load: 'languageOnly',
-    whitelist: ['en', 'nl', 'fr'],
+    whitelist: ['de', 'en', 'nl', 'fr', 'pl'],
   });
 
 export default i18n;

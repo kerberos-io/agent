@@ -10,6 +10,7 @@
     "swagger": "Swagger API",
     "documentation": "Documentatie",
     "ui_library": "UI bibliotheek",
-    "layout": "Taal & Weergave"
+    "layout": "Taal & Weergave",
+    "choose_language": "Kies taal"
   }
 }

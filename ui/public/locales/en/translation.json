@@ -10,6 +10,7 @@
     "swagger": "Swagger API",
     "documentation": "Documentation",
     "ui_library": "UI Library",
-    "layout": "Language & Layout"
+    "layout": "Language & Layout",
+    "choose_language": "Choose language"
   }
 }
