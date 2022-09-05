@@ -2,8 +2,8 @@
 	"type": "",
 	"key": "",
 	"name": "agent",
-	"time": "true",
-	"offline": "true",
+	"time": "false",
+	"offline": "false",
 	"timezone": "Africa/Ceuta",
 	"capture": {
 		"name": "",

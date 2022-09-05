@@ -12,6 +12,10 @@
         cursor: pointer;
     }
 
+    video {
+        width: 100%;
+    }
+    
     a {
         display: flex;
         color: var(--text);
