@@ -86,7 +86,7 @@ class Media extends React.Component {
   }
 
   render() {
-    const { events } = this.props;
+    const { events, eventsLoaded } = this.props;
     const { isScrolling, open, currentRecording } = this.state;
     return (
       <div id="media">
@@ -171,7 +171,7 @@ class Media extends React.Component {
           </Modal>
         )}
 
-        {!isScrolling && (
+        {!isScrolling && eventsLoaded !== 0 && (
           <div id="loader">
             <div className="lds-ripple">
               <div />
@@ -186,6 +186,7 @@ class Media extends React.Component {
 
 const mapStateToProps = (state /* , ownProps */) => ({
   events: state.agent.events,
+  eventsLoaded: state.agent.eventsLoaded,
 });
 
 const mapDispatchToProps = (dispatch) => ({
@@ -195,6 +196,7 @@ const mapDispatchToProps = (dispatch) => ({
 
 Media.propTypes = {
   events: PropTypes.objectOf(PropTypes.object).isRequired,
+  eventsLoaded: PropTypes.number.isRequired,
   dispatchGetEvents: PropTypes.func.isRequired,
 };
 

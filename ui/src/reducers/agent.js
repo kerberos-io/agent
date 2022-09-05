@@ -4,6 +4,7 @@ const agent = (
     dashboard: {},
     events: [],
     eventfilter: {},
+    eventsLoaded: -1,
   },
   action
 ) => {
@@ -123,12 +124,14 @@ const agent = (
 
     case 'GET_EVENTS':
       const { timestamp_offset_end } = action.filter;
+      const { events } = action;
       return {
         ...state,
+        eventsLoaded: events.length,
         events:
           timestamp_offset_end === 0
-            ? [...action.events]
-            : [...state.events, ...action.events],
+            ? [...events]
+            : [...state.events, ...events],
         eventfilter: action.eventfilter,
       };
 

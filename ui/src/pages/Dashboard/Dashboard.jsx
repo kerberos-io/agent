@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { Link, withRouter } from 'react-router-dom';
+import { withTranslation } from 'react-i18next';
 import { connect } from 'react-redux';
 import {
   Breadcrumb,
@@ -72,7 +73,7 @@ class Dashboard extends React.Component {
   }
 
   render() {
-    const { dashboard } = this.props;
+    const { dashboard, t } = this.props;
     const { liveviewLoaded, open, currentRecording } = this.state;
 
     // We check if the camera was getting a valid frame
@@ -83,26 +84,32 @@ class Dashboard extends React.Component {
     // We check if a connection is made to Kerberos Hub, or if Offline mode
     // has been turned on.
     const cloudOnline = this.getCurrentTimestamp() - dashboard.cloudOnline < 30;
-    let cloudConnection = 'Not connected';
+    let cloudConnection = t('dashboard.not_connected');
     if (dashboard.offlineMode === 'true') {
-      cloudConnection = 'Offline mode';
+      cloudConnection = t('dashboard.offline_mode');
     } else {
-      cloudConnection = cloudOnline ? 'Connected' : 'Not connected';
+      cloudConnection = cloudOnline
+        ? t('dashboard.connected')
+        : t('dashboard.not_connected');
     }
 
     return (
       <div id="dashboard">
         <Breadcrumb
-          title="Dashboard"
-          level1="Overview of your video surveilance"
+          title={t('dashboard.title')}
+          level1={t('dashboard.heading')}
           level1Link=""
         >
           <Link to="/media">
-            <Button label="Watch recordings" icon="media" type="default" />
+            <Button
+              label={t('breadcrumb.watch_recordings')}
+              icon="media"
+              type="default"
+            />
           </Link>
           <Link to="/settings">
             <Button
-              label="Configure"
+              label={t('breadcrumb.configure')}
               icon="preferences"
               type={isCameraOnline ? 'neutral' : 'default'}
             />
@@ -113,20 +120,24 @@ class Dashboard extends React.Component {
           <KPI
             number={dashboard.days ? dashboard.days.length : 0}
             divider="0"
-            footer="Number of days"
+            footer={t('dashboard.number_of_days')}
           />
           <KPI
             number={
               dashboard.numberOfRecordings ? dashboard.numberOfRecordings : 0
             }
             divider="0"
-            footer="Total recordings"
+            footer={t('dashboard.total_recordings')}
           />
 
           <Link to="/settings">
             <Card
               title="IP Camera"
-              subtitle={isCameraOnline ? 'Connected' : 'not connected'}
+              subtitle={
+                isCameraOnline
+                  ? t('dashboard.connected')
+                  : t('dashboard.not_connected')
+              }
               footer="Camera"
               icon={isCameraOnline ? 'circle-check-big' : 'circle-cross-big'}
             />
@@ -147,96 +158,118 @@ class Dashboard extends React.Component {
         <hr />
         <div className="stats grid-container --two-columns">
           <div>
-            <h2>Latest events</h2>
-            <Table>
-              <TableHeader>
-                <TableRow
-                  id="header"
-                  headercells={['time', 'description', 'name']}
-                />
-              </TableHeader>
-              <TableBody>
-                {dashboard.latestEvents &&
-                  dashboard.latestEvents.map((event) => (
-                    <TableRow
-                      key={event.timestamp}
-                      id="cells1"
-                      bodycells={[
-                        <>
-                          <div className="time">
-                            <Ellipse status="success" />{' '}
-                            <p data-tip="10m and 5s ago">{event.time}</p>
-                          </div>
-                        </>,
-                        <>
-                          <p
-                            className="pointer"
-                            onClick={() =>
-                              this.openModal(`${config.URL}/file/${event.key}`)
-                            }
-                          >
-                            Motion was detected
-                          </p>
-                        </>,
-                        <>
-                          <span className="version">{event.camera_name}</span>
-                          &nbsp;
-                          <Icon label="cameras" />
-                        </>,
-                      ]}
-                    />
-                  ))}
-              </TableBody>
-              {open && (
-                <Modal>
-                  <ModalHeader
-                    title="View recording"
-                    onClose={() => this.handleClose()}
+            <h2>{t('dashboard.latest_events')}</h2>
+
+            {(!dashboard.latestEvents ||
+              dashboard.latestEvents.length === 0) && (
+              <SetupBox
+                dashed
+                url="/settings"
+                btnicon="preferences"
+                btnlabel={t('dashboard.configure_connection')}
+                header={t('dashboard.no_events')}
+                text={t('dashboard.no_events_description')}
+              />
+            )}
+
+            {dashboard.latestEvents && dashboard.latestEvents.length > 0 && (
+              <Table>
+                <TableHeader>
+                  <TableRow
+                    id="header"
+                    headercells={[
+                      t('dashboard.time'),
+                      t('dashboard.description'),
+                      t('dashboard.name'),
+                    ]}
                   />
-                  <ModalBody>
-                    <video controls autoPlay>
-                      <source src={currentRecording} type="video/mp4" />
-                    </video>
-                  </ModalBody>
-                  <ModalFooter
-                    right={
-                      <>
-                        <a
-                          href={currentRecording}
-                          download="video"
-                          target="_blank"
-                          rel="noreferrer"
-                        >
+                </TableHeader>
+                <TableBody>
+                  {dashboard.latestEvents &&
+                    dashboard.latestEvents.map((event) => (
+                      <TableRow
+                        key={event.timestamp}
+                        id="cells1"
+                        bodycells={[
+                          <>
+                            <div className="time">
+                              <Ellipse status="success" />{' '}
+                              <p data-tip="10m and 5s ago">{event.time}</p>
+                            </div>
+                          </>,
+                          <>
+                            <p
+                              className="pointer"
+                              onClick={() =>
+                                this.openModal(
+                                  `${config.URL}/file/${event.key}`
+                                )
+                              }
+                            >
+                              {t('dashboard.motion_detected')}
+                            </p>
+                          </>,
+                          <>
+                            <span className="version">{event.camera_name}</span>
+                            &nbsp;
+                            <Icon label="cameras" />
+                          </>,
+                        ]}
+                      />
+                    ))}
+                </TableBody>
+                {open && (
+                  <Modal>
+                    <ModalHeader
+                      title="View recording"
+                      onClose={() => this.handleClose()}
+                    />
+                    <ModalBody>
+                      <video controls autoPlay>
+                        <source src={currentRecording} type="video/mp4" />
+                      </video>
+                    </ModalBody>
+                    <ModalFooter
+                      right={
+                        <>
+                          <a
+                            href={currentRecording}
+                            download="video"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <Button
+                              label="Download"
+                              icon="download"
+                              type="button"
+                              buttonType="button"
+                            />
+                          </a>
                           <Button
-                            label="Download"
-                            icon="download"
+                            label="Close"
+                            icon="cross-circle"
                             type="button"
                             buttonType="button"
+                            onClick={() => this.handleClose()}
                           />
-                        </a>
-                        <Button
-                          label="Close"
-                          icon="cross-circle"
-                          type="button"
-                          buttonType="button"
-                          onClick={() => this.handleClose()}
-                        />
-                      </>
-                    }
-                  />
-                </Modal>
-              )}
-            </Table>
+                        </>
+                      }
+                    />
+                  </Modal>
+                )}
+              </Table>
+            )}
           </div>
           <div>
-            <h2>Live view</h2>
+            <h2>{t('dashboard.live_view')}</h2>
             {!liveviewLoaded && (
               <SetupBox
-                btnicon="cameras"
-                btnlabel="Configure connection"
+                btnicon="preferences"
+                btnlabel={t('dashboard.configure_connection')}
                 dashed
-                header="Loading live view"
-                text="Hold on we are loading your live view here. If you didn't configure your camera connection, update it on the settings pages."
+                url="/settings"
+                header={t('dashboard.loading_live_view')}
+                text={t('dashboard.loading_live_view_description')}
               />
             )}
             <div style={{ visibility: liveviewLoaded ? 'visible' : 'hidden' }}>
@@ -258,8 +291,9 @@ const mapDispatchToProps = (/* dispatch , ownProps */) => ({});
 
 Dashboard.propTypes = {
   dashboard: PropTypes.objectOf(PropTypes.object).isRequired,
+  t: PropTypes.func.isRequired,
 };
 
-export default withRouter(
-  connect(mapStateToProps, mapDispatchToProps)(Dashboard)
+export default withTranslation()(
+  withRouter(connect(mapStateToProps, mapDispatchToProps)(Dashboard))
 );
