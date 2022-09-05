@@ -26,27 +26,24 @@ https://brianmacdonald.github.io/Ethonate/address#0xf4a759C9436E2280Ea9cdd23d314
 Kerberos Agent is a cutting edge video surveillance management system made available as Open Source under the MIT License. This means that all the source code is available for you or your company, and you can use, transform and distribute the source code; as long you keep a reference of the original license. Kerberos Agent can be used for commercial usage (which was not the case for v2). Read more [about the license here](LICENSE).
 
 ![Kerberos Agent go through UI](./assets/img/kerberos-agent-overview.gif)
+
+## Quickstart - Docker
+
+The easiest to get your Kerberos Agent up and running is to use our Docker image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you selected a specific tag, run below command, which will open the web interface of your Kerberos agent on port 8080.  
     
-## Support our project
+    docker run -p 8080:8080 --name mycamera -d kerberos/agent:latest
 
-If you like our product please feel free to execute an Ethereum donation. All donations will flow back and split to our Open Source contributors, as they are the heart of this community.
-   
-<img width="272" alt="Ethereum donation linke" src="https://user-images.githubusercontent.com/1546779/173443671-3d773068-ae10-4862-a990-dc7c89f3d9c2.png">
+For persisting your configuration and/or recordings [attach a volume](#attach-a-volume).
 
-Ethereum Address: `0xf4a759C9436E2280Ea9cdd23d3144D95538fF4bE`
+## Quickstart - Balena
+
+To be written
     
-## Work In Progress
 
-Kerberos Agent (v3) is not yet released, and is actively developed. You can follow the progress [on our project board](https://github.com/kerberos-io/agent/projects/1) and review our designs at [Figma](https://www.figma.com/proto/msuYC6sv2cOCqZeDtBxNy7/%5BNEW%5D-Kerberos.io-Apps?node-id=1%3A1788&viewport=-490%2C191%2C0.34553584456443787&scaling=min-zoom&page-id=1%3A2%3Ffuid%3D449684443467913607). Feel free to give any feedback.
+## Quickstart - Snap
 
-## Previous releases
+To be written
 
-This repository contains the next generation of Kerberos.io, **Kerberos Agent (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/agent/tree/develop) and [project overview](https://github.com/kerberos-io/agent/projects/1).
-
-Read more about this [at the FAQ](#faq) below.
-
-![opensource-to-agent](https://user-images.githubusercontent.com/1546779/172066873-7752c979-de63-4417-8d26-34192fdbd1e6.svg)
-    
 ## Introduction
 
 Kerberos.io is a cutting edge video surveillance system with a strong focus on user experience, scalability, resilience, extension and integration. Kerberos.io provides different solutions, but from a high level point of view it comes into two flavours: Kerberos Agent and Kerberos Enterprise Suite. Bottom line Kerberos Enterprise Suite extends Kerberos Agent with additional components such as Kerberos Factory, Kerberos Vault and Kerberos Hub.
@@ -177,6 +174,23 @@ You attach a volume to your container by leveraging the `-v` option. To mount yo
 3. Run the docker command as following to attach your config directory and recording directory.
 
         docker run -p 8080:8080 --name mycamera -v $(pwd)/agent/config:/home/agent/data/config  -v $(pwd)/agent/recordings:/home/agent/data/recordings -d kerberos/agent:latest
+    
+## Support our project
+
+If you like our product please feel free to execute an Ethereum donation. All donations will flow back and split to our Open Source contributors, as they are the heart of this community.
+   
+<img width="272" alt="Ethereum donation linke" src="https://user-images.githubusercontent.com/1546779/173443671-3d773068-ae10-4862-a990-dc7c89f3d9c2.png">
+
+Ethereum Address: `0xf4a759C9436E2280Ea9cdd23d3144D95538fF4bE`
+    
+## Previous releases
+
+This repository contains the next generation of Kerberos.io, **Kerberos Agent (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/agent/tree/develop) and [project overview](https://github.com/kerberos-io/agent/projects/1).
+
+Read more about this [at the FAQ](#faq) below.
+
+![opensource-to-agent](https://user-images.githubusercontent.com/1546779/172066873-7752c979-de63-4417-8d26-34192fdbd1e6.svg)
+    
 
 ## FAQ
 
