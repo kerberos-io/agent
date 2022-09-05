@@ -1188,62 +1188,115 @@ class Settings extends React.Component {
 
             {/* General settings block */}
             {showRecordingSection && (
-              <Block>
-                <BlockHeader>
-                  <h4>Fragmented recordings</h4>
-                </BlockHeader>
-                <BlockBody>
-                  <p>
-                    When recordings are fragmented they are suitable for an HLS
-                    stream. When turned on the MP4 container will look a bit
-                    different.
-                  </p>
+              <>
+                <Block>
+                  <BlockHeader>
+                    <h4>Auto clean</h4>
+                  </BlockHeader>
+                  <BlockBody>
+                    <p>
+                      Specify if the Kerberos Agent can cleanup recordings when
+                      a specific storage capacity (MB) is reached. This will
+                      remove the oldest recordings when the capacity is reached.
+                    </p>
 
-                  <div className="toggle-wrapper">
-                    <Toggle
-                      on={config.capture.fragmented === 'true'}
-                      disabled={false}
-                      onClick={(event) =>
-                        this.onUpdateToggle(
-                          'capture',
-                          'fragmented',
-                          event,
-                          config.capture
-                        )
-                      }
-                    />
-                    <div>
-                      <span>Enable fragmentation</span>
-                      <p>Fragmented recordings are required for HLS.</p>
+                    <div className="toggle-wrapper">
+                      <Toggle
+                        on={config.auto_clean === 'true'}
+                        disabled={false}
+                        onClick={(event) =>
+                          this.onUpdateToggle('', 'auto_clean', event, config)
+                        }
+                      />
+                      <div>
+                        <span>Enable auto clean</span>
+                        <p>Remove oldest recording when capacity reached.</p>
+                      </div>
                     </div>
-                  </div>
 
-                  {config.capture.fragmented === 'true' && (
-                    <Input
-                      noPadding
-                      label="fragment duration"
-                      value={config.capture.fragmentedduration}
-                      placeholder="Duration of a single fragment."
-                      onChange={(value) =>
-                        this.onUpdateNumberField(
-                          'capture',
-                          'fragmentedduration',
-                          value,
-                          config.capture
-                        )
-                      }
+                    {config.auto_clean === 'true' && (
+                      <Input
+                        noPadding
+                        label="Maximum directory size (MB)"
+                        value={config.max_directory_size}
+                        placeholder="The maximum MB's of recordings stored."
+                        onChange={(value) =>
+                          this.onUpdateNumberField(
+                            '',
+                            'max_directory_size',
+                            value,
+                            config
+                          )
+                        }
+                      />
+                    )}
+                  </BlockBody>
+                  <BlockFooter>
+                    <Button
+                      label="Save"
+                      type="default"
+                      icon="pencil"
+                      onClick={this.saveConfig}
                     />
-                  )}
-                </BlockBody>
-                <BlockFooter>
-                  <Button
-                    label="Save"
-                    type="default"
-                    icon="pencil"
-                    onClick={this.saveConfig}
-                  />
-                </BlockFooter>
-              </Block>
+                  </BlockFooter>
+                </Block>
+                <Block>
+                  <BlockHeader>
+                    <h4>Fragmented recordings</h4>
+                  </BlockHeader>
+                  <BlockBody>
+                    <p>
+                      When recordings are fragmented they are suitable for an
+                      HLS stream. When turned on the MP4 container will look a
+                      bit different.
+                    </p>
+
+                    <div className="toggle-wrapper">
+                      <Toggle
+                        on={config.capture.fragmented === 'true'}
+                        disabled={false}
+                        onClick={(event) =>
+                          this.onUpdateToggle(
+                            'capture',
+                            'fragmented',
+                            event,
+                            config.capture
+                          )
+                        }
+                      />
+                      <div>
+                        <span>Enable fragmentation</span>
+                        <p>Fragmented recordings are required for HLS.</p>
+                      </div>
+                    </div>
+
+                    {config.capture.fragmented === 'true' && (
+                      <Input
+                        noPadding
+                        label="fragment duration"
+                        value={config.capture.fragmentedduration}
+                        placeholder="Duration of a single fragment."
+                        onChange={(value) =>
+                          this.onUpdateNumberField(
+                            'capture',
+                            'fragmentedduration',
+                            value,
+                            config.capture
+                          )
+                        }
+                      />
+                    )}
+                  </BlockBody>
+                  <BlockFooter>
+                    <Button
+                      label="Save"
+                      type="default"
+                      icon="pencil"
+                      onClick={this.saveConfig}
+                    />
+                  </BlockFooter>
+                </Block>
+              </>
             )}
 
             {/* Conditions block */}

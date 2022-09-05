@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -23,6 +24,40 @@ const (
 	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
 	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
 )
+
+func DirSize(path string) (int64, error) {
+	var size int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return err
+	})
+	return size, err
+}
+
+func FindOldestFile(dir string) (oldestFile os.FileInfo, err error) {
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return
+	}
+
+	oldestTime := time.Now()
+	for _, file := range files {
+		if file.Mode().IsRegular() && file.ModTime().Before(oldestTime) {
+			oldestFile = file
+			oldestTime = file.ModTime()
+		}
+	}
+
+	if oldestFile == nil {
+		err = os.ErrNotExist
+	}
+	return
+}
 
 func RandStringBytesMaskImpr(n int) string {
 	b := make([]byte, n)

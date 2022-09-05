@@ -17,6 +17,40 @@ import (
 	"github.com/kerberos-io/joy4/av"
 )
 
+func CleanupRecordingDirectory(configuration *models.Configuration) {
+	autoClean := configuration.Config.AutoClean
+	if autoClean == "true" {
+		maxSize := configuration.Config.MaxDirectorySize
+		if maxSize == 0 {
+			maxSize = 50
+		}
+		// Total size of the recording directory.
+		recordingsDirectory := "./data/recordings"
+		size, err := utils.DirSize(recordingsDirectory)
+		if err == nil {
+			sizeInMB := size / 1000 / 1000
+			if sizeInMB >= maxSize {
+				// Remove the oldest recording
+				oldestFile, err := utils.FindOldestFile(recordingsDirectory)
+				if err == nil {
+					err := os.Remove(recordingsDirectory + "/" + oldestFile.Name())
+					log.Log.Info("HandleRecordStream: removed oldest file as part of cleanup - " + recordingsDirectory + "/" + oldestFile.Name())
+					if err != nil {
+						log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+					}
+				} else {
+					log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+				}
+			}
+		} else {
+			log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+		}
+
+	} else {
+		log.Log.Info("HandleRecordStream: Autoclean disabled, nothing to do here.")
+	}
+}
+
 func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, streams []av.CodecData) {
 	log.Log.Debug("HandleRecordStream: started")
 
@@ -89,6 +123,9 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 				debug.FreeOSMemory()
 
 				recordingStatus = "idle"
+
+				// Clean up the recording directory if necessary.
+				CleanupRecordingDirectory(configuration)
 			}
 
 			// If not yet started and a keyframe, let's make a recording
@@ -305,6 +342,9 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 			// Create a symbol linc.
 			fc, _ := os.Create("./data/cloud/" + name)
 			fc.Close()
+
+			// Clean up the recording directory if necessary.
+			CleanupRecordingDirectory(configuration)
 		}
 	}
 

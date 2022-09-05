@@ -4,6 +4,8 @@
 	"name": "agent",
 	"time": "false",
 	"offline": "false",
+	"auto_clean": "true",
+	"max_directory_size": 100,
 	"timezone": "Africa/Ceuta",
 	"capture": {
 		"name": "",
@@ -87,16 +89,9 @@
 	"s3": {
 		"proxyuri": "http://proxy.kerberos.io",
 		"bucket": "kerberosaccept",
-		"region": "eu-west1",
-		"username": ""
+		"region": "eu-west1"
 	},
-	"kstorage": {
-		"uri": "",
-		"access_key": "",
-		"secret_access_key": "",
-		"provider": "",
-		"directory": ""
-	},
+	"kstorage": {},
 	"mqtturi": "tcp://mqtt.kerberos.io:1883",
 	"mqtt_username": "",
 	"mqtt_password": "",
