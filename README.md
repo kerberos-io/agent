@@ -25,7 +25,7 @@ https://brianmacdonald.github.io/Ethonate/address#0xf4a759C9436E2280Ea9cdd23d314
 
 Kerberos Agent is a cutting edge video surveillance management system made available as Open Source under the MIT License. This means that all the source code is available for you or your company, and you can use, transform and distribute the source code; as long you keep a reference of the original license. Kerberos Agent can be used for commercial usage (which was not the case for v2). Read more [about the license here](LICENSE).
 
-![login-agent](./assets/img/agent-login.png)
+![Kerberos Agent go through UI](./assets/img/kerberos-agent-overview.gif)
     
 ## Support our project
 
