@@ -10,12 +10,6 @@
     "swagger": "Swagger API",
     "documentation": "Documentatie",
     "ui_library": "UI bibliotheek",
-    "layout": "Taal & Weergave",
-    "select_language": "Selecteer taal",
-    "languages": {
-      "english": "Engels",
-      "dutch": "Nederlands",
-      "french": "Frans"
-    }
+    "layout": "Taal & Weergave"
   }
 }

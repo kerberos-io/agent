@@ -10,12 +10,6 @@
     "swagger": "Swagger API",
     "documentation": "Documentation",
     "ui_library": "UI Library",
-    "layout": "Language & Layout",
-    "select_language": "Select language",
-    "languages": {
-      "english": "English",
-      "dutch": "Dutch",
-      "french": "French"
-    }
+    "layout": "Language & Layout"
   }
 }

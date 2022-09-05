@@ -1,5 +1,4 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
 import Popover from '@material-ui/core/Popover';
 import List from '@material-ui/core/List';
@@ -10,16 +9,15 @@ import './LanguageSelect.scss';
 
 const LanguageSelect = () => {
   const selected = localStorage.getItem('i18nextLng') || 'en';
-  const { t } = useTranslation();
-
   const languageMap = {
     en: {
-      label: t('navigation.languages.english'),
+      label: 'English',
       dir: 'ltr',
       active: true,
     },
-    nl: { label: t('navigation.languages.dutch'), dir: 'ltr', active: false },
-    fr: { label: t('navigation.languages.french'), dir: 'ltr', active: false },
+    nl: { label: 'Nederlands', dir: 'ltr', active: false },
+    fr: { label: 'Francais', dir: 'ltr', active: false },
+    pl: { label: 'Polski', dir: 'ltr', active: false },
   };
 
   const [menuAnchor, setMenuAnchor] = React.useState(null);
@@ -54,7 +52,7 @@ const LanguageSelect = () => {
       >
         <div>
           <List>
-            <ListSubheader>{t('navigation.select_language')}</ListSubheader>
+            <ListSubheader>Choose language</ListSubheader>
             {Object.keys(languageMap)?.map((item) => (
               <ListItem
                 button
@@ -64,7 +62,7 @@ const LanguageSelect = () => {
                   setMenuAnchor(null);
                 }}
               >
-                {languageMap[item].label}
+                {languageMap[item] ? languageMap[item].label : ''}
               </ListItem>
             ))}
           </List>
