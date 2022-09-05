@@ -29,11 +29,10 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 
 ## Quickstart - Docker
 
-The easiest to get your Kerberos Agent up and running is to use our Docker image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you selected a specific tag, run below command, which will open the web interface of your Kerberos agent on port 8080.  
+The easiest to get your Kerberos Agent up and running is to use our Docker image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you selected a specific tag, run below command, which will open the web interface of your Kerberos agent on port `8080`. For persisting your configuration and/or recordings [attach a volume](#attach-a-volume).
     
     docker run -p 8080:8080 --name mycamera -d kerberos/agent:latest
 
-For persisting your configuration and/or recordings [attach a volume](#attach-a-volume).
 
 ## Quickstart - Balena
 
@@ -50,13 +49,13 @@ Kerberos.io is a cutting edge video surveillance system with a strong focus on u
 
 ### Kerberos Agent
 
-- Installation in seconds (Kerberos Etcher, Docker, Binaries).
+- Installation in seconds (Docker, Balena, Snap, etc).
 - Simplified and modern user interface.
 - Multi architecture (ARMv7, ARMv8, amd64, etc).
-- Multi camera support: IP Cameras (MJPEG/H264), USB cameras, Raspberry Pi Cameras.
+- Multi camera support: IP Cameras (MJPEG/H264), USB cameras and Raspberry Pi Cameras through a RTSP proxy.
 - Single camera per instance (e.g. One Docker container per camera).
-- Cloud integration through Webhooks, MQTT, etc.
-- Cloud storage through Kerberos Hub.
+- Integrations (Webhooks, MQTT, Script, etc).
+- Cloud storage (Kerberos Hub, Kerberos Vault, Minio, Storj, etc).
 - MIT License
 
 ### Kerberos Factory (part of [Kerberos Enterprise suite](https://doc.kerberos.io/enterprise/first-things-first/))
