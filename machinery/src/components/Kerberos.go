@@ -91,9 +91,11 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// and consumed by all other routines: motion, livestream, etc.
 		if config.Capture.PreRecording <= 0 {
 			config.Capture.PreRecording = 1
+			log.Log.Warning("RunAgent: Prerecording value not found in config or invalid value! Found: " + strconv.FormatInt(config.Capture.PreRecording, 10))
 		}
 		queue = pubsub.NewQueue()
 		queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording.
+		log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
 		queue.WriteHeader(streams)
 
 		// Configure a MQTT client which helps for a bi-directional communication
