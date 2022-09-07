@@ -109,16 +109,16 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		go capture.HandleStream(infile, queue, communication) //, &wg)
 
 		// Handle processing of motion
-		motionCursor := queue.Latest()
+		motionCursor := queue.Oldest()
 		communication.HandleMotion = make(chan models.MotionDataPartial, 1)
 		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
 		// Handle livestream SD (low resolution over MQTT)
-		livestreamCursor := queue.Latest()
+		livestreamCursor := queue.Oldest()
 		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
 		// Handle livestream HD (high resolution over WEBRTC)
-		livestreamHDCursor := queue.Latest()
+		livestreamHDCursor := queue.Oldest()
 		communication.HandleLiveHDHandshake = make(chan models.SDPPayload, 1)
 		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, streams, decoder, &decoderMutex)
 
