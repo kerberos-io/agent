@@ -28,6 +28,8 @@ jobs:
       run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-dev:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
     - name: Create new and append to manifest
       run: docker buildx imagetools create -t kerberos/agent-dev:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-dev:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+    - name: Create new and append to latest manifest
+      run: docker buildx imagetools create -t kerberos/agent-dev:latest kerberos/agent-dev:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
   build-other:
     runs-on: ubuntu-latest
     strategy:
@@ -51,3 +53,5 @@ jobs:
       run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-dev:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
     - name: Create new and append to manifest
       run: docker buildx imagetools create --append -t kerberos/agent-dev:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-dev:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+    - name: Create new and append to manifest latest
+      run: docker buildx imagetools create --append -t kerberos/agent-dev:latest kerberos/agent-dev:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)

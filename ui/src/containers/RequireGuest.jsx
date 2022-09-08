@@ -27,8 +27,8 @@ export default function RequireGuest(ComposedComponent) {
   }
 
   const mapStateToProps = (state) => ({
-    isAuthenticated: state.auth.loggedIn,
-    isInstalled: state.auth.installed,
+    isAuthenticated: state.authentication.loggedIn,
+    isInstalled: state.authentication.installed,
   });
 
   const mapDispatchToProps = (dispatch) =>

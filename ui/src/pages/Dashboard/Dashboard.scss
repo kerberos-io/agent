@@ -1,3 +1,35 @@
-hr {
-    margin-top: 50px;
+#dashboard {
+
+    hr {
+        margin-top: 50px;
+    }
+    
+    .dashed {
+        padding: 20%;
+    }
+
+    .pointer {
+        cursor: pointer;
+    }
+
+    video {
+        width: 100%;
+    }
+    
+    a {
+        display: flex;
+        color: var(--text);
+
+        &:hover, &:active {
+            color: var(--text);
+        }
+    }
+
+    .time {
+        display: flex;
+        align-items: center;
+        .ellipse-container {
+            margin-right: 8px;
+        }
+    }
 }

@@ -17,93 +17,100 @@ func ConfigureMQTT(configuration *models.Configuration, communication *models.Co
 
 	config := configuration.Config
 
-	opts := mqtt.NewClientOptions()
+	if config.Offline == "true" {
+		log.Log.Info("ConfigureMQTT: not starting as running in Offline mode.")
+	} else {
 
-	// We will set the MQTT endpoint to which we want to connect
-	// and share and receive messages to/from.
-	mqttURL := config.MQTTURI
-	opts.AddBroker(mqttURL)
-	log.Log.Info("ConfigureMQTT: Set broker uri " + mqttURL)
+		opts := mqtt.NewClientOptions()
 
-	// Our MQTT broker can have username/password credentials
-	// to protect it from the outside.
-	mqtt_username := config.MQTTUsername
-	mqtt_password := config.MQTTPassword
-	if mqtt_username != "" || mqtt_password != "" {
-		opts.SetUsername(mqtt_username)
-		opts.SetPassword(mqtt_password)
-		log.Log.Info("ConfigureMQTT: Set username " + mqtt_username)
-		log.Log.Info("ConfigureMQTT: Set password " + mqtt_password)
-	}
+		// We will set the MQTT endpoint to which we want to connect
+		// and share and receive messages to/from.
+		mqttURL := config.MQTTURI
+		opts.AddBroker(mqttURL)
+		log.Log.Info("ConfigureMQTT: Set broker uri " + mqttURL)
 
-	// Some extra options to make sure the connection behaves
-	// properly. More information here: github.com/eclipse/paho.mqtt.golang.
-	opts.SetCleanSession(true)
-	opts.SetConnectRetry(true)
-	//opts.SetAutoReconnect(true)
-	opts.SetConnectTimeout(30 * time.Second)
-
-	hubKey := ""
-	// This is the old way ;)
-	if config.Cloud == "s3" && config.S3.Publickey != "" {
-		hubKey = config.S3.Publickey
-	} else if config.Cloud == "kstorage" && config.KStorage.CloudKey != "" {
-		hubKey = config.KStorage.CloudKey
-	}
-	// This is the new way ;)
-	if config.HubKey != "" {
-		hubKey = config.HubKey
-	}
-
-	if hubKey != "" {
-
-		rand.Seed(time.Now().UnixNano())
-		random := rand.Intn(100)
-		mqttClientID := config.Key + strconv.Itoa(random) // this random int is to avoid conflicts.
-
-		// This is a worked-around.
-		// current S3 (Kerberos Hub SAAS) is using a secured MQTT, where the client id,
-		// should match the kerberos hub key.
-		if config.Cloud == "s3" {
-			mqttClientID = config.Key
+		// Our MQTT broker can have username/password credentials
+		// to protect it from the outside.
+		mqtt_username := config.MQTTUsername
+		mqtt_password := config.MQTTPassword
+		if mqtt_username != "" || mqtt_password != "" {
+			opts.SetUsername(mqtt_username)
+			opts.SetPassword(mqtt_password)
+			log.Log.Info("ConfigureMQTT: Set username " + mqtt_username)
+			log.Log.Info("ConfigureMQTT: Set password " + mqtt_password)
 		}
 
-		opts.SetClientID(mqttClientID)
-		log.Log.Info("ConfigureMQTT: Set ClientID " + mqttClientID)
-		rand.Seed(time.Now().UnixNano())
-		webrtc.CandidateArrays = make(map[string](chan string))
+		// Some extra options to make sure the connection behaves
+		// properly. More information here: github.com/eclipse/paho.mqtt.golang.
+		opts.SetCleanSession(true)
+		opts.SetConnectRetry(true)
+		//opts.SetAutoReconnect(true)
+		opts.SetConnectTimeout(30 * time.Second)
 
-		opts.OnConnect = func(c mqtt.Client) {
-
-			// We managed to connect to the MQTT broker, hurray!
-			log.Log.Info("ConfigureMQTT: " + mqttClientID + " connected to " + mqttURL)
-
-			// Create a subscription to know if send out a livestream or not.
-			MQTTListenerHandleLiveSD(c, hubKey, configuration, communication)
-
-			// Create a subscription for the WEBRTC livestream.
-			MQTTListenerHandleLiveHDHandshake(c, hubKey, configuration, communication)
-
-			// Create a subscription for keeping alive the WEBRTC livestream.
-			MQTTListenerHandleLiveHDKeepalive(c, hubKey, configuration, communication)
-
-			// Create a subscription to listen to the number of WEBRTC peers.
-			MQTTListenerHandleLiveHDPeers(c, hubKey, configuration, communication)
-
-			// Create a subscription to listen for WEBRTC candidates.
-			MQTTListenerHandleLiveHDCandidates(c, hubKey, configuration, communication)
-
-			// Create a susbcription to listen for ONVIF actions: e.g. PTZ, Zoom, etc.
-			MQTTListenerHandleONVIF(c, hubKey, configuration, communication)
+		hubKey := ""
+		// This is the old way ;)
+		if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
+			hubKey = config.S3.Publickey
+		} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
+			hubKey = config.KStorage.CloudKey
 		}
-	}
-	mqc := mqtt.NewClient(opts)
-	if token := mqc.Connect(); token.WaitTimeout(3 * time.Second) {
-		if token.Error() != nil {
-			log.Log.Error("ConfigureMQTT: unable to establish mqtt broker connection, error was: " + token.Error().Error())
+		// This is the new way ;)
+		if config.HubKey != "" {
+			hubKey = config.HubKey
 		}
+
+		if hubKey != "" {
+
+			rand.Seed(time.Now().UnixNano())
+			random := rand.Intn(100)
+			mqttClientID := config.Key + strconv.Itoa(random) // this random int is to avoid conflicts.
+
+			// This is a worked-around.
+			// current S3 (Kerberos Hub SAAS) is using a secured MQTT, where the client id,
+			// should match the kerberos hub key.
+			if config.Cloud == "s3" {
+				mqttClientID = config.Key
+			}
+
+			opts.SetClientID(mqttClientID)
+			log.Log.Info("ConfigureMQTT: Set ClientID " + mqttClientID)
+			rand.Seed(time.Now().UnixNano())
+			webrtc.CandidateArrays = make(map[string](chan string))
+
+			opts.OnConnect = func(c mqtt.Client) {
+
+				// We managed to connect to the MQTT broker, hurray!
+				log.Log.Info("ConfigureMQTT: " + mqttClientID + " connected to " + mqttURL)
+
+				// Create a subscription to know if send out a livestream or not.
+				MQTTListenerHandleLiveSD(c, hubKey, configuration, communication)
+
+				// Create a subscription for the WEBRTC livestream.
+				MQTTListenerHandleLiveHDHandshake(c, hubKey, configuration, communication)
+
+				// Create a subscription for keeping alive the WEBRTC livestream.
+				MQTTListenerHandleLiveHDKeepalive(c, hubKey, configuration, communication)
+
+				// Create a subscription to listen to the number of WEBRTC peers.
+				MQTTListenerHandleLiveHDPeers(c, hubKey, configuration, communication)
+
+				// Create a subscription to listen for WEBRTC candidates.
+				MQTTListenerHandleLiveHDCandidates(c, hubKey, configuration, communication)
+
+				// Create a susbcription to listen for ONVIF actions: e.g. PTZ, Zoom, etc.
+				MQTTListenerHandleONVIF(c, hubKey, configuration, communication)
+			}
+		}
+		mqc := mqtt.NewClient(opts)
+		if token := mqc.Connect(); token.WaitTimeout(3 * time.Second) {
+			if token.Error() != nil {
+				log.Log.Error("ConfigureMQTT: unable to establish mqtt broker connection, error was: " + token.Error().Error())
+			}
+		}
+		return mqc
 	}
-	return mqc
+
+	return nil
 }
 
 func MQTTListenerHandleLiveSD(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, communication *models.Communication) {
@@ -187,5 +194,7 @@ func MQTTListenerHandleONVIF(mqttClient mqtt.Client, hubKey string, configuratio
 }
 
 func DisconnectMQTT(mqttClient mqtt.Client) {
-	mqttClient.Disconnect(1000)
+	if mqttClient != nil {
+		mqttClient.Disconnect(1000)
+	}
 }

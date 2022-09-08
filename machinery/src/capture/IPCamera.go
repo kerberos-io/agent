@@ -64,9 +64,7 @@ loop:
 		var pkt av.Packet
 		if pkt, err = infile.ReadPacket(); err != nil { // sometimes this throws an end of file..
 			log.Log.Error("HandleStream: " + err.Error())
-			if err.Error() == "EOF" {
-				time.Sleep(30 * time.Second)
-			}
+			time.Sleep(1 * time.Second)
 		}
 
 		// Could be that a decode is throwing errors.
@@ -89,6 +87,7 @@ loop:
 				r := communication.PackageCounter.Load().(int64)
 				log.Log.Info("HandleStream: packet size " + strconv.Itoa(len(pkt.Data)))
 				communication.PackageCounter.Store((r + 1) % 1000)
+				communication.LastPacketTimer.Store(time.Now().Unix())
 			}
 		}
 	}

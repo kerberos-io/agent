@@ -106,7 +106,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 		mediaEngine := &pionWebRTC.MediaEngine{}
 		if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
-			panic("InitializeWebRTCConnection: something went wrong registering codecs.")
+			log.Log.Error("InitializeWebRTCConnection: something went wrong registering codecs.")
 		}
 
 		api := pionWebRTC.NewAPI(pionWebRTC.WithMediaEngine(mediaEngine))
@@ -127,89 +127,94 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			},
 		)
 
-		if _, err = peerConnection.AddTrack(track); err != nil {
-			panic(err)
-		}
+		if err == nil && peerConnection != nil {
 
-		_, err = peerConnection.AddTransceiverFromTrack(track,
-			pionWebRTC.RtpTransceiverInit{
-				Direction: pionWebRTC.RTPTransceiverDirectionSendonly,
-			},
-		)
+			if _, err = peerConnection.AddTrack(track); err != nil {
+				panic(err)
+			}
 
-		if err != nil {
-			panic(err)
-		}
+			_, err = peerConnection.AddTransceiverFromTrack(track,
+				pionWebRTC.RtpTransceiverInit{
+					Direction: pionWebRTC.RTPTransceiverDirectionSendonly,
+				},
+			)
 
-		peerConnection.OnICEConnectionStateChange(func(connectionState pionWebRTC.ICEConnectionState) {
-			if connectionState == pionWebRTC.ICEConnectionStateDisconnected {
-				atomic.AddInt64(&peerConnectionCount, -1)
-				peerConnections[handshake.Cuuid] = nil
-				close(candidates)
-				close(w.PacketsCount)
-				if err := peerConnection.Close(); err != nil {
-					panic(err)
-				}
-				runtime.GC()
-				debug.FreeOSMemory()
-			} else if connectionState == pionWebRTC.ICEConnectionStateConnected {
-				atomic.AddInt64(&peerConnectionCount, 1)
-			} else if connectionState == pionWebRTC.ICEConnectionStateChecking {
-				for candidate := range candidates {
-					log.Log.Info("InitializeWebRTCConnection: Received candidate.")
-					if candidateErr := peerConnection.AddICECandidate(pionWebRTC.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
+			if err != nil {
+				panic(err)
+			}
+
+			peerConnection.OnICEConnectionStateChange(func(connectionState pionWebRTC.ICEConnectionState) {
+				if connectionState == pionWebRTC.ICEConnectionStateDisconnected {
+					atomic.AddInt64(&peerConnectionCount, -1)
+					peerConnections[handshake.Cuuid] = nil
+					close(candidates)
+					close(w.PacketsCount)
+					if err := peerConnection.Close(); err != nil {
+						panic(err)
+					}
+					runtime.GC()
+					debug.FreeOSMemory()
+				} else if connectionState == pionWebRTC.ICEConnectionStateConnected {
+					atomic.AddInt64(&peerConnectionCount, 1)
+				} else if connectionState == pionWebRTC.ICEConnectionStateChecking {
+					for candidate := range candidates {
+						log.Log.Info("InitializeWebRTCConnection: Received candidate.")
+						if candidateErr := peerConnection.AddICECandidate(pionWebRTC.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
+						}
 					}
 				}
-			}
-			log.Log.Info("InitializeWebRTCConnection: connection state changed to: " + connectionState.String())
-			log.Log.Info("InitializeWebRTCConnection: Number of peers connected (" + strconv.FormatInt(peerConnectionCount, 10) + ")")
-		})
+				log.Log.Info("InitializeWebRTCConnection: connection state changed to: " + connectionState.String())
+				log.Log.Info("InitializeWebRTCConnection: Number of peers connected (" + strconv.FormatInt(peerConnectionCount, 10) + ")")
+			})
 
-		offer := w.CreateOffer(sd)
-		if err = peerConnection.SetRemoteDescription(offer); err != nil {
-			panic(err)
-		}
-
-		//gatherCompletePromise := pionWebRTC.GatheringCompletePromise(peerConnection)
-		answer, err := peerConnection.CreateAnswer(nil)
-		if err != nil {
-			panic(err)
-		} else if err = peerConnection.SetLocalDescription(answer); err != nil {
-			panic(err)
-		}
-
-		// When an ICE candidate is available send to the other Pion instance
-		// the other Pion instance will add this candidate by calling AddICECandidate
-		var candidatesMux sync.Mutex
-		peerConnection.OnICECandidate(func(candidate *pionWebRTC.ICECandidate) {
-
-			if candidate == nil {
-				return
+			offer := w.CreateOffer(sd)
+			if err = peerConnection.SetRemoteDescription(offer); err != nil {
+				panic(err)
 			}
 
-			candidatesMux.Lock()
-			defer candidatesMux.Unlock()
+			//gatherCompletePromise := pionWebRTC.GatheringCompletePromise(peerConnection)
+			answer, err := peerConnection.CreateAnswer(nil)
+			if err != nil {
+				panic(err)
+			} else if err = peerConnection.SetLocalDescription(answer); err != nil {
+				panic(err)
+			}
 
-			topic := fmt.Sprintf("%s/%s/candidate/edge", name, handshake.Cuuid)
-			log.Log.Info("InitializeWebRTCConnection: Send candidate to " + topic)
-			candiInit := candidate.ToJSON()
-			sdpmid := "0"
-			candiInit.SDPMid = &sdpmid
-			candi, err := json.Marshal(candiInit)
+			// When an ICE candidate is available send to the other Pion instance
+			// the other Pion instance will add this candidate by calling AddICECandidate
+			var candidatesMux sync.Mutex
+			peerConnection.OnICECandidate(func(candidate *pionWebRTC.ICECandidate) {
+
+				if candidate == nil {
+					return
+				}
+
+				candidatesMux.Lock()
+				defer candidatesMux.Unlock()
+
+				topic := fmt.Sprintf("%s/%s/candidate/edge", name, handshake.Cuuid)
+				log.Log.Info("InitializeWebRTCConnection: Send candidate to " + topic)
+				candiInit := candidate.ToJSON()
+				sdpmid := "0"
+				candiInit.SDPMid = &sdpmid
+				candi, err := json.Marshal(candiInit)
+				if err == nil {
+					log.Log.Info("InitializeWebRTCConnection:" + string(candi))
+					token := mqttClient.Publish(topic, 2, false, candi)
+					token.Wait()
+				}
+			})
+
+			peerConnections[handshake.Cuuid] = peerConnection
+
 			if err == nil {
-				log.Log.Info("InitializeWebRTCConnection:" + string(candi))
-				token := mqttClient.Publish(topic, 2, false, candi)
-				token.Wait()
+				topic := fmt.Sprintf("%s/%s/answer", name, handshake.Cuuid)
+				log.Log.Info("InitializeWebRTCConnection: Send SDP answer to " + topic)
+				mqttClient.Publish(topic, 2, false, []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP))))
 			}
-		})
-
-		peerConnections[handshake.Cuuid] = peerConnection
-
-		if err == nil {
-			topic := fmt.Sprintf("%s/%s/answer", name, handshake.Cuuid)
-			log.Log.Info("InitializeWebRTCConnection: Send SDP answer to " + topic)
-			mqttClient.Publish(topic, 2, false, []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP))))
 		}
+	} else {
+		log.Log.Error("InitializeWebRTCConnection: NewPeerConnection failed: " + err.Error())
 	}
 }
 

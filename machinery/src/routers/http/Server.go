@@ -63,6 +63,7 @@ func StartServer(configuration *models.Configuration, communication *models.Comm
 	r.Use(static.Serve("/media", static.LocalFile("./www", true)))
 	r.Use(static.Serve("/settings", static.LocalFile("./www", true)))
 	r.Use(static.Serve("/login", static.LocalFile("./www", true)))
+	r.StaticFS("/file", gin.Dir("./data/recordings", false))
 
 	// Run the api on port
 	err = r.Run(":" + configuration.Port)

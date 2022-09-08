@@ -25,41 +25,37 @@ https://brianmacdonald.github.io/Ethonate/address#0xf4a759C9436E2280Ea9cdd23d314
 
 Kerberos Agent is a cutting edge video surveillance management system made available as Open Source under the MIT License. This means that all the source code is available for you or your company, and you can use, transform and distribute the source code; as long you keep a reference of the original license. Kerberos Agent can be used for commercial usage (which was not the case for v2). Read more [about the license here](LICENSE).
 
-![login-agent](./assets/img/agent-login.png)
+![Kerberos Agent go through UI](./assets/img/kerberos-agent-overview.gif)
+
+## Quickstart - Docker
+
+The easiest to get your Kerberos Agent up and running is to use our Docker image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you selected a specific tag, run below command, which will open the web interface of your Kerberos agent on port `8080`. For persisting your configuration and/or recordings [attach a volume](#attach-a-volume).
     
-## Support our project
+    docker run -p 8080:8080 --name mycamera -d kerberos/agent:latest
 
-If you like our product please feel free to execute an Ethereum donation. All donations will flow back and split to our Open Source contributors, as they are the heart of this community.
-   
-<img width="272" alt="Ethereum donation linke" src="https://user-images.githubusercontent.com/1546779/173443671-3d773068-ae10-4862-a990-dc7c89f3d9c2.png">
 
-Ethereum Address: `0xf4a759C9436E2280Ea9cdd23d3144D95538fF4bE`
+## Quickstart - Balena
+
+To be written
     
-## Work In Progress
 
-Kerberos Agent (v3) is not yet released, and is actively developed. You can follow the progress [on our project board](https://github.com/kerberos-io/agent/projects/1) and review our designs at [Figma](https://www.figma.com/proto/msuYC6sv2cOCqZeDtBxNy7/%5BNEW%5D-Kerberos.io-Apps?node-id=1%3A1788&viewport=-490%2C191%2C0.34553584456443787&scaling=min-zoom&page-id=1%3A2%3Ffuid%3D449684443467913607). Feel free to give any feedback.
+## Quickstart - Snap
 
-## Previous releases
+To be written
 
-This repository contains the next generation of Kerberos.io, **Kerberos Agent (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/agent/tree/develop) and [project overview](https://github.com/kerberos-io/agent/projects/1).
-
-Read more about this [at the FAQ](#faq) below.
-
-![opensource-to-agent](https://user-images.githubusercontent.com/1546779/172066873-7752c979-de63-4417-8d26-34192fdbd1e6.svg)
-    
 ## Introduction
 
 Kerberos.io is a cutting edge video surveillance system with a strong focus on user experience, scalability, resilience, extension and integration. Kerberos.io provides different solutions, but from a high level point of view it comes into two flavours: Kerberos Agent and Kerberos Enterprise Suite. Bottom line Kerberos Enterprise Suite extends Kerberos Agent with additional components such as Kerberos Factory, Kerberos Vault and Kerberos Hub.
 
 ### Kerberos Agent
 
-- Installation in seconds (Kerberos Etcher, Docker, Binaries).
+- Installation in seconds (Docker, Balena, Snap, etc).
 - Simplified and modern user interface.
 - Multi architecture (ARMv7, ARMv8, amd64, etc).
-- Multi camera support: IP Cameras (MJPEG/H264), USB cameras, Raspberry Pi Cameras.
+- Multi camera support: IP Cameras (MJPEG/H264), USB cameras and Raspberry Pi Cameras through a RTSP proxy.
 - Single camera per instance (e.g. One Docker container per camera).
-- Cloud integration through Webhooks, MQTT, etc.
-- Cloud storage through Kerberos Hub.
+- Integrations (Webhooks, MQTT, Script, etc).
+- Cloud storage (Kerberos Hub, Kerberos Vault, Minio, Storj, etc).
 - MIT License
 
 ### Kerberos Factory (part of [Kerberos Enterprise suite](https://doc.kerberos.io/enterprise/first-things-first/))
@@ -78,10 +74,41 @@ Kerberos.io applies the concept of agents. An agent is running next to or on you
 
 If you are looking for a solution that scales better with your video surveillance and/or video analytics requirements, [Kerberos Enterprise Suite might be a better fit](https://doc.kerberos.io/enterprise/first-things-first).
 
-## Installation
-Kerberos Agent **will ship in different formats**: Docker, binary, snap, KiOS. Version 3 is still in active development right now, and not yet released.
+## Running as a container
 
-## Run and develop
+We are creating Docker images as part of our CI/CD process. You'll find our Docker images on [Docker hub](https://hub.docker.com/r/kerberos/agent). Pick a specific tag of choice, or use latest. Once done run below command, this will open the web interface of your Kerberos agent on port 8080.  
+    
+    docker run -p 8080:8080 --name mycamera -d kerberos/agent:latest
+
+Or for a develop build:
+
+    docker run -p 8080:8080 --name mycamera -d kerberos/agent-dev:latest
+
+Feel free to use another port if your host system already has a workload running on `8080`. For example `8082`.
+
+    docker run -p 8082:8080 --name mycamera -d kerberos/agent:latest
+
+## Attach a volume
+
+By default your Kerberos agent will store all its configuration and recordings inside the container. It might be interesting to store both configuration and your recordings outside the container, on your local disk. This helps persisting your storage even after you decide to wipe out your Kerberos agent.
+
+You attach a volume to your container by leveraging the `-v` option. To mount your own configuration file, execute as following:
+
+1. Decide where you would like to store your configuration and recordings; create a new directory for the config file and recordings folder accordingly.
+
+        mkdir agent
+        mkdir agent/config
+        mkdir agent/recordings
+
+2. Once you have located your desired directory, copy the latest [`config.json`](https://github.com/kerberos-io/agent/blob/master/machinery/data/config/config.json) file into your config directory.
+
+        wget https://raw.githubusercontent.com/kerberos-io/agent/master/machinery/data/config/config.json -O agent/config/config.json
+
+3. Run the docker command as following to attach your config directory and recording directory.
+
+        docker run -p 8080:8080 --name mycamera -v $(pwd)/agent/config:/home/agent/data/config  -v $(pwd)/agent/recordings:/home/agent/data/recordings -d kerberos/agent:latest
+    
+## Develop and build
 
 Kerberos Agent is divided in two parts a `machinery` and `web`. Both parts live in this repository in their relative folders. For development or running the application on your local machine, you have to run both the `machinery` and the `web` as described below. When running in production everything is shipped as only one artifact, read more about this at [Building for production](#building-for-production).
 
@@ -97,6 +124,10 @@ This will start a webserver and launches the web app on port `3000`.
 
 ![login-agent](./assets/img/agent-login.gif)
 
+Once signed in you'll see the dashboard page showing up. After successfull configuration of your agent, you'll should see a live view and possible events recorded to disk.
+
+![dashboard-agent](./assets/img/agent-dashboard.png)
+
 ### Machinery
 
 The `machinery` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent which is doing all the heavy lifting with camera processing and other kinds of logic, on the other hand it acts as a webserver (Rest API) that allows communication from the web (React) or any other custom application. The API is documented using `swagger`.
@@ -107,7 +138,7 @@ You can simply run the `machinery` using following commands.
     cd machinery
     go run main.go run mycameraname 8080
 
-This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/), as it comes with all the debugging and linting features builtin.
+This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/) or [Visual Studio Code](https://code.visualstudio.com/), as it comes with all the debugging and linting features builtin.
 
 ![run-in-goland](https://user-images.githubusercontent.com/1546779/111139940-0a4d1a80-8582-11eb-8985-ceaf7359f4ee.gif)
 
@@ -139,7 +170,22 @@ This base image contains already a couple of tools, such as Golang, FFmpeg and O
 By running the `docker build` command, you will create the Kerberos Agent Docker image. After building you can simply run the image as a Docker container.
 
     docker build -t kerberos/agent .
-    docker run -p 8080:8080 --name mycamera -d kerberos/agent
+
+## Support our project
+
+If you like our product please feel free to execute an Ethereum donation. All donations will flow back and split to our Open Source contributors, as they are the heart of this community.
+   
+<img width="272" alt="Ethereum donation linke" src="https://user-images.githubusercontent.com/1546779/173443671-3d773068-ae10-4862-a990-dc7c89f3d9c2.png">
+
+Ethereum Address: `0xf4a759C9436E2280Ea9cdd23d3144D95538fF4bE`
+    
+## Previous releases
+
+This repository contains the next generation of Kerberos.io, **Kerberos Agent (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/agent/tree/develop) and [project overview](https://github.com/kerberos-io/agent/projects/1).
+
+Read more about this [at the FAQ](#faq) below.
+
+![opensource-to-agent](https://user-images.githubusercontent.com/1546779/172066873-7752c979-de63-4417-8d26-34192fdbd1e6.svg)
 
 ## FAQ
 

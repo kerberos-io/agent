@@ -1,0 +1,39 @@
+{
+  "breadcrumb": {
+    "watch_recordings": "Watch recordings",
+    "configure": "Configure"
+  },
+  "navigation": {
+    "profile": "Profile",
+    "admin": "admin",
+    "management": "Management",
+    "dashboard": "Dashboard",
+    "recordings": "Recordings", 
+    "settings": "Settings",
+    "help_support": "Help & Support",
+    "swagger": "Swagger API",
+    "documentation": "Documentation",
+    "ui_library": "UI Library",
+    "layout": "Language & Layout",
+    "choose_language": "Choose language"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "heading": "Overview of your video surveilance",
+    "number_of_days": "Number of days",
+    "connected": "Connected",
+    "not_connected": "Not connected",
+    "offline_mode": "Offline mode",
+    "latest_events": "Latest events",
+    "configure_connection": "Configure connection",
+    "no_events": "No events",
+    "no_events_description": "No recordings where found, make sure your Kerberos Agent is properly configured.",
+    "motion_detected": "Motion was detected",
+    "live_view": "Live view",
+    "loading_live_view": "Loading live view",
+    "loading_live_view_description": "Hold on we are loading your live view here. If you didn't configure your camera connection, update it on the settings pages.",
+    "time": "Time",
+    "description": "Description",
+    "name": "Name"
+  }
+}

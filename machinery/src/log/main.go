@@ -2,6 +2,7 @@ package log
 
 import (
 	"os"
+	"time"
 
 	"github.com/op/go-logging"
 	"github.com/sirupsen/logrus"
@@ -20,7 +21,7 @@ var Log = Logging{
 
 var gologging = logging.MustGetLogger("gologger")
 
-func ConfigureGoLogging() {
+func ConfigureGoLogging(timezone *time.Location) {
 	// Logging
 	var format = logging.MustStringFormatter(
 		`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
@@ -44,9 +45,12 @@ func ConfigureGoLogging() {
 // This a logrus
 // -> github.com/sirupsen/logrus
 
-func ConfigureLogrus() {
+func ConfigureLogrus(timezone *time.Location) {
 	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(&logrus.JSONFormatter{})
+	logrus.SetFormatter(LocalTimeZoneFormatter{
+		Timezone:  timezone,
+		Formatter: &logrus.JSONFormatter{},
+	}) // Use local timezone for providing datetime in logs!
 
 	// Output to stdout instead of the default stderr
 	// Can be any io.Writer, see below for File example
@@ -56,13 +60,14 @@ func ConfigureLogrus() {
 	logrus.SetLevel(logrus.InfoLevel)
 }
 
-func NewLogger(logger string, level string) *Logging {
-	loggy := Logging{
-		Logger: logger,
-		Level:  level,
-	}
-	loggy.Init()
-	return &loggy
+type LocalTimeZoneFormatter struct {
+	Timezone  *time.Location
+	Formatter logrus.Formatter
+}
+
+func (u LocalTimeZoneFormatter) Format(e *logrus.Entry) ([]byte, error) {
+	e.Time = e.Time.In(u.Timezone)
+	return u.Formatter.Format(e)
 }
 
 type Logging struct {
@@ -70,12 +75,12 @@ type Logging struct {
 	Level  string
 }
 
-func (self *Logging) Init() {
+func (self *Logging) Init(timezone *time.Location) {
 	switch self.Logger {
 	case "go-logging":
-		ConfigureGoLogging()
+		ConfigureGoLogging(timezone)
 	case "logrus":
-		ConfigureLogrus()
+		ConfigureLogrus(timezone)
 	default:
 	}
 }

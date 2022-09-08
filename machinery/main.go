@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/routers"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 )
 
 func main() {
@@ -16,7 +18,8 @@ func main() {
 	const VERSION = "3.0"
 	action := os.Args[1]
 
-	log.Log.Init()
+	timezone, _ := time.LoadLocation("CET")
+	log.Log.Init(timezone)
 
 	switch action {
 
@@ -50,6 +53,22 @@ func main() {
 
 			// Open this configuration either from Kerberos Agent or Kerberos Factory.
 			components.OpenConfig(&configuration)
+
+			timezone, _ := time.LoadLocation(configuration.Config.Timezone)
+			log.Log.Init(timezone)
+
+			// Check if we have a device Key or not, if not
+			// we will generate one.
+			if configuration.Config.Key == "" {
+				key := utils.RandStringBytesMaskImpr(30)
+				configuration.Config.Key = key
+				err := components.StoreConfig(configuration.Config)
+				if err == nil {
+					log.Log.Info("Main: updated unique key for agent to: " + key)
+				} else {
+					log.Log.Info("Main: something went wrong while trying to store key: " + key)
+				}
+			}
 
 			// Bootstrapping the agent
 			communication := models.Communication{

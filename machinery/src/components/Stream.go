@@ -2,12 +2,15 @@ package components
 
 import (
 	"fmt"
+	"image"
+	"image/jpeg"
 	"log"
 	"time"
 
 	"github.com/deepch/vdk/av"
 	"github.com/deepch/vdk/codec/h264parser"
 	"github.com/deepch/vdk/format/rtsp"
+	"github.com/nsmith5/mjpeg"
 )
 
 type Stream struct {
@@ -80,4 +83,12 @@ func GetSPSFromCodec(codecs []av.CodecData) ([]byte, []byte) {
 	sps := codecs[0].(h264parser.CodecData).SPS()
 	pps := codecs[0].(h264parser.CodecData).PPS()
 	return sps, pps
+}
+
+func StartMotionJPEG(imageFunction func() (image.Image, error), quality int) mjpeg.Handler {
+	stream := mjpeg.Handler{
+		Next:    imageFunction,
+		Options: &jpeg.Options{Quality: quality},
+	}
+	return stream
 }

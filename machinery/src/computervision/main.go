@@ -1,7 +1,6 @@
 package computervision
 
 import (
-	"fmt"
 	"image"
 	"io/ioutil"
 	"os"
@@ -35,7 +34,7 @@ func GetRGBImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mut
 }
 
 func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) gocv.Mat {
-	var gray gocv.Mat
+	var rgb gocv.Mat
 	img, err := capture.DecodeImage(pkt, dec, decoderMutex)
 
 	if err == nil && img != nil {
@@ -65,16 +64,20 @@ func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex)
 		}
 
 		im := img.Image
-		rgb, _ := ToRGB8(im)
+		rgb, _ = ToRGB8(im)
 		img.Free()
 		if scaleFactor > 1 {
 			gocv.Resize(rgb, &rgb, image.Pt(newWidth, newHeight), 0, 0, gocv.InterpolationArea)
 		}
-		gray = gocv.NewMat()
-		gocv.CvtColor(rgb, &gray, gocv.ColorBGRToGray)
-		rgb.Close()
 	}
-	return gray
+	return rgb
+}
+
+func ToGray(rgb gocv.Mat) (gocv.Mat, error) {
+	gray := gocv.NewMat()
+	gocv.CvtColor(rgb, &gray, gocv.ColorBGRToGray)
+	rgb.Close()
+	return gray, nil
 }
 
 func ToRGB8(img image.YCbCr) (gocv.Mat, error) {
@@ -84,8 +87,11 @@ func ToRGB8(img image.YCbCr) (gocv.Mat, error) {
 	bytes := make([]byte, 0, x*y*3)
 	for j := bounds.Min.Y; j < bounds.Max.Y; j++ {
 		for i := bounds.Min.X; i < bounds.Max.X; i++ {
-			r, g, b, _ := img.At(i, j).RGBA()
-			bytes = append(bytes, byte(b>>8), byte(g>>8), byte(r>>8))
+			iy := img.At(i, j)
+			if iy != nil {
+				r, g, b, _ := iy.RGBA()
+				bytes = append(bytes, byte(b>>8), byte(g>>8), byte(r>>8))
+			}
 		}
 	}
 	return gocv.NewMatFromBytes(y, x, gocv.MatTypeCV8UC3, bytes)
@@ -94,6 +100,9 @@ func ToRGB8(img image.YCbCr) (gocv.Mat, error) {
 func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) { //, wg *sync.WaitGroup) {
 	log.Log.Debug("ProcessMotion: started")
 	config := configuration.Config
+
+	var isPixelChangeThresholdReached = false
+	var changesToReturn = 0
 
 	if config.Capture.Continuous == "true" {
 
@@ -118,7 +127,8 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 			// Check If valid package.
 			if len(pkt.Data) > 0 && pkt.IsKeyFrame {
 				rgb := GetImage(pkt, decoder, decoderMutex)
-				matArray[j] = &rgb
+				gray, _ := ToGray(rgb)
+				matArray[j] = &gray
 				j++
 			}
 			if j == 2 {
@@ -173,22 +183,23 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				}
 
 				rgb := GetImage(pkt, decoder, decoderMutex)
-				matArray[2] = &rgb
+				gray, _ := ToGray(rgb)
+				matArray[2] = &gray
 
 				// Store snapshots (jpg) or hull.
-				if i%3 == 0 {
-					files, err := ioutil.ReadDir("./data/snapshots")
-					if err == nil {
-						sort.Slice(files, func(i, j int) bool {
-							return files[i].ModTime().Before(files[j].ModTime())
-						})
-						if len(files) > 3 {
-							os.Remove("./data/snapshots/" + files[0].Name())
-						}
+				files, err := ioutil.ReadDir("./data/snapshots")
+				if err == nil {
+					sort.Slice(files, func(i, j int) bool {
+						return files[i].ModTime().Before(files[j].ModTime())
+					})
+					if len(files) > 3 {
+						os.Remove("./data/snapshots/" + files[0].Name())
 					}
-					t := strconv.FormatInt(time.Now().Unix(), 10)
-					gocv.IMWrite("./data/snapshots/"+t+".png", rgb)
 				}
+				t := strconv.FormatInt(time.Now().Unix(), 10)
+				snapshotRGB := GetImage(pkt, decoder, decoderMutex)
+				gocv.IMWrite("./data/snapshots/"+t+".png", snapshotRGB)
+				snapshotRGB.Close()
 
 				// Check if continuous recording.
 				if config.Capture.Continuous == "true" {
@@ -221,10 +232,21 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 						}
 					}
 
-					if detectMotion && FindMotion(matArray, coordinatesToCheck, config.Capture.PixelChangeThreshold) {
-						mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
-						fmt.Println(key)
-						communication.HandleMotion <- time.Now().Unix()
+					// Remember additional information about the result of findmotion
+					isPixelChangeThresholdReached, changesToReturn = FindMotion(matArray, coordinatesToCheck, config.Capture.PixelChangeThreshold)
+
+					if detectMotion && isPixelChangeThresholdReached {
+
+						if mqttClient != nil {
+							mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
+						}
+
+						//FIXME: In the future MotionDataPartial should be replaced with MotionDataFull
+						dataToPass := models.MotionDataPartial{
+							Timestamp:       time.Now().Unix(),
+							NumberOfChanges: changesToReturn,
+						}
+						communication.HandleMotion <- dataToPass //Save data to the channel
 					}
 				}
 
@@ -246,7 +268,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 	log.Log.Debug("ProcessMotion: finished")
 }
 
-func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int, pixelChangeThreshold int) bool {
+func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {
 
 	h1 := gocv.NewMat()
 	gocv.AbsDiff(*matArray[2], *matArray[0], &h1)
@@ -283,5 +305,6 @@ func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int, pixelChangeTh
 		pixelChangeThreshold = 75 // Keep hardcoded value of 75 for now if no value is given for changes treshold in config.json
 	}
 
-	return changes > pixelChangeThreshold
+	changesDetected = changes                              // Assign final amount of changes to the return variable
+	return changes > pixelChangeThreshold, changesDetected // Return bool ifReachedThreshold AND the amount of changes detected in total
 }

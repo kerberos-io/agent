@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"image"
+	_ "image/png"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -17,6 +20,25 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"gopkg.in/mgo.v2/bson"
 )
+
+func GetImageFromFilePath() (image.Image, error) {
+	snapshotDirectory := "./data/snapshots"
+	files, err := ioutil.ReadDir(snapshotDirectory)
+	if err == nil && len(files) > 1 {
+		sort.Slice(files, func(i, j int) bool {
+			return files[i].ModTime().Before(files[j].ModTime())
+		})
+		filePath := "./data/snapshots/" + files[1].Name()
+		f, err := os.Open(filePath)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		image, _, err := image.Decode(f)
+		return image, err
+	}
+	return nil, errors.New("Could not find a snapshot in " + snapshotDirectory)
+}
 
 func GetSnapshot() string {
 	var snapshot string
@@ -156,4 +178,52 @@ func OpenConfig(configuration *models.Configuration) {
 	}
 
 	return
+}
+
+func SaveConfig(config models.Config, configuration *models.Configuration, communication *models.Communication) error {
+	if !communication.IsConfiguring.IsSet() {
+		communication.IsConfiguring.Set()
+
+		err := StoreConfig(config)
+		if err != nil {
+			communication.IsConfiguring.UnSet()
+			return err
+		}
+
+		select {
+		case communication.HandleBootstrap <- "restart":
+		default:
+		}
+
+		communication.IsConfiguring.UnSet()
+
+		return nil
+	} else {
+		return errors.New("☄ Already reconfiguring")
+	}
+}
+
+func StoreConfig(config models.Config) error {
+	// Save into database
+	if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
+		// Write to mongodb
+		session := database.New().Copy()
+		defer session.Close()
+		db := session.DB(database.DatabaseName)
+		collection := db.C("configuration")
+
+		err := collection.Update(bson.M{
+			"type": "config",
+			"name": os.Getenv("DEPLOYMENT_NAME"),
+		}, &config)
+		return err
+
+		// Save into file
+	} else if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
+		res, _ := json.MarshalIndent(config, "", "\t")
+		err := ioutil.WriteFile("./data/config/config.json", res, 0644)
+		return err
+	}
+
+	return errors.New("Not able to update config")
 }

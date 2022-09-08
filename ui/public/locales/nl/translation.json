@@ -1,0 +1,40 @@
+{
+  "breadcrumb": {
+    "watch_recordings": "Bekijk opnames",
+    "configure": "Instellingen"
+  },
+  "navigation": {
+    "profile": "Profiel",
+    "admin": "beheerder",
+    "management": "Beheer",
+    "dashboard": "Overzicht",
+    "recordings": "Opnames",
+    "settings": "Instellingen",
+    "help_support": "Hulp & informatie",
+    "swagger": "Swagger API",
+    "documentation": "Documentatie",
+    "ui_library": "UI bibliotheek",
+    "layout": "Taal & Weergave",
+    "choose_language": "Kies taal"
+  },
+  "dashboard": {
+    "title": "Overzicht",
+    "heading": "Overzicht van je video beveiliging",
+    "number_of_days": "Aantal dagen",
+    "total_recordings": "Aantal opnames",
+    "connected": "Verbonden",
+    "not_connected": "Niet verbonden",
+    "offline_mode": "Offline modus",
+    "latest_events": "Laatste opnames",
+    "configure_connection": "Configureer verbinding",
+    "no_events": "Geen opnames",
+    "no_events_description": "Geen opnames gevonden, zorg ervoor dat je Kerberos Agent geconfigureerd is.",
+    "motion_detected": "Beweging gedetecteerd",
+    "live_view": "Live weergave",
+    "loading_live_view": "Live view laden",
+    "loading_live_view_description": "Eventjes geduld we laden jouw live weergave. Indien je de camera connectie nog niet geconfigureerd hebt, ga naar de instellingen pagina.",
+    "time": "Tijd",
+    "description": "Omschrijving",
+    "name": "Naam"
+  }
+}

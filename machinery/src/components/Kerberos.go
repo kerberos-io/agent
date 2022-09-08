@@ -25,6 +25,19 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	var packageCounter atomic.Value
 	packageCounter.Store(int64(0))
 	communication.PackageCounter = &packageCounter
+
+	// This is used when the last packet was received (timestamp),
+	// this metric is used to determine if the camera is still online/connected.
+	var lastPacketTimer atomic.Value
+	packageCounter.Store(int64(0))
+	communication.LastPacketTimer = &lastPacketTimer
+
+	// This is used to understand if we have a working Kerberos Hub connection
+	// cloudTimestamp will be updated when successfully sending heartbeats.
+	var cloudTimestamp atomic.Value
+	cloudTimestamp.Store(int64(0))
+	communication.CloudTimestamp = &cloudTimestamp
+
 	communication.HandleStream = make(chan string, 1)
 	communication.HandleUpload = make(chan string, 1)
 	communication.HandleHeartBeat = make(chan string, 1)
@@ -76,8 +89,13 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// Create a packet queue, which is filled by the HandleStream routing
 		// and consumed by all other routines: motion, livestream, etc.
+		if config.Capture.PreRecording <= 0 {
+			config.Capture.PreRecording = 1
+			log.Log.Warning("RunAgent: Prerecording value not found in config or invalid value! Found: " + strconv.FormatInt(config.Capture.PreRecording, 10))
+		}
 		queue = pubsub.NewQueue()
-		queue.SetMaxGopCount(5) // GOP time frame is set to 5.
+		queue.SetMaxGopCount(int(config.Capture.PreRecording)) // GOP time frame is set to prerecording.
+		log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)))
 		queue.WriteHeader(streams)
 
 		// Configure a MQTT client which helps for a bi-directional communication
@@ -92,7 +110,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// Handle processing of motion
 		motionCursor := queue.Oldest()
-		communication.HandleMotion = make(chan int64, 1)
+		communication.HandleMotion = make(chan models.MotionDataPartial, 1)
 		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
 		// Handle livestream SD (low resolution over MQTT)
@@ -120,9 +138,10 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		status = <-communication.HandleBootstrap
 
 		// Here we are cleaning up everything!
-		communication.HandleStream <- "stop"
-		communication.HandleHeartBeat <- "stop"
-		communication.HandleUpload <- "stop"
+		if configuration.Config.Offline != "true" {
+			communication.HandleHeartBeat <- "stop"
+			communication.HandleUpload <- "stop"
+		}
 		infile.Close()
 		queue.Close()
 		close(communication.HandleONVIF)
@@ -130,10 +149,11 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		close(communication.HandleMotion)
 		routers.DisconnectMQTT(mqttClient)
 		decoder.Close()
+		communication.HandleStream <- "stop"
 
 		// Waiting for some seconds to make sure everything is properly closed.
-		log.Log.Info("RunAgent: waiting 1 second to make sure everything is properly closed.")
-		time.Sleep(time.Second * 1)
+		log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")
+		time.Sleep(time.Second * 3)
 	} else {
 		log.Log.Error("Something went wrong while opening RTSP: " + err.Error())
 		time.Sleep(time.Second * 3)
@@ -160,6 +180,7 @@ func ControlAgent(communication *models.Communication) {
 					occurence = occurence + 1
 				}
 			} else {
+
 				occurence = 0
 			}
 

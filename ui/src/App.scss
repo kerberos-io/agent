@@ -1,0 +1,25 @@
+@import "./app.variables";
+
+
+.offline-mode, .cloud-not-installed {
+    background: var(--upper-gradient);
+    width: 100%;
+    color: white;
+    margin: -6px 0 0 0;
+    display: flex;
+    align-items: center;
+
+    > div {
+        padding: size(1.5) size(4);
+        display: flex;
+        align-items: center;
+    }
+
+    svg {
+        padding-right: size(1);
+    }
+}
+
+.cloud-not-installed {
+    background: linear-gradient(90deg,  hsl(170deg 48% 34%) 0%, hsl(127deg 62% 31%) 58.33%, hsl(278deg 16% 42%) 100%);
+}

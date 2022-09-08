@@ -17,6 +17,40 @@ import (
 	"github.com/kerberos-io/joy4/av"
 )
 
+func CleanupRecordingDirectory(configuration *models.Configuration) {
+	autoClean := configuration.Config.AutoClean
+	if autoClean == "true" {
+		maxSize := configuration.Config.MaxDirectorySize
+		if maxSize == 0 {
+			maxSize = 50
+		}
+		// Total size of the recording directory.
+		recordingsDirectory := "./data/recordings"
+		size, err := utils.DirSize(recordingsDirectory)
+		if err == nil {
+			sizeInMB := size / 1000 / 1000
+			if sizeInMB >= maxSize {
+				// Remove the oldest recording
+				oldestFile, err := utils.FindOldestFile(recordingsDirectory)
+				if err == nil {
+					err := os.Remove(recordingsDirectory + "/" + oldestFile.Name())
+					log.Log.Info("HandleRecordStream: removed oldest file as part of cleanup - " + recordingsDirectory + "/" + oldestFile.Name())
+					if err != nil {
+						log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+					}
+				} else {
+					log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+				}
+			}
+		} else {
+			log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+		}
+
+	} else {
+		log.Log.Info("HandleRecordStream: Autoclean disabled, nothing to do here.")
+	}
+}
+
 func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, streams []av.CodecData) {
 	log.Log.Debug("HandleRecordStream: started")
 
@@ -88,6 +122,9 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 				debug.FreeOSMemory()
 
 				recordingStatus = "idle"
+
+				// Clean up the recording directory if necessary.
+				CleanupRecordingDirectory(configuration)
 			}
 
 			// If not yet started and a keyframe, let's make a recording
@@ -131,7 +168,13 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 				// - Token
 
 				startRecording = time.Now().Unix() // we mark the current time when the record started.ss
-				s := strconv.FormatInt(startRecording, 10) + "_" + "6" + "-" + "967003" + "_" + config.Name + "_" + "200-200-400-400" + "_" + "24" + "_" + "769"
+				s := strconv.FormatInt(startRecording, 10) + "_" +
+					"6" + "-" +
+					"967003" + "_" +
+					config.Name + "_" +
+					"200-200-400-400" + "_0_" +
+					"769"
+
 				name = s + ".mp4"
 				fullName = "./data/recordings/" + name
 
@@ -202,11 +245,11 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 		var file *os.File
 		var err error
 
-		for _ = range communication.HandleMotion {
+		for motion := range communication.HandleMotion {
 
-			now = time.Now().Unix()
-			timestamp = now
-			startRecording = now // we mark the current time when the record started.
+			timestamp = time.Now().Unix()
+			startRecording = time.Now().Unix() // we mark the current time when the record started.
+			numberOfChanges := motion.NumberOfChanges
 
 			// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 			// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
@@ -217,7 +260,14 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 			// - Number of changes
 			// - Token
 
-			s := strconv.FormatInt(startRecording, 10) + "_" + "6" + "-" + "967003" + "_" + config.Name + "_" + "200-200-400-400" + "_" + "24" + "_" + "769"
+			s := strconv.FormatInt(startRecording, 10) + "_" +
+				"6" + "-" +
+				"967003" + "_" +
+				config.Name + "_" +
+				"200-200-400-400" + "_" +
+				strconv.Itoa(numberOfChanges) + "_" +
+				"769"
+
 			name := s + ".mp4"
 			fullName := "./data/recordings/" + name
 
@@ -252,16 +302,19 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 
 				now := time.Now().Unix()
 				select {
-				case <-communication.HandleMotion:
+				case motion := <-communication.HandleMotion:
 					timestamp = now
 					log.Log.Info("HandleRecordStream: motion detected while recording. Expanding recording.")
+					numberOfChanges = motion.NumberOfChanges
+					log.Log.Info("Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
 				default:
 				}
-				if timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod {
+
+				if timestamp+recordingPeriod-now < 0 || now-startRecording > maxRecordingPeriod {
 					log.Log.Info("HandleRecordStream: closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", recordingPeriod: " + strconv.FormatInt(recordingPeriod, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 					break
 				}
-				if pkt.IsKeyFrame {
+				if pkt.IsKeyFrame && start == false {
 					log.Log.Info("HandleRecordStream: write frames")
 					start = true
 				}
@@ -288,6 +341,9 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 			// Create a symbol linc.
 			fc, _ := os.Create("./data/cloud/" + name)
 			fc.Close()
+
+			// Clean up the recording directory if necessary.
+			CleanupRecordingDirectory(configuration)
 		}
 	}
 

@@ -1,4 +1,204 @@
 basePath: /
+definitions:
+  models.APIResponse:
+    properties:
+      data: {}
+    type: object
+  models.Capture:
+    properties:
+      continuous:
+        type: string
+      forwardwebrtc:
+        type: string
+      fragmented:
+        type: string
+      fragmentedduration:
+        type: integer
+      ipcamera:
+        $ref: '#/definitions/models.IPCamera'
+      maxlengthrecording:
+        type: integer
+      name:
+        type: string
+      pixelChangeThreshold:
+        type: integer
+      postrecording:
+        type: integer
+      prerecording:
+        type: integer
+      raspicamera:
+        $ref: '#/definitions/models.RaspiCamera'
+      transcodingresolution:
+        type: integer
+      transcodingwebrtc:
+        type: string
+      usbcamera:
+        $ref: '#/definitions/models.USBCamera'
+    type: object
+  models.Config:
+    properties:
+      capture:
+        $ref: '#/definitions/models.Capture'
+      cloud:
+        type: string
+      condition_uri:
+        type: string
+      heartbeaturi:
+        description: obsolete
+        type: string
+      hub_key:
+        type: string
+      hub_private_key:
+        type: string
+      hub_site:
+        type: string
+      hub_uri:
+        type: string
+      key:
+        type: string
+      kstorage:
+        $ref: '#/definitions/models.KStorage'
+      mqtt_password:
+        type: string
+      mqtt_username:
+        type: string
+      mqtturi:
+        type: string
+      name:
+        type: string
+      offline:
+        type: string
+      region:
+        $ref: '#/definitions/models.Region'
+      s3:
+        $ref: '#/definitions/models.S3'
+      stunuri:
+        type: string
+      time:
+        type: string
+      timetable:
+        items:
+          $ref: '#/definitions/models.Timetable'
+        type: array
+      timezone:
+        type: string
+      turn_password:
+        type: string
+      turn_username:
+        type: string
+      turnuri:
+        type: string
+      type:
+        type: string
+    type: object
+  models.Coordinate:
+    properties:
+      x:
+        type: number
+      "y":
+        type: number
+    type: object
+  models.IPCamera:
+    properties:
+      fps:
+        type: string
+      onvif:
+        type: boolean
+      onvif_password:
+        type: string
+      onvif_username:
+        type: string
+      onvif_xaddr:
+        type: string
+      rtsp:
+        type: string
+      sub_rtsp:
+        type: string
+    type: object
+  models.KStorage:
+    properties:
+      access_key:
+        type: string
+      cloud_key:
+        type: string
+      directory:
+        type: string
+      provider:
+        type: string
+      secret_access_key:
+        type: string
+      uri:
+        type: string
+    type: object
+  models.Polygon:
+    properties:
+      coordinates:
+        items:
+          $ref: '#/definitions/models.Coordinate'
+        type: array
+      id:
+        type: string
+    type: object
+  models.RaspiCamera:
+    properties:
+      device:
+        type: string
+    type: object
+  models.Rectangle:
+    properties:
+      x1:
+        type: integer
+      x2:
+        type: integer
+      y1:
+        type: integer
+      y2:
+        type: integer
+    type: object
+  models.Region:
+    properties:
+      name:
+        type: string
+      polygon:
+        items:
+          $ref: '#/definitions/models.Polygon'
+        type: array
+      rectangle:
+        $ref: '#/definitions/models.Rectangle'
+    type: object
+  models.S3:
+    properties:
+      bucket:
+        type: string
+      proxy:
+        type: string
+      proxyuri:
+        type: string
+      publickey:
+        type: string
+      region:
+        type: string
+      secretkey:
+        type: string
+      username:
+        type: string
+    type: object
+  models.Timetable:
+    properties:
+      end1:
+        type: integer
+      end2:
+        type: integer
+      start1:
+        type: integer
+      start2:
+        type: integer
+    type: object
+  models.USBCamera:
+    properties:
+      device:
+        type: string
+    type: object
 info:
   contact:
     email: support@kerberos.io
@@ -11,7 +211,49 @@ info:
   termsOfService: https://kerberos.io
   title: Swagger Kerberos Agent API
   version: "1.0"
-paths: {}
+paths:
+  /api/hub/verify:
+    post:
+      description: Will verify the hub connectivity.
+      operationId: verify-hub
+      parameters:
+      - description: Config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.Config'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will verify the hub connectivity.
+      tags:
+      - config
+  /api/persistence/verify:
+    post:
+      description: Will verify the persistence.
+      operationId: verify-persistence
+      parameters:
+      - description: Config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.Config'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will verify the persistence.
+      tags:
+      - config
 securityDefinitions:
   Bearer:
     in: header
