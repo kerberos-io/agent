@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { withTranslation } from 'react-i18next';
 import {
   Breadcrumb,
   ControlBar,
@@ -385,7 +386,7 @@ class Settings extends React.Component {
       loadingHub,
     } = this.state;
 
-    const { config: c } = this.props;
+    const { config: c, t } = this.props;
     const { config, snapshot } = c;
 
     const snapshotBase64 = 'data:image/png;base64,';
@@ -467,22 +468,30 @@ class Settings extends React.Component {
 
     return config ? (
       <div id="settings">
-        <Breadcrumb title="Settings" level1="Onboard your camera" level1Link="">
+        <Breadcrumb
+          title={t('settings.title')}
+          level1={t('settings.heading')}
+          level1Link=""
+        >
           <Link to="/media">
-            <Button label="Watch recordings" icon="media" type="default" />
+            <Button
+              label={t('breadcrumb.watch_recordings')}
+              icon="media"
+              type="default"
+            />
           </Link>
         </Breadcrumb>
         <ControlBar type="row">
           <Tabs>
             <Tab
-              label="All"
+              label={t('settings.submenu.all')}
               value="all"
               active={selectedTab === 'all'}
               onClick={() => this.changeTab('all')}
               icon={<Icon label="list" />}
             />
             <Tab
-              label="Overview"
+              label={t('settings.submenu.overview')}
               value="overview"
               active={selectedTab === 'overview'}
               onClick={() => this.changeTab('overview')}
@@ -732,7 +741,7 @@ class Settings extends React.Component {
                     <>
                       <Input
                         noPadding
-                        label="pre recording (seconds)"
+                        label="pre recording (key frames buffered)"
                         value={config.capture.prerecording}
                         placeholder="Seconds before an event occurred."
                         onChange={(value) =>
@@ -2008,6 +2017,7 @@ const mapDispatchToProps = (dispatch /* , ownProps */) => ({
 });
 
 Settings.propTypes = {
+  t: PropTypes.func.isRequired,
   config: PropTypes.objectOf(PropTypes.object).isRequired,
   dispatchVerifyHub: PropTypes.func.isRequired,
   dispatchVerifyPersistence: PropTypes.func.isRequired,
@@ -2019,6 +2029,6 @@ Settings.propTypes = {
   dispatchRemoveRegion: PropTypes.func.isRequired,
 };
 
-export default withRouter(
-  connect(mapStateToProps, mapDispatchToProps)(Settings)
+export default withTranslation()(
+  withRouter(connect(mapStateToProps, mapDispatchToProps)(Settings))
 );

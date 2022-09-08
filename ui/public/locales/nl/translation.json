@@ -36,5 +36,17 @@
     "time": "Tijd",
     "description": "Omschrijving",
     "name": "Naam"
+  },
+  "recordings": {
+    "title": "Opnames",
+    "heading": "Al je opnames in een eenvoudig overzicht",
+    "search_media": "Zoek video"
+  },
+  "settings": {
+    "title": "Instellingen",
+    "heading": "Configureer je camera",
+    "submenu": {
+      "all": "Alles"
+    }
   }
 }

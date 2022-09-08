@@ -14,7 +14,7 @@ i18n
       escapeValue: false,
     },
     load: 'languageOnly',
-    whitelist: ['de', 'en', 'nl', 'fr', 'pl'],
+    whitelist: ['de', 'en', 'nl', 'fr', 'pl', 'es', 'pt'],
   });
 
 export default i18n;

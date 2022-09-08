@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { withTranslation } from 'react-i18next';
 import {
   Breadcrumb,
   VideoContainer,
@@ -86,17 +87,21 @@ class Media extends React.Component {
   }
 
   render() {
-    const { events, eventsLoaded } = this.props;
+    const { events, eventsLoaded, t } = this.props;
     const { isScrolling, open, currentRecording } = this.state;
     return (
       <div id="media">
         <Breadcrumb
-          title="Recordings"
-          level1="All your recordings in a single place"
+          title={t('recordings.title')}
+          level1={t('recordings.heading')}
           level1Link=""
         >
           <Link to="/settings">
-            <Button label="Configure" icon="preferences" type="default" />
+            <Button
+              label={t('breadcrumb.configure')}
+              icon="preferences"
+              type="default"
+            />
           </Link>
         </Breadcrumb>
 
@@ -104,7 +109,7 @@ class Media extends React.Component {
           <Input
             iconleft="search"
             onChange={() => {}}
-            placeholder="Search media..."
+            placeholder={t('recordings.search_media')}
             layout="controlbar"
             type="text"
           />
@@ -195,9 +200,12 @@ const mapDispatchToProps = (dispatch) => ({
 });
 
 Media.propTypes = {
+  t: PropTypes.func.isRequired,
   events: PropTypes.objectOf(PropTypes.object).isRequired,
   eventsLoaded: PropTypes.number.isRequired,
   dispatchGetEvents: PropTypes.func.isRequired,
 };
 
-export default withRouter(connect(mapStateToProps, mapDispatchToProps)(Media));
+export default withTranslation()(
+  withRouter(connect(mapStateToProps, mapDispatchToProps)(Media))
+);

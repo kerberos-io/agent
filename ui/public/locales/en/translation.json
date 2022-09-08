@@ -21,6 +21,7 @@
     "title": "Dashboard",
     "heading": "Overview of your video surveilance",
     "number_of_days": "Number of days",
+    "total_recordings": "Total recordings",
     "connected": "Connected",
     "not_connected": "Not connected",
     "offline_mode": "Offline mode",
@@ -35,5 +36,18 @@
     "time": "Time",
     "description": "Description",
     "name": "Name"
+  },
+  "recordings": {
+    "title": "Recordings",
+    "heading": "All your recordings in a single place",
+    "search_media": "Search media"
+  },
+  "settings": {
+    "title": "Settings",
+    "heading": "Onboard your camera",
+    "submenu": {
+      "all": "All",
+      "overview": "Overview"
+    }
   }
 }
