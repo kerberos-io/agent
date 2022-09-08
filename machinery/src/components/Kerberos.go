@@ -91,9 +91,11 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// and consumed by all other routines: motion, livestream, etc.
 		if config.Capture.PreRecording <= 0 {
 			config.Capture.PreRecording = 1
+			log.Log.Warning("RunAgent: Prerecording value not found in config or invalid value! Found: " + strconv.FormatInt(config.Capture.PreRecording, 10))
 		}
 		queue = pubsub.NewQueue()
-		queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording.
+		queue.SetMaxGopCount(int(config.Capture.PreRecording)) // GOP time frame is set to prerecording.
+		log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)))
 		queue.WriteHeader(streams)
 
 		// Configure a MQTT client which helps for a bi-directional communication
@@ -107,16 +109,16 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		go capture.HandleStream(infile, queue, communication) //, &wg)
 
 		// Handle processing of motion
-		motionCursor := queue.Latest()
+		motionCursor := queue.Oldest()
 		communication.HandleMotion = make(chan models.MotionDataPartial, 1)
 		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
 		// Handle livestream SD (low resolution over MQTT)
-		livestreamCursor := queue.Latest()
+		livestreamCursor := queue.Oldest()
 		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
 		// Handle livestream HD (high resolution over WEBRTC)
-		livestreamHDCursor := queue.Latest()
+		livestreamHDCursor := queue.Oldest()
 		communication.HandleLiveHDHandshake = make(chan models.SDPPayload, 1)
 		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, streams, decoder, &decoderMutex)
 
