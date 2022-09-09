@@ -186,6 +186,12 @@ func NumberOfFilesInDirectory(path string) int {
 	return len(files)
 }
 
+func NumberOfMP4sInDirectory(path string) int {
+	pattern := filepath.Join(path, "*.mp4")
+	files, _ := filepath.Glob(pattern)
+	return len(files)
+}
+
 func RandStringBytesRmndr(n int) string {
 	b := make([]byte, n)
 	for i := range b {

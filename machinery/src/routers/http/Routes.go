@@ -73,7 +73,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 
 			// The total number of recordings stored in the directory.
 			recordingDirectory := "./data/recordings"
-			numberOfRecordings := utils.NumberOfFilesInDirectory(recordingDirectory)
+			numberOfRecordings := utils.NumberOfMP4sInDirectory(recordingDirectory)
 
 			// All days stored in this agent.
 			days := []string{}
