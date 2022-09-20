@@ -369,9 +369,37 @@ func VerifyCamera(c *gin.Context) {
 	err := c.BindJSON(&config)
 
 	if err == nil {
-		c.JSON(400, models.APIResponse{
-			Data: "Something went wrong while receiving the config",
-		})
+
+		rtspUrl := config.Capture.IPCamera.RTSP
+		_, codecs, err := OpenRTSP(rtspUrl)
+
+		if err == nil {
+
+			videoIdx := -1
+			audioIdx := -1
+			for i, codec := range codecs {
+				if codec.Type().String() == "H264" && videoIdx < 0 {
+					videoIdx = i
+				} else if codec.Type().String() == "PCM_MULAW" && audioIdx < 0 {
+					audioIdx = i
+				}
+			}
+
+			if videoIdx > -1 {
+				c.JSON(200, models.APIResponse{
+					Data: "All good, detected a H264 codec.",
+				})
+			} else {
+				c.JSON(400, models.APIResponse{
+					Data: "Stream doesn't have a H264 codec, we only support H264 so far.",
+				})
+			}
+
+		} else {
+			c.JSON(400, models.APIResponse{
+				Data: err.Error(),
+			})
+		}
 	} else {
 		c.JSON(400, models.APIResponse{
 			Data: "Something went wrong while receiving the config " + err.Error(),
