@@ -44,6 +44,13 @@ func main() {
 			name := os.Args[2]
 			port := os.Args[3]
 
+			// Check the folder permissions, it might be that we do not have permissions to write
+			// recordings, update the configuration or save snapshots.
+			err := utils.CheckDataDirectoryPermissions()
+			if err != nil {
+				log.Log.Fatal(err.Error())
+			}
+
 			// Read the config on start, and pass it to the other
 			// function and features. Please note that this might be changed
 			// when saving or updating the configuration through the REST api or MQTT handler.

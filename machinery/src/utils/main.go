@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -83,6 +84,41 @@ func CountDigits(i int64) (count int) {
 		count = count + 1
 	}
 	return count
+}
+
+func CheckDataDirectoryPermissions() error {
+	recordingsDirectory := "./data/recordings"
+	configDirectory := "./data/config"
+	snapshotsDirectory := "./data/snapshots"
+
+	err := CheckDirectoryPermissions(recordingsDirectory)
+	if err != nil {
+		return err
+	}
+	err = CheckDirectoryPermissions(configDirectory)
+	if err != nil {
+		return err
+	}
+	err = CheckDirectoryPermissions(snapshotsDirectory)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func CheckDirectoryPermissions(directory string) error {
+	file := directory + "/.test"
+	f, err := os.Create(file)
+	defer f.Close()
+	if err == nil {
+		err := os.Remove(file)
+		if err == nil {
+			return nil
+		} else {
+			return errors.New("Problem deleting a file: " + err.Error())
+		}
+	}
+	return errors.New("Problem creating a file: " + err.Error())
 }
 
 func ReadDirectory(directory string) ([]os.FileInfo, error) {
