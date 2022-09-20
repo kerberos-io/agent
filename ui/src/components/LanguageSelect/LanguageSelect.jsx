@@ -76,6 +76,16 @@ const LanguageSelect = () => {
                 {languageMap[item] ? languageMap[item].label : ''}
               </ListItem>
             ))}
+            <hr />
+            <a
+              href="https://github.com/kerberos-io/agent/issues/47"
+              rel="noreferrer"
+              target="_blank"
+            >
+              <ListItem button key="contribute-language">
+                Contribute language
+              </ListItem>
+            </a>
           </List>
         </div>
       </Popover>

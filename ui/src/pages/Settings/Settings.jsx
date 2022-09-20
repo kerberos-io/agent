@@ -498,14 +498,14 @@ class Settings extends React.Component {
               icon={<Icon label="dashboard" />}
             />
             <Tab
-              label="Camera"
+              label={t('settings.submenu.camera')}
               value="camera"
               active={selectedTab === 'camera'}
               onClick={() => this.changeTab('camera')}
               icon={<Icon label="cameras" />}
             />
             <Tab
-              label="Recording"
+              label={t('settings.submenu.recording')}
               value="recording"
               active={selectedTab === 'recording'}
               onClick={() => this.changeTab('recording')}
@@ -513,7 +513,7 @@ class Settings extends React.Component {
             />
             {config.offline !== 'true' && (
               <Tab
-                label="Streaming"
+                label={t('settings.submenu.streaming')}
                 value="streaming"
                 active={selectedTab === 'streaming'}
                 onClick={() => this.changeTab('streaming')}
@@ -521,7 +521,7 @@ class Settings extends React.Component {
               />
             )}
             <Tab
-              label="Conditions"
+              label={t('settings.submenu.conditions')}
               value="conditions"
               active={selectedTab === 'conditions'}
               onClick={() => this.changeTab('conditions')}
@@ -529,7 +529,7 @@ class Settings extends React.Component {
             />
             {config.offline !== 'true' && (
               <Tab
-                label="Persistence"
+                label={t('settings.submenu.persistence')}
                 value="persistence"
                 active={selectedTab === 'persistence'}
                 onClick={() => this.changeTab('persistence')}
@@ -547,7 +547,7 @@ class Settings extends React.Component {
           >
             <InfoBar
               type="info"
-              message="Have a look at our Kerberos Hub demo environment, to see Kerberos Hub in action!"
+              message={t('settings.info.kerberos_hub_demo')}
             />
           </a>
         )}
@@ -555,44 +555,54 @@ class Settings extends React.Component {
         {configSuccess && (
           <InfoBar
             type="success"
-            message="Your configuration have been updated successfully."
+            message={t('settings.info.configuration_updated_success')}
           />
         )}
 
         {configError && (
-          <InfoBar type="alert" message="Something went wrong while saving." />
+          <InfoBar
+            type="alert"
+            message={t('settings.info.configuration_updated_error')}
+          />
         )}
 
         {loadingHub && (
-          <InfoBar
-            type="loading"
-            message="Verifying your Kerberos Hub settings."
-          />
+          <InfoBar type="loading" message={t('settings.info.verify_hub')} />
         )}
         {verifyHubSuccess && (
           <InfoBar
             type="success"
-            message="Kerberos Hub settings are successfully verified."
+            message={t('settings.info.verify_hub_success')}
           />
         )}
         {verifyHubError && (
-          <InfoBar type="alert" message={verifyHubErrorMessage} />
+          <InfoBar
+            type="alert"
+            message={`${t(
+              'settings.info.verify_hub_error'
+            )} :${verifyHubErrorMessage}`}
+          />
         )}
 
         {loading && (
           <InfoBar
             type="loading"
-            message="Verifying your persistence settings."
+            message={t('settings.info.verify_persistence')}
           />
         )}
         {verifyPersistenceSuccess && (
           <InfoBar
             type="success"
-            message="Persistence settings are successfully verified."
+            message={t('settings.info.verify_persistence_success')}
           />
         )}
         {verifyPersistenceError && (
-          <InfoBar type="alert" message={verifyPersistenceMessage} />
+          <InfoBar
+            type="alert"
+            message={`${t(
+              'settings.info.verify_persistence_error'
+            )} :${verifyPersistenceMessage}`}
+          />
         )}
         <div className="stats grid-container --two-columns">
           <div>
@@ -600,23 +610,20 @@ class Settings extends React.Component {
             {showOverviewSection && (
               <Block>
                 <BlockHeader>
-                  <h4>General</h4>
+                  <h4>{t('settings.overview.general')}</h4>
                 </BlockHeader>
                 <BlockBody>
-                  <p>
-                    General settings allow you to configure your Kerberos Agents
-                    on a higher level.
-                  </p>
+                  <p>{t('settings.overview.description_general')}</p>
                   <Input
                     noPadding
-                    label="key"
+                    label={t('settings.overview.key')}
                     disabled
                     defaultValue={config.key}
                   />
 
                   <Input
                     noPadding
-                    label="camera name"
+                    label={t('settings.overview.camera_name')}
                     defaultValue={config.name}
                     onChange={(value) =>
                       this.onUpdateField('', 'name', value, config)
@@ -626,8 +633,8 @@ class Settings extends React.Component {
                   <Dropdown
                     isRadio
                     icon="world"
-                    label="Timezone"
-                    placeholder="Select a timezone"
+                    label={t('settings.overview.timezone')}
+                    placeholder={t('settings.overview.select_timezone')}
                     items={this.timezones}
                     selected={[config.timezone]}
                     shorten
@@ -640,7 +647,7 @@ class Settings extends React.Component {
                 </BlockBody>
                 <BlockFooter>
                   <Button
-                    label="Save"
+                    label={t('buttons.save')}
                     type="default"
                     icon="pencil"
                     onClick={this.saveConfig}
@@ -653,24 +660,21 @@ class Settings extends React.Component {
             {showCameraSection && (
               <Block>
                 <BlockHeader>
-                  <h4>Camera</h4>
+                  <h4>{t('settings.camera.camera')}</h4>
                 </BlockHeader>
                 <BlockBody>
                   <div className="warning-message">
                     <InfoBar
-                      message="Currently only H264 RTSP streams are supported."
+                      message={t('settings.camera.only_h264')}
                       type="info"
                     />
                   </div>
-                  <p>
-                    Camera settings are required to make a connection to your
-                    camera of choice.
-                  </p>
+                  <p>{t('settings.camera.description_camera')}</p>
                   <Input
                     noPadding
-                    label="RTSP URL"
+                    label={t('settings.camera.rtsp_url')}
                     value={config.capture.ipcamera.rtsp}
-                    placeholder="The IP camera address"
+                    placeholder={t('settings.camera.rtsp_h264')}
                     onChange={(value) =>
                       this.onUpdateField(
                         'capture.ipcamera',
@@ -683,7 +687,7 @@ class Settings extends React.Component {
                 </BlockBody>
                 <BlockFooter>
                   <Button
-                    label="Save"
+                    label={t('buttons.save')}
                     type="default"
                     icon="pencil"
                     onClick={this.saveConfig}
@@ -696,13 +700,10 @@ class Settings extends React.Component {
             {showRecordingSection && (
               <Block>
                 <BlockHeader>
-                  <h4>Recording</h4>
+                  <h4>{t('settings.recording.recording')}</h4>
                 </BlockHeader>
                 <BlockBody>
-                  <p>
-                    Specify how you would like to make recordings. Having a
-                    continuous 24/7 setup or a motion based recording.
-                  </p>
+                  <p>{t('settings.recording.description_recording')}</p>
                   <div className="toggle-wrapper">
                     <Toggle
                       on={config.capture.continuous === 'true'}
@@ -717,16 +718,24 @@ class Settings extends React.Component {
                       }
                     />
                     <div>
-                      <span>Continuous recording</span>
-                      <p>Make 24/7 or motion based recordings.</p>
+                      <span>
+                        {t('settings.recording.continuous_recording')}
+                      </span>
+                      <p>
+                        {t(
+                          'settings.recording.description_continuous_recording'
+                        )}
+                      </p>
                     </div>
                   </div>
 
                   <Input
                     noPadding
-                    label="max video duration (seconds)"
+                    label={t('settings.recording.max_duration')}
                     value={config.capture.maxlengthrecording}
-                    placeholder="The maximum duration of a recording."
+                    placeholder={t(
+                      'settings.recording.description_max_duration'
+                    )}
                     onChange={(value) =>
                       this.onUpdateNumberField(
                         'capture',
@@ -741,9 +750,9 @@ class Settings extends React.Component {
                     <>
                       <Input
                         noPadding
-                        label="pre recording (key frames buffered)"
+                        label={t('settings.recording.pre_recording')}
                         value={config.capture.prerecording}
-                        placeholder="Seconds before an event occurred."
+                        placeholder={t('settings.recording.max_duration')}
                         onChange={(value) =>
                           this.onUpdateNumberField(
                             'capture',
@@ -755,9 +764,9 @@ class Settings extends React.Component {
                       />
                       <Input
                         noPadding
-                        label="post recording (seconds)"
+                        label={t('settings.recording.max_duration')}
                         value={config.capture.postrecording}
-                        placeholder="Seconds after an event occurred."
+                        placeholder={t('settings.recording.max_duration')}
                         onChange={(value) =>
                           this.onUpdateNumberField(
                             'capture',
@@ -769,9 +778,9 @@ class Settings extends React.Component {
                       />
                       <Input
                         noPadding
-                        label="Recording threshold (pixels)"
+                        label={t('settings.recording.max_duration')}
                         value={config.capture.pixelChangeThreshold}
-                        placeholder="The number of pixels changed to record"
+                        placeholder={t('settings.recording.max_duration')}
                         onChange={(value) =>
                           this.onUpdateNumberField(
                             'capture',
@@ -786,7 +795,7 @@ class Settings extends React.Component {
                 </BlockBody>
                 <BlockFooter>
                   <Button
-                    label="Save"
+                    label={t('buttons.save')}
                     type="default"
                     icon="pencil"
                     onClick={this.saveConfig}
@@ -799,18 +808,13 @@ class Settings extends React.Component {
             {showStreamingSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
-                  <h4>STUN/TURN for WebRTC</h4>
+                  <h4>{t('settings.streaming.stun_turn')}</h4>
                 </BlockHeader>
                 <BlockBody>
-                  <p>
-                    For full-resolution livestreaming we use the concept of
-                    WebRTC. One of the key capabilities is the ICE-candidate
-                    feature, which allows NAT traversal using the concepts of
-                    STUN/TURN.
-                  </p>
+                  <p>{t('settings.streaming.description_stun_turn')}</p>
                   <Input
                     noPadding
-                    label="STUN server"
+                    label={t('settings.streaming.stun_server')}
                     value={config.stunuri}
                     onChange={(value) =>
                       this.onUpdateField('', 'stunuri', value, config)
@@ -818,7 +822,7 @@ class Settings extends React.Component {
                   />
                   <Input
                     noPadding
-                    label="TURN server"
+                    label={t('settings.streaming.turn_server')}
                     value={config.turnuri}
                     onChange={(value) =>
                       this.onUpdateField('', 'turnuri', value, config)
@@ -826,7 +830,7 @@ class Settings extends React.Component {
                   />
                   <Input
                     noPadding
-                    label="Username"
+                    label={t('settings.streaming.turn_username')}
                     value={config.turn_username}
                     onChange={(value) =>
                       this.onUpdateField('', 'turn_username', value, config)
@@ -834,7 +838,7 @@ class Settings extends React.Component {
                   />
                   <Input
                     noPadding
-                    label="Password"
+                    label={t('settings.streaming.turn_password')}
                     value={config.turn_password}
                     onChange={(value) =>
                       this.onUpdateField('', 'turn_password', value, config)
@@ -843,7 +847,7 @@ class Settings extends React.Component {
                 </BlockBody>
                 <BlockFooter>
                   <Button
-                    label="Save"
+                    label={t('buttons.save')}
                     onClick={this.saveConfig}
                     type="default"
                     icon="pencil"
@@ -855,11 +859,11 @@ class Settings extends React.Component {
             {showPersistenceSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
-                  <h4>Kerberos Hub</h4>
+                  <h4>{t('settings.persistence.kerberoshub')}</h4>
                 </BlockHeader>
                 <BlockBody>
                   <p>
-                    Kerberos Agents can send heartbeats to a central{' '}
+                    {t('settings.persistence.description_kerberoshub')}{' '}
                     <a
                       href="https://doc.kerberos.io/hub/first-things-first/"
                       rel="noopener noreferrer"
@@ -867,14 +871,14 @@ class Settings extends React.Component {
                     >
                       Kerberos Hub
                     </a>{' '}
-                    installation. Heartbeats and other relevant information are
-                    synced to Kerberos Hub to show realtime information about
-                    your video landscape.
+                    {t('settings.persistence.description2_kerberoshub')}
                   </p>
                   <Input
                     noPadding
-                    label="API url"
-                    placeholder="The API for Kerberos Hub."
+                    label={t('settings.persistence.kerberoshub_apiurl')}
+                    placeholder={t(
+                      'settings.persistence.kerberoshub_description_apiurl'
+                    )}
                     value={config.hub_uri}
                     onChange={(value) =>
                       this.onUpdateField('', 'hub_uri', value, config)
@@ -882,8 +886,10 @@ class Settings extends React.Component {
                   />
                   <Input
                     noPadding
-                    label="Public key"
-                    placeholder="The public key granted to your Kerberos Hub account."
+                    label={t('settings.persistence.kerberoshub_publickey')}
+                    placeholder={t(
+                      'settings.persistence.kerberoshub_description_publickey'
+                    )}
                     value={config.hub_key}
                     onChange={(value) =>
                       this.onUpdateField('', 'hub_key', value, config)
@@ -891,8 +897,10 @@ class Settings extends React.Component {
                   />
                   <Input
                     noPadding
-                    label="Private key"
-                    placeholder="The private key granted to your Kerberos Hub account."
+                    label={t('settings.persistence.kerberoshub_privatekey')}
+                    placeholder={t(
+                      'settings.persistence.kerberoshub_description_privatekey'
+                    )}
                     value={config.hub_private_key}
                     onChange={(value) =>
                       this.onUpdateField('', 'hub_private_key', value, config)
@@ -900,9 +908,11 @@ class Settings extends React.Component {
                   />
                   <Input
                     noPadding
-                    label="Site"
+                    label={t('settings.persistence.kerberoshub_site')}
                     value={config.hub_site}
-                    placeholder="The site ID the Kerberos Agents are belonging to in Kerberos Hub."
+                    placeholder={t(
+                      'settings.persistence.kerberoshub_description_site'
+                    )}
                     onChange={(value) =>
                       this.onUpdateField('', 'hub_site', value, config)
                     }
@@ -910,14 +920,14 @@ class Settings extends React.Component {
                 </BlockBody>
                 <BlockFooter>
                   <Button
-                    label="Verify Connection"
+                    label={t('settings.persistence.verify_connection')}
                     disabled={loadingHub}
                     type={loadingHub ? 'neutral' : 'default'}
                     onClick={this.verifyHubSettings}
                     icon="verify"
                   />
                   <Button
-                    label="Save"
+                    label={t('buttons.save')}
                     onClick={this.saveConfig}
                     type="default"
                     icon="pencil"
@@ -930,13 +940,10 @@ class Settings extends React.Component {
             {showConditionsHubSection && (
               <Block>
                 <BlockHeader>
-                  <h4>Region Of Interest</h4>
+                  <h4>{t('settings.conditions.regionofinterest')}</h4>
                 </BlockHeader>
                 <BlockBody>
-                  <p>
-                    By defining one or more regions, motion will be tracked only
-                    in the regions you have defined.
-                  </p>
+                  <p>{t('settings.conditions.description_regionofinterest')}</p>
                   {config.region && (
                     <ImageCanvas
                       image={snapshotBase64 + snapshot}
@@ -950,7 +957,7 @@ class Settings extends React.Component {
                 </BlockBody>
                 <BlockFooter>
                   <Button
-                    label="Save"
+                    label={t('buttons.save')}
                     onClick={this.saveConfig}
                     type="default"
                     icon="pencil"
@@ -965,18 +972,14 @@ class Settings extends React.Component {
             {showCameraSection && (
               <Block>
                 <BlockHeader>
-                  <h4>ONVIF</h4>
+                  <h4>{t('settings.camera.onvif')}</h4>
                 </BlockHeader>
                 <BlockBody>
-                  <p>
-                    Credentials to communicate with ONVIF capabilities. These
-                    are used for PTZ or other capabilities provided by the
-                    camera.
-                  </p>
+                  <p>{t('settings.camera.description_onvif')}</p>
 
                   <Input
                     noPadding
-                    label="onvif xaddr"
+                    label={t('settings.camera.onvif_xaddr')}
                     value={config.capture.ipcamera.onvif_xaddr}
                     placeholder="http://x.x.x.x/onvif/device_service"
                     onChange={(value) =>
@@ -991,7 +994,7 @@ class Settings extends React.Component {
 
                   <Input
                     noPadding
-                    label="username"
+                    label={t('settings.camera.onvif_username')}
                     value={config.capture.ipcamera.onvif_username}
                     onChange={(value) =>
                       this.onUpdateField(
@@ -1005,7 +1008,7 @@ class Settings extends React.Component {
 
                   <Input
                     noPadding
-                    label="password"
+                    label={t('settings.camera.onvif_password')}
                     value={config.capture.ipcamera.onvif_password}
                     onChange={(value) =>
                       this.onUpdateField(
@@ -1019,7 +1022,7 @@ class Settings extends React.Component {
                 </BlockBody>
                 <BlockFooter>
                   <Button
-                    label="Save"
+                    label={t('buttons.save')}
                     type="default"
                     icon="pencil"
                     onClick={this.saveConfig}
@@ -1032,12 +1035,11 @@ class Settings extends React.Component {
             {showOverviewSection && (
               <Block>
                 <BlockHeader>
-                  <h4>Advanced configuration</h4>
+                  <h4>{t('settings.overview.advanced_configuration')}</h4>
                 </BlockHeader>
                 <BlockBody>
                   <p>
-                    Detailed configuration options to enable or disable specific
-                    parts of the Kerberos Agent
+                    {t('settings.overview.description_advanced_configuration')}
                   </p>
                   <div className="toggle-wrapper">
                     <Toggle
@@ -1048,14 +1050,14 @@ class Settings extends React.Component {
                       }
                     />
                     <div>
-                      <span>Offline mode</span>
-                      <p>Disable all outgoing traffic</p>
+                      <span>{t('settings.overview.offline_mode')}</span>
+                      <p>{t('settings.overview.description_offline_mode')}</p>
                     </div>
                   </div>
                 </BlockBody>
                 <BlockFooter>
                   <Button
-                    label="Save"
+                    label={t('buttons.save')}
                     type="default"
                     icon="pencil"
                     onClick={this.saveConfig}
@@ -1067,11 +1069,11 @@ class Settings extends React.Component {
             {showStreamingSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
-                  <h4>MQTT</h4>
+                  <h4>{t('settings.streaming.mqtt')}</h4>
                 </BlockHeader>
                 <BlockBody>
                   <p>
-                    A MQTT broker is used to communicate from{' '}
+                    {t('settings.streaming.description_mqtt')}{' '}
                     <a
                       href="https://doc.kerberos.io/hub/first-things-first/"
                       rel="noopener noreferrer"
@@ -1079,12 +1081,11 @@ class Settings extends React.Component {
                     >
                       Kerberos Hub
                     </a>{' '}
-                    to the Kerberos Agent, to achieve for example livestreaming
-                    or ONVIF (PTZ) capabilities.
+                    {t('settings.streaming.description2_mqtt')}
                   </p>
                   <Input
                     noPadding
-                    label="Broker Uri"
+                    label={t('settings.streaming.mqtt_brokeruri')}
                     value={config.mqtturi}
                     onChange={(value) =>
                       this.onUpdateField('', 'mqtturi', value, config)
@@ -1092,7 +1093,7 @@ class Settings extends React.Component {
                   />
                   <Input
                     noPadding
-                    label="Username"
+                    label={t('settings.streaming.mqtt_username')}
                     value={config.mqtt_username}
                     onChange={(value) =>
                       this.onUpdateField('', 'mqtt_username', value, config)
@@ -1100,7 +1101,7 @@ class Settings extends React.Component {
                   />
                   <Input
                     noPadding
-                    label="Password"
+                    label={t('settings.streaming.mqtt_password')}
                     value={config.mqtt_password}
                     onChange={(value) =>
                       this.onUpdateField('', 'mqtt_password', value, config)
@@ -1109,7 +1110,7 @@ class Settings extends React.Component {
                 </BlockBody>
                 <BlockFooter>
                   <Button
-                    label="Save"
+                    label={t('buttons.save')}
                     onClick={this.saveConfig}
                     type="default"
                     icon="pencil"
@@ -1122,12 +1123,10 @@ class Settings extends React.Component {
             {showStreamingSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
-                  <h4>Forwarding and transcoding</h4>
+                  <h4>{t('settings.streaming.stun_turn_forward')}</h4>
                 </BlockHeader>
                 <BlockBody>
-                  <p>
-                    Optimisations and enhancements for TURN/STUN communication.
-                  </p>
+                  <p>{t('settings.streaming.stun_turn_description_forward')}</p>
 
                   <div className="toggle-wrapper">
                     <Toggle
@@ -1143,8 +1142,10 @@ class Settings extends React.Component {
                       }
                     />
                     <div>
-                      <span>Forwarding to WebRTC broker</span>
-                      <p>Forward h264 stream through MQTT</p>
+                      <span>{t('settings.streaming.stun_turn_webrtc')}</span>
+                      <p>
+                        {t('settings.streaming.stun_turn_description_webrtc')}
+                      </p>
                     </div>
                   </div>
 
@@ -1162,15 +1163,19 @@ class Settings extends React.Component {
                       }
                     />
                     <div>
-                      <span>Transcode stream</span>
-                      <p>Convert stream to a lower resolution</p>
+                      <span>{t('settings.streaming.stun_turn_transcode')}</span>
+                      <p>
+                        {t(
+                          'settings.streaming.stun_turn_description_transcode'
+                        )}
+                      </p>
                     </div>
                   </div>
 
                   {config.capture.transcodingwebrtc === 'true' && (
                     <Input
                       noPadding
-                      label="Downscale resolution (in % or original resolution)"
+                      label={t('settings.streaming.stun_turn_downscale')}
                       value={config.capture.transcodingresolution}
                       placeholder="The % of the original resolution."
                       onChange={(value) =>
@@ -1186,7 +1191,7 @@ class Settings extends React.Component {
                 </BlockBody>
                 <BlockFooter>
                   <Button
-                    label="Save"
+                    label={t('buttons.save')}
                     onClick={this.saveConfig}
                     type="default"
                     icon="pencil"
@@ -1200,14 +1205,10 @@ class Settings extends React.Component {
               <>
                 <Block>
                   <BlockHeader>
-                    <h4>Auto clean</h4>
+                    <h4>{t('settings.recording.autoclean')}</h4>
                   </BlockHeader>
                   <BlockBody>
-                    <p>
-                      Specify if the Kerberos Agent can cleanup recordings when
-                      a specific storage capacity (MB) is reached. This will
-                      remove the oldest recordings when the capacity is reached.
-                    </p>
+                    <p>{t('settings.recording.description_autoclean')}</p>
 
                     <div className="toggle-wrapper">
                       <Toggle
@@ -1218,17 +1219,23 @@ class Settings extends React.Component {
                         }
                       />
                       <div>
-                        <span>Enable auto clean</span>
-                        <p>Remove oldest recording when capacity reached.</p>
+                        <span>{t('settings.recording.autoclean_enable')}</span>
+                        <p>
+                          {t('settings.recording.autoclean_description_enable')}
+                        </p>
                       </div>
                     </div>
 
                     {config.auto_clean === 'true' && (
                       <Input
                         noPadding
-                        label="Maximum directory size (MB)"
+                        label={t(
+                          'settings.recording.autoclean_max_directory_size'
+                        )}
                         value={config.max_directory_size}
-                        placeholder="The maximum MB's of recordings stored."
+                        placeholder={t(
+                          'settings.recording.autoclean_description_enable'
+                        )}
                         onChange={(value) =>
                           this.onUpdateNumberField(
                             '',
@@ -1242,7 +1249,7 @@ class Settings extends React.Component {
                   </BlockBody>
                   <BlockFooter>
                     <Button
-                      label="Save"
+                      label={t('buttons.save')}
                       type="default"
                       icon="pencil"
                       onClick={this.saveConfig}
@@ -1251,13 +1258,11 @@ class Settings extends React.Component {
                 </Block>
                 <Block>
                   <BlockHeader>
-                    <h4>Fragmented recordings</h4>
+                    <h4>{t('settings.recording.fragmentedrecordings')}</h4>
                   </BlockHeader>
                   <BlockBody>
                     <p>
-                      When recordings are fragmented they are suitable for an
-                      HLS stream. When turned on the MP4 container will look a
-                      bit different.
+                      {t('settings.recording.description_fragmentedrecordings')}
                     </p>
 
                     <div className="toggle-wrapper">
@@ -1274,17 +1279,27 @@ class Settings extends React.Component {
                         }
                       />
                       <div>
-                        <span>Enable fragmentation</span>
-                        <p>Fragmented recordings are required for HLS.</p>
+                        <span>
+                          {t('settings.recording.fragmentedrecordings_enable')}
+                        </span>
+                        <p>
+                          {t(
+                            'settings.recording.fragmentedrecordings_description_enable'
+                          )}
+                        </p>
                       </div>
                     </div>
 
                     {config.capture.fragmented === 'true' && (
                       <Input
                         noPadding
-                        label="fragment duration"
+                        label={t(
+                          'settings.recording.fragmentedrecordings_duration'
+                        )}
                         value={config.capture.fragmentedduration}
-                        placeholder="Duration of a single fragment."
+                        placeholder={t(
+                          'settings.recording.fragmentedrecordings_description_duration'
+                        )}
                         onChange={(value) =>
                           this.onUpdateNumberField(
                             'capture',
@@ -1312,15 +1327,14 @@ class Settings extends React.Component {
             {showConditionsHubSection && (
               <Block>
                 <BlockHeader>
-                  <h4>Time Of Interest</h4>
+                  <h4>{t('settings.conditions.timeofinterest')}</h4>
                 </BlockHeader>
                 <BlockBody>
                   <div className="grid-2">
                     {this.timetable && this.timetable.length > 0 && (
                       <div>
                         <p>
-                          Only make recordings between specific time intervals
-                          (based on Timezone).
+                          {t('settings.conditions.description_timeofinterest')}
                         </p>
 
                         <div className="toggle-wrapper">
@@ -1332,14 +1346,22 @@ class Settings extends React.Component {
                             }
                           />
                           <div>
-                            <span>Enabled</span>
-                            <p>If enabled you can specify time windows.</p>
+                            <span>
+                              {t('settings.conditions.timeofinterest_enabled')}
+                            </span>
+                            <p>
+                              {t(
+                                'settings.conditions.timeofinterest_description_enabled'
+                              )}
+                            </p>
                           </div>
                         </div>
 
                         {config.time === 'true' && (
                           <div>
-                            <span className="time-of-interest">Sunday</span>
+                            <span className="time-of-interest">
+                              {t('settings.conditions.sunday')}
+                            </span>
                             <div className="grid-4">
                               <Input
                                 noPadding
@@ -1399,7 +1421,9 @@ class Settings extends React.Component {
                               />
                             </div>
 
-                            <span className="time-of-interest">Monday</span>
+                            <span className="time-of-interest">
+                              {t('settings.conditions.monday')}
+                            </span>
                             <div className="grid-4">
                               <Input
                                 noPadding
@@ -1459,7 +1483,9 @@ class Settings extends React.Component {
                               />
                             </div>
 
-                            <span className="time-of-interest">Tuesday</span>
+                            <span className="time-of-interest">
+                              {t('settings.conditions.tuesday')}
+                            </span>
                             <div className="grid-4">
                               <Input
                                 noPadding
@@ -1519,7 +1545,9 @@ class Settings extends React.Component {
                               />
                             </div>
 
-                            <span className="time-of-interest">Wednesday</span>
+                            <span className="time-of-interest">
+                              {t('settings.conditions.wednesday')}
+                            </span>
                             <div className="grid-4">
                               <Input
                                 noPadding
@@ -1579,7 +1607,9 @@ class Settings extends React.Component {
                               />
                             </div>
 
-                            <span className="time-of-interest">Thursday</span>
+                            <span className="time-of-interest">
+                              {t('settings.conditions.thursday')}
+                            </span>
                             <div className="grid-4">
                               <Input
                                 noPadding
@@ -1639,7 +1669,9 @@ class Settings extends React.Component {
                               />
                             </div>
 
-                            <span className="time-of-interest">Friday</span>
+                            <span className="time-of-interest">
+                              {t('settings.conditions.friday')}
+                            </span>
                             <div className="grid-4">
                               <Input
                                 noPadding
@@ -1699,7 +1731,9 @@ class Settings extends React.Component {
                               />
                             </div>
 
-                            <span className="time-of-interest">Saturday</span>
+                            <span className="time-of-interest">
+                              {t('settings.conditions.saturday')}
+                            </span>
                             <div className="grid-4">
                               <Input
                                 noPadding
@@ -1780,12 +1814,11 @@ class Settings extends React.Component {
             {showConditionsHubSection && (
               <Block>
                 <BlockHeader>
-                  <h4>External Condition</h4>
+                  <h4>{t('settings.conditions.externalcondition')}</h4>
                 </BlockHeader>
                 <BlockBody>
                   <p>
-                    Depending on an external webservice recording can be enabled
-                    or disabled.
+                    {t('settings.conditions.description_externalcondition')}
                   </p>
                   <Input
                     noPadding
@@ -1817,18 +1850,17 @@ class Settings extends React.Component {
             {showPersistenceSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
-                  <h4>Persistence</h4>
+                  <h4>{t('settings.persistence.persistence')}</h4>
                 </BlockHeader>
                 <BlockBody>
                   <p>
-                    Having the ability to store your recordings is the beginning
-                    of everything. You can choose between our{' '}
+                    {t('settings.persistence.description_persistence')}{' '}
                     <a
                       href="https://doc.kerberos.io/hub/first-things-first/"
                       rel="noopener noreferrer"
                       target="_blank"
                     >
-                      Kerberos Hub (SAAS offering)
+                      {t('settings.persistence.saasoffering')}
                     </a>
                     ,{' '}
                     <a
@@ -1838,12 +1870,12 @@ class Settings extends React.Component {
                     >
                       Kerberos Vault
                     </a>
-                    , or a 3rd party provider.
+                    {t('settings.persistence.description2_persistence')}.
                   </p>
                   <Dropdown
                     isRadio
                     icon="cloud"
-                    placeholder="Select a persistence"
+                    placeholder={t('settings.persistence.select_persistence')}
                     selected={[config.cloud]}
                     items={this.storageTypes}
                     onChange={(value) =>
@@ -1854,8 +1886,10 @@ class Settings extends React.Component {
                     <>
                       <Input
                         noPadding
-                        label="Kerberos Hub API URL"
-                        placeholder="The API endpoint for uploading your recordings."
+                        label={t('settings.persistence.kerberoshub_proxyurl')}
+                        placeholder={t(
+                          'settings.persistence.kerberoshub_description_proxyurl'
+                        )}
                         value={config.s3 ? config.s3.proxyuri : ''}
                         onChange={(value) =>
                           this.onUpdateField('s3', 'proxyuri', value, config.s3)
@@ -1863,8 +1897,10 @@ class Settings extends React.Component {
                       />
                       <Input
                         noPadding
-                        label="Region"
-                        placeholder="The region we are storing our recordings in."
+                        label={t('settings.persistence.kerberoshub_region')}
+                        placeholder={t(
+                          'settings.persistence.kerberoshub_description_region'
+                        )}
                         value={config.s3 ? config.s3.region : ''}
                         onChange={(value) =>
                           this.onUpdateField('s3', 'region', value, config.s3)
@@ -1872,8 +1908,10 @@ class Settings extends React.Component {
                       />
                       <Input
                         noPadding
-                        label="Bucket"
-                        placeholder="The bucket we are storing our recordings in."
+                        label={t('settings.persistence.kerberoshub_bucket')}
+                        placeholder={t(
+                          'settings.persistence.kerberoshub_description_bucket'
+                        )}
                         value={config.s3 ? config.s3.bucket : ''}
                         onChange={(value) =>
                           this.onUpdateField('s3', 'bucket', value, config.s3)
@@ -1881,8 +1919,10 @@ class Settings extends React.Component {
                       />
                       <Input
                         noPadding
-                        label="Username/Directory"
-                        placeholder="The username of your Kerberos Hub account."
+                        label={t('settings.persistence.kerberoshub_username')}
+                        placeholder={t(
+                          'settings.persistence.kerberoshub_description_username'
+                        )}
                         value={config.s3 ? config.s3.username : ''}
                         onChange={(value) =>
                           this.onUpdateField('s3', 'username', value, config.s3)
@@ -1894,8 +1934,10 @@ class Settings extends React.Component {
                     <>
                       <Input
                         noPadding
-                        label="Kerberos Vault API URL"
-                        placeholder="The Kerberos Vault API"
+                        label={t('settings.persistence.kerberosvault_apiurl')}
+                        placeholder={t(
+                          'settings.persistence.kerberosvault_description_apiurl'
+                        )}
                         value={config.kstorage ? config.kstorage.uri : ''}
                         onChange={(value) =>
                           this.onUpdateField(
@@ -1908,8 +1950,10 @@ class Settings extends React.Component {
                       />
                       <Input
                         noPadding
-                        label="Provider"
-                        placeholder="The provider to which your recordings will be send."
+                        label={t('settings.persistence.kerberosvault_provider')}
+                        placeholder={t(
+                          'settings.persistence.kerberosvault_description_provider'
+                        )}
                         value={config.kstorage ? config.kstorage.provider : ''}
                         onChange={(value) =>
                           this.onUpdateField(
@@ -1922,8 +1966,12 @@ class Settings extends React.Component {
                       />
                       <Input
                         noPadding
-                        label="Directory"
-                        placeholder="Sub directory the recordings will be stored in your provider."
+                        label={t(
+                          'settings.persistence.kerberosvault_directory'
+                        )}
+                        placeholder={t(
+                          'settings.persistence.kerberosvault_description_directory'
+                        )}
                         value={config.kstorage ? config.kstorage.directory : ''}
                         onChange={(value) =>
                           this.onUpdateField(
@@ -1936,8 +1984,12 @@ class Settings extends React.Component {
                       />
                       <Input
                         noPadding
-                        label="Access key"
-                        placeholder="The access key of your Kerberos Vault account."
+                        label={t(
+                          'settings.persistence.kerberosvault_accesskey'
+                        )}
+                        placeholder={t(
+                          'settings.persistence.kerberosvault_description_accesskey'
+                        )}
                         value={
                           config.kstorage ? config.kstorage.access_key : ''
                         }
@@ -1952,8 +2004,12 @@ class Settings extends React.Component {
                       />
                       <Input
                         noPadding
-                        label="Secret key"
-                        placeholder="The secret key of your Kerberos Vault account."
+                        label={t(
+                          'settings.persistence.kerberosvault_secretkey'
+                        )}
+                        placeholder={t(
+                          'settings.persistence.kerberosvault_description_secretkey'
+                        )}
                         value={
                           config.kstorage
                             ? config.kstorage.secret_access_key
@@ -1973,7 +2029,7 @@ class Settings extends React.Component {
                 </BlockBody>
                 <BlockFooter>
                   <Button
-                    label="Verify Connection"
+                    label={t('settings.persistence.verify_connection')}
                     disabled={loading}
                     onClick={this.verifyPersistenceSettings}
                     type={loading ? 'neutral' : 'default'}
