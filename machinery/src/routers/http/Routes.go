@@ -7,6 +7,7 @@ import (
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -73,7 +74,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 
 			// The total number of recordings stored in the directory.
 			recordingDirectory := "./data/recordings"
-			numberOfRecordings := utils.NumberOfFilesInDirectory(recordingDirectory)
+			numberOfRecordings := utils.NumberOfMP4sInDirectory(recordingDirectory)
 
 			// All days stored in this agent.
 			days := []string{}
@@ -202,6 +203,10 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			c.JSON(200, gin.H{
 				"stopped": true,
 			})
+		})
+
+		api.POST("/camera/verify", func(c *gin.Context) {
+			capture.VerifyCamera(c)
 		})
 
 		api.POST("/hub/verify", func(c *gin.Context) {

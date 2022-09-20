@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import './LanguageSelect.scss';
 
 const LanguageSelect = () => {
-  let selected = localStorage.getItem('i18nextLng') || 'en';
+  let selected = localStorage.getItem('i18nextLng') || i18next.language || 'en';
   const languageMap = {
     en: {
       label: 'English',
@@ -20,6 +20,8 @@ const LanguageSelect = () => {
     fr: { label: 'Francais', dir: 'ltr', active: false },
     pl: { label: 'Polski', dir: 'ltr', active: false },
     de: { label: 'Deutsch', dir: 'ltr', active: false },
+    pt: { label: 'Português', dir: 'ltr', active: false },
+    es: { label: 'Español', dir: 'ltr', active: false },
   };
 
   if (!languageMap[selected]) {
@@ -74,6 +76,16 @@ const LanguageSelect = () => {
                 {languageMap[item] ? languageMap[item].label : ''}
               </ListItem>
             ))}
+            <hr />
+            <a
+              href="https://github.com/kerberos-io/agent/issues/47"
+              rel="noreferrer"
+              target="_blank"
+            >
+              <ListItem button key="contribute-language">
+                Contribute language
+              </ListItem>
+            </a>
           </List>
         </div>
       </Popover>

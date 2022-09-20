@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
@@ -348,4 +349,60 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 	}
 
 	log.Log.Debug("HandleRecordStream: finished")
+}
+
+// VerifyCamera godoc
+// @Router /api/camera/verify [post]
+// @ID verify-camera
+// @Security Bearer
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @Tags capture
+// @Param config body models.Config true "Config"
+// @Summary Will verify the camera connectivity.
+// @Description Will verify the camera connectivity.
+// @Success 200 {object} models.APIResponse
+func VerifyCamera(c *gin.Context) {
+
+	var config models.Config
+	err := c.BindJSON(&config)
+
+	if err == nil {
+
+		rtspUrl := config.Capture.IPCamera.RTSP
+		_, codecs, err := OpenRTSP(rtspUrl)
+
+		if err == nil {
+
+			videoIdx := -1
+			audioIdx := -1
+			for i, codec := range codecs {
+				if codec.Type().String() == "H264" && videoIdx < 0 {
+					videoIdx = i
+				} else if codec.Type().String() == "PCM_MULAW" && audioIdx < 0 {
+					audioIdx = i
+				}
+			}
+
+			if videoIdx > -1 {
+				c.JSON(200, models.APIResponse{
+					Data: "All good, detected a H264 codec.",
+				})
+			} else {
+				c.JSON(400, models.APIResponse{
+					Data: "Stream doesn't have a H264 codec, we only support H264 so far.",
+				})
+			}
+
+		} else {
+			c.JSON(400, models.APIResponse{
+				Data: err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, models.APIResponse{
+			Data: "Something went wrong while receiving the config " + err.Error(),
+		})
+	}
 }

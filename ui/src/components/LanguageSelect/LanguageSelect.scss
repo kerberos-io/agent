@@ -22,3 +22,12 @@
 #language-picker {
     cursor: pointer;
 }
+
+a, a:active, a:focus, a:hover {
+    color: inherit;
+}
+
+hr {
+    margin: 8px 0 0 0 !important;
+    padding: 4px 0 0 0 !important;
+}

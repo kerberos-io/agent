@@ -7,18 +7,18 @@
     "save": "Save"
   },
   "navigation": {
-    "profile": "Profil",
+    "profile": "Perfil",
     "admin": "admin",
-    "management": "Kierownictwo",
-    "dashboard": "Panel",
-    "recordings": "Nagrania", 
-    "settings": "Ustawienia",
-    "help_support": "Pomoc wsparcie",
+    "management": "Administración",
+    "dashboard": "Tablero",
+    "recordings": "Grabaciones", 
+    "settings": "Ajustes",
+    "help_support": "Servicio de asistencia",
     "swagger": "Swagger API",
-    "documentation": "Dokumentacja",
-    "ui_library": "UI Biblioteka",
-    "layout": "Język i układ",
-    "choose_language": "Wybierz język"
+    "documentation": "Documentación",
+    "ui_library": "UI Biblioteca",
+    "layout": "Idioma y diseño",
+    "choose_language": "Elige lengua"
   },
   "dashboard": {
     "title": "Dashboard",

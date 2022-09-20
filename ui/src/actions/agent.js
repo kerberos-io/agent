@@ -6,6 +6,7 @@ import {
   doGetKerberosAgentTags,
   doGetDashboardInformation,
   doGetEvents,
+  doVerifyCamera,
 } from '../api/agent';
 
 export const addRegion = (id, polygon) => {
@@ -35,6 +36,28 @@ export const updateRegion = (id, polygon) => {
       id,
       polygon,
     });
+  };
+};
+
+export const verifyCamera = (config, onSuccess, onError) => {
+  return (dispatch) => {
+    doVerifyCamera(
+      config,
+      () => {
+        dispatch({
+          type: 'VERIFY_CAMERA',
+        });
+        if (onSuccess) {
+          onSuccess();
+        }
+      },
+      (error) => {
+        const { data } = error.response.data;
+        if (onError) {
+          onError(data);
+        }
+      }
+    );
   };
 };
 
