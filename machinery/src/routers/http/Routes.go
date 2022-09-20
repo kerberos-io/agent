@@ -7,6 +7,7 @@ import (
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -202,6 +203,10 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			c.JSON(200, gin.H{
 				"stopped": true,
 			})
+		})
+
+		api.POST("/camera/verify", func(c *gin.Context) {
+			capture.VerifyCamera(c)
 		})
 
 		api.POST("/hub/verify", func(c *gin.Context) {

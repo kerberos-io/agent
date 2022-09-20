@@ -66,7 +66,10 @@
       "verify_hub_error": "Er ging iets fout tijdens het controleren van Kerberos Hub",
       "verify_persistence": "Controleren van de opslag instellingen.",
       "verify_persistence_success": "De opslag instellingen zijn goed bevonden",
-      "verify_persistence_error": "Er ging iets fout tijdens het controleren van de opslag instellingen"
+      "verify_persistence_error": "Er ging iets fout tijdens het controleren van de opslag instellingen",
+      "verify_camera": "We controleren de camera instellingen.",
+      "verify_camera_success": "De camera instellingen zijn gevalideerd.",
+      "verify_camera_error": "Er ging iets mis met de camera instellingen."
     },
     "overview": {
       "general": "Algemeen",
@@ -90,7 +93,8 @@
       "description_onvif": "Gegevens om te communiceren met ONVIF vaardigheden. Deze worden gebruikt voor PTZ of andere vaardigheden van de camera.",
       "onvif_xaddr": "ONVIF xaddr",
       "onvif_username": "ONVIF gebruikersnaam",
-      "onvif_password": "ONVIF wachtwoord"
+      "onvif_password": "ONVIF wachtwoord",
+      "verify_connection": "Verifieer verbinding"
     },
     "recording": {
       "recording": "Opname",
@@ -116,7 +120,8 @@
       "fragmentedrecordings_enable": "Zet fragmentatie aan",
       "fragmentedrecordings_description_enable": "Fragmenteerde opnames zijn noodzakelijk voor HLS.",
       "fragmentedrecordings_duration": "fragment duratie",
-      "fragmentedrecordings_description_duration": "Duratie van een fragment."
+      "fragmentedrecordings_description_duration": "Duratie van een fragment.",
+      "verify_connection": "Verifieer Connectie"
     },
     "streaming": {
       "stun_turn": "STUN/TURN voor WebRTC",
@@ -191,7 +196,7 @@
       "kerberosvault_description_accesskey": "De access key van jouw Kerberos Vault account.",
       "kerberosvault_secretkey": "Secret key",
       "kerberosvault_description_secretkey": "De secret key van jouw Kerberos Vault account.",
-      "verify_connection": "Verifieer connectie"
+      "verify_connection": "Verifieer verbinding"
     }
   }
 }

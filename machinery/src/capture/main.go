@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
@@ -348,4 +349,32 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 	}
 
 	log.Log.Debug("HandleRecordStream: finished")
+}
+
+// VerifyCamera godoc
+// @Router /api/camera/verify [post]
+// @ID verify-camera
+// @Security Bearer
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @Tags capture
+// @Param config body models.Config true "Config"
+// @Summary Will verify the camera connectivity.
+// @Description Will verify the camera connectivity.
+// @Success 200 {object} models.APIResponse
+func VerifyCamera(c *gin.Context) {
+
+	var config models.Config
+	err := c.BindJSON(&config)
+
+	if err == nil {
+		c.JSON(400, models.APIResponse{
+			Data: "Something went wrong while receiving the config",
+		})
+	} else {
+		c.JSON(400, models.APIResponse{
+			Data: "Something went wrong while receiving the config " + err.Error(),
+		})
+	}
 }

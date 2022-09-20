@@ -66,7 +66,10 @@
       "verify_hub_error": "Something went wrong while verifying Kerberos Hub",
       "verify_persistence": "Verifying your persistence settings.",
       "verify_persistence_success": "Persistence settings are successfully verified.",
-      "verify_persistence_error": "Something went wrong while verifying the persistence"
+      "verify_persistence_error": "Something went wrong while verifying the persistence",
+      "verify_camera": "Verifying your camera settings.",
+      "verify_camera_success": "Camera settings are successfully verified.",
+      "verify_camera_error": "Something went wrong while verifying the camera settings"
     },
     "overview": {
       "general": "General",
@@ -90,7 +93,8 @@
       "description_onvif": "Credentials to communicate with ONVIF capabilities. These are used for PTZ or other capabilities provided by the camera.",
       "onvif_xaddr": "ONVIF xaddr",
       "onvif_username": "ONVIF username",
-      "onvif_password": "ONVIF password"
+      "onvif_password": "ONVIF password",
+      "verify_connection": "Verify Connection"
     },
     "recording": {
       "recording": "Recording",

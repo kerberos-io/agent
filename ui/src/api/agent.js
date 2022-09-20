@@ -91,6 +91,25 @@ export function doVerifyHub(config, onSuccess, onError) {
     });
 }
 
+export function doVerifyCamera(config, onSuccess, onError) {
+  const endpoint = API.post(`camera/verify`, {
+    ...config,
+  });
+  endpoint
+    .then((res) => {
+      if (res.status !== 200) {
+        throw new Error(res.data);
+      }
+      return res.data;
+    })
+    .then((data) => {
+      onSuccess(data);
+    })
+    .catch((error) => {
+      onError(error);
+    });
+}
+
 export function doGetDashboardInformation(onSuccess, onError) {
   const endpoint = API.get(`dashboard`);
   endpoint

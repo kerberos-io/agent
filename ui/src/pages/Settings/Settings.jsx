@@ -27,6 +27,7 @@ import {
   updateRegion,
   removeRegion,
   saveConfig,
+  verifyCamera,
   verifyHub,
   verifyPersistence,
   getConfig,
@@ -57,8 +58,12 @@ class Settings extends React.Component {
       verifyPersistenceSuccess: false,
       verifyPersistenceError: false,
       verifyPersistenceMessage: '',
+      verifyCameraSuccess: false,
+      verifyCameraError: false,
+      verifyCameraMessage: '',
       loading: false,
       loadingHub: false,
+      loadingCamera: false,
     };
     this.storageTypes = [
       {
@@ -107,6 +112,7 @@ class Settings extends React.Component {
     this.onUpdateTimeline = this.onUpdateTimeline.bind(this);
     this.verifyPersistenceSettings = this.verifyPersistenceSettings.bind(this);
     this.verifyHubSettings = this.verifyHubSettings.bind(this);
+    this.verifyCameraSettings = this.verifyCameraSettings.bind(this);
     this.calculateTimetable = this.calculateTimetable.bind(this);
     this.saveConfig = this.saveConfig.bind(this);
     this.onUpdateDropdown = this.onUpdateDropdown.bind(this);
@@ -298,6 +304,9 @@ class Settings extends React.Component {
         verifyHubErrorMessage: '',
         hubSuccess: false,
         hubError: false,
+        verifyCameraSuccess: false,
+        verifyCameraError: false,
+        verifyCameraErrorMessage: '',
         loadingHub: true,
       });
 
@@ -341,6 +350,9 @@ class Settings extends React.Component {
         verifyPersistenceError: false,
         persistenceSuccess: false,
         persistenceError: false,
+        verifyCameraSuccess: false,
+        verifyCameraError: false,
+        verifyCameraErrorMessage: '',
         loading: true,
       });
 
@@ -370,6 +382,49 @@ class Settings extends React.Component {
     }
   }
 
+  verifyCameraSettings() {
+    const { config, dispatchVerifyCamera } = this.props;
+    if (config) {
+      this.setState({
+        configSuccess: false,
+        configError: false,
+        verifyPersistenceSuccess: false,
+        verifyPersistenceError: false,
+        verifyHubSuccess: false,
+        verifyHubError: false,
+        verifyHubErrorMessage: '',
+        verifyCameraSuccess: false,
+        verifyCameraError: false,
+        verifyCameraErrorMessage: '',
+        hubSuccess: false,
+        hubError: false,
+        loadingCamera: true,
+      });
+
+      // .... test fields
+
+      dispatchVerifyCamera(
+        config.config,
+        () => {
+          this.setState({
+            verifyCameraSuccess: true,
+            verifyCameraError: false,
+            verifyCameraErrorMessage: '',
+            loadingCamera: false,
+          });
+        },
+        (error) => {
+          this.setState({
+            verifyCameraSuccess: false,
+            verifyCameraError: true,
+            verifyCameraErrorMessage: error,
+            loadingCamera: false,
+          });
+        }
+      );
+    }
+  }
+
   render() {
     const {
       selectedTab,
@@ -382,6 +437,10 @@ class Settings extends React.Component {
       verifyPersistenceSuccess,
       verifyPersistenceError,
       verifyPersistenceMessage,
+      verifyCameraSuccess,
+      verifyCameraError,
+      verifyCameraErrorMessage,
+      loadingCamera,
       loading,
       loadingHub,
     } = this.state;
@@ -566,6 +625,24 @@ class Settings extends React.Component {
           />
         )}
 
+        {loadingCamera && (
+          <InfoBar type="loading" message={t('settings.info.verify_camera')} />
+        )}
+        {verifyCameraSuccess && (
+          <InfoBar
+            type="success"
+            message={t('settings.info.verify_camera_success')}
+          />
+        )}
+        {verifyCameraError && (
+          <InfoBar
+            type="alert"
+            message={`${t(
+              'settings.info.verify_camera_error'
+            )} :${verifyCameraErrorMessage}`}
+          />
+        )}
+
         {loadingHub && (
           <InfoBar type="loading" message={t('settings.info.verify_hub')} />
         )}
@@ -686,6 +763,13 @@ class Settings extends React.Component {
                   />
                 </BlockBody>
                 <BlockFooter>
+                  <Button
+                    label={t('settings.camera.verify_connection')}
+                    disabled={loading}
+                    onClick={this.verifyCameraSettings}
+                    type={loading ? 'neutral' : 'default'}
+                    icon="verify"
+                  />
                   <Button
                     label={t('buttons.save')}
                     type="default"
@@ -2059,6 +2143,8 @@ const mapStateToProps = (state /* , ownProps */) => ({
 });
 
 const mapDispatchToProps = (dispatch /* , ownProps */) => ({
+  dispatchVerifyCamera: (config, success, error) =>
+    dispatch(verifyCamera(config, success, error)),
   dispatchVerifyHub: (config, success, error) =>
     dispatch(verifyHub(config, success, error)),
   dispatchVerifyPersistence: (config, success, error) =>
@@ -2083,6 +2169,7 @@ Settings.propTypes = {
   dispatchAddRegion: PropTypes.func.isRequired,
   dispatchUpdateRegion: PropTypes.func.isRequired,
   dispatchRemoveRegion: PropTypes.func.isRequired,
+  dispatchVerifyCamera: PropTypes.func.isRequired,
 };
 
 export default withTranslation()(
