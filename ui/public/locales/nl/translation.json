@@ -81,7 +81,7 @@
       "description_offline_mode": "Uitzetten van uitgaande connectiviteit"
     },
     "camera": {
-      "camera": "camera",
+      "camera": "Camera",
       "description_camera": "Camera settings are required to make a connection to your camera of choice.",
       "only_h264": "Momenteel worden enkel H264 RTSP streams gesupporteerd",
       "rtsp_url": "RTSP url",
