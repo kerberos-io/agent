@@ -9,7 +9,7 @@ jobs:
     working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
     steps:
       - checkout
-      - run: apt-get install -y --no-install-recommends libavcodec-dev libavformat-dev libswscale-dev
+      - run: apt-get update && apt-get install -y --no-install-recommends libavcodec-dev libavformat-dev libswscale-dev
       - run: cd machinery && go mod download
       - run: cd machinery && go test -v ./...
       - run: cd machinery && go vet
