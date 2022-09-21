@@ -139,6 +139,10 @@ RUN /home/agent/main version
 
 RUN chown -R agent:kerberosio /home/agent/data
 
+###########################
+# Grant the necessary root capabilities to the process trying to bind to the privileged port
+RUN apk add libcap && setcap 'cap_net_bind_service=+ep' /home/agent
+
 ###################
 # Run non-root user
 
