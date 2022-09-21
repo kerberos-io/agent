@@ -1,0 +1,10 @@
+
+version: "2.1"
+services:
+  agent:
+    build: ./
+    privileged: true
+    restart: always
+    network_mode: host
+    labels:
+        io.balena.features.dbus: '1'
