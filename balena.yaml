@@ -12,7 +12,7 @@ assets:
     type: blob.asset
     data:
       url: >-
-        https://raw.githubusercontent.com/kerberos-io/agent/assets/img/logo.png
+        https://raw.githubusercontent.com/kerberos-io/agent/master/assets/img/logo.png
 data:
   defaultDeviceType: raspberry-pi
   supportedDeviceTypes:
