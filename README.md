@@ -29,9 +29,9 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 
 ## Quickstart - Docker
 
-The easiest to get your Kerberos Agent up and running is to use our Docker image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you selected a specific tag, run below command, which will open the web interface of your Kerberos agent on port `8080`. For persisting your configuration and/or recordings [attach a volume](#attach-a-volume).
+The easiest to get your Kerberos Agent up and running is to use our Docker image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you selected a specific tag, run below command, which will open the web interface of your Kerberos agent on port `80`. For persisting your configuration and/or recordings [attach a volume](#attach-a-volume).
     
-    docker run -p 8080:8080 --name mycamera -d kerberos/agent:latest
+    docker run -p 80:80 --name mycamera -d kerberos/agent:latest
 
 
 ## Quickstart - Balena
@@ -76,17 +76,17 @@ If you are looking for a solution that scales better with your video surveillanc
 
 ## Running as a container
 
-We are creating Docker images as part of our CI/CD process. You'll find our Docker images on [Docker hub](https://hub.docker.com/r/kerberos/agent). Pick a specific tag of choice, or use latest. Once done run below command, this will open the web interface of your Kerberos agent on port 8080.  
+We are creating Docker images as part of our CI/CD process. You'll find our Docker images on [Docker hub](https://hub.docker.com/r/kerberos/agent). Pick a specific tag of choice, or use latest. Once done run below command, this will open the web interface of your Kerberos agent on port 80.  
     
-    docker run -p 8080:8080 --name mycamera -d kerberos/agent:latest
+    docker run -p 80:80 --name mycamera -d kerberos/agent:latest
 
 Or for a develop build:
 
-    docker run -p 8080:8080 --name mycamera -d kerberos/agent-dev:latest
+    docker run -p 80:80 --name mycamera -d kerberos/agent-dev:latest
 
-Feel free to use another port if your host system already has a workload running on `8080`. For example `8082`.
+Feel free to use another port if your host system already has a workload running on `80`. For example `8082`.
 
-    docker run -p 8082:8080 --name mycamera -d kerberos/agent:latest
+    docker run -p 8082:80 --name mycamera -d kerberos/agent:latest
 
 ## Attach a volume
 
@@ -106,7 +106,7 @@ You attach a volume to your container by leveraging the `-v` option. To mount yo
 
 3. Run the docker command as following to attach your config directory and recording directory.
 
-        docker run -p 8080:8080 --name mycamera -v $(pwd)/agent/config:/home/agent/data/config  -v $(pwd)/agent/recordings:/home/agent/data/recordings -d kerberos/agent:latest
+        docker run -p 80:80 --name mycamera -v $(pwd)/agent/config:/home/agent/data/config  -v $(pwd)/agent/recordings:/home/agent/data/recordings -d kerberos/agent:latest
     
 ## Develop and build
 
@@ -136,9 +136,9 @@ You can simply run the `machinery` using following commands.
 
     git clone https://github.com/kerberos-io/agent
     cd machinery
-    go run main.go run mycameraname 8080
+    go run main.go run mycameraname 80
 
-This will launch the Kerberos Agent and run a webserver on port `8080`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/) or [Visual Studio Code](https://code.visualstudio.com/), as it comes with all the debugging and linting features builtin.
+This will launch the Kerberos Agent and run a webserver on port `80`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/) or [Visual Studio Code](https://code.visualstudio.com/), as it comes with all the debugging and linting features builtin.
 
 ![run-in-goland](https://user-images.githubusercontent.com/1546779/111139940-0a4d1a80-8582-11eb-8985-ceaf7359f4ee.gif)
 

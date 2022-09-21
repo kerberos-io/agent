@@ -145,17 +145,17 @@ RUN chown -R agent:kerberosio /home/agent/data
 USER agent
 
 ######################################
-# By default the app runs on port 8080
+# By default the app runs on port 80
 
-EXPOSE 8080
+EXPOSE 80
 
 ######################################
 # Check if agent is still running
 
-HEALTHCHECK CMD curl --fail http://localhost:8080 || exit 1   
+HEALTHCHECK CMD curl --fail http://localhost:80 || exit 1   
 
 ###################################################
 # Leeeeettttt'ssss goooooo!!!
 # Run the shizzle from the right working directory.
 WORKDIR /home/agent
-CMD ["./main", "run", "opensource", "8080"]
+CMD ["./main", "run", "opensource", "80"]
