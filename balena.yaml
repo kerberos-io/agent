@@ -1,0 +1,24 @@
+name: Kerberos Agent
+type: sw.application
+description: >-
+  Kerberos Agent is a cutting edge video surveillance management system 
+  made available as Open Source under the MIT Licens
+assets:
+  repository:
+    type: blob.asset
+    data:
+      url: 'https://github.com/kerberos-io/agent'
+  logo:
+    type: blob.asset
+    data:
+      url: >-
+        https://raw.githubusercontent.com/kerberos-io/agent/assets/img/logo.png
+data:
+  defaultDeviceType: raspberry-pi
+  supportedDeviceTypes:
+    - raspberry-pi
+    - raspberry-pi2
+    - raspberrypi3
+    - raspberrypi4-64
+    - intel-nuc
+version: v1.0.0-beta
