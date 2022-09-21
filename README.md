@@ -36,8 +36,11 @@ The easiest to get your Kerberos Agent up and running is to use our Docker image
 
 ## Quickstart - Balena
 
-To be written
-    
+Run Kerberos Agent with Balena super powers. Monitor your agent with seamless remote access, and an encrypted https endpoint. 
+Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=any&0%5B0%5D%5Bo%5D=full_text_search&0%5B0%5D%5Bv%5D=agent), and add your agent.
+
+[![balena deploy button](https://www.balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/agent)
+
 
 ## Quickstart - Snap
 
