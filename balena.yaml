@@ -51,9 +51,9 @@ data:
   applicationEnvironmentVariables:
   defaultDeviceType: "raspberrypi4-64"
   supportedDeviceTypes:
-    #- "raspberry-pi2"
     - "raspberrypi3"
     - "raspberrypi3-64"
     - "raspberrypi4-64"
-    #- "intel-nuc"
-    #- "jetson-nano"
+    - "orange-pi-one"
+    - "intel-nuc"
+    - "jetson-nano"
