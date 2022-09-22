@@ -30,11 +30,6 @@ jobs:
       run: docker buildx imagetools create -t kerberos/agent:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
     - name: Create new and append to manifest latest
       run: docker buildx imagetools create -t kerberos/agent:latest kerberos/agent:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
-    #- uses: balena-io/deploy-to-balena-action@master
-    #  id: build
-    #  with:
-    #    balena_token: ${{ secrets.BALENA_TOKEN }}
-    #    fleet: kerberos_io/agent
   build-other:
     runs-on: ubuntu-latest
     strategy:
