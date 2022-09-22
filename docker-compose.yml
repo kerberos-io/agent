@@ -9,8 +9,11 @@ services:
 
     # https://hub.docker.com/r/kerberos/agent
     agent:
-        image: kerberos/agent:8987535
+        build:
+            context: balena
         network_mode: host
+        tty: true
+        restart: always
         volumes:
             - 'kerberosagent_recordings:/home/agent/data/recordings:rw'
             - 'kerberosagent_snapshots:/home/agent/data/snapshots:rw'

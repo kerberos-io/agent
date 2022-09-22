@@ -1,0 +1,2 @@
+FROM kerberos/agent@sha256:89fb8e1fb43e53c657b656cf848f910687b4a3f42092cb63ae861df6c88bb544
+CMD ["./main", "run", "opensource", "80"]
