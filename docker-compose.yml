@@ -11,6 +11,7 @@ services:
     agent:
         build:
             context: balena
+        #image: kerberos/agent:8987535
         network_mode: host
         tty: true
         restart: always
