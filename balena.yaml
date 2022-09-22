@@ -49,8 +49,9 @@ assets:
         https://raw.githubusercontent.com/kerberos-io/agent/master/assets/img/logo.png
 data:
   applicationEnvironmentVariables:
-  defaultDeviceType: "raspberrypi4-64"
+  defaultDeviceType: "raspberrypi3"
   supportedDeviceTypes:
+    - "raspberrypi2"
     - "raspberrypi3"
     - "raspberrypi3-64"
     - "raspberrypi4-64"
