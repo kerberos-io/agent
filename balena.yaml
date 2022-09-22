@@ -49,11 +49,11 @@ assets:
         https://raw.githubusercontent.com/kerberos-io/agent/master/assets/img/logo.png
 data:
   applicationEnvironmentVariables:
-  defaultDeviceType: "raspberrypi4-64"
+  defaultDeviceType: "raspberrypi3"
   supportedDeviceTypes:
-    - "raspberry-pi2"
+    #- "raspberry-pi2"
     - "raspberrypi3"
     - "raspberrypi3-64"
-    - "raspberrypi4-64"
-    - "intel-nuc"
-    - "jetson-nano"
+    #- "raspberrypi4-64"
+    #- "intel-nuc"
+    #- "jetson-nano"
