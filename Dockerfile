@@ -1,4 +1,4 @@
-FROM kerberos/base:977706d AS builder
+FROM kerberos/base:4281f79 AS builder
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
@@ -23,12 +23,16 @@ RUN mkdir -p /go/src/github.com/kerberos-io/agent
 COPY machinery /go/src/github.com/kerberos-io/agent/machinery
 COPY ui /go/src/github.com/kerberos-io/agent/ui
 
+######################
+# Symbol link ld-linux
+
+
 ########################
 # Download NPM and Yarns
 
 RUN mkdir /usr/local/nvm
 ENV NVM_DIR /usr/local/nvm
-ENV NODE_VERSION 14.18.1
+ENV NODE_VERSION 16.17.0
 RUN curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash \
 	&& . $NVM_DIR/nvm.sh \
 	&& nvm install $NODE_VERSION \
@@ -37,8 +41,8 @@ RUN curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash 
 
 ENV NODE_PATH $NVM_DIR/v$NODE_VERSION/lib/node_modules
 ENV PATH $NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
+RUN npm install -g yarn
 
-RUN apt-get update && npm install -g yarn
 ##################################################################
 # Build Web
 # this will move the /build directory to ../machinery/www
