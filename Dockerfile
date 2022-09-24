@@ -23,10 +23,6 @@ RUN mkdir -p /go/src/github.com/kerberos-io/agent
 COPY machinery /go/src/github.com/kerberos-io/agent/machinery
 COPY ui /go/src/github.com/kerberos-io/agent/ui
 
-######################
-# Symbol link ld-linux
-
-
 ########################
 # Download NPM and Yarns
 
