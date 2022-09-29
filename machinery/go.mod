@@ -50,6 +50,7 @@ require (
 	github.com/go-playground/validator/v10 v10.11.0 // indirect
 	github.com/goccy/go-json v0.9.10 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
+	github.com/golang-module/carbon/v2 v2.1.9
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
