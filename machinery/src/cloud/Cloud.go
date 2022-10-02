@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-module/carbon/v2"
 	"github.com/kerberos-io/joy4/av/pubsub"
 	"github.com/minio/minio-go/v6"
 
@@ -32,7 +34,6 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
 	"github.com/shirou/gopsutil/disk"
-	"github.com/shirou/gopsutil/host"
 )
 
 func PendingUpload() {
@@ -92,8 +93,7 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 	log.Log.Debug("HandleUpload: finished")
 }
 
-func HandleHeartBeat(configuration *models.Configuration, communication *models.Communication) {
-
+func HandleHeartBeat(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time) {
 	log.Log.Debug("HandleHeartBeat: started")
 
 	config := configuration.Config
@@ -127,11 +127,12 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 	loop:
 		for {
 
-			uptime, _ := host.Uptime()
-			days := strconv.Itoa(int(uptime / (60 * 60 * 24)))
-			//12:11:48 up 11 days
+			// We will formated the uptime to a human readable format
+			// this will be used on Kerberos Hub: Uptime -> 1 day and 2 hours.
+			uptimeFormatted := uptimeStart.Format("2006-01-02 15:04:05")
+			uptimeString := carbon.Parse(uptimeFormatted).DiffForHumans()
+			uptimeString = strings.ReplaceAll(uptimeString, "ago", "")
 
-			//partitions, _ := disk.Partitions(false)
 			usage, _ := disk.Usage("/")
 			diskPercentUsed := strconv.Itoa(int(usage.UsedPercent))
 
@@ -168,11 +169,11 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 			"temperature" : "sh: 1: vcgencmd: not found",
 			"wifissid" : "",
 			"wifistrength" : "",
-			"uptime" : "up %s days,",
+			"uptime" : "%s",
 			"timestamp" : 1564747908,
 			"siteID" : "%s",
 			"onvif" : "%s"
-		}`, config.Key, username, key, config.Name, isEnterprise, "0", "0", diskPercentUsed, days, config.HubSite, onvifEnabled)
+		}`, config.Key, username, key, config.Name, isEnterprise, "0", "0", diskPercentUsed, uptimeString, config.HubSite, onvifEnabled)
 
 			var jsonStr = []byte(object)
 			buffy := bytes.NewBuffer(jsonStr)

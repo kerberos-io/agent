@@ -20,6 +20,10 @@ import (
 func Bootstrap(configuration *models.Configuration, communication *models.Communication) {
 	log.Log.Debug("Bootstrap: started")
 
+	// We will keep track of the Kerberos Agent up time
+	// This is send to Kerberos Hub in a heartbeat.
+	uptimeStart := time.Now()
+
 	// Initiate the packet counter, this is being used to detect
 	// if a camera is going blocky, or got disconnected.
 	var packageCounter atomic.Value
@@ -55,7 +59,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 
 	for {
 		// This will blocking until receiving a signal to be restarted, reconfigured, stopped, etc.
-		status := RunAgent(configuration, communication)
+		status := RunAgent(configuration, communication, uptimeStart)
 		if status == "stop" {
 			break
 		}
@@ -65,7 +69,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	log.Log.Debug("Bootstrap: finished")
 }
 
-func RunAgent(configuration *models.Configuration, communication *models.Communication) string {
+func RunAgent(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time) string {
 	log.Log.Debug("RunAgent: started")
 
 	config := configuration.Config
@@ -103,7 +107,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		mqttClient := routers.ConfigureMQTT(configuration, communication)
 
 		// Handle heartbeats
-		go cloud.HandleHeartBeat(configuration, communication)
+		go cloud.HandleHeartBeat(configuration, communication, uptimeStart)
 
 		// Handle the camera stream
 		go capture.HandleStream(infile, queue, communication) //, &wg)
