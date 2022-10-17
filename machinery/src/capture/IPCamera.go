@@ -52,7 +52,6 @@ func HandleStream(infile av.DemuxCloser, queue *pubsub.Queue, communication *mod
 	var err error
 loop:
 	for {
-
 		// This will check if we need to stop the thread,
 		// because of a reconfiguration.
 		select {
@@ -94,4 +93,43 @@ loop:
 
 	queue.Close()
 	log.Log.Debug("HandleStream: finished")
+}
+
+func HandleSubStream(infile av.DemuxCloser, queue *pubsub.Queue, communication *models.Communication) { //, wg *sync.WaitGroup) {
+
+	log.Log.Debug("HandleSubStream: started")
+	var err error
+loop:
+	for {
+		// This will check if we need to stop the thread,
+		// because of a reconfiguration.
+		select {
+		case <-communication.HandleSubStream:
+			break loop
+		default:
+		}
+
+		var pkt av.Packet
+		if pkt, err = infile.ReadPacket(); err != nil { // sometimes this throws an end of file..
+			log.Log.Error("HandleSubStream: " + err.Error())
+			time.Sleep(1 * time.Second)
+		}
+
+		// Could be that a decode is throwing errors.
+		if len(pkt.Data) > 0 {
+
+			queue.WritePacket(pkt)
+
+			// This will check if we need to stop the thread,
+			// because of a reconfiguration.
+			select {
+			case <-communication.HandleSubStream:
+				break loop
+			default:
+			}
+		}
+	}
+
+	queue.Close()
+	log.Log.Debug("HandleSubStream: finished")
 }

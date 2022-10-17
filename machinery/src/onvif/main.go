@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"io"
 	"io/ioutil"
+	"strings"
 
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -112,9 +113,88 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 					log.Log.Info("HandleONVIFActions: " + string(bs))
 				}
 			}
+		} else if onvifAction.Action == "zoom" {
+
+			// Do the PTZ shizzle
+			device, err := onvif.NewDevice(onvif.DeviceParams{
+				Xaddr:    config.Capture.IPCamera.ONVIFXAddr,
+				Username: config.Capture.IPCamera.ONVIFUsername,
+				Password: config.Capture.IPCamera.ONVIFPassword,
+			})
+
+			// Get Profiles
+			resp, _ := device.CallMethod(media.GetProfiles{})
+			defer resp.Body.Close()
+			b, _ := io.ReadAll(resp.Body)
+			stringBody := string(b)
+			decodedXML, et, errorFunc := getXMLNode(stringBody, "GetProfilesResponse")
+			if errorFunc != "" {
+			}
+			var mProfilesResp media.GetProfilesResponse
+			if err := decodedXML.DecodeElement(&mProfilesResp, et); err != nil {
+				log.Log.Error("HandleONVIFActions: " + err.Error())
+			}
+			var ptzToken xsd.ReferenceToken
+			for _, profile := range mProfilesResp.Profiles {
+				ptzToken = profile.Token
+			}
+
+			if err == nil {
+				zoom := ptzAction.Zoom
+				res, _ := device.CallMethod(ptz.RelativeMove{
+					ProfileToken: ptzToken,
+					Translation: xsd.PTZVector{
+						PanTilt: xsd.Vector2D{
+							X:     0,
+							Y:     0,
+							Space: "http://www.onvif.org/ver10/tptz/PanTiltSpaces/TranslationGenericSpace",
+						},
+						Zoom: xsd.Vector1D{
+							X:     zoom,
+							Space: "http://www.onvif.org/ver10/tptz/ZoomSpaces/TranslationGenericSpace",
+						},
+					},
+				})
+
+				bs, _ := ioutil.ReadAll(res.Body)
+				log.Log.Info("HandleONVIFActions: " + string(bs))
+			}
 		}
 	}
 	log.Log.Debug("HandleONVIFActions: finished")
+}
+
+func CheckOnvifCapabilities(configuration *models.Configuration) []string {
+	log.Log.Debug("CheckOnvifCapabilities: started")
+
+	var capabilities []string
+	config := configuration.Config
+
+	// Get the capabilities of the ONVIF device
+	device, err := onvif.NewDevice(onvif.DeviceParams{
+		Xaddr:    config.Capture.IPCamera.ONVIFXAddr,
+		Username: config.Capture.IPCamera.ONVIFUsername,
+		Password: config.Capture.IPCamera.ONVIFPassword,
+	})
+
+	if err == nil {
+		// Get Profiles
+		services := device.GetServices()
+		for key, _ := range services {
+			if key != "" {
+				keyParts := strings.Split(key, "/")
+				if len(keyParts) > 0 {
+					capability := keyParts[len(keyParts)-1]
+					capabilities = append(capabilities, capability)
+				}
+			}
+		}
+	} else {
+		log.Log.Error("CheckOnvifCapabilities: " + err.Error())
+	}
+	log.Log.Debug("CheckOnvifCapabilities: finished")
+
+	return capabilities
 }
 
 func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, string) {

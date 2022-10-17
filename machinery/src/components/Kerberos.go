@@ -13,7 +13,9 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
 	routers "github.com/kerberos-io/agent/machinery/src/routers/mqtt"
+	"github.com/kerberos-io/joy4/av"
 	"github.com/kerberos-io/joy4/av/pubsub"
+	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 	"github.com/tevino/abool"
 )
 
@@ -43,6 +45,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	communication.CloudTimestamp = &cloudTimestamp
 
 	communication.HandleStream = make(chan string, 1)
+	communication.HandleSubStream = make(chan string, 1)
 	communication.HandleUpload = make(chan string, 1)
 	communication.HandleHeartBeat = make(chan string, 1)
 	communication.HandleLiveSD = make(chan int64, 1)
@@ -80,16 +83,35 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 	rtspUrl := config.Capture.IPCamera.RTSP
 	infile, streams, err := capture.OpenRTSP(rtspUrl)
 
-	//var decoder *ffmpeg.VideoDecoder
 	var queue *pubsub.Queue
 	status := "not started"
 
 	if err == nil {
 
+		log.Log.Info("RunAgent: opened RTSP stream")
+
+		// We might have a secondary rtsp url, so we might need to use that.
+		var subInfile av.DemuxCloser
+		var subStreams []av.CodecData
+		subStreamEnabled := false
+		subRtspUrl := config.Capture.IPCamera.SubRTSP
+		if subRtspUrl != "" && subRtspUrl != rtspUrl {
+			subInfile, subStreams, err = capture.OpenRTSP(subRtspUrl)
+			if err == nil {
+				log.Log.Info("RunAgent: opened RTSP sub stream")
+				subStreamEnabled = true
+			}
+		}
+
 		// At some routines we will need to decode the image.
 		// Make sure its properly locked as we only have a single decoder.
 		var decoderMutex sync.Mutex
 		decoder := capture.GetVideoDecoder(streams)
+
+		var subDecoder *ffmpeg.VideoDecoder
+		if subStreamEnabled {
+			subDecoder = capture.GetVideoDecoder(subStreams)
+		}
 
 		// Create a packet queue, which is filled by the HandleStream routing
 		// and consumed by all other routines: motion, livestream, etc.
@@ -97,10 +119,22 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 			config.Capture.PreRecording = 1
 			log.Log.Warning("RunAgent: Prerecording value not found in config or invalid value! Found: " + strconv.FormatInt(config.Capture.PreRecording, 10))
 		}
+
+		// We are creating a queue to store the RTSP frames in, these frames will be
+		// processed by the different consumers: motion detection, recording, etc.
 		queue = pubsub.NewQueue()
 		queue.SetMaxGopCount(int(config.Capture.PreRecording)) // GOP time frame is set to prerecording.
 		log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)))
 		queue.WriteHeader(streams)
+
+		// We might have a substream, if so we'll create a seperate queue.
+		var subQueue *pubsub.Queue
+		if subStreamEnabled {
+			log.Log.Info("RunAgent: Creating sub stream queue with SetMaxGopCount set to " + strconv.Itoa(int(config.Capture.PreRecording)))
+			subQueue = pubsub.NewQueue()
+			queue.SetMaxGopCount(1)
+			queue.WriteHeader(subStreams)
+		}
 
 		// Configure a MQTT client which helps for a bi-directional communication
 		communication.HandleONVIF = make(chan models.OnvifAction, 1)
@@ -110,7 +144,12 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		go cloud.HandleHeartBeat(configuration, communication, uptimeStart)
 
 		// Handle the camera stream
-		go capture.HandleStream(infile, queue, communication) //, &wg)
+		go capture.HandleStream(infile, queue, communication)
+
+		// Handle the substream if enabled
+		if subStreamEnabled {
+			go capture.HandleSubStream(subInfile, subQueue, communication)
+		}
 
 		// Handle processing of motion
 		motionCursor := queue.Oldest()
@@ -122,9 +161,14 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 
 		// Handle livestream HD (high resolution over WEBRTC)
-		livestreamHDCursor := queue.Oldest()
 		communication.HandleLiveHDHandshake = make(chan models.SDPPayload, 1)
-		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, streams, decoder, &decoderMutex)
+		if subStreamEnabled {
+			livestreamHDCursor := subQueue.Oldest()
+			go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, subStreams, subDecoder, &decoderMutex)
+		} else {
+			livestreamHDCursor := queue.Oldest()
+			go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, streams, decoder, &decoderMutex)
+		}
 
 		// Handle recording, will write an mp4 to disk.
 		recordingCursor := queue.Oldest()
@@ -146,15 +190,26 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 			communication.HandleHeartBeat <- "stop"
 			communication.HandleUpload <- "stop"
 		}
+		communication.HandleStream <- "stop"
+		if subStreamEnabled {
+			communication.HandleSubStream <- "stop"
+		}
+		time.Sleep(time.Second * 1)
+
 		infile.Close()
 		queue.Close()
+		if subStreamEnabled {
+			subInfile.Close()
+			subQueue.Close()
+		}
 		close(communication.HandleONVIF)
 		close(communication.HandleLiveHDHandshake)
 		close(communication.HandleMotion)
 		routers.DisconnectMQTT(mqttClient)
 		decoder.Close()
-		communication.HandleStream <- "stop"
-
+		if subStreamEnabled {
+			subDecoder.Close()
+		}
 		// Waiting for some seconds to make sure everything is properly closed.
 		log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")
 		time.Sleep(time.Second * 3)

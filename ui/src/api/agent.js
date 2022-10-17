@@ -91,8 +91,8 @@ export function doVerifyHub(config, onSuccess, onError) {
     });
 }
 
-export function doVerifyCamera(config, onSuccess, onError) {
-  const endpoint = API.post(`camera/verify`, {
+export function doVerifyCamera(streamType, config, onSuccess, onError) {
+  const endpoint = API.post(`camera/verify/${streamType}`, {
     ...config,
   });
   endpoint

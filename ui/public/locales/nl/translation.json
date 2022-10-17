@@ -89,12 +89,15 @@
       "only_h264": "Momenteel worden enkel H264 RTSP streams gesupporteerd",
       "rtsp_url": "RTSP url",
       "rtsp_h264": "Een H264 RTSP connectie met jouw camera.",
+      "sub_rtsp_url": "Sub RTSP url (used for livestreaming)",
+      "sub_rtsp_h264": "A secondary RTSP connection to the low resolution of your camera.",
       "onvif": "ONVIF",
       "description_onvif": "Gegevens om te communiceren met ONVIF vaardigheden. Deze worden gebruikt voor PTZ of andere vaardigheden van de camera.",
       "onvif_xaddr": "ONVIF xaddr",
       "onvif_username": "ONVIF gebruikersnaam",
       "onvif_password": "ONVIF wachtwoord",
-      "verify_connection": "Verifieer verbinding"
+      "verify_connection": "Verifieer verbinding",
+      "verify_sub_connection": "Verify Sub Connection"
     },
     "recording": {
       "recording": "Opname",

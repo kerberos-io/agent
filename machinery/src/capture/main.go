@@ -370,7 +370,15 @@ func VerifyCamera(c *gin.Context) {
 
 	if err == nil {
 
+		streamType := c.Param("streamType")
+		if streamType == "" {
+			streamType = "primary"
+		}
+
 		rtspUrl := config.Capture.IPCamera.RTSP
+		if streamType == "secondary" {
+			rtspUrl = config.Capture.IPCamera.SubRTSP
+		}
 		_, codecs, err := OpenRTSP(rtspUrl)
 
 		if err == nil {

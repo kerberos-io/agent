@@ -205,7 +205,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			})
 		})
 
-		api.POST("/camera/verify", func(c *gin.Context) {
+		api.POST("/camera/verify/:streamType", func(c *gin.Context) {
 			capture.VerifyCamera(c)
 		})
 

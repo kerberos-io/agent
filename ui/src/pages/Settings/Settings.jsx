@@ -113,6 +113,7 @@ class Settings extends React.Component {
     this.verifyPersistenceSettings = this.verifyPersistenceSettings.bind(this);
     this.verifyHubSettings = this.verifyHubSettings.bind(this);
     this.verifyCameraSettings = this.verifyCameraSettings.bind(this);
+    this.verifySubCameraSettings = this.verifySubCameraSettings.bind(this);
     this.calculateTimetable = this.calculateTimetable.bind(this);
     this.saveConfig = this.saveConfig.bind(this);
     this.onUpdateDropdown = this.onUpdateDropdown.bind(this);
@@ -382,7 +383,12 @@ class Settings extends React.Component {
     }
   }
 
-  verifyCameraSettings() {
+  verifySubCameraSettings(event) {
+    this.verifyCameraSettings(event, 'secondary');
+  }
+
+  verifyCameraSettings(event, streamType = 'primary') {
+    console.log(streamType);
     const { config, dispatchVerifyCamera } = this.props;
     if (config) {
       this.setState({
@@ -401,9 +407,8 @@ class Settings extends React.Component {
         loadingCamera: true,
       });
 
-      // .... test fields
-
       dispatchVerifyCamera(
+        streamType,
         config.config,
         () => {
           this.setState({
@@ -761,8 +766,33 @@ class Settings extends React.Component {
                       )
                     }
                   />
+                  <Input
+                    noPadding
+                    label={t('settings.camera.sub_rtsp_url')}
+                    value={config.capture.ipcamera.sub_rtsp}
+                    placeholder={t('settings.camera.sub_rtsp_h264')}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'capture.ipcamera',
+                        'sub_rtsp',
+                        value,
+                        config.capture.ipcamera
+                      )
+                    }
+                  />
                 </BlockBody>
                 <BlockFooter>
+                  {config.capture.ipcamera &&
+                    config.capture.ipcamera.sub_rtsp &&
+                    config.capture.ipcamera.sub_rtsp !== '' && (
+                      <Button
+                        label={t('settings.camera.verify_sub_connection')}
+                        disabled={loading}
+                        onClick={this.verifySubCameraSettings}
+                        type={loading ? 'neutral' : 'default'}
+                        icon="verify"
+                      />
+                    )}
                   <Button
                     label={t('settings.camera.verify_connection')}
                     disabled={loading}
@@ -2143,8 +2173,8 @@ const mapStateToProps = (state /* , ownProps */) => ({
 });
 
 const mapDispatchToProps = (dispatch /* , ownProps */) => ({
-  dispatchVerifyCamera: (config, success, error) =>
-    dispatch(verifyCamera(config, success, error)),
+  dispatchVerifyCamera: (streamType, config, success, error) =>
+    dispatch(verifyCamera(streamType, config, success, error)),
   dispatchVerifyHub: (config, success, error) =>
     dispatch(verifyHub(config, success, error)),
   dispatchVerifyPersistence: (config, success, error) =>

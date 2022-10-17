@@ -89,12 +89,15 @@
       "only_h264": "Actuellement, seuls les flux RTSP H264 sont pris en charge.",
       "rtsp_url": "URL RTSP",
       "rtsp_h264": "Une connexion RTSP H264 à votre caméra.",
+      "sub_rtsp_url": "Sub RTSP url (used for livestreaming)",
+      "sub_rtsp_h264": "A secondary RTSP connection to the low resolution of your camera.",
       "onvif": "ONVIF",
       "description_onvif": "Les identifiants pour communiquer avec les fonctionnalités ONVIF. Ils sont utilisés pour les fonctionnalités PTZ ou autres fournies par la caméra.",
       "onvif_xaddr": "Xaddr ONVIF",
       "onvif_username": "Nom d'utilisateur ONVIF",
       "onvif_password": "Mot de passe ONVIF",
-      "verify_connection": "Vérifier la connexion"
+      "verify_connection": "Vérifier la connexion",
+      "verify_sub_connection": "Verify Sub Connection"
     },
     "recording": {
       "recording": "Enregistrement",

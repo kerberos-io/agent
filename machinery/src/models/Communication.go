@@ -14,6 +14,7 @@ type Communication struct {
 	CloudTimestamp        *atomic.Value
 	HandleBootstrap       chan string
 	HandleStream          chan string
+	HandleSubStream       chan string
 	HandleMotion          chan MotionDataPartial
 	HandleUpload          chan string
 	HandleHeartBeat       chan string

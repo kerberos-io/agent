@@ -31,6 +31,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/onvif"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
 	"github.com/shirou/gopsutil/disk"
@@ -138,7 +139,18 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 
 			onvifEnabled := "false"
 			if config.Capture.IPCamera.ONVIFXAddr != "" {
-				onvifEnabled = "true"
+				// We will check the capabilities
+				capabilities := onvif.CheckOnvifCapabilities(configuration)
+				hasPTZ := false
+				for _, v := range capabilities {
+					if v == "PTZ" || v == "ptz" {
+						hasPTZ = true
+					}
+				}
+
+				if hasPTZ {
+					onvifEnabled = "true"
+				}
 			}
 
 			// Check if the agent is running inside a cluster (Kerberos Factory) or as

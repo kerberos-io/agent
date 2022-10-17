@@ -39,9 +39,10 @@ export const updateRegion = (id, polygon) => {
   };
 };
 
-export const verifyCamera = (config, onSuccess, onError) => {
+export const verifyCamera = (streamType, config, onSuccess, onError) => {
   return (dispatch) => {
     doVerifyCamera(
+      streamType,
       config,
       () => {
         dispatch({
