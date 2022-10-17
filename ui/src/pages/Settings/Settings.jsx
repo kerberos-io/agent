@@ -388,7 +388,6 @@ class Settings extends React.Component {
   }
 
   verifyCameraSettings(event, streamType = 'primary') {
-    console.log(streamType);
     const { config, dispatchVerifyCamera } = this.props;
     if (config) {
       this.setState({
