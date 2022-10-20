@@ -52,7 +52,7 @@ func CleanupRecordingDirectory(configuration *models.Configuration) {
 	}
 }
 
-func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, streams []av.CodecData) {
+func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration, communication *models.Communication, streams []av.CodecData) {
 	log.Log.Debug("HandleRecordStream: started")
 
 	config := configuration.Config
@@ -89,6 +89,7 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 		var cursorError error
 		var pkt av.Packet
 		recordingStatus := "idle"
+		recordingCursor := queue.Oldest()
 
 		for cursorError == nil {
 
@@ -289,10 +290,9 @@ func HandleRecordStream(recordingCursor *pubsub.QueueCursor, configuration *mode
 			}
 
 			// Get as much packets we need.
-			//for pkt := range packets {
-
 			var cursorError error
 			var pkt av.Packet
+			recordingCursor := queue.Oldest()
 
 			for cursorError == nil {
 

@@ -171,8 +171,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		}
 
 		// Handle recording, will write an mp4 to disk.
-		recordingCursor := queue.Oldest()
-		go capture.HandleRecordStream(recordingCursor, configuration, communication, streams)
+		go capture.HandleRecordStream(queue, configuration, communication, streams)
 
 		// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)
 		go cloud.HandleUpload(configuration, communication)
