@@ -132,8 +132,8 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		if subStreamEnabled {
 			log.Log.Info("RunAgent: Creating sub stream queue with SetMaxGopCount set to " + strconv.Itoa(int(config.Capture.PreRecording)))
 			subQueue = pubsub.NewQueue()
-			queue.SetMaxGopCount(1)
-			queue.WriteHeader(subStreams)
+			subQueue.SetMaxGopCount(1)
+			subQueue.WriteHeader(subStreams)
 		}
 
 		// Configure a MQTT client which helps for a bi-directional communication
