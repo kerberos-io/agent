@@ -12,7 +12,7 @@
 		80
 	],
 	// Uncomment the next line to run commands after the container is created - for example installing curl.
-	"postCreateCommand": "cd ui && yarn install && cd ../machinery && go mod download",
+	"postCreateCommand": "cd ui && yarn install && yarn build && cd ../machinery && go mod download",
 	"features": {
 		"ghcr.io/devcontainers-contrib/features/ansible:1": {},
 	},
