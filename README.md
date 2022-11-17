@@ -207,15 +207,9 @@ Due to previous reason we have decided to rebuild the Kerberos Agent technology 
 
 #### 3. What is the difference with Kerberos Enterprise?
 
-We started the developments of Kerberos Enterprise a year ago (January, 2020), our focus here was scalability, and fast development and easy deployment. We noticed that with technologies such as Golang and React, we can still provide a highly performant video surveillance system.
+We started the developments of Kerberos Enterprise a year ago (January, 2020), our focus here was scalability, and fast development and easy deployment. We noticed that with technologies such as Golang and React, we can still provide a highly performant video surveillance system. Kerberos Agent is the one and only agent for both an Open Source and Enterprise deployment.
 
-Kerberos Agent uses the same technology stack, and some code pieces, of Kerberos Enterprise which we have already build. We have a very clear now, of how a well developed and documented video surveillance system needs to look like.
-
-#### 4. When are we going to be able to install the first version?
-
-We plan to ship the first version by the end of Q1, afterwards we will add more and more features as usual.
-
-#### 5. Change in License
+#### 4. Change in License
 
 Kerberos Agent (v3) is now available under the MIT license.
 
