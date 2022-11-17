@@ -4,8 +4,6 @@ ui/public/assets/env.js
 .idea
 machinery/www
 yarn.lock
-machinery/data/config
-machinery/data/cloud
-machinery/data/recordings
-machinery/data/snapshots
+machinery/data/config/config.json
+machinery/data/config/user.json
 machinery/test*
