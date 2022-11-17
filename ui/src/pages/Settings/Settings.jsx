@@ -877,9 +877,9 @@ class Settings extends React.Component {
                       />
                       <Input
                         noPadding
-                        label={t('settings.recording.max_duration')}
+                        label={t('settings.recording.post_recording')}
                         value={config.capture.postrecording}
-                        placeholder={t('settings.recording.max_duration')}
+                        placeholder={t('settings.recording.post_recording')}
                         onChange={(value) =>
                           this.onUpdateNumberField(
                             'capture',
@@ -891,9 +891,9 @@ class Settings extends React.Component {
                       />
                       <Input
                         noPadding
-                        label={t('settings.recording.max_duration')}
+                        label={t('settings.recording.threshold')}
                         value={config.capture.pixelChangeThreshold}
-                        placeholder={t('settings.recording.max_duration')}
+                        placeholder={t('settings.recording.threshold')}
                         onChange={(value) =>
                           this.onUpdateNumberField(
                             'capture',

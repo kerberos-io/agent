@@ -11,7 +11,7 @@
     "admin": "admin",
     "management": "Gestion",
     "dashboard": "Tableau de bord",
-    "recordings": "Enregistrements", 
+    "recordings": "Enregistrements",
     "settings": "Paramètres",
     "help_support": "Aide et Support",
     "swagger": "API Swagger",
@@ -202,4 +202,3 @@
     }
   }
 }
-
