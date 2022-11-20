@@ -142,6 +142,11 @@ RUN cd && wget https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-639.x86_64-u
 RUN mv /agent/* /home/agent/
 RUN /home/agent/main version
 
+#######################
+# Make template config
+
+RUN cp /home/agent/data/config/config.json /home/agent/data/config.template.json
+
 ###########################
 # Set permissions correctly
 
