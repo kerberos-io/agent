@@ -1,0 +1,124 @@
+- hosts: localhost
+  vars:
+    - oc_cluster_url: ""
+    - oc_username: ""
+    - oc_password: ""
+  tasks:
+    - name: Print variables
+      debug:
+        msg: "OC url: {{ oc_cluster_url }}"
+
+    - name: Try to login to OCP cluster
+      k8s_auth:
+        host: "{{ oc_cluster_url }}"
+        username: kubeadmin
+        password: wD6Wg-ovgDz-32gYB-o9nkj
+        validate_certs: no
+      register: k8s_auth_result
+
+    - name: Create a Persistent volume claim
+      k8s:
+        state: present
+        namespace: kerberos
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: kerberos-data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 2Gi
+            storageClassName: managed-premium
+      register: pvc_result
+
+    - name: deploy kerberos agent
+      k8s:
+        state: present
+        apply: yes
+        namespace: kerberos
+        host: "{{ oc_cluster_url }}"
+        api_key: "{{ k8s_auth_result.k8s_auth.api_key }}"
+        validate_certs: no
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: agent
+            labels:
+              name: agent
+          spec:
+            selector:
+              matchLabels:
+                app: agent
+            replicas: 1
+            template:
+              metadata:
+                labels:
+                  app: agent
+              spec:
+                volumes:
+                  - name: kerberos-data
+                    persistentVolumeClaim:
+                      claimName: kerberos-data
+
+                initContainers:
+                  - name: download-config
+                    image: kerberos/agent:1b96d01
+                    volumeMounts:
+                      - name: kerberos-data
+                        mountPath: /home/agent/data/config
+                        subPath: config
+                    command:
+                      [
+                        "cp",
+                        "/home/agent/data/config.template.json",
+                        "/home/agent/data/config/config.json",
+                      ]
+
+                containers:
+                  - name: agent
+                    image: kerberos/agent:1b96d01
+                    volumeMounts:
+                      - name: kerberos-data
+                        mountPath: /home/agent/data/config
+                        subPath: config
+                      - name: kerberos-data
+                        mountPath: /home/agent/data/recordings
+                        subPath: recordings
+                      - name: kerberos-data
+                        mountPath: /home/agent/data/snapshots
+                        subPath: snapshots
+                      - name: kerberos-data
+                        mountPath: /home/agent/data/cloud
+                        subPath: cloud
+                    ports:
+                      - containerPort: 80
+                        protocol: TCP
+
+    - name: expose kerberos agent
+      k8s:
+        state: present
+        apply: yes
+        namespace: kerberos
+        host: "{{ oc_cluster_url }}"
+        api_key: "{{ k8s_auth_result.k8s_auth.api_key }}"
+        validate_certs: no
+        definition:
+          kind: Service
+          apiVersion: v1
+          metadata:
+            name: agent-svc
+            labels:
+              name: agent-svc
+          spec:
+            selector:
+              app: agent
+            type: LoadBalancer
+            ports:
+              - name: http
+                port: 80
+                targetPort: 80
+                protocol: TCP

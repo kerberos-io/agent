@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent
+  labels:
+    name: agent
+spec:
+  selector:
+    matchLabels:
+      app: agent
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: agent
+    spec:
+      volumes:
+        - name: kerberos-data
+          persistentVolumeClaim:
+            claimName: kerberos-data
+
+      initContainers:
+        - name: download-config
+          image: kerberos/agent:1b96d01
+          volumeMounts:
+            - name: kerberos-data
+              mountPath: /home/agent/data/config
+              subPath: config
+          command:
+            [
+              "cp",
+              "/home/agent/data/config.template.json",
+              "/home/agent/data/config/config.json",
+            ]
+
+      containers:
+        - name: agent
+          image: kerberos/agent:1b96d01
+          volumeMounts:
+            - name: kerberos-data
+              mountPath: /home/agent/data/config
+              subPath: config
+            - name: kerberos-data
+              mountPath: /home/agent/data/recordings
+              subPath: recordings
+            - name: kerberos-data
+              mountPath: /home/agent/data/snapshots
+              subPath: snapshots
+            - name: kerberos-data
+              mountPath: /home/agent/data/cloud
+              subPath: cloud
+          ports:
+            - containerPort: 80
+              protocol: TCP
