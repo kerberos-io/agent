@@ -4,7 +4,7 @@
     - oc_username: ""
     - oc_password: ""
   tasks:
-    - name: Print variables
+    - name: Print Variables
       debug:
         msg: "OC url: {{ oc_cluster_url }}"
 
@@ -15,6 +15,16 @@
         password: wD6Wg-ovgDz-32gYB-o9nkj
         validate_certs: no
       register: k8s_auth_result
+
+    - name: Create a Namespace
+      k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: kerberos
+      register: k8s_namespace_result
 
     - name: Create a Persistent volume claim
       k8s:
@@ -34,7 +44,7 @@
             storageClassName: managed-premium
       register: pvc_result
 
-    - name: deploy kerberos agent
+    - name: Deploy Kerberos Agent
       k8s:
         state: present
         apply: yes
@@ -98,7 +108,7 @@
                       - containerPort: 80
                         protocol: TCP
 
-    - name: expose kerberos agent
+    - name: Expose Kerberos Agent
       k8s:
         state: present
         apply: yes
