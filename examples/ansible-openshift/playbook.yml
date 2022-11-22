@@ -6,13 +6,13 @@
   tasks:
     - name: Print Variables
       debug:
-        msg: "OC url: {{ oc_cluster_url }}"
+        msg: "OpenShift url: {{ oc_cluster_url }}, OpenShift username: {{ oc_username }}, OpenShift password: {{ oc_password }}"
 
     - name: Try to login to OCP cluster
       k8s_auth:
         host: "{{ oc_cluster_url }}"
-        username: kubeadmin
-        password: wD6Wg-ovgDz-32gYB-o9nkj
+        username: "{{ oc_username }}"
+        password: "{{ oc_password }}"
         validate_certs: no
       register: k8s_auth_result
 

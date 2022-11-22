@@ -38,3 +38,8 @@ RUN curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash 
 ENV NODE_PATH $NVM_DIR/v$NODE_VERSION/lib/node_modules
 ENV PATH $NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
 RUN npm install -g yarn
+
+##########################
+# Dependencies for ansible
+
+RUN pip install requests requests-oauthlib  kubernetes
