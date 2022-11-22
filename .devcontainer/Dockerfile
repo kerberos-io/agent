@@ -42,6 +42,6 @@ RUN npm install -g yarn
 ##########################
 # Dependencies for ansible
 
-RUN apt-get update -y
-RUN apt-get install python3-pip
-RUN pip install requests requests-oauthlib  kubernetes
+#RUN apt-get update -y
+#RUN apt-get install python3-pip
+#RUN pip install requests requests-oauthlib  kubernetes
