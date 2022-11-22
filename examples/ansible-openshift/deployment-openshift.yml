@@ -19,6 +19,9 @@
     - name: Create a Namespace
       k8s:
         state: present
+        host: "{{ oc_cluster_url }}"
+        api_key: "{{ k8s_auth_result.k8s_auth.api_key }}"
+        validate_certs: no
         definition:
           apiVersion: v1
           kind: Namespace
@@ -29,6 +32,9 @@
     - name: Create a Persistent volume claim
       k8s:
         state: present
+        host: "{{ oc_cluster_url }}"
+        api_key: "{{ k8s_auth_result.k8s_auth.api_key }}"
+        validate_certs: no
         namespace: kerberos
         definition:
           apiVersion: v1
