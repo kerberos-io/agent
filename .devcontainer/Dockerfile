@@ -1,2 +1,2 @@
-FROM kerberos/devcontainer:46a86ba
+FROM kerberos/devcontainer:9da0ee3
 LABEL AUTHOR=Kerberos.io
