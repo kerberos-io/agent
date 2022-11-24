@@ -33,7 +33,7 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 
 * An IP camera which supports a RTSP h264 encoded stream,
 * (or) a USB camera, Raspberry Pi camera or other camera, that [you can tranform to a valid RTSP stream](https://github.com/kerberos-io/camera-to-rtsp).
-* Any hardware that can run a Docker container, for example: a Raspberry Pi, 
+* Any hardware that can run a Docker container, for example: a Raspberry Pi, NVidia Jetson, Intel NUC, a VM, Bare metal machine or a full blown Kubernetes cluster.
 
 
 ## :books: Overview
