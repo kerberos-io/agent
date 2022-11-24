@@ -42,11 +42,6 @@ Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=
 
 [![balena deploy button](https://www.balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/agent)
 
-
-## Quickstart - Snap
-
-To be written
-
 ## Introduction
 
 Kerberos.io is a cutting edge video surveillance system with a strong focus on user experience, scalability, resilience, extension and integration. Kerberos.io provides different solutions, but from a high level point of view it comes into two flavours: Kerberos Agent and Kerberos Enterprise Suite. Bottom line Kerberos Enterprise Suite extends Kerberos Agent with additional components such as Kerberos Factory, Kerberos Vault and Kerberos Hub.
@@ -111,7 +106,20 @@ You attach a volume to your container by leveraging the `-v` option. To mount yo
 3. Run the docker command as following to attach your config directory and recording directory.
 
         docker run -p 80:80 --name mycamera -v $(pwd)/agent/config:/home/agent/data/config  -v $(pwd)/agent/recordings:/home/agent/data/recordings -d kerberos/agent:latest
+
+## Contribute with Codespaces
+
+One of the major blockers for letting you contribute to an Open Source project is to setup your local development machine. Why? Because you might have already some tools and libraries installed that are used for other projects, and the libraries you would need for Kerberos Agent, for example FFmpeg, might require a different version. Welcome to the dependency hell..
+
+By leveraging codespaces, which the Kerberos Agent repo supports, you will be able to setup the required development environment in a few minutes. By opening the `<> Code` tab on the top of the page, you will be able to create a codespace, [using the Kerberos Devcontainer](https://github.com/kerberos-io/devcontainer) base image. This image requires all the relevant dependencies: FFmpeg, OpenCV, Golang, Node, Yarn, etc.
+
+![Kerberos Agent codespace](assets/img/codespace.png)
+
+After a few minutes, you will see a beautiful `Visual Studio Code` shown in your browser, and you are ready to code!
     
+![Kerberos Agent VSCode](assets/img/codespace-vscode.png)
+
+
 ## Develop and build
 
 Kerberos Agent is divided in two parts a `machinery` and `web`. Both parts live in this repository in their relative folders. For development or running the application on your local machine, you have to run both the `machinery` and the `web` as described below. When running in production everything is shipped as only one artifact, read more about this at [Building for production](#building-for-production).
@@ -144,9 +152,9 @@ You can simply run the `machinery` using following commands.
 
 This will launch the Kerberos Agent and run a webserver on port `80`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/) or [Visual Studio Code](https://code.visualstudio.com/), as it comes with all the debugging and linting features builtin.
 
-![run-in-goland](https://user-images.githubusercontent.com/1546779/111139940-0a4d1a80-8582-11eb-8985-ceaf7359f4ee.gif)
+![VSCode desktop](./assets/img/vscode-desktop.png)
 
-## Building for Production
+## Building from source
 
 Running Kerberos Agent in production only require a single binary to run. Nevertheless, we have two parts, the `machinery` and the `web`, we merge them during build time. So this is what happens.
 
