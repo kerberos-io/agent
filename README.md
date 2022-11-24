@@ -48,10 +48,10 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 5. [Running as a container](#running-as-a-container)
    
 ### Contributing
-1. [Contribute with Codespaces](#contribute-with-codespaces)
-2. [Develop and build](#develop-and-build)
-3. [Building from source](#building-from-source)
-4.  [Building for Docker](#building-for-docker)
+6. [Contribute with Codespaces](#contribute-with-codespaces)
+7. [Develop and build](#develop-and-build)
+8. [Building from source](#building-from-source)
+9.  [Building for Docker](#building-for-docker)
 
 ### Varia
 10. [Support our project](#support-our-project)
