@@ -45,13 +45,13 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 ### Introduction
 3. [Introduction](#introduction)
 4. [How it works: A world of Agents 🕵🏼‍♂️]()
-
-### Contributing
 5. [Running as a container](#running-as-a-container)
-6. [Contribute with Codespaces](#contribute-with-codespaces)
-7. [Develop and build](#develop-and-build)
-8. [Building from source](#building-from-source)
-9.  [Building for Docker](#building-for-docker)
+   
+### Contributing
+1. [Contribute with Codespaces](#contribute-with-codespaces)
+2. [Develop and build](#develop-and-build)
+3. [Building from source](#building-from-source)
+4.  [Building for Docker](#building-for-docker)
 
 ### Varia
 10. [Support our project](#support-our-project)
@@ -78,24 +78,23 @@ Kerberos.io is a cutting edge video surveillance system with a strong focus on u
 
 ### Kerberos Agent
 
-- Installation in seconds (Docker, Balena, Snap, etc).
+- Low memory and not CPU intensive.
+- Installation in seconds (Docker, Balena, etc).
 - Simplified and modern user interface.
 - Multi architecture (ARMv7, ARMv8, amd64, etc).
-- Multi camera support: IP Cameras (MJPEG/H264), USB cameras and Raspberry Pi Cameras through a RTSP proxy.
+- Multi camera support: IP Cameras (MJPEG/H264), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp).
 - Single camera per instance (e.g. One Docker container per camera).
-- Integrations (Webhooks, MQTT, Script, etc).
-- Cloud storage (Kerberos Hub, Kerberos Vault, Minio, Storj, etc).
+- WIP: Integrations (Webhooks, MQTT, Script, etc).
+- Cloud storage (Kerberos Hub, Kerberos Vault). WIP: Minio, Storj, etc.
+- Ability to specifiy conditions: motion region, time table, continuous recording, etc.
 - MIT License
 
 ### Kerberos Factory (part of [Kerberos Enterprise suite](https://doc.kerberos.io/enterprise/first-things-first/))
 
-- Installation on top of Kubernetes (K8S).
+- Kerberos Agent leveraged in a Kubernetes cluster [through a UI](https://doc.kerberos.io/factory/getting-started/).
 - Camera support for IP camera only (RTSP/H264).
-- Massive horizontal scaling, thanks to Kubernetes.
+- Massive horizontal scaling and flexibility (private, hybrid and cloud deployment).
 - Management of multiple Kerberos Agents through a single pane of glass.
-- Low memory and CPU intensive.
-- Modular and extensible design for building own extensions and integrations (e.g. a video analytics platform).
-- Commercial licensed and closed source.
 
 ## How it works: A world of Agents 🕵🏼‍♂️
 
