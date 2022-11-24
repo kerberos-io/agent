@@ -205,7 +205,7 @@ Remember the build step of the `web` part, during build time we move the build d
 
 ## Building for Docker
 
-Inside the root of this `agent` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping **Kerberos Agent**. Important to note is that start from a prebuild base image, `kerberos/debian-opencv-ffmpeg:1.0.xxx`.
+Inside the root of this `agent` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping **Kerberos Agent**. Important to note is that start from a prebuild base image, `kerberos/base:xxx`.
 This base image contains already a couple of tools, such as Golang, FFmpeg and OpenCV. We do this for faster compilation times.
 
 By running the `docker build` command, you will create the Kerberos Agent Docker image. After building you can simply run the image as a Docker container.
