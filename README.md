@@ -38,33 +38,25 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 
 ## :books: Overview
 
-- [Kerberos Agent](#kerberos-agent)
-  - [:thinking: Prerequisites](#thinking-prerequisites)
-  - [:books: Overview](#books-overview)
-  - [Quickstart - Docker](#quickstart---docker)
-  - [Quickstart - Balena](#quickstart---balena)
-  - [Introduction](#introduction)
-    - [Kerberos Agent](#kerberos-agent-1)
-    - [Kerberos Factory (part of Kerberos Enterprise suite)](#kerberos-factory-part-of-kerberos-enterprise-suite)
-  - [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents-️)
-  - [Running as a container](#running-as-a-container)
-    - [Attach a volume](#attach-a-volume)
-  - [Contribute with Codespaces](#contribute-with-codespaces)
-  - [Develop and build](#develop-and-build)
-    - [UI](#ui)
-    - [Machinery](#machinery)
-  - [Building from source](#building-from-source)
-    - [UI](#ui-1)
-    - [Machinery](#machinery-1)
-  - [Building for Docker](#building-for-docker)
-  - [Support our project](#support-our-project)
-  - [Previous releases](#previous-releases)
-  - [FAQ](#faq)
-      - [1. Why a mono repo?](#1-why-a-mono-repo)
-      - [2. Why a change in technologies?](#2-why-a-change-in-technologies)
-      - [3. What is the difference with Kerberos Enterprise?](#3-what-is-the-difference-with-kerberos-enterprise)
-      - [4. Change in License](#4-change-in-license)
-  - [Contributors](#contributors)
+### Up and running in no time
+1. [Quickstart - Docker](#quickstart---docker)
+2. [Quickstart - Balena](#quickstart---balena)
+
+### Introduction
+3. [Introduction](#introduction)
+4. [How it works: A world of Agents 🕵🏼‍♂️]()
+
+### Contributing
+5. [Running as a container](#running-as-a-container)
+6. [Contribute with Codespaces](#contribute-with-codespaces)
+7. [Develop and build](#develop-and-build)
+8. [Building from source](#building-from-source)
+9.  [Building for Docker](#building-for-docker)
+
+### Varia
+10. [Support our project](#support-our-project)
+11. [Previous releases](#previous-releases)
+12. [FAQ](#faq)
 
 ## Quickstart - Docker
 
