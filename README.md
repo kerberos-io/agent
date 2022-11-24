@@ -28,6 +28,44 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 
 ![Kerberos Agent go through UI](./assets/img/kerberos-agent-overview.gif)
 
+
+## :thinking: Prerequisites
+
+* An IP camera which supports a RTSP h264 encoded stream,
+* (or) a USB camera, Raspberry Pi camera or other camera, that [you can tranform to a valid RTSP stream](https://github.com/kerberos-io/camera-to-rtsp).
+* Any hardware that can run a Docker container, for example: a Raspberry Pi, 
+
+
+## :books: Overview
+
+- [Kerberos Agent](#kerberos-agent)
+  - [:thinking: Prerequisites](#thinking-prerequisites)
+  - [:books: Overview](#books-overview)
+  - [Quickstart - Docker](#quickstart---docker)
+  - [Quickstart - Balena](#quickstart---balena)
+  - [Introduction](#introduction)
+    - [Kerberos Agent](#kerberos-agent-1)
+    - [Kerberos Factory (part of Kerberos Enterprise suite)](#kerberos-factory-part-of-kerberos-enterprise-suite)
+  - [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents-️)
+  - [Running as a container](#running-as-a-container)
+    - [Attach a volume](#attach-a-volume)
+  - [Contribute with Codespaces](#contribute-with-codespaces)
+  - [Develop and build](#develop-and-build)
+    - [UI](#ui)
+    - [Machinery](#machinery)
+  - [Building from source](#building-from-source)
+    - [UI](#ui-1)
+    - [Machinery](#machinery-1)
+  - [Building for Docker](#building-for-docker)
+  - [Support our project](#support-our-project)
+  - [Previous releases](#previous-releases)
+  - [FAQ](#faq)
+      - [1. Why a mono repo?](#1-why-a-mono-repo)
+      - [2. Why a change in technologies?](#2-why-a-change-in-technologies)
+      - [3. What is the difference with Kerberos Enterprise?](#3-what-is-the-difference-with-kerberos-enterprise)
+      - [4. Change in License](#4-change-in-license)
+  - [Contributors](#contributors)
+
 ## Quickstart - Docker
 
 The easiest to get your Kerberos Agent up and running is to use our Docker image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you selected a specific tag, run below command, which will open the web interface of your Kerberos agent on port `80`. For persisting your configuration and/or recordings [attach a volume](#attach-a-volume).
@@ -87,7 +125,7 @@ Feel free to use another port if your host system already has a workload running
 
     docker run -p 8082:80 --name mycamera -d kerberos/agent:latest
 
-## Attach a volume
+### Attach a volume
 
 By default your Kerberos agent will store all its configuration and recordings inside the container. It might be interesting to store both configuration and your recordings outside the container, on your local disk. This helps persisting your storage even after you decide to wipe out your Kerberos agent.
 
