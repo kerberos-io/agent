@@ -64,6 +64,7 @@ The easiest to get your Kerberos Agent up and running is to use our Docker image
     
     docker run -p 80:80 --name mycamera -d kerberos/agent:latest
 
+If you want to connect to an USB or Raspberry Pi camera, [you'll need to run our side car container](https://github.com/kerberos-io/camera-to-rtsp) which proxy the camera to an RTSP stream. 
 
 ## Quickstart - Balena
 
@@ -71,6 +72,9 @@ Run Kerberos Agent with Balena super powers. Monitor your agent with seamless re
 Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=any&0%5B0%5D%5Bo%5D=full_text_search&0%5B0%5D%5Bv%5D=agent), and add your agent.
 
 [![balena deploy button](https://www.balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/agent)
+
+***Work In Progress*** - Currently we only support IP Cameras, we have [an approach for leveraging the USB and Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
+
 
 ## Introduction
 
