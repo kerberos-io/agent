@@ -48,10 +48,10 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 5. [Running as a container](#running-as-a-container)
    
 ### Contributing
-1. [Contribute with Codespaces](#contribute-with-codespaces)
-2. [Develop and build](#develop-and-build)
-3. [Building from source](#building-from-source)
-4.  [Building for Docker](#building-for-docker)
+6. [Contribute with Codespaces](#contribute-with-codespaces)
+7. [Develop and build](#develop-and-build)
+8. [Building from source](#building-from-source)
+9.  [Building for Docker](#building-for-docker)
 
 ### Varia
 10. [Support our project](#support-our-project)
@@ -209,7 +209,7 @@ Remember the build step of the `web` part, during build time we move the build d
 
 ## Building for Docker
 
-Inside the root of this `agent` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping **Kerberos Agent**. Important to note is that start from a prebuild base image, `kerberos/debian-opencv-ffmpeg:1.0.xxx`.
+Inside the root of this `agent` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping **Kerberos Agent**. Important to note is that start from a prebuild base image, `kerberos/base:xxx`.
 This base image contains already a couple of tools, such as Golang, FFmpeg and OpenCV. We do this for faster compilation times.
 
 By running the `docker build` command, you will create the Kerberos Agent Docker image. After building you can simply run the image as a Docker container.
