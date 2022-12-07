@@ -61,6 +61,10 @@ func main() {
 			// Open this configuration either from Kerberos Agent or Kerberos Factory.
 			components.OpenConfig(&configuration)
 
+			// We will override the configuration with the environment variables
+			components.OverrideWithEnvironmentVariables(&configuration)
+
+			// Set timezone
 			timezone, _ := time.LoadLocation(configuration.Config.Timezone)
 			log.Log.Init(timezone)
 

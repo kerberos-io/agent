@@ -140,6 +140,50 @@ You attach a volume to your container by leveraging the `-v` option. To mount yo
 
         docker run -p 80:80 --name mycamera -v $(pwd)/agent/config:/home/agent/data/config  -v $(pwd)/agent/recordings:/home/agent/data/recordings -d kerberos/agent:latest
 
+### Override with environment variables
+
+Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments easier when leveraging `docker compose` or `kubernetes` deployments
+
+| Name                                      | Description                                                                                     | Default Value                         |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `AGENT_KEY`                               | A unique identifier for your Kerberos Agent, this is auto-generated but can be overriden.       | ""                                    |
+| `AGENT_NAME`                              | The agent friendly-name.                                                                        | "agent"                               |
+| `AGENT_TIMEZONE`                          | Timezone which is used for converting time.                                                     | "Africa/Ceuta"                        |
+| `AGENT_OFFLINE`                           | Makes sure no external connection is made.                                                      | "false"                               |
+| `AGENT_AUTO_CLEAN`                        | Cleans up the recordings directory.                                                             | "true"                                |
+| `AGENT_AUTO_CLEAN_MAX_SIZE`               | If `AUTO_CLEAN` enabled, set the max size of the recordings directory in (MB).                  | "100"                                 |
+| `AGENT_CAPTURE_IPCAMERA_RTSP`             | Full-HD RTSP endpoint to the camera you're targetting.                                          | ""                                    |
+| `AGENT_CAPTURE_IPCAMERA_SUB_RTSP`         | Sub-stream RTSP endpoint used for livestreaming (WebRTC).                                       | ""                                    |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF`            | Mark as a compliant ONVIF device.                                                               | ""                                    |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF_XADDR`      | ONVIF endpoint/address running on the camera.                                                   | ""                                    |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF_USERNAME`   | ONVIF username to authenticate against.                                                         | ""                                    |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF_PASSWORD`   | ONVIF password to authenticate against.                                                         | ""                                    |
+| `AGENT_CAPTURE_CONTINUOUS`                | Toggle for enabling continuous or motion based recording.                                       | "false"                               |
+| `AGENT_CAPTURE_PRERECORDING`              | If `CONTINUOUS` set to `false`, specify the recording time (seconds) before after motion event. | "10"                                  |
+| `AGENT_CAPTURE_POSTRECORDING`             | If `CONTINUOUS` set to `false`, specify the recording time (seconds) after motion event.        | "20"                                  |
+| `AGENT_CAPTURE_MAXLENGTH`                 | The maximum length of a single recording (seconds).                                             | "30"                                  |
+| `AGENT_CAPTURE_PIXEL_CHANGE`              | If `CONTINUOUS` set to `false`, the number of pixel require to change before motion triggers.   | "150"                                 |
+| `AGENT_CAPTURE_FRAGMENTED`                | Set the format of the recorded MP4 to fragmented (suitable for HLS).                            | "false"                               |
+| `AGENT_CAPTURE_FRAGMENTED_DURATION`       | If `AGENT_CAPTURE_FRAGMENTED` set to `true`, define the duration (seconds) of a fragment.       | "8"                                   |
+| `AGENT_CLOUD`                             | Store recordings in a Kerberos Hub (s3) or your Kerberos Vault (kstorage).                      | "s3"                                  |
+| `AGENT_HUB_URI`                           | The Kerberos Hub API, defaults to our Kerberos Hub SAAS.                                        | "https://api.cloud.kerberos.io"       |
+| `AGENT_HUB_KEY`                           | The access key linked to your account in Kerberos Hub.                                          | ""                                    |
+| `AGENT_HUB_PRIVATE_KEY`                   | The secret access key linked to your account in Kerberos Hub.                                   | ""                                    |
+| `AGENT_HUB_USERNAME`                      | Your Kerberos Hub username, which owns the above access and secret keys.                        | ""                                    |
+| `AGENT_HUB_SITE`                          | The site ID of a site you've created in your Kerberos Hub account.                              | ""                                    |
+| `AGENT_MQTT_URI`                          | A MQTT broker endpoint that is used for bi-directional communication (live view, onvif, etc)    | "tcp://mqtt.kerberos.io:1883"         |
+| `AGENT_MQTT_USERNAME`                     | Username of the MQTT broker.                                                                    | ""                                    |
+| `AGENT_MQTT_PASSWORD`                     | Password of the MQTT broker.                                                                    | ""                                    |
+| `AGENT_STUN_URI`                          | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn.kerberos.io:8443"          |
+| `AGENT_TURN_URI`                          | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn.kerberos.io:8443"          |
+| `AGENT_TURN_USERNAME`                     | TURN username used for WebRTC.                                                                  | "username1"                           |
+| `AGENT_TURN_PASSWORD`                     | TURN password used for WebRTC.                                                                  | "password1"                           |
+| `AGENT_KERBEROSVAULT_URI`                 | The Kerberos Vault API url.                                                                     | "" .                                  |
+| `AGENT_KERBEROSVAULT_ACCESS_KEY`          | The access key of a Kerberos Vault account.                                                     | ""                                    |
+| `AGENT_KERBEROSVAULT_SECRET_KEY`          | The secret key of a Kerberos Vault account.                                                     | ""                                    |
+| `AGENT_KERBEROSVAULT_PROVIDER`            | A Kerberos Vault provider you have created (optional).                                          | ""                                    |
+| `AGENT_KERBEROSVAULT_DIRECTORY`           | The directory, in the provider, where the recordings will be stored in.                         | ""                                    |
+    
 ## Contribute with Codespaces
 
 One of the major blockers for letting you contribute to an Open Source project is to setup your local development machine. Why? Because you might have already some tools and libraries installed that are used for other projects, and the libraries you would need for Kerberos Agent, for example FFmpeg, might require a different version. Welcome to the dependency hell..

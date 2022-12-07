@@ -136,7 +136,7 @@ type S3 struct {
 // By defining KStorage you can make your recordings available in the cloud, at a centrel place.
 type KStorage struct {
 	URI             string `json:"uri,omitempty" bson:"uri,omitempty"`
-	CloudKey        string `json:"cloud_key,omitempty" bson:"cloud_key,omitempty"`
+	CloudKey        string `json:"cloud_key,omitempty" bson:"cloud_key,omitempty"` /* old way, remove this */
 	AccessKey       string `json:"access_key,omitempty" bson:"access_key,omitempty"`
 	SecretAccessKey string `json:"secret_access_key,omitempty" bson:"secret_access_key,omitempty"`
 	Provider        string `json:"provider,omitempty" bson:"provider,omitempty"`

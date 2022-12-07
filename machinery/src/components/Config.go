@@ -12,6 +12,8 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/InVisionApp/conjungo"
@@ -178,6 +180,168 @@ func OpenConfig(configuration *models.Configuration) {
 	}
 
 	return
+}
+
+// This function will override the configuration with environment variables.
+func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
+	environmentVariables := os.Environ()
+	for _, env := range environmentVariables {
+		if strings.Contains(env, "AGENT_") {
+			key := strings.Split(env, "=")[0]
+			value := os.Getenv(key)
+			switch key {
+
+			/* General configuration */
+			case "AGENT_KEY":
+				configuration.Config.Key = value
+				break
+			case "AGENT_NAME":
+				configuration.Config.Name = value
+				break
+			case "AGENT_TIMEZONE":
+				configuration.Config.Timezone = value
+				break
+			case "AGENT_OFFLINE":
+				configuration.Config.Offline = value
+				break
+			case "AGENT_AUTO_CLEAN":
+				configuration.Config.AutoClean = value
+				break
+			case "AGENT_AUTO_CLEAN_MAX_SIZE":
+				size, err := strconv.ParseInt(value, 10, 64)
+				if err == nil {
+					configuration.Config.MaxDirectorySize = size
+				}
+				break
+
+			/* Camera configuration */
+			case "AGENT_CAPTURE_IPCAMERA_RTSP":
+				configuration.Config.Capture.IPCamera.RTSP = value
+				break
+			case "AGENT_CAPTURE_IPCAMERA_SUB_RTSP":
+				configuration.Config.Capture.IPCamera.SubRTSP = value
+				break
+
+				/* ONVIF connnection settings */
+			case "AGENT_CAPTURE_IPCAMERA_ONVIF":
+				isEnabled := value == " true"
+				configuration.Config.Capture.IPCamera.ONVIF = isEnabled
+				break
+			case "AGENT_CAPTURE_IPCAMERA_ONVIF_XADDR":
+				configuration.Config.Capture.IPCamera.ONVIFXAddr = value
+				break
+			case "AGENT_CAPTURE_IPCAMERA_ONVIF_USERNAME":
+				configuration.Config.Capture.IPCamera.ONVIFUsername = value
+				break
+			case "AGENT_CAPTURE_IPCAMERA_ONVIF_PASSWORD":
+				configuration.Config.Capture.IPCamera.ONVIFPassword = value
+				break
+
+			/* Recording mode */
+			case "AGENT_CAPTURE_CONTINUOUS":
+				configuration.Config.Capture.Continuous = value
+				break
+			case "AGENT_CAPTURE_PRERECORDING":
+				duration, err := strconv.ParseInt(value, 10, 64)
+				if err == nil {
+					configuration.Config.Capture.PreRecording = duration
+				}
+				break
+			case "AGENT_CAPTURE_POSTRECORDING":
+				duration, err := strconv.ParseInt(value, 10, 64)
+				if err == nil {
+					configuration.Config.Capture.PostRecording = duration
+				}
+				break
+			case "AGENT_CAPTURE_MAXLENGTH":
+				duration, err := strconv.ParseInt(value, 10, 64)
+				if err == nil {
+					configuration.Config.Capture.MaxLengthRecording = duration
+				}
+				break
+			case "AGENT_CAPTURE_PIXEL_CHANGE":
+				count, err := strconv.Atoi(value)
+				if err == nil {
+					configuration.Config.Capture.PixelChangeThreshold = count
+				}
+				break
+			case "AGENT_CAPTURE_FRAGMENTED":
+				configuration.Config.Capture.Fragmented = value
+				break
+			case "AGENT_CAPTURE_FRAGMENTED_DURATION":
+				duration, err := strconv.ParseInt(value, 10, 64)
+				if err == nil {
+					configuration.Config.Capture.FragmentedDuration = duration
+				}
+				break
+
+			/* Cloud settings for persisting recordings */
+			case "AGENT_CLOUD":
+				configuration.Config.Cloud = value
+				break
+
+			/* When connected and storing in Kerberos Hub (SAAS) */
+			case "AGENT_HUB_URI":
+				configuration.Config.HubURI = value
+				break
+			case "AGENT_HUB_KEY":
+				configuration.Config.HubKey = value
+				break
+			case "AGENT_HUB_PRIVATE_KEY":
+				configuration.Config.HubPrivateKey = value
+				break
+			case "AGENT_HUB_USERNAME":
+				configuration.Config.S3.Username = value
+				break
+			case "AGENT_HUB_SITE":
+				configuration.Config.HubSite = value
+				break
+
+			/* MQTT settings for bi-directional communication */
+			case "AGENT_MQTT_URI":
+				configuration.Config.MQTTURI = value
+				break
+			case "AGENT_MQTT_USERNAME":
+				configuration.Config.MQTTUsername = value
+				break
+			case "AGENT_MQTT_PASSWORD":
+				configuration.Config.MQTTPassword = value
+				break
+
+			/* WebRTC settings for live-streaming (remote) */
+			case "AGENT_STUN_URI":
+				configuration.Config.STUNURI = value
+				break
+			case "AGENT_TURN_URI":
+				configuration.Config.TURNURI = value
+				break
+			case "AGENT_TURN_USERNAME":
+				configuration.Config.TURNUsername = value
+				break
+			case "AGENT_TURN_PASSWORD":
+				configuration.Config.TURNPassword = value
+				break
+
+			/* When storing in a Kerberos Vault */
+			case "AGENT_KERBEROSVAULT_URI":
+				configuration.Config.KStorage.URI = value
+				break
+			case "AGENT_KERBEROSVAULT_ACCESS_KEY":
+				configuration.Config.KStorage.AccessKey = value
+				break
+			case "AGENT_KERBEROSVAULT_SECRET_KEY":
+				configuration.Config.KStorage.SecretAccessKey = value
+				break
+			case "AGENT_KERBEROSVAULT_PROVIDER":
+				configuration.Config.KStorage.Provider = value
+				break
+			case "AGENT_KERBEROSVAULT_DIRECTORY":
+				configuration.Config.KStorage.Directory = value
+				break
+
+			}
+		}
+	}
 }
 
 func SaveConfig(config models.Config, configuration *models.Configuration, communication *models.Communication) error {
