@@ -35,7 +35,7 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 
 ## :video_camera: Is my camera working?
 
-There are a myriad of cameras out there (USB, IP and other cameras), and it might be daunting to know if Kerberos Agent will work for your camera. Therefore we are listing all the camera models that are acknowlegded by the community](https://github.com/kerberos-io/agent/issues/59). Feel free to add your camera to the list as well!
+There are a myriad of cameras out there (USB, IP and other cameras), and it might be daunting to know if Kerberos Agent will work for your camera. [Therefore we are listing all the camera models that are acknowlegded by the community](https://github.com/kerberos-io/agent/issues/59). Feel free to add your camera to the list as well!
 
 ## :books: Overview
 
