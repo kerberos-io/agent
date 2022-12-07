@@ -21,17 +21,15 @@ https://brianmacdonald.github.io/Ethonate/address#0xf4a759C9436E2280Ea9cdd23d314
 <a target="_blank" href="https://twitter.com/kerberosio?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40kerberosio&style=social&url=https%3A%2F%2Ftwitter.com%2Fkerberosio" alt="Twitter Widget"></a>
 [![Discord Shield](https://discordapp.com/api/guilds/1039619181731135499/widget.png?style=shield)](https://discord.gg/Bj77Vqfp2G)
 
-
 [**Docker Hub**](https://hub.docker.com/r/kerberos/agent) | [**Documentation**](https://doc.kerberos.io) | [**Website**](https://kerberos.io)
 
 Kerberos Agent is a cutting edge video surveillance management system made available as Open Source under the MIT License. This means that all the source code is available for you or your company, and you can use, transform and distribute the source code; as long you keep a reference of the original license. Kerberos Agent can be used for commercial usage (which was not the case for v2). Read more [about the license here](LICENSE).
 
 ![Kerberos Agent go through UI](./assets/img/kerberos-agent-overview.gif)
 
-
 ## :thinking: Prerequisites
 
-* An IP camera which supports a RTSP h264 encoded stream,
+* An IP camera which supports a RTSP H264 encoded stream,
 * (or) a USB camera, Raspberry Pi camera or other camera, that [you can tranform to a valid RTSP stream](https://github.com/kerberos-io/camera-to-rtsp).
 * Any hardware that can run a Docker container, for example: a Raspberry Pi, NVidia Jetson, Intel NUC, a VM, Bare metal machine or a full blown Kubernetes cluster.
 
