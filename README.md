@@ -196,7 +196,6 @@ After a few minutes, you will see a beautiful `Visual Studio Code` shown in your
     
 ![Kerberos Agent VSCode](assets/img/codespace-vscode.png)
 
-
 ## Develop and build
 
 Kerberos Agent is divided in two parts a `machinery` and `web`. Both parts live in this repository in their relative folders. For development or running the application on your local machine, you have to run both the `machinery` and the `web` as described below. When running in production everything is shipped as only one artifact, read more about this at [Building for production](#building-for-production).
