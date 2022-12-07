@@ -44,7 +44,7 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 
 ### Introduction
 3. [Introduction](#introduction)
-4. [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents-)
+4. [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents)
 5. [Running as a container](#running-as-a-container)
    1. [Attach a volume](#attach-a-volume)
    2. [Override with environment variables](#override-with-environment-variables)
@@ -102,7 +102,7 @@ Kerberos.io is a cutting edge video surveillance system with a strong focus on u
 - Massive horizontal scaling and flexibility (private, hybrid and cloud deployment).
 - Management of multiple Kerberos Agents through a single pane of glass.
 
-## How it works: A world of Agents 🕵🏼‍♂️
+## How it works: A world of Agents
 
 Kerberos.io applies the concept of agents. An agent is running next to or on your camera, and is processing a single camera feed. It applies motion based recording and make those recordings available through a user friendly web interface. Kerberos Agent allows you to connect to other cloud services or custom applications. Kerberos Agent is perfect for personal usage and/or is a great tool if you only have a couple of surveillance cameras to be processed.
 
