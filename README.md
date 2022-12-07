@@ -44,7 +44,7 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 
 ### Introduction
 3. [Introduction](#introduction)
-4. [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents-🕵🏼‍♂️)
+4. [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents-)
 5. [Running as a container](#running-as-a-container)
    1. [Attach a volume](#attach-a-volume)
    2. [Override with environment variables](#override-with-environment-variables)
