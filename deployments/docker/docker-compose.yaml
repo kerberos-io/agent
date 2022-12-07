@@ -1,0 +1,29 @@
+version: "3.9"
+services:
+  kerberos-agent1:
+    image: "kerberos/agent:latest"
+    ports:
+      - "8081:80"
+    environment:
+      - AGENT_NAME=agent1
+      - AGENT_CAPTURE_IPCAMERA_RTSP=rtsp://x.x.x.x:554/Streaming/Channels/101
+      - AGENT_HUB_KEY=xxx
+      - AGENT_HUB_PRIVATE_KEY=xxx
+  kerberos-agent2:
+    image: "kerberos/agent:latest"
+    ports:
+      - "8082:80"
+    environment:
+      - AGENT_NAME=agent2
+      - AGENT_CAPTURE_IPCAMERA_RTSP=rtsp://x.x.x.x:554/Streaming/Channels/101
+      - AGENT_HUB_KEY=yyy
+      - AGENT_HUB_PRIVATE_KEY=yyy
+  kerberos-agent3:
+    image: "kerberos/agent:latest"
+    ports:
+      - "8083:80"
+    environment:
+      - AGENT_NAME=agent3
+      - AGENT_CAPTURE_IPCAMERA_RTSP=rtsp://x.x.x.x:554/Streaming/Channels/101
+      - AGENT_HUB_KEY=yyy
+      - AGENT_HUB_PRIVATE_KEY=yyy
