@@ -46,6 +46,8 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 3. [Introduction](#introduction)
 4. [How it works: A world of Agents 🕵🏼‍♂️]()
 5. [Running as a container](#running-as-a-container)
+   1. [Attach a volume](#attach-a-volume)
+   2. [Override with environment variables](#override-with-environment-variables)
    
 ### Contributing
 6. [Contribute with Codespaces](#contribute-with-codespaces)
@@ -142,7 +144,7 @@ You attach a volume to your container by leveraging the `-v` option. To mount yo
 
 ### Override with environment variables
 
-Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments easier when leveraging `docker compose` or `kubernetes` deployments
+Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments easier when leveraging `docker compose` or `kubernetes` deployments much easier and scalable. Using this approach we simplify automation through `ansible` and `terraform`.
 
 | Name                                      | Description                                                                                     | Default Value                         |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------- |
