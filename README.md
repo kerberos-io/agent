@@ -62,7 +62,7 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 ## Quickstart - Docker
 
-The easiest to get your Kerberos Agent up and running is to use our Docker image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you selected a specific tag, run below command, which will open the web interface of your Kerberos agent on port `80`. For persisting your configuration and/or recordings [attach a volume](#attach-a-volume).
+The easiest to get your Kerberos Agent up and running is to use our Docker image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you selected a specific tag, run below command, which will open the web interface of your Kerberos agent on port `80`. For a more configurable and persistent deployment have a look at [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent).
     
     docker run -p 80:80 --name mycamera -d kerberos/agent:latest
 
