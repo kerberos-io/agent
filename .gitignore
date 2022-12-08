@@ -9,3 +9,4 @@ machinery/data/cloud
 machinery/data/recordings
 machinery/data/snapshots
 machinery/test*
+deployments/docker/private-docker-compose.yaml
