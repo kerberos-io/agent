@@ -83,7 +83,7 @@ Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=
 
 **_Work In Progress_** - Currently we only support IP Cameras, we have [an approach for leveraging the USB and Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
 
-### Kerberos Agent
+## Introduction
 
 The Kerberos Agent is an isolated and scalable video (surveillance) management agent with a strong focus on user experience, scalability, resilience, extension and integration. Kerberos.io provides, next to the Kerberos Agent, many other tools such as [Kerberos Factory](https://github.com/kerberos-io/factory), [Kerberos Vault](https://github.com/kerberos-io/vault) and [Kerberos Hub](https://github.com/kerberos-io/hub) to support different (enterprise) usecases: bring your own cloud, bring your own storage, etc. This repository contains everything you'll need to know about the core product, the Kerberos Agent. Below you'll find a brief list of features and functions.
 
