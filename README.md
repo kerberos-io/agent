@@ -63,8 +63,8 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 ### Varia
 
 12. [Support our project](#support-our-project)
-13. [Previous releases](#previous-releases)
-14. [FAQ](#faq)
+13. [What is new?](#what-is-new)
+14. [Contributors](#contributors)
 
 ## Quickstart - Docker
 
@@ -117,9 +117,7 @@ We have documented the different deployment models [in the `deployments` directo
 - [Terraform](https://github.com/kerberos-io/agent/tree/master/deployments#5-terraform)
 - [Salt](https://github.com/kerberos-io/agent/tree/master/deployments#6-salt)
 
-By default your Kerberos Agents will store all its configuration and recordings inside the container. To help you automate and have consistent data governance, you can attach volumes to configure and persist data of your Kerberos Agent, and/or configure the Kerberos Agent through environment variables.
-
-To overcome this you be interesting to store both configuration and your recordings outside the container, on your local disk. This helps persisting your storage even after you decide to wipe out your Kerberos agent.
+By default your Kerberos Agents will store all its configuration and recordings inside the container. To help you automate and have a more consistent data governance, you can attach volumes to configure and persist data of your Kerberos Agents, and/or configure each Kerberos Agent through environment variables.
 
 ## Configure and persist with volume mounts
 
@@ -261,35 +259,13 @@ If you like our product please feel free to execute an Ethereum donation. All do
 
 Ethereum Address: `0xf4a759C9436E2280Ea9cdd23d3144D95538fF4bE`
 
-## Previous releases
+## What is new?
 
 This repository contains the next generation of Kerberos.io, **Kerberos Agent (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/agent/tree/develop) and [project overview](https://github.com/kerberos-io/agent/projects/1).
 
 Read more about this [at the FAQ](#faq) below.
 
 ![opensource-to-agent](https://user-images.githubusercontent.com/1546779/172066873-7752c979-de63-4417-8d26-34192fdbd1e6.svg)
-
-## FAQ
-
-#### 1. Why a mono repo?
-
-We have noticed in the past (v1 and v2) splitting the repositories (machinery and web), created a lot of confusion within our community. People didn't understand the different versions and so on. This caused a lack of collaboration, and made it impossible for some people to collaborate and contribute.
-
-Having a mono repo, which is well organised, simplifies the entry point for new people who would like to use, understand and/or contribute to Kerberos Agent.
-
-#### 2. Why a change in technologies?
-
-In previous versions (v1 and v2) we used technologies like C++, PHP and BackboneJS. 7 years ago this was still acceptable, however time has changed and new technologies such as React and Golang became very popular.
-
-Due to previous reason we have decided to rebuild the Kerberos Agent technology from scratch, taking into account all the feedback we acquired over the years. Having these technologies available, we will enable more people to contribute and use our technology.
-
-#### 3. What is the difference with Kerberos Enterprise?
-
-We started the developments of Kerberos Enterprise a year ago (January, 2020), our focus here was scalability, and fast development and easy deployment. We noticed that with technologies such as Golang and React, we can still provide a highly performant video surveillance system. Kerberos Agent is the one and only agent for both an Open Source and Enterprise deployment.
-
-#### 4. Change in License
-
-Kerberos Agent (v3) is now available under the MIT license.
 
 ## Contributors
 
