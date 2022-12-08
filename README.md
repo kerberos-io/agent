@@ -46,15 +46,14 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 ### Introduction
 3. [Introduction](#introduction)
 4. [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents)
-5. [Running as a container](#running-as-a-container)
-   1. [Attach a volume](#attach-a-volume)
-   2. [Override with environment variables](#override-with-environment-variables)
+5. [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent)
+   1. [Override with environment variables](#override-with-environment-variables)
    
 ### Contributing
 6. [Contribute with Codespaces](#contribute-with-codespaces)
 7. [Develop and build](#develop-and-build)
 8. [Building from source](#building-from-source)
-9.  [Building for Docker](#building-for-docker)
+9. [Building for Docker](#building-for-docker)
 
 ### Varia
 10. [Support our project](#support-our-project)
@@ -109,39 +108,18 @@ Kerberos.io applies the concept of agents. An agent is running next to or on you
 
 If you are looking for a solution that scales better with your video surveillance and/or video analytics requirements, [Kerberos Enterprise Suite might be a better fit](https://doc.kerberos.io/enterprise/first-things-first).
 
-## Running as a container
+## Running and automating a Kerberos Agent
 
-We are creating Docker images as part of our CI/CD process. You'll find our Docker images on [Docker hub](https://hub.docker.com/r/kerberos/agent). Pick a specific tag of choice, or use latest. Once done run below command, this will open the web interface of your Kerberos agent on port 80.  
-    
-    docker run -p 80:80 --name mycamera -d kerberos/agent:latest
+As described before a Kerberos Agent is a container, which can be deployed through various ways and automation tools such as `docker`, `docker compose`, `kubernetes` and the list goes on. To simplify your life we have come with concrete and working examples of deployments to help you speed up your Kerberos.io journey.
 
-Or for a develop build:
+We have documented the different deployment models [in the `deployments` directory](https://github.com/kerberos-io/agent/tree/master/deployments) of this repository. There you'll learn and find how to deploy using:
 
-    docker run -p 80:80 --name mycamera -d kerberos/agent-dev:latest
-
-Feel free to use another port if your host system already has a workload running on `80`. For example `8082`.
-
-    docker run -p 8082:80 --name mycamera -d kerberos/agent:latest
-
-### Attach a volume
-
-By default your Kerberos agent will store all its configuration and recordings inside the container. It might be interesting to store both configuration and your recordings outside the container, on your local disk. This helps persisting your storage even after you decide to wipe out your Kerberos agent.
-
-You attach a volume to your container by leveraging the `-v` option. To mount your own configuration file, execute as following:
-
-1. Decide where you would like to store your configuration and recordings; create a new directory for the config file and recordings folder accordingly.
-
-        mkdir agent
-        mkdir agent/config
-        mkdir agent/recordings
-
-2. Once you have located your desired directory, copy the latest [`config.json`](https://github.com/kerberos-io/agent/blob/master/machinery/data/config/config.json) file into your config directory.
-
-        wget https://raw.githubusercontent.com/kerberos-io/agent/master/machinery/data/config/config.json -O agent/config/config.json
-
-3. Run the docker command as following to attach your config directory and recording directory.
-
-        docker run -p 80:80 --name mycamera -v $(pwd)/agent/config:/home/agent/data/config  -v $(pwd)/agent/recordings:/home/agent/data/recordings -d kerberos/agent:latest
+- [Docker](https://github.com/kerberos-io/agent/tree/master/deployments#1-docker)
+- [Docker Compose](https://github.com/kerberos-io/agent/tree/master/deployments#2-docker-compose)
+- [Kubernetes](https://github.com/kerberos-io/agent/tree/master/deployments#3-kubernetes)
+- [Red Hat OpenShift with Ansible](https://github.com/kerberos-io/agent/tree/master/deployments#4-redhat-ansible-and-openshift)
+- [Terraform](https://github.com/kerberos-io/agent/tree/master/deployments#5-terraform)
+- [Salt](https://github.com/kerberos-io/agent/tree/master/deployments#6-salt)
 
 ### Override with environment variables
 
