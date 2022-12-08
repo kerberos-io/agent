@@ -44,7 +44,7 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 ### Introduction
 
-3. [Introduction](#introduction)
+3. [Introduction](#introduction-1)
 4. [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents)
 
 ### Running and automation
