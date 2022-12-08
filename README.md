@@ -15,9 +15,7 @@
 <a target="_blank" href="https://www.figma.com/proto/msuYC6sv2cOCqZeDtBxNy7/%5BNEW%5D-Kerberos.io-Apps?node-id=1%3A1788&viewport=-490%2C191%2C0.34553584456443787&scaling=min-zoom&page-id=1%3A2%3Ffuid%3D449684443467913607" alt="Kerberos Agent"></a>
 
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-[![donate](
-https://brianmacdonald.github.io/Ethonate/svg/eth-donate-blue.svg)](
-https://brianmacdonald.github.io/Ethonate/address#0xf4a759C9436E2280Ea9cdd23d3144D95538fF4bE)
+[![donate](https://brianmacdonald.github.io/Ethonate/svg/eth-donate-blue.svg)](https://brianmacdonald.github.io/Ethonate/address#0xf4a759C9436E2280Ea9cdd23d3144D95538fF4bE)
 <a target="_blank" href="https://twitter.com/kerberosio?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40kerberosio&style=social&url=https%3A%2F%2Ftwitter.com%2Fkerberosio" alt="Twitter Widget"></a>
 [![Discord Shield](https://discordapp.com/api/guilds/1039619181731135499/widget.png?style=shield)](https://discord.gg/Bj77Vqfp2G)
 
@@ -29,9 +27,9 @@ Kerberos Agent is a cutting edge video surveillance management system made avail
 
 ## :thinking: Prerequisites
 
-* An IP camera which supports a RTSP H264 encoded stream,
-* (or) a USB camera, Raspberry Pi camera or other camera, that [you can tranform to a valid RTSP stream](https://github.com/kerberos-io/camera-to-rtsp).
-* Any hardware that can run a Docker container, for example: a Raspberry Pi, NVidia Jetson, Intel NUC, a VM, Bare metal machine or a full blown Kubernetes cluster.
+- An IP camera which supports a RTSP H264 encoded stream,
+- (or) a USB camera, Raspberry Pi camera or other camera, that [you can tranform to a valid RTSP stream](https://github.com/kerberos-io/camera-to-rtsp).
+- Any hardware that can run a Docker container, for example: a Raspberry Pi, NVidia Jetson, Intel NUC, a VM, Bare metal machine or a full blown Kubernetes cluster.
 
 ## :video_camera: Is my camera working?
 
@@ -40,45 +38,50 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 ## :books: Overview
 
 ### Up and running in no time
+
 1. [Quickstart - Docker](#quickstart---docker)
 2. [Quickstart - Balena](#quickstart---balena)
 
 ### Introduction
+
 3. [Introduction](#introduction)
 4. [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents)
 
 ### Running and automation
-5. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
-6. [Override with environment variables](#override-with-environment-variables)
-   
+
+5. [How to run and deploy a Kerberos Agent](#how-to-run-and-deploy-a-kerberos-agent)
+6. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
+7. [Override with environment variables](#override-with-environment-variables)
+
 ### Contributing
-7. [Contribute with Codespaces](#contribute-with-codespaces)
-8. [Develop and build](#develop-and-build)
-9. [Building from source](#building-from-source)
-10. [Building for Docker](#building-for-docker)
+
+8. [Contribute with Codespaces](#contribute-with-codespaces)
+9. [Develop and build](#develop-and-build)
+10. [Building from source](#building-from-source)
+11. [Building for Docker](#building-for-docker)
 
 ### Varia
-11. [Support our project](#support-our-project)
-12. [Previous releases](#previous-releases)
-13. [FAQ](#faq)
+
+12. [Support our project](#support-our-project)
+13. [Previous releases](#previous-releases)
+14. [FAQ](#faq)
 
 ## Quickstart - Docker
 
 The easiest to get your Kerberos Agent up and running is to use our Docker image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you selected a specific tag, run below command, which will open the web interface of your Kerberos agent on port `80`. For a more configurable and persistent deployment have a look at [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent).
-    
+
     docker run -p 80:80 --name mycamera -d kerberos/agent:latest
 
-If you want to connect to an USB or Raspberry Pi camera, [you'll need to run our side car container](https://github.com/kerberos-io/camera-to-rtsp) which proxy the camera to an RTSP stream. 
+If you want to connect to an USB or Raspberry Pi camera, [you'll need to run our side car container](https://github.com/kerberos-io/camera-to-rtsp) which proxy the camera to an RTSP stream.
 
 ## Quickstart - Balena
 
-Run Kerberos Agent with Balena super powers. Monitor your agent with seamless remote access, and an encrypted https endpoint. 
+Run Kerberos Agent with Balena super powers. Monitor your agent with seamless remote access, and an encrypted https endpoint.
 Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=any&0%5B0%5D%5Bo%5D=full_text_search&0%5B0%5D%5Bv%5D=agent), and add your agent.
 
 [![balena deploy button](https://www.balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/agent)
 
-***Work In Progress*** - Currently we only support IP Cameras, we have [an approach for leveraging the USB and Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
-
+**_Work In Progress_** - Currently we only support IP Cameras, we have [an approach for leveraging the USB and Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
 
 ## Introduction
 
@@ -110,7 +113,7 @@ Kerberos.io applies the concept of agents. An agent is running next to or on you
 
 If you are looking for a solution that scales better with your video surveillance and/or video analytics requirements, [Kerberos Enterprise Suite might be a better fit](https://doc.kerberos.io/enterprise/first-things-first).
 
-# Running and automation
+## How to run and deploy a Kerberos Agent
 
 As described before a Kerberos Agent is a container, which can be deployed through various ways and automation tools such as `docker`, `docker compose`, `kubernetes` and the list goes on. To simplify your life we have come with concrete and working examples of deployments to help you speed up your Kerberos.io journey.
 
@@ -125,7 +128,7 @@ We have documented the different deployment models [in the `deployments` directo
 
 By default your Kerberos Agents will store all its configuration and recordings inside the container. To help you automate and have consistent data governance, you can attach volumes to configure and persist data of your Kerberos Agent, and/or configure the Kerberos Agent through environment variables.
 
-To overcome this you be interesting to store both configuration and your recordings outside the container, on your local disk. This helps persisting your storage even after you decide to wipe out your Kerberos agent. 
+To overcome this you be interesting to store both configuration and your recordings outside the container, on your local disk. This helps persisting your storage even after you decide to wipe out your Kerberos agent.
 
 ## Configure and persist with volume mounts
 
@@ -141,46 +144,46 @@ More example [can be found in the deployment section](https://github.com/kerbero
 
 Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments easier when leveraging `docker compose` or `kubernetes` deployments much easier and scalable. Using this approach we simplify automation through `ansible` and `terraform`.
 
-| Name                                      | Description                                                                                     | Default Value                         |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `AGENT_KEY`                               | A unique identifier for your Kerberos Agent, this is auto-generated but can be overriden.       | ""                                    |
-| `AGENT_NAME`                              | The agent friendly-name.                                                                        | "agent"                               |
-| `AGENT_TIMEZONE`                          | Timezone which is used for converting time.                                                     | "Africa/Ceuta"                        |
-| `AGENT_OFFLINE`                           | Makes sure no external connection is made.                                                      | "false"                               |
-| `AGENT_AUTO_CLEAN`                        | Cleans up the recordings directory.                                                             | "true"                                |
-| `AGENT_AUTO_CLEAN_MAX_SIZE`               | If `AUTO_CLEAN` enabled, set the max size of the recordings directory in (MB).                  | "100"                                 |
-| `AGENT_CAPTURE_IPCAMERA_RTSP`             | Full-HD RTSP endpoint to the camera you're targetting.                                          | ""                                    |
-| `AGENT_CAPTURE_IPCAMERA_SUB_RTSP`         | Sub-stream RTSP endpoint used for livestreaming (WebRTC).                                       | ""                                    |
-| `AGENT_CAPTURE_IPCAMERA_ONVIF`            | Mark as a compliant ONVIF device.                                                               | ""                                    |
-| `AGENT_CAPTURE_IPCAMERA_ONVIF_XADDR`      | ONVIF endpoint/address running on the camera.                                                   | ""                                    |
-| `AGENT_CAPTURE_IPCAMERA_ONVIF_USERNAME`   | ONVIF username to authenticate against.                                                         | ""                                    |
-| `AGENT_CAPTURE_IPCAMERA_ONVIF_PASSWORD`   | ONVIF password to authenticate against.                                                         | ""                                    |
-| `AGENT_CAPTURE_CONTINUOUS`                | Toggle for enabling continuous or motion based recording.                                       | "false"                               |
-| `AGENT_CAPTURE_PRERECORDING`              | If `CONTINUOUS` set to `false`, specify the recording time (seconds) before after motion event. | "10"                                  |
-| `AGENT_CAPTURE_POSTRECORDING`             | If `CONTINUOUS` set to `false`, specify the recording time (seconds) after motion event.        | "20"                                  |
-| `AGENT_CAPTURE_MAXLENGTH`                 | The maximum length of a single recording (seconds).                                             | "30"                                  |
-| `AGENT_CAPTURE_PIXEL_CHANGE`              | If `CONTINUOUS` set to `false`, the number of pixel require to change before motion triggers.   | "150"                                 |
-| `AGENT_CAPTURE_FRAGMENTED`                | Set the format of the recorded MP4 to fragmented (suitable for HLS).                            | "false"                               |
-| `AGENT_CAPTURE_FRAGMENTED_DURATION`       | If `AGENT_CAPTURE_FRAGMENTED` set to `true`, define the duration (seconds) of a fragment.       | "8"                                   |
-| `AGENT_CLOUD`                             | Store recordings in a Kerberos Hub (s3) or your Kerberos Vault (kstorage).                      | "s3"                                  |
-| `AGENT_HUB_URI`                           | The Kerberos Hub API, defaults to our Kerberos Hub SAAS.                                        | "https://api.cloud.kerberos.io"       |
-| `AGENT_HUB_KEY`                           | The access key linked to your account in Kerberos Hub.                                          | ""                                    |
-| `AGENT_HUB_PRIVATE_KEY`                   | The secret access key linked to your account in Kerberos Hub.                                   | ""                                    |
-| `AGENT_HUB_USERNAME`                      | Your Kerberos Hub username, which owns the above access and secret keys.                        | ""                                    |
-| `AGENT_HUB_SITE`                          | The site ID of a site you've created in your Kerberos Hub account.                              | ""                                    |
-| `AGENT_MQTT_URI`                          | A MQTT broker endpoint that is used for bi-directional communication (live view, onvif, etc)    | "tcp://mqtt.kerberos.io:1883"         |
-| `AGENT_MQTT_USERNAME`                     | Username of the MQTT broker.                                                                    | ""                                    |
-| `AGENT_MQTT_PASSWORD`                     | Password of the MQTT broker.                                                                    | ""                                    |
-| `AGENT_STUN_URI`                          | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn.kerberos.io:8443"          |
-| `AGENT_TURN_URI`                          | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn.kerberos.io:8443"          |
-| `AGENT_TURN_USERNAME`                     | TURN username used for WebRTC.                                                                  | "username1"                           |
-| `AGENT_TURN_PASSWORD`                     | TURN password used for WebRTC.                                                                  | "password1"                           |
-| `AGENT_KERBEROSVAULT_URI`                 | The Kerberos Vault API url.                                                                     | "" .                                  |
-| `AGENT_KERBEROSVAULT_ACCESS_KEY`          | The access key of a Kerberos Vault account.                                                     | ""                                    |
-| `AGENT_KERBEROSVAULT_SECRET_KEY`          | The secret key of a Kerberos Vault account.                                                     | ""                                    |
-| `AGENT_KERBEROSVAULT_PROVIDER`            | A Kerberos Vault provider you have created (optional).                                          | ""                                    |
-| `AGENT_KERBEROSVAULT_DIRECTORY`           | The directory, in the provider, where the recordings will be stored in.                         | ""                                    |
-    
+| Name                                    | Description                                                                                     | Default Value                   |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------- |
+| `AGENT_KEY`                             | A unique identifier for your Kerberos Agent, this is auto-generated but can be overriden.       | ""                              |
+| `AGENT_NAME`                            | The agent friendly-name.                                                                        | "agent"                         |
+| `AGENT_TIMEZONE`                        | Timezone which is used for converting time.                                                     | "Africa/Ceuta"                  |
+| `AGENT_OFFLINE`                         | Makes sure no external connection is made.                                                      | "false"                         |
+| `AGENT_AUTO_CLEAN`                      | Cleans up the recordings directory.                                                             | "true"                          |
+| `AGENT_AUTO_CLEAN_MAX_SIZE`             | If `AUTO_CLEAN` enabled, set the max size of the recordings directory in (MB).                  | "100"                           |
+| `AGENT_CAPTURE_IPCAMERA_RTSP`           | Full-HD RTSP endpoint to the camera you're targetting.                                          | ""                              |
+| `AGENT_CAPTURE_IPCAMERA_SUB_RTSP`       | Sub-stream RTSP endpoint used for livestreaming (WebRTC).                                       | ""                              |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF`          | Mark as a compliant ONVIF device.                                                               | ""                              |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF_XADDR`    | ONVIF endpoint/address running on the camera.                                                   | ""                              |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF_USERNAME` | ONVIF username to authenticate against.                                                         | ""                              |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF_PASSWORD` | ONVIF password to authenticate against.                                                         | ""                              |
+| `AGENT_CAPTURE_CONTINUOUS`              | Toggle for enabling continuous or motion based recording.                                       | "false"                         |
+| `AGENT_CAPTURE_PRERECORDING`            | If `CONTINUOUS` set to `false`, specify the recording time (seconds) before after motion event. | "10"                            |
+| `AGENT_CAPTURE_POSTRECORDING`           | If `CONTINUOUS` set to `false`, specify the recording time (seconds) after motion event.        | "20"                            |
+| `AGENT_CAPTURE_MAXLENGTH`               | The maximum length of a single recording (seconds).                                             | "30"                            |
+| `AGENT_CAPTURE_PIXEL_CHANGE`            | If `CONTINUOUS` set to `false`, the number of pixel require to change before motion triggers.   | "150"                           |
+| `AGENT_CAPTURE_FRAGMENTED`              | Set the format of the recorded MP4 to fragmented (suitable for HLS).                            | "false"                         |
+| `AGENT_CAPTURE_FRAGMENTED_DURATION`     | If `AGENT_CAPTURE_FRAGMENTED` set to `true`, define the duration (seconds) of a fragment.       | "8"                             |
+| `AGENT_CLOUD`                           | Store recordings in a Kerberos Hub (s3) or your Kerberos Vault (kstorage).                      | "s3"                            |
+| `AGENT_HUB_URI`                         | The Kerberos Hub API, defaults to our Kerberos Hub SAAS.                                        | "https://api.cloud.kerberos.io" |
+| `AGENT_HUB_KEY`                         | The access key linked to your account in Kerberos Hub.                                          | ""                              |
+| `AGENT_HUB_PRIVATE_KEY`                 | The secret access key linked to your account in Kerberos Hub.                                   | ""                              |
+| `AGENT_HUB_USERNAME`                    | Your Kerberos Hub username, which owns the above access and secret keys.                        | ""                              |
+| `AGENT_HUB_SITE`                        | The site ID of a site you've created in your Kerberos Hub account.                              | ""                              |
+| `AGENT_MQTT_URI`                        | A MQTT broker endpoint that is used for bi-directional communication (live view, onvif, etc)    | "tcp://mqtt.kerberos.io:1883"   |
+| `AGENT_MQTT_USERNAME`                   | Username of the MQTT broker.                                                                    | ""                              |
+| `AGENT_MQTT_PASSWORD`                   | Password of the MQTT broker.                                                                    | ""                              |
+| `AGENT_STUN_URI`                        | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn.kerberos.io:8443"    |
+| `AGENT_TURN_URI`                        | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn.kerberos.io:8443"    |
+| `AGENT_TURN_USERNAME`                   | TURN username used for WebRTC.                                                                  | "username1"                     |
+| `AGENT_TURN_PASSWORD`                   | TURN password used for WebRTC.                                                                  | "password1"                     |
+| `AGENT_KERBEROSVAULT_URI`               | The Kerberos Vault API url.                                                                     | "" .                            |
+| `AGENT_KERBEROSVAULT_ACCESS_KEY`        | The access key of a Kerberos Vault account.                                                     | ""                              |
+| `AGENT_KERBEROSVAULT_SECRET_KEY`        | The secret key of a Kerberos Vault account.                                                     | ""                              |
+| `AGENT_KERBEROSVAULT_PROVIDER`          | A Kerberos Vault provider you have created (optional).                                          | ""                              |
+| `AGENT_KERBEROSVAULT_DIRECTORY`         | The directory, in the provider, where the recordings will be stored in.                         | ""                              |
+
 ## Contribute with Codespaces
 
 One of the major blockers for letting you contribute to an Open Source project is to setup your local development machine. Why? Because you might have already some tools and libraries installed that are used for other projects, and the libraries you would need for Kerberos Agent, for example FFmpeg, might require a different version. Welcome to the dependency hell..
@@ -190,7 +193,7 @@ By leveraging codespaces, which the Kerberos Agent repo supports, you will be ab
 ![Kerberos Agent codespace](assets/img/codespace.png)
 
 After a few minutes, you will see a beautiful `Visual Studio Code` shown in your browser, and you are ready to code!
-    
+
 ![Kerberos Agent VSCode](assets/img/codespace-vscode.png)
 
 ## Develop and build
@@ -242,7 +245,7 @@ To build the Kerberos Agent web app, you simply have to run the `build` command 
 
 Building the `machinery` is also super easy 🚀, by using `go build` you can create a single binary which ships it all; thank you Golang. After building you will endup with a binary called `main`, this is what contains everything you need to run Kerberos Agent.
 
-Remember the build step of the `web` part, during build time we move the build directory to the `machinery` directory. Inside the `machinery` web server [we reference the](https://github.com/kerberos-io/agent/blob/master/machinery/src/routers/http/Server.go#L44) `build` directory. This makes it possible to just a have single web server that runs it all.  
+Remember the build step of the `web` part, during build time we move the build directory to the `machinery` directory. Inside the `machinery` web server [we reference the](https://github.com/kerberos-io/agent/blob/master/machinery/src/routers/http/Server.go#L44) `build` directory. This makes it possible to just a have single web server that runs it all.
 
     cd machinery
     go build
@@ -259,11 +262,11 @@ By running the `docker build` command, you will create the Kerberos Agent Docker
 ## Support our project
 
 If you like our product please feel free to execute an Ethereum donation. All donations will flow back and split to our Open Source contributors, as they are the heart of this community.
-   
+
 <img width="272" alt="Ethereum donation linke" src="https://user-images.githubusercontent.com/1546779/173443671-3d773068-ae10-4862-a990-dc7c89f3d9c2.png">
 
 Ethereum Address: `0xf4a759C9436E2280Ea9cdd23d3144D95538fF4bE`
-    
+
 ## Previous releases
 
 This repository contains the next generation of Kerberos.io, **Kerberos Agent (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/agent/tree/develop) and [project overview](https://github.com/kerberos-io/agent/projects/1).
