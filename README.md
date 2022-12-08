@@ -47,7 +47,8 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 3. [Introduction](#introduction)
 4. [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents)
 5. [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent)
-   1. [Override with environment variables](#override-with-environment-variables)
+   1. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
+   2. [Override with environment variables](#override-with-environment-variables)
    
 ### Contributing
 6. [Contribute with Codespaces](#contribute-with-codespaces)
@@ -121,7 +122,21 @@ We have documented the different deployment models [in the `deployments` directo
 - [Terraform](https://github.com/kerberos-io/agent/tree/master/deployments#5-terraform)
 - [Salt](https://github.com/kerberos-io/agent/tree/master/deployments#6-salt)
 
-### Override with environment variables
+By default your Kerberos Agents will store all its configuration and recordings inside the container. To help you automate and have consistent data governance, you can attach volumes to configure and persist data of your Kerberos Agent, and/or configure the Kerberos Agent through environment variables.
+
+To overcome this you be interesting to store both configuration and your recordings outside the container, on your local disk. This helps persisting your storage even after you decide to wipe out your Kerberos agent. 
+
+### Configure and persist with volume mounts
+
+An example of how to mount a host directory is shown below using `docker`, but is applicable for [all the deployment models and tools described above](#running-and-automating-a-kerberos-agent).
+
+You attach a volume to your container by leveraging the `-v` option. To mount your own configuration file and recordings folder, execute as following:
+
+        docker run -p 80:80 --name mycamera -v $(pwd)/agent/config:/home/agent/data/config  -v $(pwd)/agent/recordings:/home/agent/data/recordings -d kerberos/agent:latest
+
+More example [can be found in the deployment section](https://github.com/kerberos-io/agent/tree/master/deployments) for each deployment and automation tool.
+
+### Configure with environment variables
 
 Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments easier when leveraging `docker compose` or `kubernetes` deployments much easier and scalable. Using this approach we simplify automation through `ansible` and `terraform`.
 
