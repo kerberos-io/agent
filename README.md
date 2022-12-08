@@ -68,7 +68,7 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 ## Quickstart - Docker
 
-The easiest to get your Kerberos Agent up and running is to use our Docker image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you selected a specific tag, run below command, which will open the web interface of your Kerberos agent on port `80`. For a more configurable and persistent deployment have a look at [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent).
+The easiest to get your Kerberos Agent up and running is to use our public image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you have selected a specific tag, run below `docker` command, which will open the web interface of your Kerberos agent on port `80`, and off you go. For a more configurable and persistent deployment have a look at [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent).
 
     docker run -p 80:80 --name mycamera -d kerberos/agent:latest
 
@@ -87,16 +87,15 @@ Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=
 
 The Kerberos Agent is an isolated and scalable video (surveillance) management agent with a strong focus on user experience, scalability, resilience, extension and integration. Kerberos.io provides, next to the Kerberos Agent, many other tools such as [Kerberos Factory](https://github.com/kerberos-io/factory), [Kerberos Vault](https://github.com/kerberos-io/vault) and [Kerberos Hub](https://github.com/kerberos-io/hub) to support different (enterprise) usecases: bring your own cloud, bring your own storage, etc. This repository contains everything you'll need to know about the core product, the Kerberos Agent. Below you'll find a brief list of features and functions.
 
-- Low memory and not CPU intensive.
-- Installation in seconds (Docker, Balena, etc).
+- Low memory and CPU usage.
 - Simplified and modern user interface.
 - Multi architecture (ARMv7, ARMv8, amd64, etc).
-- Multi camera support: IP Cameras (MJPEG/H264), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp).
-- Single camera per instance (e.g. One Docker container per camera).
-- WIP: Integrations (Webhooks, MQTT, Script, etc).
-- Cloud storage (Kerberos Hub, Kerberos Vault). WIP: Minio, Storj, etc.
+- Multi camera support: IP Cameras (H264), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp).
+- Single camera per instance (e.g. oneå container per camera).
 - Ability to specifiy conditions: motion region, time table, continuous recording, etc.
 - [Deploy where you want](#how-to-run-and-deploy-a-kerberos-agent) with the tools you use: `docker`, `docker compose`, `ansible`, `terraform`, `kubernetes`, etc.
+- Cloud storage (Kerberos Hub, Kerberos Vault). WIP: Minio, Storj, etc.
+- WIP: Integrations (Webhooks, MQTT, Script, etc).
 - MIT License
 
 ## How it works: A world of Agents
