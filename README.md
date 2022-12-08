@@ -29,7 +29,7 @@ Kerberos Agent is an isolated and scalable video (surveillance) management agent
 
 - An IP camera which supports a RTSP H264 encoded stream,
   - (or) a USB camera, Raspberry Pi camera or other camera, that [you can tranform to a valid RTSP stream](https://github.com/kerberos-io/camera-to-rtsp).
-- Any hardware that can run a Docker container, for example: a Raspberry Pi, NVidia Jetson, Intel NUC, a VM, Bare metal machine or a full blown Kubernetes cluster.
+- Any hardware that can run a container, for example: a Raspberry Pi, NVidia Jetson, Intel NUC, a VM, Bare metal machine or a full blown Kubernetes cluster.
 
 ## :video_camera: Is my camera working?
 
@@ -136,7 +136,10 @@ An example of how to mount a host directory is shown below using `docker`, but i
 
 You attach a volume to your container by leveraging the `-v` option. To mount your own configuration file and recordings folder, execute as following:
 
-        docker run -p 80:80 --name mycamera -v $(pwd)/agent/config:/home/agent/data/config  -v $(pwd)/agent/recordings:/home/agent/data/recordings -d kerberos/agent:latest
+        docker run -p 80:80 --name mycamera \
+        -v $(pwd)/agent/config:/home/agent/data/config \
+        -v $(pwd)/agent/recordings:/home/agent/data/recordings \
+        -d kerberos/agent:latest
 
 More example [can be found in the deployment section](https://github.com/kerberos-io/agent/tree/master/deployments) for each deployment and automation tool.
 
