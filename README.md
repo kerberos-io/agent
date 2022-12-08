@@ -83,11 +83,9 @@ Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=
 
 **_Work In Progress_** - Currently we only support IP Cameras, we have [an approach for leveraging the USB and Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
 
-## Introduction
-
-Kerberos Agent is an isolated and scalable video (surveillance) management agent with a strong focus on user experience, scalability, resilience, extension and integration. Kerberos.io provides different solutions, but from a high level point of view it comes into two flavours: Kerberos Agent and Kerberos Enterprise Suite. Bottom line Kerberos Enterprise Suite extends Kerberos Agent with additional components such as Kerberos Factory, Kerberos Vault and Kerberos Hub.
-
 ### Kerberos Agent
+
+The Kerberos Agent is an isolated and scalable video (surveillance) management agent with a strong focus on user experience, scalability, resilience, extension and integration. Kerberos.io provides, next to the Kerberos Agent, many other tools such as [Kerberos Factory](https://github.com/kerberos-io/factory), [Kerberos Vault](https://github.com/kerberos-io/vault) and [Kerberos Hub](https://github.com/kerberos-io/hub) to support different (enterprise) usecases: bring your own cloud, bring your own storage, etc. This repository contains everything you'll need to know about the core product, the Kerberos Agent. Below you'll find a brief list of features and functions.
 
 - Low memory and not CPU intensive.
 - Installation in seconds (Docker, Balena, etc).
@@ -98,20 +96,14 @@ Kerberos Agent is an isolated and scalable video (surveillance) management agent
 - WIP: Integrations (Webhooks, MQTT, Script, etc).
 - Cloud storage (Kerberos Hub, Kerberos Vault). WIP: Minio, Storj, etc.
 - Ability to specifiy conditions: motion region, time table, continuous recording, etc.
+- [Deploy where you want](#how-to-run-and-deploy-a-kerberos-agent) with the tools you use: `docker`, `docker compose`, `ansible`, `terraform`, `kubernetes`, etc.
 - MIT License
-
-### Kerberos Factory (part of [Kerberos Enterprise suite](https://doc.kerberos.io/enterprise/first-things-first/))
-
-- Kerberos Agent leveraged in a Kubernetes cluster [through a UI](https://doc.kerberos.io/factory/getting-started/).
-- Camera support for IP camera only (RTSP/H264).
-- Massive horizontal scaling and flexibility (private, hybrid and cloud deployment).
-- Management of multiple Kerberos Agents through a single pane of glass.
 
 ## How it works: A world of Agents
 
-Kerberos.io applies the concept of agents. An agent is running next to or on your camera, and is processing a single camera feed. It applies motion based recording and make those recordings available through a user friendly web interface. Kerberos Agent allows you to connect to other cloud services or custom applications. Kerberos Agent is perfect for personal usage and/or is a great tool if you only have a couple of surveillance cameras to be processed.
+Kerberos.io applies the concept of agents. An agent is running next to (or on) your camera, and is processing a single camera feed. It applies motion based or continuous recording and make those recordings available through a user friendly web interface. A Kerberos Agent allows you to connect to other cloud services or integrates with custom applications. Kerberos Agent is used for personal usage and scales to enterprise production level deployments.
 
-If you are looking for a solution that scales better with your video surveillance and/or video analytics requirements, [Kerberos Enterprise Suite might be a better fit](https://doc.kerberos.io/enterprise/first-things-first).
+Note that Kerberos Agent is just a piece in the Kerberos.io ecosystem. The [Kerberos Enterprise Suite](https://doc.kerberos.io/enterprise/first-things-first) brings additional capabilities into to the picture such as: bring you own cloud, bring your own storage, caching and forwarding, etc.
 
 ## How to run and deploy a Kerberos Agent
 
