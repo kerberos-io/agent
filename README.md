@@ -46,20 +46,21 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 ### Introduction
 3. [Introduction](#introduction)
 4. [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents)
-5. [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent)
-   1. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
-   2. [Override with environment variables](#override-with-environment-variables)
+
+### Running and automation
+5. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
+6. [Override with environment variables](#override-with-environment-variables)
    
 ### Contributing
-6. [Contribute with Codespaces](#contribute-with-codespaces)
-7. [Develop and build](#develop-and-build)
-8. [Building from source](#building-from-source)
-9. [Building for Docker](#building-for-docker)
+7. [Contribute with Codespaces](#contribute-with-codespaces)
+8. [Develop and build](#develop-and-build)
+9. [Building from source](#building-from-source)
+10. [Building for Docker](#building-for-docker)
 
 ### Varia
-10. [Support our project](#support-our-project)
-11. [Previous releases](#previous-releases)
-12. [FAQ](#faq)
+11. [Support our project](#support-our-project)
+12. [Previous releases](#previous-releases)
+13. [FAQ](#faq)
 
 ## Quickstart - Docker
 
@@ -109,7 +110,7 @@ Kerberos.io applies the concept of agents. An agent is running next to or on you
 
 If you are looking for a solution that scales better with your video surveillance and/or video analytics requirements, [Kerberos Enterprise Suite might be a better fit](https://doc.kerberos.io/enterprise/first-things-first).
 
-## Running and automating a Kerberos Agent
+# Running and automation
 
 As described before a Kerberos Agent is a container, which can be deployed through various ways and automation tools such as `docker`, `docker compose`, `kubernetes` and the list goes on. To simplify your life we have come with concrete and working examples of deployments to help you speed up your Kerberos.io journey.
 
@@ -126,7 +127,7 @@ By default your Kerberos Agents will store all its configuration and recordings 
 
 To overcome this you be interesting to store both configuration and your recordings outside the container, on your local disk. This helps persisting your storage even after you decide to wipe out your Kerberos agent. 
 
-### Configure and persist with volume mounts
+## Configure and persist with volume mounts
 
 An example of how to mount a host directory is shown below using `docker`, but is applicable for [all the deployment models and tools described above](#running-and-automating-a-kerberos-agent).
 
@@ -136,7 +137,7 @@ You attach a volume to your container by leveraging the `-v` option. To mount yo
 
 More example [can be found in the deployment section](https://github.com/kerberos-io/agent/tree/master/deployments) for each deployment and automation tool.
 
-### Configure with environment variables
+## Configure with environment variables
 
 Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments easier when leveraging `docker compose` or `kubernetes` deployments much easier and scalable. Using this approach we simplify automation through `ansible` and `terraform`.
 
