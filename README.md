@@ -44,28 +44,27 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 ### Introduction
 
-3. [Introduction](#introduction-1)
-4. [How it works: A world of Agents 🕵🏼‍♂️](#how-it-works-a-world-of-agents)
+3. [A world of Agents](#a-world-of-agents)
 
 ### Running and automation
 
-5. [How to run and deploy a Kerberos Agent](#how-to-run-and-deploy-a-kerberos-agent)
-6. [Access the Kerberos Agent](#access-the-kerberos-agent)
-7. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
-8. [Configure with environment variables](#configure-with-environment-variables)
+4. [How to run and deploy a Kerberos Agent](#how-to-run-and-deploy-a-kerberos-agent)
+5. [Access the Kerberos Agent](#access-the-kerberos-agent)
+6. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
+7. [Configure with environment variables](#configure-with-environment-variables)
 
 ### Contributing
 
-9. [Contribute with Codespaces](#contribute-with-codespaces)
-10. [Develop and build](#develop-and-build)
-11. [Building from source](#building-from-source)
-12. [Building for Docker](#building-for-docker)
+8. [Contribute with Codespaces](#contribute-with-codespaces)
+9. [Develop and build](#develop-and-build)
+10. [Building from source](#building-from-source)
+11. [Building for Docker](#building-for-docker)
 
 ### Varia
 
-13. [Support our project](#support-our-project)
-14. [What is new?](#what-is-new)
-15. [Contributors](#contributors)
+12. [Support our project](#support-our-project)
+13. [What is new?](#what-is-new)
+14. [Contributors](#contributors)
 
 ## Quickstart - Docker
 
@@ -84,9 +83,13 @@ Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=
 
 **_Work In Progress_** - Currently we only support IP Cameras, we have [an approach for leveraging the USB and Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
 
-## Introduction
+## A world of agents
 
-The Kerberos Agent is an isolated and scalable video (surveillance) management agent with a strong focus on user experience, scalability, resilience, extension and integration. Kerberos.io provides, next to the Kerberos Agent, many other tools such as [Kerberos Factory](https://github.com/kerberos-io/factory), [Kerberos Vault](https://github.com/kerberos-io/vault) and [Kerberos Hub](https://github.com/kerberos-io/hub) to support different (enterprise) usecases: bring your own cloud, bring your own storage, etc. This repository contains everything you'll need to know about the core product, the Kerberos Agent. Below you'll find a brief list of features and functions.
+The Kerberos Agent is an isolated and scalable video (surveillance) management agent with a strong focus on user experience, scalability, resilience, extension and integration. Next to the Kerberos Agent, Kerberos.io provides many other tools such as [Kerberos Factory](https://github.com/kerberos-io/factory), [Kerberos Vault](https://github.com/kerberos-io/vault) and [Kerberos Hub](https://github.com/kerberos-io/hub) to provide additional capabilities: bring your own cloud, bring your own storage, central overview, live streaming, machine learning etc.
+
+As mentioned above Kerberos.io applies the concept of agents. An agent is running next to (or on) your camera, and is processing a single camera feed. It applies motion based or continuous recording and make those recordings available through a user friendly web interface. A Kerberos Agent allows you to connect to other cloud services or integrates with custom applications. Kerberos Agent is used for personal usage and scales to enterprise production level deployments.
+
+This repository contains everything you'll need to know about our core product, Kerberos Agent. Below you'll find a brief list of features and functions.
 
 - Low memory and CPU usage.
 - Simplified and modern user interface.
@@ -98,12 +101,6 @@ The Kerberos Agent is an isolated and scalable video (surveillance) management a
 - Cloud storage (Kerberos Hub, Kerberos Vault). WIP: Minio, Storj, etc.
 - WIP: Integrations (Webhooks, MQTT, Script, etc).
 - MIT License
-
-## How it works: A world of Agents
-
-Kerberos.io applies the concept of agents. An agent is running next to (or on) your camera, and is processing a single camera feed. It applies motion based or continuous recording and make those recordings available through a user friendly web interface. A Kerberos Agent allows you to connect to other cloud services or integrates with custom applications. Kerberos Agent is used for personal usage and scales to enterprise production level deployments.
-
-Note that Kerberos Agent is just a piece in the Kerberos.io ecosystem. The [Kerberos Enterprise Suite](https://doc.kerberos.io/enterprise/first-things-first) brings additional capabilities into to the picture such as: bring you own cloud, bring your own storage, caching and forwarding, etc.
 
 ## How to run and deploy a Kerberos Agent
 
