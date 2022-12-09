@@ -35,7 +35,7 @@ spec:
 
       containers:
         - name: agent
-          image: kerberos/agent:1b96d01
+          image: kerberos/agent:latest
           volumeMounts:
             - name: kerberos-data
               mountPath: /home/agent/data/config

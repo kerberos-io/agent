@@ -34,7 +34,10 @@ You attach a volume to your container by leveraging the `-v` option. To mount yo
 
 3.  Run the docker command as following to attach your config directory and recording directory.
 
-        docker run -p 80:80 --name mycamera -v $(pwd)/agent/config:/home/agent/data/config  -v $(pwd)/agent/recordings:/home/agent/data/recordings -d kerberos/agent:latest
+        docker run -p 80:80 --name mycamera \
+        -v $(pwd)/agent/config:/home/agent/data/config \
+        -v $(pwd)/agent/recordings:/home/agent/data/recordings\
+        -d --restart=alwayskerberos/agent:latest
 
 ### Override with environment variables
 

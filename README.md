@@ -52,7 +52,7 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 5. [How to run and deploy a Kerberos Agent](#how-to-run-and-deploy-a-kerberos-agent)
 6. [Access the Kerberos Agent](#access-the-kerberos-agent)
 7. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
-8. [Override with environment variables](#override-with-environment-variables)
+8. [Configure with environment variables](#configure-with-environment-variables)
 
 ### Contributing
 
