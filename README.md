@@ -44,7 +44,7 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 ### Introduction
 
-3. [A world of Agents](#a-world-of-kerberos-agents)
+3. [A world of Kerberos Agents](#a-world-of-kerberos-agents)
 
 ### Running and automation
 
