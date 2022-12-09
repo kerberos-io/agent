@@ -44,7 +44,7 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 ### Introduction
 
-3. [A world of Agents](#a-world-of-agents)
+3. [A world of Agents](#a-world-of-kerberos-agents)
 
 ### Running and automation
 
@@ -83,7 +83,7 @@ Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=
 
 **_Work In Progress_** - Currently we only support IP Cameras, we have [an approach for leveraging the USB and Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
 
-## A world of agents
+## A world of Kerberos Agents
 
 The Kerberos Agent is an isolated and scalable video (surveillance) management agent with a strong focus on user experience, scalability, resilience, extension and integration. Next to the Kerberos Agent, Kerberos.io provides many other tools such as [Kerberos Factory](https://github.com/kerberos-io/factory), [Kerberos Vault](https://github.com/kerberos-io/vault) and [Kerberos Hub](https://github.com/kerberos-io/hub) to provide additional capabilities: bring your own cloud, bring your own storage, central overview, live streaming, machine learning etc.
 
