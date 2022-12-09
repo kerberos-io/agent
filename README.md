@@ -136,6 +136,13 @@ More example [can be found in the deployment section](https://github.com/kerbero
 
 Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments easier when leveraging `docker compose` or `kubernetes` deployments much easier and scalable. Using this approach we simplify automation through `ansible` and `terraform`.
 
+        docker run -p 80:80 --name mycamera \
+        -e AGENT_NAME=mycamera \
+        -e AGENT_TIMEZONE=Europe/Brussels \
+        -e AGENT_CAPTURE_IPCAMERA_RTSP=rtsp://fake.kerberos.io/stream \
+        -e AGENT_CAPTURE_CONTINUOUS=true \
+        -d kerberos/agent:latest
+
 | Name                                    | Description                                                                                     | Default Value                   |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------- |
 | `AGENT_KEY`                             | A unique identifier for your Kerberos Agent, this is auto-generated but can be overriden.       | ""                              |
