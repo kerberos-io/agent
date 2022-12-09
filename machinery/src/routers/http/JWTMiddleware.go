@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"os"
 	"time"
 
 	jwt "github.com/appleboy/gin-jwt/v2"
@@ -45,9 +46,18 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 			username := loginVals.Username
 			password := loginVals.Password
 
-			usernameENV := "root"
-			passwordENV := "root"
-			if username == usernameENV && password == passwordENV {
+			// Get username from ENV
+			usernameFromConfig := os.Getenv("AGENT_USERNAME")
+			if usernameFromConfig == "" {
+				usernameFromConfig = "root"
+			}
+			// Get password from ENV
+			passwordFromConfig := os.Getenv("AGENT_PASSWORD")
+			if passwordFromConfig == "" {
+				passwordFromConfig = "root"
+			}
+
+			if username == usernameFromConfig && password == passwordFromConfig {
 				return &models.User{
 					Username: username,
 					Role:     "admin",

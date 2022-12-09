@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent
+  labels:
+    name: agent
+spec:
+  selector:
+    matchLabels:
+      app: agent
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: agent
+    spec:
+      containers:
+        - name: agent
+          image: kerberos/agent:latest
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          env:
+            - name: AGENT_NAME
+              value: demo-agent
+            - name: AGENT_CAPTURE_IPCAMERA_RTSP
+              value: rtsp://fake.kerberos.io/stream
+            - name: AGENT_HUB_KEY
+              value: yyy
+            - name: AGENT_HUB_PRIVATE_KEY
+              value: yyy
+            # find full list of environment variables here: https://github.com/kerberos-io/agent#override-with-environment-variables
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-svc
+  labels:
+    name: agent-svc
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: agent

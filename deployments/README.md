@@ -28,7 +28,9 @@ If you consider `docker` as "your way to go", but require to run a bigger (singl
 
 ## 3. Kubernetes
 
-To be written
+As described above, `docker` is a great tool for smaller deployments, where you are just running on a single machine and want to ramp up quickly. As you might expect, this is a not an ideal situation for production deployments. Kubernetes can help you to build a scalable, flexible and resilient deployment.
+
+> Learn more [about Kerberos Agent in a Kubernetes cluster here](https://github.com/kerberos-io/agent/tree/master/deployments/kubernetes).
 
 ## 4. RedHat Ansible and OpenShift
 

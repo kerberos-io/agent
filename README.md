@@ -50,21 +50,22 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 ### Running and automation
 
 5. [How to run and deploy a Kerberos Agent](#how-to-run-and-deploy-a-kerberos-agent)
-6. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
-7. [Override with environment variables](#override-with-environment-variables)
+6. [Access the Kerberos Agent](#access-the-kerberos-agent)
+7. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
+8. [Override with environment variables](#override-with-environment-variables)
 
 ### Contributing
 
-8. [Contribute with Codespaces](#contribute-with-codespaces)
-9. [Develop and build](#develop-and-build)
-10. [Building from source](#building-from-source)
-11. [Building for Docker](#building-for-docker)
+9. [Contribute with Codespaces](#contribute-with-codespaces)
+10. [Develop and build](#develop-and-build)
+11. [Building from source](#building-from-source)
+12. [Building for Docker](#building-for-docker)
 
 ### Varia
 
-12. [Support our project](#support-our-project)
-13. [What is new?](#what-is-new)
-14. [Contributors](#contributors)
+13. [Support our project](#support-our-project)
+14. [What is new?](#what-is-new)
+15. [Contributors](#contributors)
 
 ## Quickstart - Docker
 
@@ -119,6 +120,17 @@ We have documented the different deployment models [in the `deployments` directo
 
 By default your Kerberos Agents will store all its configuration and recordings inside the container. To help you automate and have a more consistent data governance, you can attach volumes to configure and persist data of your Kerberos Agents, and/or configure each Kerberos Agent through environment variables.
 
+## Access the Kerberos Agent
+
+Once you have deployed the Kerberos Agent, using one of the deployment models described above, you will be able to access the Kerberos Agent user interface. A login page is presented asking for some credentials.
+
+The default username and password for the Kerberos Agent is:
+
+- Username: `root`
+- Password: `root`
+
+**_Please note that you change the username and password for a final installation, see [Configure with environment variables](#configure-with-environment-variables) below._**
+
 ## Configure and persist with volume mounts
 
 An example of how to mount a host directory is shown below using `docker`, but is applicable for [all the deployment models and tools described above](#running-and-automating-a-kerberos-agent).
@@ -145,6 +157,8 @@ Next to attaching the configuration file, it is also possible to override the co
 
 | Name                                    | Description                                                                                     | Default Value                   |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------- |
+| `AGENT_USERNAME`                        | The username used to authenticate against the Kerberos Agent login page.                        | "root"                          |
+| `AGENT_PASSWORD`                        | The password used to authenticate against the Kerberos Agent login page.                        | "root"                          |
 | `AGENT_KEY`                             | A unique identifier for your Kerberos Agent, this is auto-generated but can be overriden.       | ""                              |
 | `AGENT_NAME`                            | The agent friendly-name.                                                                        | "agent"                         |
 | `AGENT_TIMEZONE`                        | Timezone which is used for converting time.                                                     | "Africa/Ceuta"                  |
