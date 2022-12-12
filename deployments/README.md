@@ -40,7 +40,9 @@ If you running an alternative distribution such as Red Hat OpenShift, things wil
 
 ## 5. Kerberos Factory
 
-To be written
+All of the previously deployments, `docker`, `kubernetes` and `openshift` are great for a technical audience. However for business users, it might be more convenient to have a clean web ui, that one can leverage to add one or more cameras (Kerberos Agents), without the hassle of the technical resources.
+
+> Learn more [about Kerberos Agent with Kerberos Factory](https://github.com/kerberos-io/agent/tree/master/deployments/factory).
 
 ## 6. Terraform
 

@@ -83,7 +83,7 @@ Next we'll add a `volumes:` section to each Kerberos Agent (service) in the `doc
       - ./agent1/config:/home/agent/data/config
       - ./agent1/recordings:/home/agent/data/recordings
 
-We'll repeat that for the other Kerberos Agents as well. You can review [the final result over here](https://github.com/kerberos-io/agent/blob/master/deployments/docker/docker-compose-with-volumes.yam).
+We'll repeat that for the other Kerberos Agents as well. You can review [the final result over here](https://github.com/kerberos-io/agent/blob/master/deployments/docker/docker-compose-with-volumes.yaml).
 
 Run the `docker compose` command by providing a different configuration file name.
 
