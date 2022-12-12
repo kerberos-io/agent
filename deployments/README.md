@@ -9,7 +9,7 @@ We will discuss following deployment models.
 - [1. Docker](#1-docker)
 - [2. Docker Compose](#2-docker-compose)
 - [3. Kubernetes](#3-kubernetes)
-- [4. RedHat Ansible and OpenShift](#4-redhat-ansible-and-openshift)
+- [4. Red Hat Ansible and OpenShift](#4-red-hat-ansible-and-openshift)
 - [5. Kerberos Factory](#5-kerberos-factory)
 - [6. Terraform](#6-terraform)
 - [7. Salt](#7-salt)
@@ -32,9 +32,9 @@ As described above, `docker` is a great tool for smaller deployments, where you 
 
 > Learn more [about Kerberos Agent in a Kubernetes cluster here](https://github.com/kerberos-io/agent/tree/master/deployments/kubernetes).
 
-## 4. RedHat Ansible and OpenShift
+## 4. Red Hat Ansible and OpenShift
 
-If you running an alternative distribution such as RedHat OpenShift, things will work out exactly as mentioned before with the `Kubernetes` deployment. You'll have all the benefints of RedHat OpenShift on top. One of the things we provide here is an Ansible playbook to deploy the Kerberos Agent in the OpenShift cluster.
+If you running an alternative distribution such as Red Hat OpenShift, things will work out exactly as mentioned before with the `Kubernetes` deployment. You'll have all the benefints of Red Hat OpenShift on top. One of the things we provide here is an Ansible playbook to deploy the Kerberos Agent in the OpenShift cluster.
 
 > Learn more [about Kerberos Agent in OpenShift with Ansible](https://github.com/kerberos-io/agent/tree/master/deployments/ansible-openshift).
 

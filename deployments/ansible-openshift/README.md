@@ -1,4 +1,4 @@
-# Deploy to a RedHat OpenShift cluster with Ansible
+# Deploy to a Red Hat OpenShift cluster with Ansible
 
 Kubernetes is great, but you might love OpenShift even more. In this directory you'll find some resources to deploy your Kerberos Agent in an OpenShift cluster using Ansible playbook. We'll review the different tasks of the Ansible playbook step by step; find the complete `playbook.yaml` here.
 
@@ -40,6 +40,10 @@ Now you understand what is happening in the playbook, let's run it. Make sure yo
 
 Specify the `environment` input variable as a `JSON` with all required variables defined in step 1. Reference the `playbook.yml` file and execute.
 
-    ansible-playbook  -e '{"oc_cluster_url":"https://api.j5z0adui.westeurope.aroapp.io:6443", "oc_username":"kubeadmin", "oc_password":"xxx"}' playbook.yml
+    ansible-playbook  -e '{ \
+    "oc_cluster_url":"https://api.j5z0adui.westeurope.aroapp.io:6443", \
+    "oc_username":"kubeadmin",\
+    "oc_password":"xxx" \
+    }' playbook.yml
 
 If everything runs as expected you should see you Kerberos Agent deployed, together with an assigned public ip address. Paste the ip address in your browser, the Kerberos Agent web interface will show up. You can use [the default username and password to sign-in](https://github.com/kerberos-io/agent#access-the-kerberos-agent), or if changed to your own (which is recommended).

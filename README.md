@@ -111,7 +111,7 @@ We have documented the different deployment models [in the `deployments` directo
 - [Docker](https://github.com/kerberos-io/agent/tree/master/deployments#1-docker)
 - [Docker Compose](https://github.com/kerberos-io/agent/tree/master/deployments#2-docker-compose)
 - [Kubernetes](https://github.com/kerberos-io/agent/tree/master/deployments#3-kubernetes)
-- [Red Hat OpenShift with Ansible](https://github.com/kerberos-io/agent/tree/master/deployments#4-redhat-ansible-and-openshift)
+- [Red Hat OpenShift with Ansible](https://github.com/kerberos-io/agent/tree/master/deployments#4-red-hat-ansible-and-openshift)
 - [Terraform](https://github.com/kerberos-io/agent/tree/master/deployments#5-terraform)
 - [Salt](https://github.com/kerberos-io/agent/tree/master/deployments#6-salt)
 
