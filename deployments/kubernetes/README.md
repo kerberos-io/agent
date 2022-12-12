@@ -39,3 +39,73 @@ When the deployment and service is created successfully, you should see somethin
     replicaset.apps/agent-7c75c4dbcf   1         1         1       20s
 
 When copying the `EXTERNAL-IP` and pasting it in your browser, you should see the Kerberos Agent user interface. You can use [the default username and password to sign-in](https://github.com/kerberos-io/agent#access-the-kerberos-agent), or if changed to your own (which is recommended).
+
+## Configure with volumes
+
+Just like with `docker`, you can also attach `volumes` to the Kerberos Agent deployment, by creating a `Persistent Volume` and mount it to a specific directory.
+
+Depending on where and how you are hosting the Kubernetes cluster, you may need to create a new `storageClass` or use a predefined `storageClass` from your cloud provider (Azure, GCP, AWS, ..). Have a look at `deployment-agent-volume.yml` to review a complete example.
+
+    template:
+    metadata:
+        labels:
+        app: agent
+    spec:
+        volumes:
+        - name: kerberos-data
+            persistentVolumeClaim:
+            claimName: kerberos-data
+        ...
+        containers:
+        - name: agent
+          image: kerberos/agent:latest
+          volumeMounts:
+            - name: kerberos-data
+              mountPath: /home/agent/data/config
+              subPath: config
+        ...
+
+## Expose with Ingress
+
+In the first example `deployment-agent.yml` we are using a `LoadBalancer` to expose the Kerberos Agent user interface; as shown below. If you are a bit more experienced with Kubernetes, you will know there are other `service types` as well.
+
+    ---
+    apiVersion: v1
+    kind: Service
+    ...
+    type: LoadBalancer
+    ports:
+        - port: 80
+    ...
+
+An alternative to `LoadBalancer` is `Ingress`. By leveraging an ingress such as `ingress-nginx` or `traefik` you setup a gateway (single point of contact), through which all communication to your apps (services) will flow.
+
+A huge benefit (there are many others), is that you only allocate 1 public IP address for all your services. So instead of creating a `LoadBalancer` and thus a public IP address for every agent, you will create an `Ingress` service for each agent. Review the complete example at `deployment-agent-with-ingress.yml`.
+
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+    name: agent-ingress
+    labels:
+        name: agent-ingress
+    annotations:
+        kubernetes.io/ingress.class: nginx
+        kubernetes.io/tls-acme: "true"
+        nginx.ingress.kubernetes.io/ssl-redirect: "true"
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    spec:
+    tls:
+        - hosts:
+            - "myagent.kerberos.io"
+        secretName: agent-secret
+    rules:
+    - host: myagent.kerberos.io
+        http:
+        paths:
+        - pathType: Prefix
+            path: "/"
+            backend:
+            service:
+                name: agent-svc
+                port:
+                number: 80

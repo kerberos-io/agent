@@ -34,7 +34,9 @@ As described above, `docker` is a great tool for smaller deployments, where you 
 
 ## 4. RedHat Ansible and OpenShift
 
-To be written
+If you running an alternative distribution such as RedHat OpenShift, things will work out exactly as mentioned before with the `Kubernetes` deployment. You'll have all the benefints of RedHat OpenShift on top. One of the things we provide here is an Ansible playbook to deploy the Kerberos Agent in the OpenShift cluster.
+
+> Learn more [about Kerberos Agent in OpenShift with Ansible](https://github.com/kerberos-io/agent/tree/master/deployments/ansible-openshift).
 
 ## 5. Kerberos Factory
 
