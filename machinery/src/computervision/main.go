@@ -64,10 +64,15 @@ func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex)
 		}
 
 		im := img.Image
-		rgb, _ = ToRGB8(im)
-		img.Free()
-		if scaleFactor > 1 {
-			gocv.Resize(rgb, &rgb, image.Pt(newWidth, newHeight), 0, 0, gocv.InterpolationArea)
+		bounds := im.Bounds()
+		x := bounds.Dx()
+		y := bounds.Dy()
+		if x > 0 && y > 0 {
+			rgb, _ = ToRGB8(im)
+			img.Free()
+			if scaleFactor > 1 {
+				gocv.Resize(rgb, &rgb, image.Pt(newWidth, newHeight), 0, 0, gocv.InterpolationArea)
+			}
 		}
 	}
 	return rgb
