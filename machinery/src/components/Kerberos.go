@@ -205,6 +205,9 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		close(communication.HandleLiveHDHandshake)
 		close(communication.HandleMotion)
 		routers.DisconnectMQTT(mqttClient)
+
+		// Wait a few seconds to stop the decoder.
+		time.Sleep(time.Second * 3)
 		decoder.Close()
 		if subStreamEnabled {
 			subDecoder.Close()
