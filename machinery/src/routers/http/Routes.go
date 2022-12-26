@@ -6,8 +6,9 @@ import (
 
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
-
 	"github.com/kerberos-io/agent/machinery/src/capture"
+	"github.com/kerberos-io/agent/machinery/src/routers/websocket"
+
 	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -16,6 +17,10 @@ import (
 )
 
 func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuration *models.Configuration, communication *models.Communication) *gin.RouterGroup {
+
+	r.GET("/ws", func(c *gin.Context) {
+		websocket.WebsocketHandler(c)
+	})
 
 	// This is legacy should be removed in future! Now everything
 	// lives under the /api prefix.
@@ -147,20 +152,6 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			}
 		})
 
-		// Streaming handler
-		api.GET("/stream", func(c *gin.Context) {
-			// TODO add a token validation!
-			imageFunction := func() (image.Image, error) {
-				// We will only send an image once per second.
-				time.Sleep(time.Second * 1)
-				log.Log.Info("AddRoutes (/stream): reading from MJPEG stream")
-				img, err := components.GetImageFromFilePath()
-				return img, err
-			}
-			h := components.StartMotionJPEG(imageFunction, 80)
-			h.ServeHTTP(c.Writer, c.Request)
-		})
-
 		api.GET("/config", func(c *gin.Context) {
 			c.JSON(200, gin.H{
 				"config":   configuration.Config,
@@ -205,10 +196,6 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			})
 		})
 
-		api.POST("/camera/verify/:streamType", func(c *gin.Context) {
-			capture.VerifyCamera(c)
-		})
-
 		api.POST("/hub/verify", func(c *gin.Context) {
 			cloud.VerifyHub(c)
 		})
@@ -217,10 +204,32 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			cloud.VerifyPersistence(c)
 		})
 
+		// Streaming handler
+		api.GET("/stream", func(c *gin.Context) {
+			// TODO add a token validation!
+			imageFunction := func() (image.Image, error) {
+				// We will only send an image once per second.
+				time.Sleep(time.Second * 1)
+				log.Log.Info("AddRoutes (/stream): reading from MJPEG stream")
+				img, err := components.GetImageFromFilePath()
+				return img, err
+			}
+			h := components.StartMotionJPEG(imageFunction, 80)
+			h.ServeHTTP(c.Writer, c.Request)
+		})
+
+		// Camera specific methods. Doesn't require any authorization.
+		// These are available for anyone, but require the agent, to reach
+		// the camera.
+		api.POST("/camera/onvif/login", LoginToOnvif)
+		api.POST("/camera/onvif/capabilities", GetOnvifCapabilities)
+		api.POST("/camera/onvif/pantilt", DoOnvifPanTilt)
+		api.POST("/camera/onvif/zoom", DoOnvifZoom)
+		api.POST("/camera/verify/:streamType", capture.VerifyCamera)
+
+		// Secured endpoints..
 		api.Use(authMiddleware.MiddlewareFunc())
 		{
-			// Secured endpoints..
-
 		}
 	}
 	return api

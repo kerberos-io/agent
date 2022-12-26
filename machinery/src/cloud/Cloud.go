@@ -137,19 +137,17 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 			usage, _ := disk.Usage("/")
 			diskPercentUsed := strconv.Itoa(int(usage.UsedPercent))
 
+			// We'll check which mode is enabled for the camera.
 			onvifEnabled := "false"
 			if config.Capture.IPCamera.ONVIFXAddr != "" {
-				// We will check the capabilities
-				capabilities := onvif.CheckOnvifCapabilities(configuration)
-				hasPTZ := false
-				for _, v := range capabilities {
-					if v == "PTZ" || v == "ptz" {
-						hasPTZ = true
+				device, err := onvif.ConnectToOnvifDevice(configuration)
+				if err == nil {
+					capabilities := onvif.GetCapabilitiesFromDevice(device)
+					for _, v := range capabilities {
+						if v == "PTZ" || v == "ptz" {
+							onvifEnabled = "true"
+						}
 					}
-				}
-
-				if hasPTZ {
-					onvifEnabled = "true"
 				}
 			}
 

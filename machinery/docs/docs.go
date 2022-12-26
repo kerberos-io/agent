@@ -25,6 +25,162 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/camera/onvif/capabilities": {
+            "post": {
+                "description": "Will return the ONVIF capabilities for the specific camera.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Will return the ONVIF capabilities for the specific camera.",
+                "operationId": "camera-onvif-capabilities",
+                "parameters": [
+                    {
+                        "description": "OnvifCredentials",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OnvifCredentials"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/camera/onvif/login": {
+            "post": {
+                "description": "Try to login into ONVIF supported camera.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Try to login into ONVIF supported camera.",
+                "operationId": "camera-onvif-login",
+                "parameters": [
+                    {
+                        "description": "OnvifCredentials",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OnvifCredentials"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/camera/onvif/pantilt": {
+            "post": {
+                "description": "Panning or/and tilting the camera using a direction (x,y).",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Panning or/and tilting the camera.",
+                "operationId": "camera-onvif-pantilt",
+                "parameters": [
+                    {
+                        "description": "OnvifPanTilt",
+                        "name": "panTilt",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OnvifPanTilt"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/camera/onvif/zoom": {
+            "post": {
+                "description": "Zooming in or out the camera.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Zooming in or out the camera.",
+                "operationId": "camera-onvif-zoom",
+                "parameters": [
+                    {
+                        "description": "OnvifZoom",
+                        "name": "zoom",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OnvifZoom"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/camera/verify/{streamType}": {
+            "post": {
+                "description": "This method will validate a specific profile connection from an RTSP camera, and try to get the codec.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Validate a specific RTSP profile camera connection.",
+                "operationId": "verify-camera",
+                "parameters": [
+                    {
+                        "enum": [
+                            "primary",
+                            "secondary"
+                        ],
+                        "type": "string",
+                        "description": "Stream Type",
+                        "name": "streamType",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Camera Streams",
+                        "name": "cameraStreams",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CameraStreams"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/hub/verify": {
             "post": {
                 "security": [
@@ -54,6 +210,35 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/login": {
+            "post": {
+                "description": "Get Authorization token.",
+                "tags": [
+                    "authentication"
+                ],
+                "summary": "Get Authorization token.",
+                "operationId": "login",
+                "parameters": [
+                    {
+                        "description": "Credentials",
+                        "name": "credentials",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.Authentication"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.Authorization"
                         }
                     }
                 }
@@ -98,7 +283,50 @@ const docTemplate = `{
         "models.APIResponse": {
             "type": "object",
             "properties": {
-                "data": {}
+                "data": {},
+                "message": {}
+            }
+        },
+        "models.Authentication": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Authorization": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "expire": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.CameraStreams": {
+            "type": "object",
+            "properties": {
+                "rtsp": {
+                    "type": "string"
+                },
+                "sub_rtsp": {
+                    "type": "string"
+                }
             }
         },
         "models.Capture": {
@@ -151,6 +379,9 @@ const docTemplate = `{
         "models.Config": {
             "type": "object",
             "properties": {
+                "auto_clean": {
+                    "type": "string"
+                },
                 "capture": {
                     "$ref": "#/definitions/models.Capture"
                 },
@@ -181,6 +412,9 @@ const docTemplate = `{
                 },
                 "kstorage": {
                     "$ref": "#/definitions/models.KStorage"
+                },
+                "max_directory_size": {
+                    "type": "integer"
                 },
                 "mqtt_password": {
                     "type": "string"
@@ -276,6 +510,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "cloud_key": {
+                    "description": "old way, remove this",
                     "type": "string"
                 },
                 "directory": {
@@ -289,6 +524,45 @@ const docTemplate = `{
                 },
                 "uri": {
                     "type": "string"
+                }
+            }
+        },
+        "models.OnvifCredentials": {
+            "type": "object",
+            "properties": {
+                "onvif_password": {
+                    "type": "string"
+                },
+                "onvif_username": {
+                    "type": "string"
+                },
+                "onvif_xaddr": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.OnvifPanTilt": {
+            "type": "object",
+            "properties": {
+                "onvif_credentials": {
+                    "$ref": "#/definitions/models.OnvifCredentials"
+                },
+                "pan": {
+                    "type": "number"
+                },
+                "tilt": {
+                    "type": "number"
+                }
+            }
+        },
+        "models.OnvifZoom": {
+            "type": "object",
+            "properties": {
+                "onvif_credentials": {
+                    "$ref": "#/definitions/models.OnvifCredentials"
+                },
+                "zoom": {
+                    "type": "number"
                 }
             }
         },

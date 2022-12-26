@@ -352,21 +352,18 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 }
 
 // VerifyCamera godoc
-// @Router /api/camera/verify [post]
+// @Router /api/camera/verify/{streamType} [post]
 // @ID verify-camera
-// @Security Bearer
-// @securityDefinitions.apikey Bearer
-// @in header
-// @name Authorization
-// @Tags capture
-// @Param config body models.Config true "Config"
-// @Summary Will verify the camera connectivity.
-// @Description Will verify the camera connectivity.
+// @Tags camera
+// @Param streamType path string true "Stream Type" Enums(primary, secondary)
+// @Param cameraStreams body models.CameraStreams true "Camera Streams"
+// @Summary Validate a specific RTSP profile camera connection.
+// @Description This method will validate a specific profile connection from an RTSP camera, and try to get the codec.
 // @Success 200 {object} models.APIResponse
 func VerifyCamera(c *gin.Context) {
 
-	var config models.Config
-	err := c.BindJSON(&config)
+	var cameraStreams models.CameraStreams
+	err := c.BindJSON(&cameraStreams)
 
 	if err == nil {
 
@@ -375,12 +372,11 @@ func VerifyCamera(c *gin.Context) {
 			streamType = "primary"
 		}
 
-		rtspUrl := config.Capture.IPCamera.RTSP
+		rtspUrl := cameraStreams.RTSP
 		if streamType == "secondary" {
-			rtspUrl = config.Capture.IPCamera.SubRTSP
+			rtspUrl = cameraStreams.SubRTSP
 		}
 		_, codecs, err := OpenRTSP(rtspUrl)
-
 		if err == nil {
 
 			videoIdx := -1
@@ -395,22 +391,23 @@ func VerifyCamera(c *gin.Context) {
 
 			if videoIdx > -1 {
 				c.JSON(200, models.APIResponse{
-					Data: "All good, detected a H264 codec.",
+					Message: "All good, detected a H264 codec.",
+					Data:    codecs,
 				})
 			} else {
 				c.JSON(400, models.APIResponse{
-					Data: "Stream doesn't have a H264 codec, we only support H264 so far.",
+					Message: "Stream doesn't have a H264 codec, we only support H264 so far.",
 				})
 			}
 
 		} else {
 			c.JSON(400, models.APIResponse{
-				Data: err.Error(),
+				Message: err.Error(),
 			})
 		}
 	} else {
 		c.JSON(400, models.APIResponse{
-			Data: "Something went wrong while receiving the config " + err.Error(),
+			Message: "Something went wrong while receiving the config " + err.Error(),
 		})
 	}
 }

@@ -3,6 +3,34 @@ definitions:
   models.APIResponse:
     properties:
       data: {}
+      message: {}
+    type: object
+  models.Authentication:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  models.Authorization:
+    properties:
+      code:
+        type: integer
+      expire:
+        type: string
+      role:
+        type: string
+      token:
+        type: string
+      username:
+        type: string
+    type: object
+  models.CameraStreams:
+    properties:
+      rtsp:
+        type: string
+      sub_rtsp:
+        type: string
     type: object
   models.Capture:
     properties:
@@ -37,6 +65,8 @@ definitions:
     type: object
   models.Config:
     properties:
+      auto_clean:
+        type: string
       capture:
         $ref: '#/definitions/models.Capture'
       cloud:
@@ -58,6 +88,8 @@ definitions:
         type: string
       kstorage:
         $ref: '#/definitions/models.KStorage'
+      max_directory_size:
+        type: integer
       mqtt_password:
         type: string
       mqtt_username:
@@ -120,6 +152,7 @@ definitions:
       access_key:
         type: string
       cloud_key:
+        description: old way, remove this
         type: string
       directory:
         type: string
@@ -129,6 +162,31 @@ definitions:
         type: string
       uri:
         type: string
+    type: object
+  models.OnvifCredentials:
+    properties:
+      onvif_password:
+        type: string
+      onvif_username:
+        type: string
+      onvif_xaddr:
+        type: string
+    type: object
+  models.OnvifPanTilt:
+    properties:
+      onvif_credentials:
+        $ref: '#/definitions/models.OnvifCredentials'
+      pan:
+        type: number
+      tilt:
+        type: number
+    type: object
+  models.OnvifZoom:
+    properties:
+      onvif_credentials:
+        $ref: '#/definitions/models.OnvifCredentials'
+      zoom:
+        type: number
     type: object
   models.Polygon:
     properties:
@@ -212,6 +270,110 @@ info:
   title: Swagger Kerberos Agent API
   version: "1.0"
 paths:
+  /api/camera/onvif/capabilities:
+    post:
+      description: Will return the ONVIF capabilities for the specific camera.
+      operationId: camera-onvif-capabilities
+      parameters:
+      - description: OnvifCredentials
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.OnvifCredentials'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Will return the ONVIF capabilities for the specific camera.
+      tags:
+      - camera
+  /api/camera/onvif/login:
+    post:
+      description: Try to login into ONVIF supported camera.
+      operationId: camera-onvif-login
+      parameters:
+      - description: OnvifCredentials
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.OnvifCredentials'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Try to login into ONVIF supported camera.
+      tags:
+      - camera
+  /api/camera/onvif/pantilt:
+    post:
+      description: Panning or/and tilting the camera using a direction (x,y).
+      operationId: camera-onvif-pantilt
+      parameters:
+      - description: OnvifPanTilt
+        in: body
+        name: panTilt
+        required: true
+        schema:
+          $ref: '#/definitions/models.OnvifPanTilt'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Panning or/and tilting the camera.
+      tags:
+      - camera
+  /api/camera/onvif/zoom:
+    post:
+      description: Zooming in or out the camera.
+      operationId: camera-onvif-zoom
+      parameters:
+      - description: OnvifZoom
+        in: body
+        name: zoom
+        required: true
+        schema:
+          $ref: '#/definitions/models.OnvifZoom'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Zooming in or out the camera.
+      tags:
+      - camera
+  /api/camera/verify/{streamType}:
+    post:
+      description: This method will validate a specific profile connection from an
+        RTSP camera, and try to get the codec.
+      operationId: verify-camera
+      parameters:
+      - description: Stream Type
+        enum:
+        - primary
+        - secondary
+        in: path
+        name: streamType
+        required: true
+        type: string
+      - description: Camera Streams
+        in: body
+        name: cameraStreams
+        required: true
+        schema:
+          $ref: '#/definitions/models.CameraStreams'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Validate a specific RTSP profile camera connection.
+      tags:
+      - camera
   /api/hub/verify:
     post:
       description: Will verify the hub connectivity.
@@ -233,6 +395,25 @@ paths:
       summary: Will verify the hub connectivity.
       tags:
       - config
+  /api/login:
+    post:
+      description: Get Authorization token.
+      operationId: login
+      parameters:
+      - description: Credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/models.Authentication'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Authorization'
+      summary: Get Authorization token.
+      tags:
+      - authentication
   /api/persistence/verify:
     post:
       description: Will verify the persistence.

@@ -92,15 +92,23 @@ export function doVerifyHub(config, onSuccess, onError) {
 }
 
 export function doVerifyCamera(streamType, config, onSuccess, onError) {
-  const endpoint = API.post(`camera/verify/${streamType}`, {
-    ...config,
-  });
+  const cameraStreams = {
+    rtsp: '',
+    sub_rtsp: '',
+  };
+
+  if (config) {
+    cameraStreams.rtsp = config.capture.ipcamera.rtsp;
+    cameraStreams.sub_rtsp = config.capture.ipcamera.sub_rtsp;
+  }
+
+  const endpoint = API.post(`camera/verify/${streamType}`, cameraStreams);
   endpoint
     .then((res) => {
       if (res.status !== 200) {
-        throw new Error(res.data);
+        throw new Error(res.message);
       }
-      return res.data;
+      return res.message;
     })
     .then((data) => {
       onSuccess(data);

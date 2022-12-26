@@ -53,9 +53,9 @@ export const verifyCamera = (streamType, config, onSuccess, onError) => {
         }
       },
       (error) => {
-        const { data } = error.response.data;
+        const { message } = error.response.data;
         if (onError) {
-          onError(data);
+          onError(message);
         }
       }
     );
