@@ -63,11 +63,15 @@ func StartServer(configuration *models.Configuration, communication *models.Comm
 	r.Use(static.Serve("/media", static.LocalFile("./www", true)))
 	r.Use(static.Serve("/settings", static.LocalFile("./www", true)))
 	r.Use(static.Serve("/login", static.LocalFile("./www", true)))
-	r.StaticFS("/file", gin.Dir("./data/recordings", false))
+	r.Handle("GET", "/file/*filepath", Files)
 
 	// Run the api on port
 	err = r.Run(":" + configuration.Port)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func Files(c *gin.Context) {
+	c.File("./data/recordings" + c.Param("filepath"))
 }
