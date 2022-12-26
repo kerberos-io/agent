@@ -25,13 +25,14 @@ jobs:
     - name: Available platforms
       run: echo ${{ steps.buildx.outputs.platforms }}
     - name: Run Buildx
-      run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
+      run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
     - name: Create new and append to manifest
-      run: docker buildx imagetools create -t kerberos/agent:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+      run: docker buildx imagetools create -t kerberos/agent:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
     - name: Create new and append to manifest latest
-      run: docker buildx imagetools create -t kerberos/agent:latest kerberos/agent:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+      run: docker buildx imagetools create -t kerberos/agent:latest kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
   build-other:
     runs-on: ubuntu-latest
+    needs: build-amd64
     strategy:
       matrix:
         #architecture: [arm64, arm/v7, arm/v6]
@@ -51,8 +52,8 @@ jobs:
     - name: Available platforms
       run: echo ${{ steps.buildx.outputs.platforms }}
     - name: Run Buildx
-      run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
+      run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
     - name: Create new and append to manifest
-      run: docker buildx imagetools create --append -t kerberos/agent:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+      run: docker buildx imagetools create --append -t kerberos/agent:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
     - name: Create new and append to manifest latest
-      run: docker buildx imagetools create --append -t kerberos/agent:latest kerberos/agent:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+      run: docker buildx imagetools create --append -t kerberos/agent:latest kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
