@@ -3,6 +3,7 @@ module github.com/kerberos-io/agent/machinery
 go 1.18
 
 //replace github.com/kerberos-io/joy4 v1.0.33 => ../../../../github.com/kerberos-io/joy4
+//replace github.com/kerberos-io/onvif v0.0.3 => ../../../../github.com/kerberos-io/onvif
 
 require (
 	github.com/InVisionApp/conjungo v1.1.0
@@ -17,7 +18,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.4.2
 	github.com/kellydunn/golang-geo v0.7.0
 	github.com/kerberos-io/joy4 v1.0.33
-	github.com/kerberos-io/onvif v0.0.3
+	github.com/kerberos-io/onvif v0.0.4
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/nsmith5/mjpeg v0.0.0-20200913181537-54b8ada0e53e
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
@@ -52,7 +53,7 @@ require (
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/golang-module/carbon/v2 v2.1.9
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/gorilla/websocket v1.5.0
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.1.0 // indirect
@@ -83,8 +84,6 @@ require (
 	github.com/pion/transport v0.13.1 // indirect
 	github.com/pion/turn/v2 v2.0.8 // indirect
 	github.com/pion/udp v0.1.1 // indirect
-	github.com/tklauser/go-sysconf v0.3.10 // indirect
-	github.com/tklauser/numcpus v0.5.0 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/ziutek/mymysql v1.5.4 // indirect
