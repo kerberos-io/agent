@@ -70,7 +70,7 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 The easiest to get your Kerberos Agent up and running is to use our public image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you have selected a specific tag, run below `docker` command, which will open the web interface of your Kerberos agent on port `80`, and off you go. For a more configurable and persistent deployment have a look at [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent).
 
-    docker run -p 80:80 --name mycamera -d kerberos/agent:latest
+    docker run -p 80:80 --name mycamera -d --restart=always kerberos/agent:latest
 
 If you want to connect to an USB or Raspberry Pi camera, [you'll need to run our side car container](https://github.com/kerberos-io/camera-to-rtsp) which proxy the camera to an RTSP stream.
 
@@ -137,7 +137,7 @@ You attach a volume to your container by leveraging the `-v` option. To mount yo
         docker run -p 80:80 --name mycamera \
         -v $(pwd)/agent/config:/home/agent/data/config \
         -v $(pwd)/agent/recordings:/home/agent/data/recordings \
-        -d kerberos/agent:latest
+        -d --restart=always kerberos/agent:latest
 
 More example [can be found in the deployment section](https://github.com/kerberos-io/agent/tree/master/deployments) for each deployment and automation tool.
 
@@ -150,7 +150,7 @@ Next to attaching the configuration file, it is also possible to override the co
         -e AGENT_TIMEZONE=Europe/Brussels \
         -e AGENT_CAPTURE_IPCAMERA_RTSP=rtsp://fake.kerberos.io/stream \
         -e AGENT_CAPTURE_CONTINUOUS=true \
-        -d kerberos/agent:latest
+        -d --restart=always kerberos/agent:latest
 
 | Name                                    | Description                                                                                     | Default Value                   |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------- |
