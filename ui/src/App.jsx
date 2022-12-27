@@ -2,6 +2,12 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { withTranslation } from 'react-i18next';
 import {
+  connect as connectWS,
+  disconnect as disconnectWS,
+  send,
+} from '@giantmachines/redux-websocket';
+import {
+  Badge,
   Main,
   MainBody,
   Gradient,
@@ -27,8 +33,9 @@ import './App.scss';
 // eslint-disable-next-line react/prefer-stateless-function
 class App extends React.Component {
   componentDidMount() {
-    const { dispatchGetDashboardInformation } = this.props;
+    const { dispatchGetDashboardInformation, dispatchConnect } = this.props;
     dispatchGetDashboardInformation();
+    dispatchConnect();
 
     const interval$ = interval(5000);
     this.subscription = interval$.subscribe(() => {
@@ -36,8 +43,33 @@ class App extends React.Component {
     });
   }
 
+  componentDidUpdate(prevProps) {
+    // We are connected again, lets fire the initial events.
+    const { connected, dispatchSend, dispatchConnect } = this.props;
+    const { connected: connectedPrev } = prevProps;
+    if (connectedPrev === false && connected === true) {
+      const message = {
+        client_id: 'ok',
+        message_type: 'start-watch',
+      };
+      dispatchSend(message);
+    }
+
+    // We disconnected, let's try to connect again
+    if (connectedPrev === true && connected === false) {
+      dispatchConnect();
+    }
+  }
+
   componentWillUnmount() {
     this.subscription.unsubscribe();
+    const message = {
+      client_id: 'ok',
+      message_type: 'stop-watch',
+    };
+    const { dispatchSend, dispatchDisconnect } = this.props;
+    dispatchSend(message);
+    dispatchDisconnect();
   }
 
   getCurrentTimestamp() {
@@ -45,7 +77,7 @@ class App extends React.Component {
   }
 
   render() {
-    const { t } = this.props;
+    const { t, connected } = this.props;
     const { children, username, dashboard, dispatchLogout } = this.props;
     const cloudOnline = this.getCurrentTimestamp() - dashboard.cloudOnline < 30;
     return (
@@ -113,6 +145,16 @@ class App extends React.Component {
             <NavigationGroup>
               <LanguageSelect />
             </NavigationGroup>
+
+            <NavigationSection title="API connection" />
+            <NavigationGroup>
+              <div className="websocket-badge">
+                <Badge
+                  title={connected ? 'connected' : 'disconnected'}
+                  status={connected ? 'success' : 'warning'}
+                />
+              </div>
+            </NavigationGroup>
           </Navigation>
         </Sidebar>
         <Main>
@@ -151,10 +193,16 @@ class App extends React.Component {
 const mapStateToProps = (state) => ({
   username: state.authentication.username,
   dashboard: state.agent.dashboard,
+  connected: state.wss.connected,
 });
 
 const mapDispatchToProps = (dispatch) => ({
   dispatchLogout: () => dispatch(logout()),
+  dispatchConnect: () => {
+    dispatch(connectWS(config.WS_URL));
+  },
+  dispatchDisconnect: () => dispatch(disconnectWS()),
+  dispatchSend: (message) => dispatch(send(message)),
   dispatchGetDashboardInformation: (dashboard, success, error) =>
     dispatch(getDashboardInformation(dashboard, success, error)),
 });
@@ -162,9 +210,13 @@ const mapDispatchToProps = (dispatch) => ({
 App.propTypes = {
   t: PropTypes.func.isRequired,
   dispatchLogout: PropTypes.func.isRequired,
+  dispatchConnect: PropTypes.func.isRequired,
+  dispatchDisconnect: PropTypes.func.isRequired,
+  dispatchSend: PropTypes.func.isRequired,
   // eslint-disable-next-line react/forbid-prop-types
   children: PropTypes.array.isRequired,
   username: PropTypes.string.isRequired,
+  connected: PropTypes.bool.isRequired,
   dashboard: PropTypes.objectOf(PropTypes.object).isRequired,
   dispatchGetDashboardInformation: PropTypes.func.isRequired,
 };

@@ -5,6 +5,7 @@ import { createStore, applyMiddleware } from 'redux';
 import { createBrowserHistory } from 'history';
 import { routerMiddleware, ConnectedRouter } from 'connected-react-router';
 import { Provider } from 'react-redux';
+import reduxWebsocket from '@giantmachines/redux-websocket';
 import { composeWithDevTools } from 'redux-devtools-extension';
 import thunk from 'redux-thunk';
 import { Redirect } from 'react-router';
@@ -49,10 +50,14 @@ function getAuthState() {
   }
 }
 
+const reduxWebsocketMiddleware = reduxWebsocket();
+
 const store = createStore(
   rootReducer(history),
   { ...getAuthState() },
-  composeWithDevTools(applyMiddleware(thunk, routerMiddleware(history)))
+  composeWithDevTools(
+    applyMiddleware(thunk, reduxWebsocketMiddleware, routerMiddleware(history))
+  )
 );
 
 const Loader = () => <div>loading...</div>;

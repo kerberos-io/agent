@@ -1,4 +1,5 @@
 const { hostname, host, protocol } = window.location;
+const websocketprotocol = protocol === 'http:' ? 'ws:' : 'wss:';
 
 // Uncomment this when using codespaces or other special DNS names (which you can't control)
 // replace this with the DNS name of the kerberos agent server (the codespace url)
@@ -9,6 +10,7 @@ const dev = {
   HOSTNAME: hostname,
   API_URL: `${protocol}//${hostname}:8080/api`,
   URL: `${protocol}//${hostname}:8080`,
+  WS_URL: `${websocketprotocol}//${hostname}:8080/ws`,
 
   // Uncomment, and comment the above lines, when using codespaces or other special DNS names (which you can't control)
   // API_URL: `${protocol}//${externalHost}/api`,
@@ -20,6 +22,7 @@ const prod = {
   HOSTNAME: hostname,
   API_URL: `${protocol}//${host}/api`,
   URL: `${protocol}//${host}`,
+  WS_URL: `${protocol}//${host}/ws`,
 };
 
 const config = process.env.REACT_APP_ENVIRONMENT === 'production' ? prod : dev;
