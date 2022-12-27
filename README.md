@@ -72,7 +72,9 @@ The easiest to get your Kerberos Agent up and running is to use our public image
 
     docker run -p 80:80 --name mycamera -d --restart=always kerberos/agent:latest
 
-If you want to connect to an USB or Raspberry Pi camera, [you'll need to run our side car container](https://github.com/kerberos-io/camera-to-rtsp) which proxy the camera to an RTSP stream.
+If you want to connect to an USB or Raspberry Pi camera, [you'll need to run our side car container](https://github.com/kerberos-io/camera-to-rtsp) which proxy the camera to an RTSP stream. In that case you'll want to configure the Kerberos Agent container to run in the host network, so it can connect directly to the RTSP sidecar.
+
+    docker run --network=host --name mycamera -d --restart=always kerberos/agent:latest
 
 ## Quickstart - Balena
 
@@ -81,7 +83,7 @@ Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=
 
 [![balena deploy button](https://www.balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/agent)
 
-**_Work In Progress_** - Currently we only support IP Cameras, we have [an approach for leveraging the USB and Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
+**_Work In Progress_** - Currently we only support IP and USB Cameras, we have [an approach for leveraging the Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
 
 ## A world of Kerberos Agents
 
@@ -134,10 +136,10 @@ An example of how to mount a host directory is shown below using `docker`, but i
 
 You attach a volume to your container by leveraging the `-v` option. To mount your own configuration file and recordings folder, execute as following:
 
-        docker run -p 80:80 --name mycamera \
-        -v $(pwd)/agent/config:/home/agent/data/config \
-        -v $(pwd)/agent/recordings:/home/agent/data/recordings \
-        -d --restart=always kerberos/agent:latest
+    docker run -p 80:80 --name mycamera \
+    -v $(pwd)/agent/config:/home/agent/data/config \
+    -v $(pwd)/agent/recordings:/home/agent/data/recordings \
+    -d --restart=always kerberos/agent:latest
 
 More example [can be found in the deployment section](https://github.com/kerberos-io/agent/tree/master/deployments) for each deployment and automation tool.
 
@@ -145,12 +147,12 @@ More example [can be found in the deployment section](https://github.com/kerbero
 
 Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments easier when leveraging `docker compose` or `kubernetes` deployments much easier and scalable. Using this approach we simplify automation through `ansible` and `terraform`.
 
-        docker run -p 80:80 --name mycamera \
-        -e AGENT_NAME=mycamera \
-        -e AGENT_TIMEZONE=Europe/Brussels \
-        -e AGENT_CAPTURE_IPCAMERA_RTSP=rtsp://fake.kerberos.io/stream \
-        -e AGENT_CAPTURE_CONTINUOUS=true \
-        -d --restart=always kerberos/agent:latest
+    docker run -p 80:80 --name mycamera \
+    -e AGENT_NAME=mycamera \
+    -e AGENT_TIMEZONE=Europe/Brussels \
+    -e AGENT_CAPTURE_IPCAMERA_RTSP=rtsp://fake.kerberos.io/stream \
+    -e AGENT_CAPTURE_CONTINUOUS=true \
+    -d --restart=always kerberos/agent:latest
 
 | Name                                    | Description                                                                                     | Default Value                   |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------- |
