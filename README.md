@@ -74,7 +74,7 @@ The easiest to get your Kerberos Agent up and running is to use our public image
 
 If you want to connect to an USB or Raspberry Pi camera, [you'll need to run our side car container](https://github.com/kerberos-io/camera-to-rtsp) which proxy the camera to an RTSP stream. In that case you'll want to configure the Kerberos Agent container to run in the host network, so it can connect directly to the RTSP sidecar.
 
-      docker run --network=host --name mycamera -d --restart=always kerberos/agent:latest
+    docker run --network=host --name mycamera -d --restart=always kerberos/agent:latest
 
 ## Quickstart - Balena
 
