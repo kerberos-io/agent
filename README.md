@@ -136,10 +136,10 @@ An example of how to mount a host directory is shown below using `docker`, but i
 
 You attach a volume to your container by leveraging the `-v` option. To mount your own configuration file and recordings folder, execute as following:
 
-        docker run -p 80:80 --name mycamera \
-        -v $(pwd)/agent/config:/home/agent/data/config \
-        -v $(pwd)/agent/recordings:/home/agent/data/recordings \
-        -d --restart=always kerberos/agent:latest
+    docker run -p 80:80 --name mycamera \
+    -v $(pwd)/agent/config:/home/agent/data/config \
+    -v $(pwd)/agent/recordings:/home/agent/data/recordings \
+    -d --restart=always kerberos/agent:latest
 
 More example [can be found in the deployment section](https://github.com/kerberos-io/agent/tree/master/deployments) for each deployment and automation tool.
 
@@ -147,12 +147,12 @@ More example [can be found in the deployment section](https://github.com/kerbero
 
 Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments easier when leveraging `docker compose` or `kubernetes` deployments much easier and scalable. Using this approach we simplify automation through `ansible` and `terraform`.
 
-        docker run -p 80:80 --name mycamera \
-        -e AGENT_NAME=mycamera \
-        -e AGENT_TIMEZONE=Europe/Brussels \
-        -e AGENT_CAPTURE_IPCAMERA_RTSP=rtsp://fake.kerberos.io/stream \
-        -e AGENT_CAPTURE_CONTINUOUS=true \
-        -d --restart=always kerberos/agent:latest
+    docker run -p 80:80 --name mycamera \
+    -e AGENT_NAME=mycamera \
+    -e AGENT_TIMEZONE=Europe/Brussels \
+    -e AGENT_CAPTURE_IPCAMERA_RTSP=rtsp://fake.kerberos.io/stream \
+    -e AGENT_CAPTURE_CONTINUOUS=true \
+    -d --restart=always kerberos/agent:latest
 
 | Name                                    | Description                                                                                     | Default Value                   |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------- |
