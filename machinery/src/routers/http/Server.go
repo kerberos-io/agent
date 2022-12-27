@@ -73,5 +73,7 @@ func StartServer(configuration *models.Configuration, communication *models.Comm
 }
 
 func Files(c *gin.Context) {
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Content-Type", "video/mp4")
 	c.File("./data/recordings" + c.Param("filepath"))
 }
