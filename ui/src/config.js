@@ -22,7 +22,7 @@ const prod = {
   HOSTNAME: hostname,
   API_URL: `${protocol}//${host}/api`,
   URL: `${protocol}//${host}`,
-  WS_URL: `${protocol}//${host}/ws`,
+  WS_URL: `${websocketprotocol}//${host}/ws`,
 };
 
 const config = process.env.REACT_APP_ENVIRONMENT === 'production' ? prod : dev;
