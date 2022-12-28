@@ -34,14 +34,12 @@ const wss = (
       };
 
     case REDUX_WEBSOCKET_CONNECT:
-      console.log('CONNECT!');
       return {
         ...state,
         url: action.payload.url,
       };
 
     case REDUX_WEBSOCKET_OPEN:
-      console.log('OPENED!');
       return {
         ...state,
         connected: true,
@@ -49,7 +47,6 @@ const wss = (
 
     case REDUX_WEBSOCKET_BROKEN:
     case REDUX_WEBSOCKET_CLOSED:
-      console.log('CLOSED!');
       return {
         ...state,
         connected: false,

@@ -146,7 +146,7 @@ class App extends React.Component {
               <LanguageSelect />
             </NavigationGroup>
 
-            <NavigationSection title="API connection" />
+            <NavigationSection title="Websocket" />
             <NavigationGroup>
               <div className="websocket-badge">
                 <Badge
