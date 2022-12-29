@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { Link, withRouter } from 'react-router-dom';
 import { withTranslation } from 'react-i18next';
+import { send } from '@giantmachines/redux-websocket';
 import { connect } from 'react-redux';
 import {
   Breadcrumb,
@@ -45,6 +46,27 @@ class Dashboard extends React.Component {
         });
       });
     }
+
+    const { connected } = this.props;
+    if (connected === true) {
+      const { dispatchSend } = this.props;
+      const message = {
+        message_type: 'stream-sd',
+      };
+      dispatchSend(message);
+    }
+  }
+
+  componentDidUpdate(prevProps) {
+    const { connected: connectedPrev } = prevProps;
+    const { connected } = this.props;
+    if (connectedPrev === false && connected === true) {
+      const { dispatchSend } = this.props;
+      const message = {
+        message_type: 'stream-sd',
+      };
+      dispatchSend(message);
+    }
   }
 
   componentWillUnmount() {
@@ -52,6 +74,12 @@ class Dashboard extends React.Component {
     if (liveview && liveview.length > 0) {
       liveview[0].remove();
     }
+
+    const { dispatchSend } = this.props;
+    const message = {
+      message_type: 'stop-sd',
+    };
+    dispatchSend(message);
   }
 
   handleClose() {
@@ -73,7 +101,7 @@ class Dashboard extends React.Component {
   }
 
   render() {
-    const { dashboard, t } = this.props;
+    const { dashboard, t, images } = this.props;
     const { liveviewLoaded, open, currentRecording } = this.state;
 
     // We check if the camera was getting a valid frame
@@ -273,7 +301,12 @@ class Dashboard extends React.Component {
               />
             )}
             <div style={{ visibility: liveviewLoaded ? 'visible' : 'hidden' }}>
-              <ImageCard imageSrc={`${config.API_URL}/stream?token=xxxx`} />
+              <ImageCard
+                imageSrc={`data:image/png;base64, ${
+                  images.length ? images[0] : ''
+                }`}
+                onerror=""
+              />
             </div>
           </div>
         </div>
@@ -285,13 +318,20 @@ class Dashboard extends React.Component {
 
 const mapStateToProps = (state /* , ownProps */) => ({
   dashboard: state.agent.dashboard,
+  connected: state.wss.connected,
+  images: state.wss.images,
 });
 
-const mapDispatchToProps = (/* dispatch , ownProps */) => ({});
+const mapDispatchToProps = (dispatch) => ({
+  dispatchSend: (message) => dispatch(send(message)),
+});
 
 Dashboard.propTypes = {
-  dashboard: PropTypes.objectOf(PropTypes.object).isRequired,
+  dashboard: PropTypes.object.isRequired,
+  connected: PropTypes.bool.isRequired,
+  images: PropTypes.array.isRequired,
   t: PropTypes.func.isRequired,
+  dispatchSend: PropTypes.func.isRequired,
 };
 
 export default withTranslation()(

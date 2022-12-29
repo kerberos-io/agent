@@ -84,6 +84,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 	infile, streams, err := capture.OpenRTSP(rtspUrl)
 
 	var queue *pubsub.Queue
+
 	status := "not started"
 
 	if err == nil {
@@ -113,6 +114,10 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 			subDecoder = capture.GetVideoDecoder(subStreams)
 		}
 
+		communication.Decoder = decoder
+		communication.SubDecoder = subDecoder
+		communication.DecoderMutex = &decoderMutex
+
 		// Create a packet queue, which is filled by the HandleStream routing
 		// and consumed by all other routines: motion, livestream, etc.
 		if config.Capture.PreRecording <= 0 {
@@ -123,6 +128,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// We are creating a queue to store the RTSP frames in, these frames will be
 		// processed by the different consumers: motion detection, recording, etc.
 		queue = pubsub.NewQueue()
+		communication.Queue = queue
 		queue.SetMaxGopCount(int(config.Capture.PreRecording)) // GOP time frame is set to prerecording.
 		log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)))
 		queue.WriteHeader(streams)

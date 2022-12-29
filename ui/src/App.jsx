@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { withTranslation } from 'react-i18next';
+import uuid from 'uuidv4';
 import {
   connect as connectWS,
   disconnect as disconnectWS,
@@ -49,8 +50,8 @@ class App extends React.Component {
     const { connected: connectedPrev } = prevProps;
     if (connectedPrev === false && connected === true) {
       const message = {
-        client_id: 'ok',
-        message_type: 'start-watch',
+        client_id: uuid(),
+        message_type: 'hello',
       };
       dispatchSend(message);
     }
@@ -64,8 +65,8 @@ class App extends React.Component {
   componentWillUnmount() {
     this.subscription.unsubscribe();
     const message = {
-      client_id: 'ok',
-      message_type: 'stop-watch',
+      client_id: uuid(),
+      message_type: 'goodbye',
     };
     const { dispatchSend, dispatchDisconnect } = this.props;
     dispatchSend(message);
@@ -217,7 +218,7 @@ App.propTypes = {
   children: PropTypes.array.isRequired,
   username: PropTypes.string.isRequired,
   connected: PropTypes.bool.isRequired,
-  dashboard: PropTypes.objectOf(PropTypes.object).isRequired,
+  dashboard: PropTypes.object.isRequired,
   dispatchGetDashboardInformation: PropTypes.func.isRequired,
 };
 

@@ -1,8 +1,11 @@
 package models
 
 import (
+	"sync"
 	"sync/atomic"
 
+	"github.com/kerberos-io/joy4/av/pubsub"
+	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 	"github.com/tevino/abool"
 )
 
@@ -24,4 +27,8 @@ type Communication struct {
 	HandleLiveHDPeers     chan string
 	HandleONVIF           chan OnvifAction
 	IsConfiguring         *abool.AtomicBool
+	Queue                 *pubsub.Queue
+	DecoderMutex          *sync.Mutex
+	Decoder               *ffmpeg.VideoDecoder
+	SubDecoder            *ffmpeg.VideoDecoder
 }

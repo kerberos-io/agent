@@ -2,19 +2,21 @@ package websocket
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/kerberos-io/agent/machinery/src/utils"
+	"github.com/kerberos-io/agent/machinery/src/computervision"
+	"github.com/kerberos-io/agent/machinery/src/log"
+	"github.com/kerberos-io/agent/machinery/src/models"
+	"gocv.io/x/gocv"
 )
 
 type Message struct {
 	ClientID    string            `json:"client_id" bson:"client_id"`
-	Group       string            `json:"group" bson:"group"`
 	MessageType string            `json:"message_type" bson:"message_type"`
 	Message     map[string]string `json:"message" bson:"message"`
 }
@@ -46,15 +48,17 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func WebsocketHandler(c *gin.Context) {
+func WebsocketHandler(c *gin.Context, communication *models.Communication) {
 	w := c.Writer
 	r := c.Request
 	conn, err := upgrader.Upgrade(w, r, nil)
 	// error handling here
 	if err == nil {
 		defer conn.Close()
-		// Register Global socket list for broadcasting.
-		clientID := utils.RandStringBytesMaskImpr(5)
+
+		var message Message
+		err = conn.ReadJSON(&message)
+		clientID := message.ClientID
 		if sockets[clientID] == nil {
 			connection := new(Connection)
 			connection.Socket = conn
@@ -63,61 +67,109 @@ func WebsocketHandler(c *gin.Context) {
 		}
 
 		// Continuously read messages
-		var message Message
 		for {
+			switch message.MessageType {
+			case "hello":
+				m := message.Message
+				bePolite := Message{
+					ClientID:    clientID,
+					MessageType: "hello-back",
+					Message: map[string]string{
+						"message": "Hello " + m["client_id"] + "!",
+					},
+				}
+				sockets[clientID].WriteJson(bePolite)
+
+			case "stop-sd":
+				_, exists := sockets[clientID].Cancels["stream-sd"]
+				if exists {
+					sockets[clientID].Cancels["stream-sd"]()
+					delete(sockets[clientID].Cancels, "stream-sd")
+				} else {
+					fmt.Println("Streaming sd does not exists for " + clientID)
+				}
+
+			case "stream-sd":
+				startStrean := Message{
+					ClientID:    clientID,
+					MessageType: "stream-sd",
+					Message: map[string]string{
+						"message": "Start streaming low resolution",
+					},
+				}
+				sockets[clientID].WriteJson(startStrean)
+
+				_, exists := sockets[clientID].Cancels["stream-sd"]
+				if exists {
+					fmt.Println("Already streaming sd for " + clientID)
+				} else {
+					ctx, cancel := context.WithCancel(context.Background())
+					sockets[clientID].Cancels["stream-sd"] = cancel
+					go ForwardSDStream(ctx, clientID, sockets[clientID], communication)
+				}
+			}
+
 			err = conn.ReadJSON(&message)
 			if err != nil {
 				break
 			}
-
-			switch message.MessageType {
-			// Start logging for a specific container
-			case "request-sd":
-				m := message.Message
-				_, exists := sockets[clientID].Cancels["log-"+m["pod_name"]]
-				if exists {
-					fmt.Println("Already streaming logs for " + m["pod_name"])
-				} else {
-					ctx, cancel := context.WithCancel(context.Background())
-					sockets[clientID].Cancels["log-"+m["pod_name"]] = cancel
-					go ForwardSDStream(ctx, sockets[clientID])
-				}
-			// Stop logging for a specific container
-			case "request-hd":
-				m := message.Message
-				_, exists := sockets[clientID].Cancels["log-"+m["pod_name"]]
-				if exists {
-					sockets[clientID].Cancels["log-"+m["pod_name"]]()
-					delete(sockets[clientID].Cancels, "log-"+m["pod_name"])
-					fmt.Println("Cancel log request!")
-				} else {
-					fmt.Println("No cancel func found for " + clientID)
-				}
-			}
-
-			fmt.Println(clientID + ": reading.")
-			time.Sleep(time.Second * 2)
 		}
 		// If clientID is in sockets
 		_, exists := sockets[clientID]
 		if exists {
 			delete(sockets, clientID)
-			fmt.Println(clientID + ": terminated and disconnected websocket connection.")
+			log.Log.Info("WebsocketHandler: " + clientID + ": terminated and disconnected websocket connection.")
 		}
 	}
 }
 
-func ForwardSDStream(ctx context.Context, connection *Connection) {
+func ForwardSDStream(ctx context.Context, clientID string, connection *Connection, communication *models.Communication) {
+
+	queue := communication.Queue
+	cursor := queue.Latest()
+	decoder := communication.Decoder
+	decoderMutex := communication.DecoderMutex
+
 logreader:
 	for {
-		// Can be killed from the outside.
+
+		var mat gocv.Mat
+		var encodedImage string
+		if cursor != nil {
+			pkt, err := cursor.ReadPacket()
+			if err == nil {
+				if !pkt.IsKeyFrame {
+					continue
+				}
+				mat = computervision.GetRGBImage(pkt, decoder, decoderMutex)
+				buffer, err := gocv.IMEncode(gocv.JPEGFileExt, mat)
+				mat.Close()
+				if err == nil {
+					encodedImage = base64.StdEncoding.EncodeToString(buffer.GetBytes())
+				}
+			} else {
+				log.Log.Error("ForwardSDStream:" + err.Error())
+				break logreader
+			}
+		}
+
+		startStrean := Message{
+			ClientID:    clientID,
+			MessageType: "image",
+			Message: map[string]string{
+				"base64": encodedImage,
+			},
+		}
+		err := connection.WriteJson(startStrean)
+		if err != nil {
+			log.Log.Error("ForwardSDStream:" + err.Error())
+			break logreader
+		}
 		select {
 		case <-ctx.Done():
-			//cancel()
-			fmt.Println("KILLED from new message")
 			break logreader
 		default:
 		}
 	}
-	fmt.Println("Stopped sending streaming...")
+	log.Log.Info("ForwardSDStream: stop sending streaming over websocket")
 }

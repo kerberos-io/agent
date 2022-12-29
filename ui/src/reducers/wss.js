@@ -22,6 +22,7 @@ const wss = (
     connected: false,
     messages: {},
     events: [],
+    images: [],
     url: null,
   },
   action
@@ -54,50 +55,18 @@ const wss = (
 
     case REDUX_WEBSOCKET_MESSAGE:
       const { payload } = action;
-      const message = JSON.parse(payload.message);
-      if (message) {
-        const { key, value } = message;
-        switch (key) {
-          case 'pod-events':
+      const m = JSON.parse(payload.message);
+      if (m) {
+        const { message_type, message } = m;
+        switch (message_type) {
+          case 'image':
+            const { base64 } = message;
             return {
               ...state,
-              events: [...state.events, value],
+              images: [base64],
             };
-          case 'watching-pods': // We do not need to do anything
-            return state;
 
           default: // Anything else should be logging (to be refactored).
-            if (!state.messages[key]) {
-              return {
-                ...state,
-                messages: {
-                  ...state.messages,
-                  [key]: [
-                    {
-                      data: value,
-                      origin: action.payload.origin,
-                      timestamp: action.meta.timestamp,
-                      type: 'INCOMING',
-                    },
-                  ],
-                },
-              };
-            }
-            return {
-              ...state,
-              messages: {
-                ...state.messages,
-                [key]: [
-                  ...state.messages[key],
-                  {
-                    data: value,
-                    origin: action.payload.origin,
-                    timestamp: action.meta.timestamp,
-                    type: 'INCOMING',
-                  },
-                ],
-              },
-            };
         }
       }
       break;
