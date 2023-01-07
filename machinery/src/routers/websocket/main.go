@@ -135,7 +135,7 @@ logreader:
 
 		var mat gocv.Mat
 		var encodedImage string
-		if cursor != nil {
+		if cursor != nil && decoder != nil {
 			pkt, err := cursor.ReadPacket()
 			if err == nil {
 				if !pkt.IsKeyFrame {
