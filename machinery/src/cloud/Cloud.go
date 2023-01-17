@@ -19,15 +19,13 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	av "github.com/kerberos-io/joy4/av"
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
-	"gocv.io/x/gocv"
 
 	"net/http"
 	"net/url"
-	"runtime"
-	"runtime/debug"
 	"strconv"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -285,15 +283,12 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 }
 
 func sendImage(topic string, mqttClient mqtt.Client, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
-	mat := computervision.GetRGBImage(pkt, decoder, decoderMutex)
-	buffer, err := gocv.IMEncode(gocv.JPEGFileExt, mat)
-	mat.Close()
+	img, err := capture.DecodeImage(pkt, decoder, decoderMutex)
 	if err == nil {
-		encoded := base64.StdEncoding.EncodeToString(buffer.GetBytes())
+		bytes, _ := computervision.ToBytes(img.Image)
+		encoded := base64.StdEncoding.EncodeToString(bytes)
 		mqttClient.Publish(topic, 0, false, encoded)
 	}
-	runtime.GC()
-	debug.FreeOSMemory()
 }
 
 func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, codecs []av.CodecData, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {

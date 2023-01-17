@@ -1,7 +1,9 @@
 package computervision
 
 import (
+	"bytes"
 	"image"
+	"image/jpeg"
 	"io/ioutil"
 	"os"
 	"runtime"
@@ -83,6 +85,12 @@ func ToGray(rgb gocv.Mat) (gocv.Mat, error) {
 	gocv.CvtColor(rgb, &gray, gocv.ColorBGRToGray)
 	rgb.Close()
 	return gray, nil
+}
+
+func ToBytes(img image.YCbCr) ([]byte, error) {
+	buffer := new(bytes.Buffer)
+	err := jpeg.Encode(buffer, &img, &jpeg.Options{Quality: 100})
+	return buffer.Bytes(), err
 }
 
 func ToRGB8(img image.YCbCr) (gocv.Mat, error) {

@@ -9,10 +9,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"gocv.io/x/gocv"
 )
 
 type Message struct {
@@ -132,8 +132,6 @@ func ForwardSDStream(ctx context.Context, clientID string, connection *Connectio
 
 logreader:
 	for {
-
-		var mat gocv.Mat
 		var encodedImage string
 		if cursor != nil && decoder != nil {
 			pkt, err := cursor.ReadPacket()
@@ -141,11 +139,10 @@ logreader:
 				if !pkt.IsKeyFrame {
 					continue
 				}
-				mat = computervision.GetRGBImage(pkt, decoder, decoderMutex)
-				buffer, err := gocv.IMEncode(gocv.JPEGFileExt, mat)
-				mat.Close()
+				img, err := capture.DecodeImage(pkt, decoder, decoderMutex)
 				if err == nil {
-					encodedImage = base64.StdEncoding.EncodeToString(buffer.GetBytes())
+					bytes, _ := computervision.ToBytes(img.Image)
+					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				}
 			} else {
 				log.Log.Error("ForwardSDStream:" + err.Error())
