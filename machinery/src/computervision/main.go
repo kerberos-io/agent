@@ -3,13 +3,12 @@ package computervision
 import (
 	"bytes"
 	"image"
+	"image/draw"
 	"image/jpeg"
 	"io/ioutil"
+	"math"
 	"os"
-	"runtime"
-	"runtime/debug"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -22,92 +21,40 @@ import (
 	geo "github.com/kellydunn/golang-geo"
 	"github.com/kerberos-io/joy4/av"
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
-	"gocv.io/x/gocv"
 )
 
-func GetRGBImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) gocv.Mat {
-	var rgb gocv.Mat
-	img, err := capture.DecodeImage(pkt, dec, decoderMutex)
-	if err == nil && img != nil {
-		rgb, _ = ToRGB8(img.Image)
-		gocv.Resize(rgb, &rgb, image.Pt(rgb.Cols()/4, rgb.Rows()/4), 0, 0, gocv.InterpolationArea)
-	}
-	return rgb
+func GetImageImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (image.YCbCr, error) {
+	rgb, err := capture.DecodeImage(pkt, dec, decoderMutex)
+	return rgb.Image, err
 }
 
-func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) gocv.Mat {
-	var rgb gocv.Mat
-	img, err := capture.DecodeImage(pkt, dec, decoderMutex)
-
-	if err == nil && img != nil {
-
-		// Check if we need to scale down.
-		width := img.Width()
-		height := img.Height()
-		newWidth := width
-		newHeight := height
-
-		// Try minify twice.
-		scaleFactor := 1.0
-		if newWidth > 800 {
-			newWidth = width / 2
-			newHeight = height / 2
-			scaleFactor *= 2
-		}
-		if newWidth > 800 {
-			newWidth = width / 2
-			newHeight = height / 2
-			scaleFactor *= 2
-		}
-		if newWidth > 800 {
-			newWidth = width / 2
-			newHeight = height / 2
-			scaleFactor *= 2
-		}
-
-		im := img.Image
-		bounds := im.Bounds()
-		x := bounds.Dx()
-		y := bounds.Dy()
-		if x > 0 && y > 0 {
-			rgb, _ = ToRGB8(im)
-			img.Free()
-			if scaleFactor > 1 {
-				gocv.Resize(rgb, &rgb, image.Pt(newWidth, newHeight), 0, 0, gocv.InterpolationArea)
-			}
+func ImageThreshold(img *image.Gray, threshold uint8) *image.Gray {
+	for i := 0; i < len(img.Pix); i++ {
+		if img.Pix[i] < threshold {
+			img.Pix[i] = 0
+		} else {
+			img.Pix[i] = 255
 		}
 	}
-	return rgb
+	return img
 }
 
-func ToGray(rgb gocv.Mat) (gocv.Mat, error) {
-	gray := gocv.NewMat()
-	gocv.CvtColor(rgb, &gray, gocv.ColorBGRToGray)
-	rgb.Close()
-	return gray, nil
+func ImageToGray(img image.YCbCr) *image.Gray {
+	result := image.NewGray(img.Bounds())
+	draw.Draw(result, result.Bounds(), &img, img.Bounds().Min, draw.Src)
+	return result
 }
 
-func ToBytes(img image.YCbCr) ([]byte, error) {
+func ToBytes(img *image.Gray) ([]byte, error) {
 	buffer := new(bytes.Buffer)
-	err := jpeg.Encode(buffer, &img, &jpeg.Options{Quality: 100})
+	err := jpeg.Encode(buffer, img, &jpeg.Options{Quality: 100})
 	return buffer.Bytes(), err
 }
 
-func ToRGB8(img image.YCbCr) (gocv.Mat, error) {
-	bounds := img.Bounds()
-	x := bounds.Dx()
-	y := bounds.Dy()
-	bytes := make([]byte, 0, x*y*3)
-	for j := bounds.Min.Y; j < bounds.Max.Y; j++ {
-		for i := bounds.Min.X; i < bounds.Max.X; i++ {
-			iy := img.At(i, j)
-			if iy != nil {
-				r, g, b, _ := iy.RGBA()
-				bytes = append(bytes, byte(b>>8), byte(g>>8), byte(r>>8))
-			}
-		}
-	}
-	return gocv.NewMatFromBytes(y, x, gocv.MatTypeCV8UC3, bytes)
+func ImageToBytes(img image.YCbCr) ([]byte, error) {
+	buffer := new(bytes.Buffer)
+	err := jpeg.Encode(buffer, &img, &jpeg.Options{Quality: 100})
+	return buffer.Bytes(), err
 }
 
 func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) { //, wg *sync.WaitGroup) {
@@ -128,7 +75,9 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 		key := config.HubKey
 
 		// Initialise first 2 elements
-		var matArray [3]*gocv.Mat
+		//var matArray [3]*gocv.Mat
+		var imageArray [3]*image.Gray
+
 		j := 0
 
 		//for pkt := range packets {
@@ -139,17 +88,22 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 			pkt, cursorError = motionCursor.ReadPacket()
 			// Check If valid package.
 			if len(pkt.Data) > 0 && pkt.IsKeyFrame {
-				rgb := GetImage(pkt, decoder, decoderMutex)
-				gray, _ := ToGray(rgb)
-				matArray[j] = &gray
-				j++
+				rgbImage, err := GetImageImage(pkt, decoder, decoderMutex)
+				if err == nil {
+					grayImage := ImageToGray(rgbImage)
+					imageArray[j] = grayImage
+					//rgb := GetImage(pkt, decoder, decoderMutex)
+					//gray, _ := ToGray(rgb)
+					//matArray[j] = &gray
+					j++
+				}
 			}
 			if j == 2 {
 				break
 			}
 		}
 
-		img := matArray[0]
+		img := imageArray[0]
 		if img != nil {
 
 			// Calculate mask
@@ -168,8 +122,9 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				polyObjects = append(polyObjects, poly)
 			}
 
-			rows := img.Rows()
-			cols := img.Cols()
+			bounds := img.Bounds()
+			rows := bounds.Dx()
+			cols := bounds.Dy()
 			var coordinatesToCheck [][]int
 			for y := 0; y < rows; y++ {
 				for x := 0; x < cols; x++ {
@@ -195,9 +150,14 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					continue
 				}
 
-				rgb := GetImage(pkt, decoder, decoderMutex)
-				gray, _ := ToGray(rgb)
-				matArray[2] = &gray
+				//rgb := GetImage(pkt, decoder, decoderMutex)
+				//gray, _ := ToGray(rgb)
+				//matArray[2] = &gray
+				rgbImage, err := GetImageImage(pkt, decoder, decoderMutex)
+				if err == nil {
+					grayImage := ImageToGray(rgbImage)
+					imageArray[2] = grayImage
+				}
 
 				// Store snapshots (jpg) or hull.
 				files, err := ioutil.ReadDir("./data/snapshots")
@@ -209,10 +169,14 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 						os.Remove("./data/snapshots/" + files[0].Name())
 					}
 				}
-				t := strconv.FormatInt(time.Now().Unix(), 10)
-				snapshotRGB := GetImage(pkt, decoder, decoderMutex)
-				gocv.IMWrite("./data/snapshots/"+t+".png", snapshotRGB)
-				snapshotRGB.Close()
+
+				// Todo snapshot
+				//rgbImage, err := GetImageImage(pkt, decoder, decoderMutex)
+
+				//t := strconv.FormatInt(time.Now().Unix(), 10)
+				//snapshotRGB := GetImage(pkt, decoder, decoderMutex)
+				//gocv.IMWrite("./data/snapshots/"+t+".png", snapshotRGB)
+				//snapshotRGB.Close()
 
 				// Check if continuous recording.
 				if config.Capture.Continuous == "true" {
@@ -246,7 +210,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					}
 
 					// Remember additional information about the result of findmotion
-					isPixelChangeThresholdReached, changesToReturn = FindMotion(matArray, coordinatesToCheck, config.Capture.PixelChangeThreshold)
+					isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, config.Capture.PixelChangeThreshold)
 
 					if detectMotion && isPixelChangeThresholdReached {
 
@@ -263,61 +227,99 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					}
 				}
 
-				matArray[0].Close()
-				matArray[0] = matArray[1]
-				matArray[1] = matArray[2]
+				imageArray[0] = imageArray[1]
+				imageArray[1] = imageArray[2]
 				i++
-				runtime.GC()
-				debug.FreeOSMemory()
+			}
+
+			if img != nil {
+				img = nil
 			}
 		}
-		if img != nil {
-			img.Close()
-		}
-		runtime.GC()
-		debug.FreeOSMemory()
 	}
 
 	log.Log.Debug("ProcessMotion: finished")
 }
 
-func FindMotion(matArray [3]*gocv.Mat, coordinatesToCheck [][]int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {
+func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck [][]int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {
 
-	h1 := gocv.NewMat()
-	gocv.AbsDiff(*matArray[2], *matArray[0], &h1)
-	h2 := gocv.NewMat()
-	gocv.AbsDiff(*matArray[2], *matArray[1], &h2)
+	image1 := imageArray[0]
+	image2 := imageArray[1]
+	image3 := imageArray[2]
 
-	and := gocv.NewMat()
-	gocv.BitwiseAnd(h1, h2, &and)
-	h1.Close()
-	h2.Close()
+	// Calculate the absolute difference between the first and second image.
+	diff1 := AbsDiff(image3, image1)
+	diff2 := AbsDiff(image3, image2)
 
-	thresh := gocv.NewMat()
-	gocv.Threshold(and, &thresh, 30.0, 255.0, gocv.ThresholdBinary)
-	and.Close()
+	// Calculate the bitwise AND between the first and second image.
+	and := BitwiseAnd(diff1, diff2)
 
-	kernel := gocv.GetStructuringElement(gocv.MorphRect, image.Pt(3, 3))
-	eroded := gocv.NewMat()
-	gocv.Erode(thresh, &eroded, kernel)
-	thresh.Close()
-	kernel.Close()
+	// Do threshold§
+	threshold := Threshold(and, 30)
+
+	// Erode and dilate the image to remove noise.
+	erode := Erode(threshold, 3)
 
 	changes := 0
 	for _, c := range coordinatesToCheck {
-		value := eroded.GetUCharAt(c[1], c[0])
+		pixel := c[0] + c[1]*erode.Stride
+		value := erode.Pix[pixel]
 		if value > 0 {
 			changes++
 		}
 	}
-	eroded.Close()
 
-	log.Log.Info("FindMotion: Number of changes detected:" + strconv.Itoa(changes))
+	return changes > pixelChangeThreshold, changes
+}
 
-	if pixelChangeThreshold == 0 {
-		pixelChangeThreshold = 75 // Keep hardcoded value of 75 for now if no value is given for changes treshold in config.json
+func Threshold(img image.Gray, threshold int) (thresholded image.Gray) {
+	thresholded = image.Gray{
+		Pix:    make([]uint8, len(img.Pix)),
+		Stride: img.Stride,
+		Rect:   img.Rect,
 	}
+	for i := 0; i < len(img.Pix); i++ {
+		if int(img.Pix[i]) > threshold {
+			thresholded.Pix[i] = 255
+		} else {
+			thresholded.Pix[i] = 0
+		}
+	}
+	return thresholded
+}
 
-	changesDetected = changes                              // Assign final amount of changes to the return variable
-	return changes > pixelChangeThreshold, changesDetected // Return bool ifReachedThreshold AND the amount of changes detected in total
+func AbsDiff(img1 *image.Gray, img2 *image.Gray) (diff image.Gray) {
+	diff = image.Gray{
+		Pix:    make([]uint8, len(img1.Pix)),
+		Stride: img1.Stride,
+		Rect:   img1.Rect,
+	}
+	for i := 0; i < len(img1.Pix); i++ {
+		diff.Pix[i] = uint8(math.Abs(float64(img1.Pix[i]) - float64(img2.Pix[i])))
+	}
+	return diff
+}
+
+func BitwiseAnd(img1 image.Gray, img2 image.Gray) (and image.Gray) {
+	and = image.Gray{
+		Pix:    make([]uint8, len(img1.Pix)),
+		Stride: img1.Stride,
+		Rect:   img1.Rect,
+	}
+	for i := 0; i < len(img1.Pix); i++ {
+		and.Pix[i] = img1.Pix[i] & img2.Pix[i]
+	}
+	return and
+}
+
+func Erode(img image.Gray, kernelSize int) (eroded image.Gray) {
+	eroded = image.Gray{
+		Pix:    make([]uint8, len(img.Pix)),
+		Stride: img.Stride,
+		Rect:   img.Rect,
+	}
+	for i := 0; i < len(img.Pix); i++ {
+		eroded.Pix[i] = img.Pix[i]
+	}
+	return eroded
 }

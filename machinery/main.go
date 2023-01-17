@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -33,11 +32,6 @@ func main() {
 	case "discover":
 		timeout := os.Args[2]
 		fmt.Println(timeout)
-
-	case "usbcamera-test":
-
-		deviceID := os.Args[2]
-		capture.TestUSBCamera(deviceID)
 
 	case "run":
 		{
