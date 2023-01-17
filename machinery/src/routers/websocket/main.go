@@ -141,7 +141,8 @@ logreader:
 				}
 				img, err := capture.DecodeImage(pkt, decoder, decoderMutex)
 				if err == nil {
-					bytes, _ := computervision.ImageToBytes(img.Image)
+					resizeImage := computervision.ResizeDownscaleImage(img.Image, 4)
+					bytes, _ := computervision.ImageToBytes(resizeImage)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				}
 			} else {

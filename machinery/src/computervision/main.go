@@ -3,14 +3,16 @@ package computervision
 import (
 	"bytes"
 	"image"
-	"image/draw"
 	"image/jpeg"
 	"io/ioutil"
 	"math"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
+
+	"golang.org/x/image/draw"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/kerberos-io/agent/machinery/src/capture"
@@ -23,37 +25,38 @@ import (
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 )
 
-func GetImageImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (image.YCbCr, error) {
+func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (image.YCbCr, error) {
 	rgb, err := capture.DecodeImage(pkt, dec, decoderMutex)
 	return rgb.Image, err
-}
-
-func ImageThreshold(img *image.Gray, threshold uint8) *image.Gray {
-	for i := 0; i < len(img.Pix); i++ {
-		if img.Pix[i] < threshold {
-			img.Pix[i] = 0
-		} else {
-			img.Pix[i] = 255
-		}
-	}
-	return img
 }
 
 func ImageToGray(img image.YCbCr) *image.Gray {
 	result := image.NewGray(img.Bounds())
 	draw.Draw(result, result.Bounds(), &img, img.Bounds().Min, draw.Src)
+
+	// Scale the image to 1/4 of its original size.
+	scaledImage := image.NewGray(image.Rect(0, 0, result.Bounds().Dx()/4, result.Bounds().Dy()/4))
+	draw.CatmullRom.Scale(scaledImage, scaledImage.Bounds(), result, result.Bounds(), draw.Over, nil)
 	return result
 }
 
-func ToBytes(img *image.Gray) ([]byte, error) {
-	buffer := new(bytes.Buffer)
-	err := jpeg.Encode(buffer, img, &jpeg.Options{Quality: 100})
-	return buffer.Bytes(), err
+func ResizeImage(img image.YCbCr, width int, height int) image.Image {
+	scaledImage := image.NewRGBA(image.Rect(0, 0, width, height))
+	draw.CatmullRom.Scale(scaledImage, scaledImage.Bounds(), &img, img.Bounds(), draw.Over, nil)
+	return scaledImage
 }
 
-func ImageToBytes(img image.YCbCr) ([]byte, error) {
+func ResizeDownscaleImage(img image.YCbCr, dxy int) image.Image {
+	width := img.Bounds().Dx()
+	height := img.Bounds().Dy()
+	scaledImage := image.NewRGBA(image.Rect(0, 0, width/dxy, height/dxy))
+	draw.BiLinear.Scale(scaledImage, scaledImage.Bounds(), &img, img.Bounds(), draw.Over, nil)
+	return scaledImage
+}
+
+func ImageToBytes(img image.Image) ([]byte, error) {
 	buffer := new(bytes.Buffer)
-	err := jpeg.Encode(buffer, &img, &jpeg.Options{Quality: 100})
+	err := jpeg.Encode(buffer, img, &jpeg.Options{Quality: 40})
 	return buffer.Bytes(), err
 }
 
@@ -88,7 +91,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 			pkt, cursorError = motionCursor.ReadPacket()
 			// Check If valid package.
 			if len(pkt.Data) > 0 && pkt.IsKeyFrame {
-				rgbImage, err := GetImageImage(pkt, decoder, decoderMutex)
+				rgbImage, err := GetImage(pkt, decoder, decoderMutex)
 				if err == nil {
 					grayImage := ImageToGray(rgbImage)
 					imageArray[j] = grayImage
@@ -153,7 +156,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				//rgb := GetImage(pkt, decoder, decoderMutex)
 				//gray, _ := ToGray(rgb)
 				//matArray[2] = &gray
-				rgbImage, err := GetImageImage(pkt, decoder, decoderMutex)
+				rgbImage, err := GetImage(pkt, decoder, decoderMutex)
 				if err == nil {
 					grayImage := ImageToGray(rgbImage)
 					imageArray[2] = grayImage
@@ -168,16 +171,17 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					if len(files) > 3 {
 						os.Remove("./data/snapshots/" + files[0].Name())
 					}
+
+					// Rescale image
+					scaledImage := ResizeDownscaleImage(rgbImage, 4)
+					// Save image
+					t := strconv.FormatInt(time.Now().Unix(), 10)
+					f, err := os.Create("./data/snapshots/" + t + ".jpg")
+					if err == nil {
+						jpeg.Encode(f, scaledImage, nil)
+						f.Close()
+					}
 				}
-
-				// Todo snapshot
-				//rgbImage, err := GetImageImage(pkt, decoder, decoderMutex)
-
-				//t := strconv.FormatInt(time.Now().Unix(), 10)
-				//snapshotRGB := GetImage(pkt, decoder, decoderMutex)
-				//gocv.IMWrite("./data/snapshots/"+t+".png", snapshotRGB)
-				//snapshotRGB.Close()
-
 				// Check if continuous recording.
 				if config.Capture.Continuous == "true" {
 
