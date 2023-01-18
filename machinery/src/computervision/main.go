@@ -43,7 +43,6 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 		key := config.HubKey
 
 		// Initialise first 2 elements
-		//var matArray [3]*gocv.Mat
 		var imageArray [3]*image.Gray
 
 		j := 0
@@ -57,7 +56,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 			if len(pkt.Data) > 0 && pkt.IsKeyFrame {
 				grayImage, err := GetImage(pkt, decoder, decoderMutex)
 				if err == nil {
-					imageArray[j] = &grayImage
+					imageArray[j] = grayImage
 					j++
 				}
 			}
@@ -118,7 +117,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				//matArray[2] = &gray
 				grayImage, err := GetImage(pkt, decoder, decoderMutex)
 				if err == nil {
-					imageArray[2] = &grayImage
+					imageArray[2] = grayImage
 				}
 
 				// Store snapshots (jpg) or hull.
@@ -135,58 +134,49 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					t := strconv.FormatInt(time.Now().Unix(), 10)
 					f, err := os.Create("./data/snapshots/" + t + ".jpg")
 					if err == nil {
-						jpeg.Encode(f, &grayImage, nil)
+						jpeg.Encode(f, grayImage, nil)
 						f.Close()
 					}
 				}
 
-				// Check if continuous recording.
-				if config.Capture.Continuous == "true" {
+				// Check if within time interval
+				detectMotion := true
+				now := time.Now().In(loc)
+				weekday := now.Weekday()
+				hour := now.Hour()
+				minute := now.Minute()
+				second := now.Second()
+				timeInterval := config.Timetable[int(weekday)]
+				if timeInterval != nil {
+					start1 := timeInterval.Start1
+					end1 := timeInterval.End1
+					start2 := timeInterval.Start2
+					end2 := timeInterval.End2
+					currentTimeInSeconds := hour*60*60 + minute*60 + second
+					if (currentTimeInSeconds >= start1 && currentTimeInSeconds <= end1) ||
+						(currentTimeInSeconds >= start2 && currentTimeInSeconds <= end2) {
 
-					// Do not do anything! Just sleep as there is no
-					// motion detection needed
+					} else {
+						detectMotion = false
+						log.Log.Debug("ProcessMotion: Time interval not valid, disabling motion detection.")
+					}
+				}
 
-				} else { // Do motion detection.
+				// Remember additional information about the result of findmotion
+				isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, config.Capture.PixelChangeThreshold)
 
-					// Check if within time interval
-					detectMotion := true
-					now := time.Now().In(loc)
-					weekday := now.Weekday()
-					hour := now.Hour()
-					minute := now.Minute()
-					second := now.Second()
-					timeInterval := config.Timetable[int(weekday)]
-					if timeInterval != nil {
-						start1 := timeInterval.Start1
-						end1 := timeInterval.End1
-						start2 := timeInterval.Start2
-						end2 := timeInterval.End2
-						currentTimeInSeconds := hour*60*60 + minute*60 + second
-						if (currentTimeInSeconds >= start1 && currentTimeInSeconds <= end1) ||
-							(currentTimeInSeconds >= start2 && currentTimeInSeconds <= end2) {
+				if detectMotion && isPixelChangeThresholdReached {
 
-						} else {
-							detectMotion = false
-							log.Log.Debug("ProcessMotion: Time interval not valid, disabling motion detection.")
-						}
+					if mqttClient != nil {
+						mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
 					}
 
-					// Remember additional information about the result of findmotion
-					isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, config.Capture.PixelChangeThreshold)
-
-					if detectMotion && isPixelChangeThresholdReached {
-
-						if mqttClient != nil {
-							mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
-						}
-
-						//FIXME: In the future MotionDataPartial should be replaced with MotionDataFull
-						dataToPass := models.MotionDataPartial{
-							Timestamp:       time.Now().Unix(),
-							NumberOfChanges: changesToReturn,
-						}
-						communication.HandleMotion <- dataToPass //Save data to the channel
+					//FIXME: In the future MotionDataPartial should be replaced with MotionDataFull
+					dataToPass := models.MotionDataPartial{
+						Timestamp:       time.Now().Unix(),
+						NumberOfChanges: changesToReturn,
 					}
+					communication.HandleMotion <- dataToPass //Save data to the channel
 				}
 
 				imageArray[0] = imageArray[1]
@@ -234,9 +224,9 @@ func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck [][]int, pixelChan
 	return changes > pixelChangeThreshold, changes
 }
 
-func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (image.Gray, error) {
-	rgb, err := capture.DecodeImage(pkt, dec, decoderMutex)
-	return rgb.ImageGray, err
+func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*image.Gray, error) {
+	img, err := capture.DecodeImage(pkt, dec, decoderMutex)
+	return &img.ImageGray, err
 }
 
 func ResizeImage(img image.Image, width int, height int) *image.NRGBA {

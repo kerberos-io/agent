@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -139,10 +138,9 @@ logreader:
 				if !pkt.IsKeyFrame {
 					continue
 				}
-				img, err := capture.DecodeImage(pkt, decoder, decoderMutex)
+				img, err := computervision.GetImage(pkt, decoder, decoderMutex)
 				if err == nil {
-					resizeImage := computervision.ResizeDownscaleImage(&img.ImageGray, 4)
-					bytes, _ := computervision.ImageToBytes(resizeImage)
+					bytes, _ := computervision.ImageToBytes(img)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				}
 			} else {

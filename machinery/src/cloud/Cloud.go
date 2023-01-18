@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -283,10 +282,9 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 }
 
 func sendImage(topic string, mqttClient mqtt.Client, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
-	img, err := capture.DecodeImage(pkt, decoder, decoderMutex)
+	img, err := computervision.GetImage(pkt, decoder, decoderMutex)
 	if err == nil {
-		resizeImage := computervision.ResizeDownscaleImage(&img.ImageGray, 4)
-		bytes, _ := computervision.ImageToBytes(resizeImage)
+		bytes, _ := computervision.ImageToBytes(img)
 		encoded := base64.StdEncoding.EncodeToString(bytes)
 		mqttClient.Publish(topic, 0, false, encoded)
 	}
