@@ -1,4 +1,4 @@
-FROM kerberos/base:4281f79 AS builder
+FROM kerberos/base:4af6579 AS builder
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
@@ -50,7 +50,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/ui && yarn && yarn build
 
 RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go mod download && \
-	go build main.go && \
+	go build -tags static --ldflags '-extldflags "-static"' main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv www /agent && \
@@ -74,43 +74,6 @@ RUN cp -r /agent ./
 # This will collect dependent libraries so they're later copied to the final image.
 
 RUN /agent/main version
-RUN ldd /agent/main | tr -s '[:blank:]' '\n'
-RUN ldd /agent/main | tr -s '[:blank:]' '\n' | grep '^/' | \
-	xargs -I % sh -c 'mkdir -p $(dirname ./%); cp % ./%;'
-
-##########################################################
-# LDD doesnt always work in docker buildx (no idea why..)
-# Therefore we are moving some libraries manually
-
-RUN mkdir -p ./usr/lib
-
-RUN [ -f /lib64/ld-linux-x86-64.so.2 ] && $(mkdir -p lib64 && \
-	cp /lib64/ld-linux-x86-64.so.2 lib64/) || echo "nothing to do here x86"
-
-RUN [ -f /lib/ld-linux-aarch64.so.1 ] && $(mkdir -p lib/aarch64-linux-gnu && \
-	cp /lib/ld-linux-aarch64.so.1 lib/ && \
-	cp /lib/aarch64-linux-gnu/lib* lib/aarch64-linux-gnu/ && \
-	cp /usr/lib/aarch64-linux-gnu/libopencv* usr/lib && \
-	cp /usr/lib/aarch64-linux-gnu/libstdc* usr/lib && \
-	cp /usr/lib/aarch64-linux-gnu/libx264* usr/lib ) || echo "nothing to do here arm64"
-
-RUN [ -f /usr/lib/arm-linux-gnueabihf/vfp/neon/libvpx.so.6 ] && \ 
-	$(cp /usr/lib/arm-linux-gnueabihf/vfp/neon/libvpx.so.6 ./usr/lib/) || echo "nothing to do here armv7"
-
-RUN cp -r /usr/local/lib/libavcodec* ./usr/lib && \
-	cp -r /usr/local/lib/libavformat* ./usr/lib && \
-	cp -r /usr/local/lib/libavfilter* ./usr/lib && \
-	cp -r /usr/local/lib/libavutil* ./usr/lib && \
-	cp -r /usr/local/lib/libavresample* ./usr/lib && \
-	cp -r /usr/local/lib/libavdevice* ./usr/lib && \
-	cp -r /usr/local/lib/libswscale* ./usr/lib && \
-	cp -r /usr/local/lib/libswresample* ./usr/lib && \
-	cp -r /usr/local/lib/libpostproc* ./usr/lib
-
-# As mentioned before, above is really a hack as LDD
-# doesn't work always in docker buildx. You might not need this 
-# when doing a local build.
-################################################################
 
 FROM alpine:latest
 
