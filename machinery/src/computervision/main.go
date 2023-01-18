@@ -194,19 +194,19 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 
 func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck [][]int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {
 
-	image1 := imageArray[0]
+	//image1 := imageArray[0]
 	image2 := imageArray[1]
 	image3 := imageArray[2]
 
 	// Calculate the absolute difference between the first and second image.
-	diff1 := AbsDiff(image3, image1)
+	//diff1 := AbsDiff(image3, image1)
 	diff2 := AbsDiff(image3, image2)
 
 	// Calculate the bitwise AND between the first and second image.
-	and := BitwiseAnd(diff1, diff2)
+	//and := BitwiseAnd(diff1, diff2)
 
 	// Do threshold§
-	threshold := Threshold(and, 30)
+	threshold := Threshold(diff2, 30)
 
 	// Erode and dilate the image to remove noise.
 	erode := Erode(threshold, 3)

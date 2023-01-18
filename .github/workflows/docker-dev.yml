@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        architecture: [arm64, arm/v7]
+        architecture: [arm64, arm/v7, arm/v5, arm/v6]
     steps:
     - name: Login to DockerHub
       uses: docker/login-action@v2
