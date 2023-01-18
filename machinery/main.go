@@ -10,10 +10,45 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/routers"
 	"github.com/kerberos-io/agent/machinery/src/utils"
+	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
+	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 )
+
+func enableDebugging() {
+	if os.Getenv("DATADOG_AGENT_ENABLED") == "true" {
+
+		service := os.Getenv("DATADOG_AGENT_SERVICE")
+		environment := os.Getenv("DATADOG_AGENT_ENVIRONMENT")
+
+		rules := []tracer.SamplingRule{tracer.RateRule(1)}
+		tracer.Start(
+			tracer.WithSamplingRules(rules),
+			tracer.WithService(service),
+			tracer.WithEnv(environment),
+		)
+		defer tracer.Stop()
+
+		err := profiler.Start(
+			profiler.WithService(service),
+			profiler.WithEnv(environment),
+			profiler.WithProfileTypes(
+				profiler.CPUProfile,
+				profiler.HeapProfile,
+			),
+		)
+		if err != nil {
+			log.Log.Fatal(err.Error())
+		}
+		defer profiler.Stop()
+	}
+}
 
 func main() {
 
+	// You might be interested in debugging the agent.
+	enableDebugging()
+
+	// Start the show ;)
 	const VERSION = "3.0"
 	action := os.Args[1]
 
