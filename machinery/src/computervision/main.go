@@ -14,7 +14,6 @@ import (
 
 	"github.com/disintegration/imaging"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/h2non/bimg"
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -239,10 +238,6 @@ func ResizeDownscaleImage(img image.Image, dxy int) *image.NRGBA {
 	height := img.Bounds().Dy()
 	dstImage128 := imaging.Resize(img, width/dxy, height/dxy, imaging.NearestNeighbor)
 	return dstImage128
-}
-
-func ResizeDownscaleBytes(buf *bytes.Buffer, originalWidth int, originalHeight int, dxy int) ([]byte, error) {
-	return bimg.NewImage(buf.Bytes()).Resize(originalWidth/dxy, originalHeight/dxy)
 }
 
 func ImageToBytes(img image.Image) ([]byte, error) {
