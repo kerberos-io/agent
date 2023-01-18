@@ -14,12 +14,13 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 )
 
-func enableDebugging() {
-	if os.Getenv("DATADOG_AGENT_ENABLED") == "true" {
+func main() {
 
+	// You might be interested in debugging the agent.
+	if os.Getenv("DATADOG_AGENT_ENABLED") == "true" {
 		service := os.Getenv("DATADOG_AGENT_SERVICE")
 		environment := os.Getenv("DATADOG_AGENT_ENVIRONMENT")
-
+		fmt.Println("Starting Datadog Agent with service: " + service + " and environment: " + environment)
 		rules := []tracer.SamplingRule{tracer.RateRule(1)}
 		tracer.Start(
 			tracer.WithSamplingRules(rules),
@@ -27,7 +28,6 @@ func enableDebugging() {
 			tracer.WithEnv(environment),
 		)
 		defer tracer.Stop()
-
 		err := profiler.Start(
 			profiler.WithService(service),
 			profiler.WithEnv(environment),
@@ -41,12 +41,6 @@ func enableDebugging() {
 		}
 		defer profiler.Stop()
 	}
-}
-
-func main() {
-
-	// You might be interested in debugging the agent.
-	enableDebugging()
 
 	// Start the show ;)
 	const VERSION = "3.0"
