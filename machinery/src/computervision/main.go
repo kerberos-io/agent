@@ -14,6 +14,7 @@ import (
 
 	"github.com/disintegration/imaging"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/h2non/bimg"
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -43,11 +44,10 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 
 		// Initialise first 2 elements
 		//var matArray [3]*gocv.Mat
-		var imageArray [3]*image.NRGBA
+		var imageArray [3]*image.Gray
 
 		j := 0
 
-		//for pkt := range packets {
 		var cursorError error
 		var pkt av.Packet
 
@@ -55,13 +55,9 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 			pkt, cursorError = motionCursor.ReadPacket()
 			// Check If valid package.
 			if len(pkt.Data) > 0 && pkt.IsKeyFrame {
-				rgbImage, err := GetImage(pkt, decoder, decoderMutex)
+				grayImage, err := GetImage(pkt, decoder, decoderMutex)
 				if err == nil {
-					grayImage := ImageToGray(&rgbImage)
-					imageArray[j] = grayImage
-					//rgb := GetImage(pkt, decoder, decoderMutex)
-					//gray, _ := ToGray(rgb)
-					//matArray[j] = &gray
+					imageArray[j] = &grayImage
 					j++
 				}
 			}
@@ -120,10 +116,9 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				//rgb := GetImage(pkt, decoder, decoderMutex)
 				//gray, _ := ToGray(rgb)
 				//matArray[2] = &gray
-				rgbImage, err := GetImage(pkt, decoder, decoderMutex)
+				grayImage, err := GetImage(pkt, decoder, decoderMutex)
 				if err == nil {
-					grayImage := ImageToGray(&rgbImage)
-					imageArray[2] = grayImage
+					imageArray[2] = &grayImage
 				}
 
 				// Store snapshots (jpg) or hull.
@@ -140,10 +135,11 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					t := strconv.FormatInt(time.Now().Unix(), 10)
 					f, err := os.Create("./data/snapshots/" + t + ".jpg")
 					if err == nil {
-						jpeg.Encode(f, &rgbImage, nil)
+						jpeg.Encode(f, &grayImage, nil)
 						f.Close()
 					}
 				}
+
 				// Check if continuous recording.
 				if config.Capture.Continuous == "true" {
 
@@ -207,7 +203,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 	log.Log.Debug("ProcessMotion: finished")
 }
 
-func FindMotion(imageArray [3]*image.NRGBA, coordinatesToCheck [][]int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {
+func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck [][]int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {
 
 	image1 := imageArray[0]
 	image2 := imageArray[1]
@@ -238,29 +234,25 @@ func FindMotion(imageArray [3]*image.NRGBA, coordinatesToCheck [][]int, pixelCha
 	return changes > pixelChangeThreshold, changes
 }
 
-func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (image.YCbCr, error) {
+func GetImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (image.Gray, error) {
 	rgb, err := capture.DecodeImage(pkt, dec, decoderMutex)
-	return rgb.Image, err
-}
-
-func ImageToGray(img image.Image) *image.NRGBA {
-	// Convert the image to grayscale.
-	gray := imaging.Grayscale(img)
-	// Resize image
-	scaled := ResizeDownscaleImage(gray, 4)
-	return scaled
+	return rgb.ImageGray, err
 }
 
 func ResizeImage(img image.Image, width int, height int) *image.NRGBA {
-	scaledImage := imaging.Resize(img, width, height, imaging.Linear)
+	scaledImage := imaging.Resize(img, width, height, imaging.NearestNeighbor)
 	return scaledImage
 }
 
 func ResizeDownscaleImage(img image.Image, dxy int) *image.NRGBA {
 	width := img.Bounds().Dx()
 	height := img.Bounds().Dy()
-	dstImage128 := imaging.Resize(img, width/dxy, height/dxy, imaging.Linear)
+	dstImage128 := imaging.Resize(img, width/dxy, height/dxy, imaging.NearestNeighbor)
 	return dstImage128
+}
+
+func ResizeDownscaleBytes(buf *bytes.Buffer, originalWidth int, originalHeight int, dxy int) ([]byte, error) {
+	return bimg.NewImage(buf.Bytes()).Resize(originalWidth/dxy, originalHeight/dxy)
 }
 
 func ImageToBytes(img image.Image) ([]byte, error) {
@@ -285,7 +277,7 @@ func Threshold(img image.Gray, threshold int) (thresholded image.Gray) {
 	return thresholded
 }
 
-func AbsDiff(img1 *image.NRGBA, img2 *image.NRGBA) (diff image.Gray) {
+func AbsDiff(img1 *image.Gray, img2 *image.Gray) (diff image.Gray) {
 	diff = image.Gray{
 		Pix:    make([]uint8, len(img1.Pix)),
 		Stride: img1.Stride,

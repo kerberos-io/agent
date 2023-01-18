@@ -2,6 +2,8 @@ module github.com/kerberos-io/agent/machinery
 
 go 1.18
 
+//replace github.com/kerberos-io/joy4 v1.0.33 => ../../../../github.com/kerberos-io/joy4
+
 require (
 	github.com/InVisionApp/conjungo v1.1.0
 	github.com/appleboy/gin-jwt/v2 v2.9.1
@@ -16,8 +18,9 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/golang-module/carbon/v2 v2.2.3
 	github.com/gorilla/websocket v1.5.0
+	github.com/h2non/bimg v1.1.9
 	github.com/kellydunn/golang-geo v0.7.0
-	github.com/kerberos-io/joy4 v1.0.33
+	github.com/kerberos-io/joy4 v1.0.34
 	github.com/kerberos-io/onvif v0.0.4
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/nsmith5/mjpeg v0.0.0-20200913181537-54b8ada0e53e
@@ -29,7 +32,6 @@ require (
 	github.com/swaggo/gin-swagger v1.5.3
 	github.com/swaggo/swag v1.8.9
 	github.com/tevino/abool v1.2.0
-	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8
 	gopkg.in/DataDog/dd-trace-go.v1 v1.46.0
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -110,6 +112,7 @@ require (
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
 	golang.org/x/crypto v0.4.0 // indirect
+	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8 // indirect
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.3.0 // indirect
