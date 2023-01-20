@@ -1,4 +1,4 @@
-FROM kerberos/base:4af6579 AS builder
+FROM kerberos/base:91ab4d4 AS build
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
@@ -11,9 +11,7 @@ ENV GOSUMDB=off
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
 	git build-essential cmake pkg-config unzip libgtk2.0-dev \
-	curl ca-certificates libcurl4-openssl-dev libssl-dev \
-	libavcodec-dev libavformat-dev libswscale-dev libtbb2 libtbb-dev \
-	libjpeg-dev libpng-dev libtiff-dev libdc1394-22-dev && \
+	curl ca-certificates libcurl4-openssl-dev libssl-dev libjpeg62-turbo-dev && \
 	rm -rf /var/lib/apt/lists/*
 
 ##############################################################################
@@ -50,7 +48,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/ui && yarn && yarn build
 
 RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go mod download && \
-	go build -tags static --ldflags '-extldflags "-static"' main.go && \
+	go build --ldflags '-extldflags "-static -latomic"' main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv www /agent && \
@@ -75,6 +73,9 @@ RUN cp -r /agent ./
 
 RUN /agent/main version
 
+############################################
+# Publish main binary to GitHub release
+
 FROM alpine:latest
 
 ############################
@@ -85,8 +86,8 @@ RUN addgroup -S kerberosio && adduser -S agent -G kerberosio && addgroup agent v
 #################################
 # Copy files from previous images
 
-COPY --chown=0:0 --from=builder /dist /
-COPY --chown=0:0 --from=builder /usr/local/go/lib/time/zoneinfo.zip /zoneinfo.zip
+COPY --chown=0:0 --from=build /dist /
+COPY --chown=0:0 --from=build /usr/local/go/lib/time/zoneinfo.zip /zoneinfo.zip
 
 ENV ZONEINFO=/zoneinfo.zip
 

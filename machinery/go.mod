@@ -18,7 +18,6 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/golang-module/carbon/v2 v2.2.3
 	github.com/gorilla/websocket v1.5.0
-	github.com/h2non/bimg v1.1.9
 	github.com/kellydunn/golang-geo v0.7.0
 	github.com/kerberos-io/joy4 v1.0.34
 	github.com/kerberos-io/onvif v0.0.4
@@ -32,6 +31,7 @@ require (
 	github.com/swaggo/gin-swagger v1.5.3
 	github.com/swaggo/swag v1.8.9
 	github.com/tevino/abool v1.2.0
+	github.com/whorfin/go-libjpeg v0.0.0-20210520191240-fe4e9ca412cb
 	gopkg.in/DataDog/dd-trace-go.v1 v1.46.0
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0

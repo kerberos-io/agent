@@ -1,9 +1,9 @@
 package computervision
 
 import (
+	"bufio"
 	"bytes"
 	"image"
-	"image/jpeg"
 	"io/ioutil"
 	"math"
 	"os"
@@ -18,6 +18,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/joy4/av/pubsub"
+	"github.com/whorfin/go-libjpeg/jpeg"
 
 	geo "github.com/kellydunn/golang-geo"
 	"github.com/kerberos-io/joy4/av"
@@ -86,7 +87,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 			bounds := img.Bounds()
 			rows := bounds.Dx()
 			cols := bounds.Dy()
-			var coordinatesToCheck [][]int
+			/*var coordinatesToCheck [][]int
 			for y := 0; y < rows; y++ {
 				for x := 0; x < cols; x++ {
 					for _, poly := range polyObjects {
@@ -94,6 +95,18 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 						if poly.Contains(point) {
 							coordinatesToCheck = append(coordinatesToCheck, []int{x, y})
 							break
+						}
+					}
+				}
+			}*/
+			// Make fixed size array of uinty8
+			var coordinatesToCheck []int
+			for y := 0; y < rows; y++ {
+				for x := 0; x < cols; x++ {
+					for _, poly := range polyObjects {
+						point := geo.NewPoint(float64(x), float64(y))
+						if poly.Contains(point) {
+							coordinatesToCheck = append(coordinatesToCheck, y*cols+x)
 						}
 					}
 				}
@@ -133,7 +146,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					t := strconv.FormatInt(time.Now().Unix(), 10)
 					f, err := os.Create("./data/snapshots/" + t + ".jpg")
 					if err == nil {
-						jpeg.Encode(f, grayImage, nil)
+						jpeg.Encode(f, img, &jpeg.EncoderOptions{Quality: 30})
 						f.Close()
 					}
 				}
@@ -192,34 +205,11 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 	log.Log.Debug("ProcessMotion: finished")
 }
 
-func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck [][]int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {
-
-	//image1 := imageArray[0]
+func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {
+	image1 := imageArray[0]
 	image2 := imageArray[1]
 	image3 := imageArray[2]
-
-	// Calculate the absolute difference between the first and second image.
-	//diff1 := AbsDiff(image3, image1)
-	diff2 := AbsDiff(image3, image2)
-
-	// Calculate the bitwise AND between the first and second image.
-	//and := BitwiseAnd(diff1, diff2)
-
-	// Do threshold§
-	threshold := Threshold(diff2, 30)
-
-	// Erode and dilate the image to remove noise.
-	erode := Erode(threshold, 3)
-
-	changes := 0
-	for _, c := range coordinatesToCheck {
-		pixel := c[0] + c[1]*erode.Stride
-		value := erode.Pix[pixel]
-		if value > 0 {
-			changes++
-		}
-	}
-
+	changes := AbsDiffBitwiseAndThreshold(image1, image2, image3, pixelChangeThreshold, coordinatesToCheck)
 	return changes > pixelChangeThreshold, changes
 }
 
@@ -242,7 +232,8 @@ func ResizeDownscaleImage(img image.Image, dxy int) *image.NRGBA {
 
 func ImageToBytes(img image.Image) ([]byte, error) {
 	buffer := new(bytes.Buffer)
-	err := jpeg.Encode(buffer, img, &jpeg.Options{Quality: 40})
+	w := bufio.NewWriter(buffer)
+	err := jpeg.Encode(w, img, &jpeg.EncoderOptions{Quality: 30})
 	return buffer.Bytes(), err
 }
 
@@ -286,14 +277,15 @@ func BitwiseAnd(img1 image.Gray, img2 image.Gray) (and image.Gray) {
 	return and
 }
 
-func Erode(img image.Gray, kernelSize int) (eroded image.Gray) {
-	eroded = image.Gray{
-		Pix:    make([]uint8, len(img.Pix)),
-		Stride: img.Stride,
-		Rect:   img.Rect,
+func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.Gray, threshold int, coordinatesToCheck []int) int {
+	changes := 0
+	for i := 0; i < len(coordinatesToCheck); i++ {
+		pixel := coordinatesToCheck[i]
+		diff := int(img3.Pix[pixel]) - int(img1.Pix[pixel])
+		diff2 := int(img3.Pix[pixel]) - int(img2.Pix[pixel])
+		if (diff > threshold || diff < -threshold) || (diff2 > threshold || diff2 < -threshold) {
+			changes++
+		}
 	}
-	for i := 0; i < len(img.Pix); i++ {
-		eroded.Pix[i] = img.Pix[i]
-	}
-	return eroded
+	return changes
 }
