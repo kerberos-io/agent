@@ -1,4 +1,4 @@
-FROM kerberos/base:91ab4d4 AS build
+FROM kerberos/base:3a1f595 AS build
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
@@ -48,7 +48,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/ui && yarn && yarn build
 
 RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go mod download && \
-	go build --ldflags '-extldflags "-static -latomic"' main.go && \
+	go build -tags timetzdata --ldflags '-s -w -extldflags "-static -latomic"' main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv www /agent && \
