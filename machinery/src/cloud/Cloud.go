@@ -282,7 +282,7 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 }
 
 func sendImage(topic string, mqttClient mqtt.Client, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
-	img, err := computervision.GetImage(pkt, decoder, decoderMutex)
+	img, err := computervision.GetRGBAImage(pkt, decoder, decoderMutex)
 	if err == nil {
 		bytes, _ := computervision.ImageToBytes(img)
 		encoded := base64.StdEncoding.EncodeToString(bytes)

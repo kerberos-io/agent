@@ -138,7 +138,7 @@ logreader:
 				if !pkt.IsKeyFrame {
 					continue
 				}
-				img, err := computervision.GetImage(pkt, decoder, decoderMutex)
+				img, err := computervision.GetRGBAImage(pkt, decoder, decoderMutex)
 				if err == nil {
 					bytes, _ := computervision.ImageToBytes(img)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
