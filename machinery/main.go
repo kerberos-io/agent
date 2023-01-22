@@ -18,28 +18,33 @@ func main() {
 
 	// You might be interested in debugging the agent.
 	if os.Getenv("DATADOG_AGENT_ENABLED") == "true" {
-		service := os.Getenv("DATADOG_AGENT_SERVICE")
-		environment := os.Getenv("DATADOG_AGENT_ENVIRONMENT")
-		fmt.Println("Starting Datadog Agent with service: " + service + " and environment: " + environment)
-		rules := []tracer.SamplingRule{tracer.RateRule(1)}
-		tracer.Start(
-			tracer.WithSamplingRules(rules),
-			tracer.WithService(service),
-			tracer.WithEnv(environment),
-		)
-		defer tracer.Stop()
-		err := profiler.Start(
-			profiler.WithService(service),
-			profiler.WithEnv(environment),
-			profiler.WithProfileTypes(
-				profiler.CPUProfile,
-				profiler.HeapProfile,
-			),
-		)
-		if err != nil {
-			log.Log.Fatal(err.Error())
+		if os.Getenv("DATADOG_AGENT_K8S_ENABLED") == "true" {
+			tracer.Start()
+			defer tracer.Stop()
+		} else {
+			service := os.Getenv("DATADOG_AGENT_SERVICE")
+			environment := os.Getenv("DATADOG_AGENT_ENVIRONMENT")
+			fmt.Println("Starting Datadog Agent with service: " + service + " and environment: " + environment)
+			rules := []tracer.SamplingRule{tracer.RateRule(1)}
+			tracer.Start(
+				tracer.WithSamplingRules(rules),
+				tracer.WithService(service),
+				tracer.WithEnv(environment),
+			)
+			defer tracer.Stop()
+			err := profiler.Start(
+				profiler.WithService(service),
+				profiler.WithEnv(environment),
+				profiler.WithProfileTypes(
+					profiler.CPUProfile,
+					profiler.HeapProfile,
+				),
+			)
+			if err != nil {
+				log.Log.Fatal(err.Error())
+			}
+			defer profiler.Stop()
 		}
-		defer profiler.Stop()
 	}
 
 	// Start the show ;)
