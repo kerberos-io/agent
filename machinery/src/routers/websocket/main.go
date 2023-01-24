@@ -138,11 +138,13 @@ logreader:
 				if !pkt.IsKeyFrame {
 					continue
 				}
-				img, err := computervision.GetRGBAImage(pkt, decoder, decoderMutex)
+				img, err := computervision.GetRawImage(pkt, decoder, decoderMutex)
 				if err == nil {
-					bytes, _ := computervision.ImageToBytes(img)
+					bytes, _ := computervision.ImageToBytes(&img.Image)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				}
+				// Cleanup the image.
+				img.Free()
 			} else {
 				log.Log.Error("ForwardSDStream:" + err.Error())
 				break logreader

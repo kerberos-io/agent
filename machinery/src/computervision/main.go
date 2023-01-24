@@ -119,8 +119,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				// Store snapshots (jpg) or hull.
 				files, err := ioutil.ReadDir("./data/snapshots")
 				if err == nil {
-
-					rgbImage, err := GetRGBAImage(pkt, decoder, decoderMutex)
+					rgbImage, err := GetRawImage(pkt, decoder, decoderMutex)
 					if err == nil {
 						sort.Slice(files, func(i, j int) bool {
 							return files[i].ModTime().Before(files[j].ModTime())
@@ -133,10 +132,11 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 						t := strconv.FormatInt(time.Now().Unix(), 10)
 						f, err := os.Create("./data/snapshots/" + t + ".jpg")
 						if err == nil {
-							jpeg.Encode(f, rgbImage, &jpeg.EncoderOptions{Quality: 30})
+							jpeg.Encode(f, &rgbImage.Image, &jpeg.EncoderOptions{Quality: 30})
 							f.Close()
 						}
 					}
+					rgbImage.Free()
 				}
 
 				// Check if within time interval
@@ -209,12 +209,16 @@ func GetGrayImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mu
 	imgDeepCopy.Stride = img.ImageGray.Stride
 	copy(imgDeepCopy.Pix, img.ImageGray.Pix)
 
+	// Cleanup of underlaying data
+	img.Free()
+
 	return imgDeepCopy, err
 }
 
-func GetRGBAImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*image.YCbCr, error) {
+func GetRawImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
 	img, err := capture.DecodeImage(pkt, dec, decoderMutex)
-	return &img.Image, err
+	// We'll need to free up ourselves ;) using -> img.Free()
+	return img, err
 }
 
 func ImageToBytes(img image.Image) ([]byte, error) {
