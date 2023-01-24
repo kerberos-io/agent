@@ -14,7 +14,7 @@
 	// Uncomment the next line to run commands after the container is created - for example installing curl.
 	"postCreateCommand": "cd ui && yarn install && yarn build && cd ../machinery && go mod download",
 	"features": {
-		"ghcr.io/devcontainers-contrib/features/ansible:1": {},
+		"ghcr.io/devcontainers-contrib/features/ansible:1": {}
 	},
 	"customizations": {
 		"vscode": {
@@ -23,11 +23,11 @@
 				"GitHub.copilot"
 			]
 		}
-	},
+	}
 	// Uncomment when using a ptrace-based debugger like C++, Go, and Rust
 	// "runArgs": [ "--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined" ],
 	// Uncomment to use the Docker CLI from inside the container. See https://aka.ms/vscode-remote/samples/docker-from-docker.
-	// "mounts": [ "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind" ],
+	// "mounts": [ "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind" ]
 	// Uncomment to connect as a non-root user if you've added one. See https://aka.ms/vscode-remote/containers/non-root.
 	// "remoteUser": "vscode"
 }
