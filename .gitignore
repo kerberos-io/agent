@@ -10,3 +10,5 @@ machinery/data/recordings
 machinery/data/snapshots
 machinery/test*
 deployments/docker/private-docker-compose.yaml
+machinery/main
+machinery/machinery
