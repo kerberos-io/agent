@@ -138,7 +138,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 						t := strconv.FormatInt(time.Now().Unix(), 10)
 						f, err := os.Create("./data/snapshots/" + t + ".jpg")
 						if err == nil {
-							jpeg.Encode(f, &rgbImage.Image, &jpeg.EncoderOptions{Quality: 30})
+							jpeg.Encode(f, &rgbImage.Image, &jpeg.EncoderOptions{Quality: 70})
 							f.Close()
 						}
 					}
@@ -230,7 +230,7 @@ func GetRawImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mut
 func ImageToBytes(img image.Image) ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	w := bufio.NewWriter(buffer)
-	err := jpeg.Encode(w, img, &jpeg.EncoderOptions{Quality: 30})
+	err := jpeg.Encode(w, img, &jpeg.EncoderOptions{Quality: 70})
 	return buffer.Bytes(), err
 }
 
