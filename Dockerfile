@@ -1,4 +1,4 @@
-FROM kerberos/base:3a1f595 AS build
+FROM kerberos/base:70d69dc AS build
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
@@ -72,6 +72,15 @@ RUN cp -r /agent ./
 # This will collect dependent libraries so they're later copied to the final image.
 
 RUN /agent/main version
+
+
+##########################################################
+# We need to move some additional libs to make mp4fragment work
+
+RUN mkdir -p ./usr/lib
+
+RUN [ -f /lib64/ld-linux-x86-64.so.2 ] && $(mkdir -p lib64 && \
+	cp /lib64/ld-linux-x86-64.so.2 lib64/) || echo "nothing to do here x86"
 
 ############################################
 # Publish main binary to GitHub release

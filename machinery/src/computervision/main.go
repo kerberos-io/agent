@@ -30,6 +30,12 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 	var isPixelChangeThresholdReached = false
 	var changesToReturn = 0
 
+	pixelThreshold := config.Capture.PixelChangeThreshold
+	// Might not be set in the config file, so set it to 150
+	if pixelThreshold == 0 {
+		pixelThreshold = 150
+	}
+
 	if config.Capture.Continuous == "true" {
 
 		log.Log.Info("ProcessMotion: Continuous recording, so no motion detection.")
@@ -163,7 +169,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				}
 
 				// Remember additional information about the result of findmotion
-				isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, config.Capture.PixelChangeThreshold)
+				isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
 
 				if detectMotion && isPixelChangeThresholdReached {
 
