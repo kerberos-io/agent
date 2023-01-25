@@ -1,6 +1,8 @@
 module github.com/kerberos-io/agent/machinery
 
-go 1.18
+go 1.19
+
+//replace github.com/kerberos-io/joy4 v1.0.43 => ../../../../github.com/kerberos-io/joy4
 
 require (
 	github.com/InVisionApp/conjungo v1.1.0
@@ -16,7 +18,7 @@ require (
 	github.com/golang-module/carbon/v2 v2.2.3
 	github.com/gorilla/websocket v1.5.0
 	github.com/kellydunn/golang-geo v0.7.0
-	github.com/kerberos-io/joy4 v1.0.37
+	github.com/kerberos-io/joy4 v1.0.44
 	github.com/kerberos-io/onvif v0.0.4
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/nsmith5/mjpeg v0.0.0-20200913181537-54b8ada0e53e
