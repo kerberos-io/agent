@@ -101,7 +101,7 @@ COPY --chown=0:0 --from=build /usr/local/go/lib/time/zoneinfo.zip /zoneinfo.zip
 ENV ZONEINFO=/zoneinfo.zip
 
 RUN apk update && apk add ca-certificates --no-cache && \
-	apk add tzdata curl libgcc libstdc++ libc6-compat --no-cache && rm -rf /var/cache/apk/*
+	apk add tzdata curl libgcc libstdc++ libc6-compat libbsd --no-cache && rm -rf /var/cache/apk/*
 
 #################
 # Install Bento4
