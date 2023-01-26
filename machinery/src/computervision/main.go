@@ -91,8 +91,8 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 			}
 
 			bounds := img.Bounds()
-			rows := bounds.Dx()
-			cols := bounds.Dy()
+			rows := bounds.Dy()
+			cols := bounds.Dx()
 
 			// Make fixed size array of uinty8
 			var coordinatesToCheck []int
