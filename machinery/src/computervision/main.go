@@ -206,7 +206,7 @@ func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChange
 	image1 := imageArray[0]
 	image2 := imageArray[1]
 	image3 := imageArray[2]
-	threshold := 30
+	threshold := 60
 	changes := AbsDiffBitwiseAndThreshold(image1, image2, image3, threshold, coordinatesToCheck)
 	return changes > pixelChangeThreshold, changes
 }
