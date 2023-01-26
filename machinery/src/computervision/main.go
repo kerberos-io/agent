@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"image"
+	"image/jpeg"
 	"io/ioutil"
 	"os"
 	"sort"
@@ -16,7 +17,8 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/joy4/av/pubsub"
-	"github.com/whorfin/go-libjpeg/jpeg"
+
+	//"github.com/whorfin/go-libjpeg/jpeg"
 
 	geo "github.com/kellydunn/golang-geo"
 	"github.com/kerberos-io/joy4/av"
@@ -138,7 +140,8 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 						t := strconv.FormatInt(time.Now().Unix(), 10)
 						f, err := os.Create("./data/snapshots/" + t + ".jpg")
 						if err == nil {
-							jpeg.Encode(f, &rgbImage.Image, &jpeg.EncoderOptions{Quality: 70})
+							jpeg.Encode(f, &rgbImage.Image, &jpeg.Options{Quality: 15})
+							//jpeg.Encode(f, &rgbImage.Image, &jpeg.EncoderOptions{Quality: 70, })
 							f.Close()
 						}
 					}
@@ -230,7 +233,8 @@ func GetRawImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mut
 func ImageToBytes(img image.Image) ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	w := bufio.NewWriter(buffer)
-	err := jpeg.Encode(w, img, &jpeg.EncoderOptions{Quality: 70})
+	//err := jpeg.Encode(w, img, &jpeg.EncoderOptions{Quality: 70})
+	err := jpeg.Encode(w, img, &jpeg.Options{Quality: 15})
 	return buffer.Bytes(), err
 }
 

@@ -29,6 +29,7 @@ type Communication struct {
 	IsConfiguring         *abool.AtomicBool
 	Queue                 *pubsub.Queue
 	DecoderMutex          *sync.Mutex
+	SubDecoderMutex       *sync.Mutex
 	Decoder               *ffmpeg.VideoDecoder
 	SubDecoder            *ffmpeg.VideoDecoder
 }

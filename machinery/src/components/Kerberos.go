@@ -107,6 +107,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// At some routines we will need to decode the image.
 		// Make sure its properly locked as we only have a single decoder.
 		var decoderMutex sync.Mutex
+		var subDecoderMutex sync.Mutex
 		decoder := capture.GetVideoDecoder(streams)
 
 		var subDecoder *ffmpeg.VideoDecoder
@@ -117,6 +118,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		communication.Decoder = decoder
 		communication.SubDecoder = subDecoder
 		communication.DecoderMutex = &decoderMutex
+		communication.SubDecoderMutex = &subDecoderMutex
 
 		// Create a packet queue, which is filled by the HandleStream routing
 		// and consumed by all other routines: motion, livestream, etc.
@@ -162,20 +164,20 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		if subStreamEnabled {
 			motionCursor := subQueue.Latest()
-			go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, subDecoder, &decoderMutex)
+			go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, subDecoder, &subDecoderMutex)
 		} else {
 			motionCursor := queue.Latest()
 			go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 		}
 
 		// Handle livestream SD (low resolution over MQTT)
-		//if subStreamEnabled {
-		//	livestreamCursor := subQueue.Latest()
-		//	cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, subDecoder, &decoderMutex)
-		//} else {
-		livestreamCursor := queue.Latest()
-		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
-		//}
+		if subStreamEnabled {
+			livestreamCursor := subQueue.Latest()
+			go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, subDecoder, &subDecoderMutex)
+		} else {
+			livestreamCursor := queue.Latest()
+			go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
+		}
 
 		// Handle livestream HD (high resolution over WEBRTC)
 		communication.HandleLiveHDHandshake = make(chan models.SDPPayload, 1)
