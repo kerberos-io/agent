@@ -161,7 +161,6 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// Handle processing of motion
 		communication.HandleMotion = make(chan models.MotionDataPartial, 1)
-
 		if subStreamEnabled {
 			motionCursor := subQueue.Latest()
 			go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, subDecoder, &subDecoderMutex)
