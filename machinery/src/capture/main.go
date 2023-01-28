@@ -120,8 +120,6 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				// Cleanup muxer
 				start = false
 				myMuxer = nil
-				runtime.GC()
-				debug.FreeOSMemory()
 
 				recordingStatus = "idle"
 
@@ -233,8 +231,6 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				// Cleanup muxer
 				start = false
 				myMuxer = nil
-				runtime.GC()
-				debug.FreeOSMemory()
 
 				recordingStatus = "idle"
 			}
