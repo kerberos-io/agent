@@ -204,6 +204,10 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				if err := myMuxer.WritePacket(pkt); err != nil {
 					log.Log.Error(err.Error())
 				}
+
+				if now%100 == 0 {
+					myMuxer.Flush()
+				}
 			}
 		}
 
