@@ -3,8 +3,6 @@ package capture
 
 import (
 	"os"
-	"runtime"
-	"runtime/debug"
 	"strconv"
 	"time"
 
@@ -329,7 +327,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					log.Log.Info("HandleRecordStream: closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", recordingPeriod: " + strconv.FormatInt(recordingPeriod, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 					break
 				}
-				if pkt.IsKeyFrame && start == false {
+				if pkt.IsKeyFrame && !start {
 					log.Log.Info("HandleRecordStream: write frames")
 					start = true
 				}
@@ -347,8 +345,6 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 			log.Log.Info("HandleRecordStream:  file save: " + name)
 			file.Close()
 			myMuxer = nil
-			runtime.GC()
-			debug.FreeOSMemory()
 
 			// Check if need to convert to fragmented using bento
 			if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
