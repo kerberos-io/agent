@@ -105,6 +105,11 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 			if start && // If already recording and current frame is a keyframe and we should stop recording
 				nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
+				// Write the last packet
+				if err := myMuxer.WritePacket(pkt); err != nil {
+					log.Log.Error(err.Error())
+				}
+
 				// This will write the trailer a well.
 				if err := myMuxer.WriteTrailerWithPacket(nextPkt); err != nil {
 					log.Log.Error(err.Error())
@@ -218,8 +223,9 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 		// If this happens we need to check to properly close the recording.
 		if cursorError != nil {
 			if recordingStatus == "started" {
+
 				// This will write the trailer a well.
-				if err := myMuxer.WriteTrailerWithPacket(nextPkt); err != nil {
+				if err := myMuxer.WriteTrailer(); err != nil {
 					log.Log.Error(err.Error())
 				}
 
