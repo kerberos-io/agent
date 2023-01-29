@@ -88,20 +88,25 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 		//for pkt := range packets {
 		var cursorError error
 		var pkt av.Packet
+		var nextPkt av.Packet
 		recordingStatus := "idle"
 		recordingCursor := queue.Oldest()
 
+		if cursorError == nil {
+			pkt, cursorError = recordingCursor.ReadPacket()
+		}
+
 		for cursorError == nil {
 
-			pkt, cursorError = recordingCursor.ReadPacket()
+			nextPkt, cursorError = recordingCursor.ReadPacket()
 
 			now := time.Now().Unix()
 
 			if start && // If already recording and current frame is a keyframe and we should stop recording
-				pkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
+				nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
 				// This will write the trailer a well.
-				if err := myMuxer.WriteTrailer(); err != nil {
+				if err := myMuxer.WriteTrailerWithPacket(nextPkt); err != nil {
 					log.Log.Error(err.Error())
 				}
 
@@ -205,6 +210,8 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					log.Log.Error(err.Error())
 				}
 			}
+
+			pkt = nextPkt
 		}
 
 		// We might have interrupted the recording while restarting the agent.
@@ -212,7 +219,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 		if cursorError != nil {
 			if recordingStatus == "started" {
 				// This will write the trailer a well.
-				if err := myMuxer.WriteTrailer(); err != nil {
+				if err := myMuxer.WriteTrailerWithPacket(nextPkt); err != nil {
 					log.Log.Error(err.Error())
 				}
 
@@ -288,11 +295,16 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 			// Get as much packets we need.
 			var cursorError error
 			var pkt av.Packet
+			var nextPkt av.Packet
 			recordingCursor := queue.Oldest()
+
+			if cursorError == nil {
+				pkt, cursorError = recordingCursor.ReadPacket()
+			}
 
 			for cursorError == nil {
 
-				pkt, cursorError = recordingCursor.ReadPacket()
+				nextPkt, cursorError = recordingCursor.ReadPacket()
 				if cursorError != nil {
 					log.Log.Error("HandleRecordStream: " + cursorError.Error())
 				}
@@ -307,7 +319,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				default:
 				}
 
-				if timestamp+recordingPeriod-now < 0 || now-startRecording > maxRecordingPeriod {
+				if (timestamp+recordingPeriod-now < 0 || now-startRecording > maxRecordingPeriod) && nextPkt.IsKeyFrame {
 					log.Log.Info("HandleRecordStream: closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", recordingPeriod: " + strconv.FormatInt(recordingPeriod, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 					break
 				}
@@ -320,10 +332,12 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 						log.Log.Error(err.Error())
 					}
 				}
+
+				pkt = nextPkt
 			}
 
 			// This will write the trailer as well.
-			myMuxer.WriteTrailer()
+			myMuxer.WriteTrailerWithPacket(nextPkt)
 			log.Log.Info("HandleRecordStream:  file save: " + name)
 			file.Close()
 			myMuxer = nil
