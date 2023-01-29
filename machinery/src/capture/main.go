@@ -201,9 +201,9 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				recordingStatus = "started"
 
 			} else if start {
-				if err := myMuxer.WritePacket(pkt); err != nil {
+				/*if err := myMuxer.WritePacket(pkt); err != nil {
 					log.Log.Error(err.Error())
-				}
+				}*/
 			}
 		}
 
