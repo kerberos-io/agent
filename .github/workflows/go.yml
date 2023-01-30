@@ -12,7 +12,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     container:
-      image: kerberos/base:91ab4d4
+      image: kerberos/base:70d69dc
+
 
     strategy:
       matrix:
@@ -23,9 +24,6 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: ${{ matrix.go-version }}
-    - name: Change Owner of Container Working Directory
-      if: matrix.container
-      run: chown root:root .
     - name: Check out code into the Go module directory
       uses: actions/checkout@v3
     - name: Install dependencies
