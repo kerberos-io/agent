@@ -353,6 +353,16 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 						if err := myMuxer.WritePacket(pkt); err != nil {
 							log.Log.Error(err.Error())
 						}
+
+						// We will sync to file every keyframe.
+						if pkt.IsKeyFrame {
+							err := file.Sync()
+							if err != nil {
+								log.Log.Error(err.Error())
+							} else {
+								log.Log.Info("HandleRecordStream: Synced file: " + name)
+							}
+						}
 					}
 
 					pkt = nextPkt
