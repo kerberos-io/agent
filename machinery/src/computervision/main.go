@@ -130,7 +130,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					imageArray[2] = grayImage
 				}
 
-				// Store snapshots (jpg) or hull.
+				// Store snapshots (jpg) for hull.
 				files, err := ioutil.ReadDir("./data/snapshots")
 				if err == nil {
 					rgbImage, err := GetRawImage(pkt, decoder, decoderMutex)
@@ -147,7 +147,6 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 						f, err := os.Create("./data/snapshots/" + t + ".jpg")
 						if err == nil {
 							jpeg.Encode(f, &rgbImage.Image, &jpeg.Options{Quality: 15})
-							//jpeg.Encode(f, &rgbImage.Image, &jpeg.EncoderOptions{Quality: 70, })
 							f.Close()
 						}
 					}
