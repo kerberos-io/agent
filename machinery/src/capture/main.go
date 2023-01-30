@@ -122,6 +122,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 
 					// Cleanup muxer
 					start = false
+					myMuxer.Close()
 					myMuxer = nil
 					file.Close()
 					file = nil
@@ -218,11 +219,15 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					if err := myMuxer.WritePacket(pkt); err != nil {
 						log.Log.Error(err.Error())
 					}
-					err := file.Sync()
-					if err != nil {
-						log.Log.Error(err.Error())
-					} else {
-						log.Log.Info("HandleRecordStream: Synced file: " + name)
+
+					// We will sync to file every keyframe.
+					if pkt.IsKeyFrame {
+						err := file.Sync()
+						if err != nil {
+							log.Log.Error(err.Error())
+						} else {
+							log.Log.Info("HandleRecordStream: Synced file: " + name)
+						}
 					}
 				}
 
@@ -242,6 +247,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					log.Log.Info("HandleRecordStream: Recording finished: file save: " + name)
 					// Cleanup muxer
 					start = false
+					myMuxer.Close()
 					myMuxer = nil
 					file.Close()
 					file = nil
@@ -357,6 +363,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				log.Log.Info("HandleRecordStream:  file save: " + name)
 
 				// Cleanup muxer
+				myMuxer.Close()
 				myMuxer = nil
 				file.Close()
 				file = nil
