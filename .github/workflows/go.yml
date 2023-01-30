@@ -12,7 +12,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     container:
-      image: kerberos/base:91ab4d4
+      image: kerberos/base:70d69dc
+
 
     strategy:
       matrix:
@@ -24,7 +25,7 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
     - name: Check out code into the Go module directory
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Install dependencies
       run: apt update -y && apt install -y --no-install-recommends git build-essential cmake pkg-config unzip libgtk2.0-dev curl ca-certificates libcurl4-openssl-dev libssl-dev libavcodec-dev libavformat-dev libswscale-dev libtbb2 libtbb-dev libpng-dev libtiff-dev libdc1394-22-dev libjpeg62-turbo-dev
     - name: Get dependencies
