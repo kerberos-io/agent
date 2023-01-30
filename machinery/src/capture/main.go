@@ -21,7 +21,7 @@ func CleanupRecordingDirectory(configuration *models.Configuration) {
 	if autoClean == "true" {
 		maxSize := configuration.Config.MaxDirectorySize
 		if maxSize == 0 {
-			maxSize = 50
+			maxSize = 300
 		}
 		// Total size of the recording directory.
 		recordingsDirectory := "./data/recordings"
