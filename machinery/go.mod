@@ -2,11 +2,11 @@ module github.com/kerberos-io/agent/machinery
 
 go 1.19
 
-//replace github.com/kerberos-io/joy4 v1.0.46 => ../../../../github.com/kerberos-io/joy4
+replace github.com/kerberos-io/joy4 v1.0.47 => ../../../../github.com/kerberos-io/joy4
+
 //replace github.com/kerberos-io/onvif v0.0.5 => ../../../../github.com/kerberos-io/onvif
 
 require (
-	github.com/Eyevinn/mp4ff v0.33.2
 	github.com/InVisionApp/conjungo v1.1.0
 	github.com/appleboy/gin-jwt/v2 v2.9.1
 	github.com/cedricve/go-onvif v0.0.0-20200222191200-567e8ce298f6
@@ -20,7 +20,7 @@ require (
 	github.com/golang-module/carbon/v2 v2.2.3
 	github.com/gorilla/websocket v1.5.0
 	github.com/kellydunn/golang-geo v0.7.0
-	github.com/kerberos-io/joy4 v1.0.47
+	github.com/kerberos-io/joy4 v1.0.48
 	github.com/kerberos-io/onvif v0.0.5
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/nsmith5/mjpeg v0.0.0-20200913181537-54b8ada0e53e
