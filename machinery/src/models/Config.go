@@ -48,6 +48,7 @@ type Capture struct {
 	IPCamera              IPCamera    `json:"ipcamera"`
 	USBCamera             USBCamera   `json:"usbcamera"`
 	RaspiCamera           RaspiCamera `json:"raspicamera"`
+	Recording             string      `json:"recording,omitempty"`
 	Continuous            string      `json:"continuous,omitempty"`
 	PostRecording         int64       `json:"postrecording"`
 	PreRecording          int64       `json:"prerecording"`

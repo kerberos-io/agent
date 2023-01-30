@@ -238,6 +238,9 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				break
 
 			/* Recording mode */
+			case "AGENT_CAPTURE_RECORDING":
+				configuration.Config.Capture.Recording = value
+				break
 			case "AGENT_CAPTURE_CONTINUOUS":
 				configuration.Config.Capture.Continuous = value
 				break

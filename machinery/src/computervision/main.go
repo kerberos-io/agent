@@ -26,6 +26,7 @@ import (
 )
 
 func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) { //, wg *sync.WaitGroup) {
+
 	log.Log.Debug("ProcessMotion: started")
 	config := configuration.Config
 
@@ -38,7 +39,12 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 		pixelThreshold = 150
 	}
 
-	if config.Capture.Continuous == "true" {
+	if config.Capture.Recording == "false" {
+
+		// We might later add the option to still detect motion, but not record.
+		log.Log.Info("ProcessMotion: Recording disabled, so we do not need motion detection either.")
+
+	} else if config.Capture.Continuous == "true" {
 
 		log.Log.Info("ProcessMotion: Continuous recording, so no motion detection.")
 
