@@ -19,7 +19,7 @@ require (
 	github.com/golang-module/carbon/v2 v2.2.3
 	github.com/gorilla/websocket v1.5.0
 	github.com/kellydunn/golang-geo v0.7.0
-	github.com/kerberos-io/joy4 v1.0.49
+	github.com/kerberos-io/joy4 v1.0.50
 	github.com/kerberos-io/onvif v0.0.5
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/nsmith5/mjpeg v0.0.0-20200913181537-54b8ada0e53e
