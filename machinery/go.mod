@@ -2,8 +2,7 @@ module github.com/kerberos-io/agent/machinery
 
 go 1.19
 
-replace github.com/kerberos-io/joy4 v1.0.47 => ../../../../github.com/kerberos-io/joy4
-
+//replace github.com/kerberos-io/joy4 v1.0.47 => ../../../../github.com/kerberos-io/joy4
 //replace github.com/kerberos-io/onvif v0.0.5 => ../../../../github.com/kerberos-io/onvif
 
 require (
