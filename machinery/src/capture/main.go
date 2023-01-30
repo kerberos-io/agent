@@ -119,7 +119,12 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					}
 
 					log.Log.Info("HandleRecordStream: Recording finished: file save: " + name)
+
+					// Cleanup muxer
+					start = false
+					myMuxer = nil
 					file.Close()
+					file = nil
 
 					// Check if need to convert to fragmented using bento
 					if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
@@ -129,10 +134,6 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					// Create a symbol link.
 					fc, _ := os.Create("./data/cloud/" + name)
 					fc.Close()
-
-					// Cleanup muxer
-					start = false
-					myMuxer = nil
 
 					recordingStatus = "idle"
 
@@ -217,6 +218,11 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					if err := myMuxer.WritePacket(pkt); err != nil {
 						log.Log.Error(err.Error())
 					}
+
+					// Sync every 100 frames.
+					if now%100 == 0 {
+						file.Sync()
+					}
 				}
 
 				pkt = nextPkt
@@ -233,7 +239,11 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					}
 
 					log.Log.Info("HandleRecordStream: Recording finished: file save: " + name)
+					// Cleanup muxer
+					start = false
+					myMuxer = nil
 					file.Close()
+					file = nil
 
 					// Check if need to convert to fragmented using bento
 					if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
@@ -243,10 +253,6 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					// Create a symbol link.
 					fc, _ := os.Create("./data/cloud/" + name)
 					fc.Close()
-
-					// Cleanup muxer
-					start = false
-					myMuxer = nil
 
 					recordingStatus = "idle"
 				}
@@ -348,8 +354,11 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				// This will write the trailer as well.
 				myMuxer.WriteTrailerWithPacket(nextPkt)
 				log.Log.Info("HandleRecordStream:  file save: " + name)
-				file.Close()
+
+				// Cleanup muxer
 				myMuxer = nil
+				file.Close()
+				file = nil
 
 				// Check if need to convert to fragmented using bento
 				if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
