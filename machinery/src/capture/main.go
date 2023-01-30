@@ -218,10 +218,11 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					if err := myMuxer.WritePacket(pkt); err != nil {
 						log.Log.Error(err.Error())
 					}
-
-					// Sync every 100 frames.
-					if now%100 == 0 {
-						file.Sync()
+					err := file.Sync()
+					if err != nil {
+						log.Log.Error(err.Error())
+					} else {
+						log.Log.Info("HandleRecordStream: Synced file: " + name)
 					}
 				}
 
