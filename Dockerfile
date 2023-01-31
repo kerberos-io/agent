@@ -30,7 +30,7 @@ RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
 ########################
 # Download NPM and Yarns
 
-RUN curl -sL https://deb.nodesource.com/setup_12.x | bash - && \
+RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
 	apt-get install -y nodejs && \
 	npm install -g yarn
 
