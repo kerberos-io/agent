@@ -1,4 +1,4 @@
-FROM kerberos/base:70d69dc AS build
+FROM kerberos/base:37a6e69 AS build
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
@@ -41,7 +41,9 @@ RUN curl https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash 
 
 ENV NODE_PATH $NVM_DIR/v$NODE_VERSION/lib/node_modules
 ENV PATH $NVM_DIR/versions/node/v$NODE_VERSION/bin:$PATH
-RUN npm install -g yarn
+
+RUN wget https://github.com/yarnpkg/yarn/releases/download/v1.22.19/yarn_1.22.19_all.deb && \
+	dpkg -i yarn_1.22.19_all.deb
 
 ##################################################################
 # Build Web
