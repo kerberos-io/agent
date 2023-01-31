@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/elastic/go-sysinfo"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-module/carbon/v2"
 	"github.com/kerberos-io/joy4/av/pubsub"
@@ -31,7 +32,6 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/onvif"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
-	"github.com/shirou/gopsutil/disk"
 )
 
 func PendingUpload() {
@@ -91,6 +91,65 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 	log.Log.Debug("HandleUpload: finished")
 }
 
+func GetSystemInfo() (models.System, error) {
+	var usedMem uint64 = 0
+	var totalMem uint64 = 0
+	var freeMem uint64 = 0
+	architecture := ""
+	cpuId := ""
+	KernelVersion := ""
+	agentVersion := ""
+	var MACs []string
+	var IPs []string
+	hostname := ""
+	bootTime := time.Time{}
+
+	// Read agent version
+	version, err := os.Open("./version")
+	defer version.Close()
+	agentVersion = "unknown"
+	if err == nil {
+		agentVersionBytes, err := ioutil.ReadAll(version)
+		agentVersion = string(agentVersionBytes)
+		if err != nil {
+			log.Log.Error(err.Error())
+		}
+	}
+
+	host, err := sysinfo.Host()
+	if err == nil {
+		cpuId = host.Info().UniqueID
+		architecture = host.Info().Architecture
+		KernelVersion = host.Info().KernelVersion
+		MACs = host.Info().MACs
+		IPs = host.Info().IPs
+		hostname = host.Info().Hostname
+		bootTime = host.Info().BootTime
+		memory, err := host.Memory()
+		if err == nil {
+			usedMem = memory.Used
+			totalMem = memory.Total
+			freeMem = memory.Free
+		}
+	}
+
+	system := models.System{
+		Hostname:      hostname,
+		CPUId:         cpuId,
+		KernelVersion: KernelVersion,
+		Version:       agentVersion,
+		MACs:          MACs,
+		IPs:           IPs,
+		BootTime:      uint64(bootTime.Unix()),
+		Architecture:  architecture,
+		UsedMemory:    usedMem,
+		TotalMemory:   totalMem,
+		FreeMemory:    freeMem,
+	}
+
+	return system, nil
+}
+
 func HandleHeartBeat(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time) {
 	log.Log.Debug("HandleHeartBeat: started")
 
@@ -105,6 +164,7 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 		username := ""
 		vaultURI := ""
 
+		username = config.S3.Username
 		if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
 			username = config.S3.Username
 			key = config.S3.Publickey
@@ -125,14 +185,21 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 	loop:
 		for {
 
+			// Check if we have a friendly name or not.
+			name := config.Name
+			if config.FriendlyName != "" {
+				name = config.FriendlyName
+			}
+
+			// Get some system information
+			// like the uptime, hostname, memory usage, etc.
+			system, _ := GetSystemInfo()
+
 			// We will formated the uptime to a human readable format
 			// this will be used on Kerberos Hub: Uptime -> 1 day and 2 hours.
 			uptimeFormatted := uptimeStart.Format("2006-01-02 15:04:05")
 			uptimeString := carbon.Parse(uptimeFormatted).DiffForHumans()
 			uptimeString = strings.ReplaceAll(uptimeString, "ago", "")
-
-			usage, _ := disk.Usage("/")
-			diskPercentUsed := strconv.Itoa(int(usage.UsedPercent))
 
 			// We'll check which mode is enabled for the camera.
 			onvifEnabled := "false"
@@ -156,31 +223,36 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 			}
 
 			var object = fmt.Sprintf(`{
-			"key" : "%s",
-			"hash" : "826133658",
-			"version" : "3.0.0",
-			"cpuid" : "Serial: xxx",
-			"clouduser" : "%s",
-			"cloudpublickey" : "%s",
-			"cameraname" : "%s",
-			"cameratype" : "IPCamera",
-			"docker" : true,
-			"kios" : false,
-			"raspberrypi" : false,
-			"enterprise" : %t,
-			"board" : "",
-			"disk1size" : "%s",
-			"disk3size" : "%s",
-			"diskvdasize" :  "%s",
-			"numberoffiles" : "33",
-			"temperature" : "sh: 1: vcgencmd: not found",
-			"wifissid" : "",
-			"wifistrength" : "",
-			"uptime" : "%s",
-			"timestamp" : 1564747908,
-			"siteID" : "%s",
-			"onvif" : "%s"
-		}`, config.Key, username, key, config.Name, isEnterprise, "0", "0", diskPercentUsed, uptimeString, config.HubSite, onvifEnabled)
+				"key" : "%s",
+				"version" : "%s",
+				"cpuid" : "%s",
+				"clouduser" : "%s",
+				"cloudpublickey" : "%s",
+				"cameraname" : "%s",
+				"enterprise" : %t,
+				"hostname" : "%s",
+				"architecture" : "%s",
+				"freeMemory" : "%d",
+				"usedMemory" : "%d",
+				"totalMemory" : "%d",
+				"macs" : "%v",
+				"ips" : "%v",
+				"board" : "",
+				"disk1size" : "%s",
+				"disk3size" : "%s",
+				"diskvdasize" :  "%s",
+				"uptime" : "%s",
+				"siteID" : "%s",
+				"onvif" : "%s",
+				"numberoffiles" : "33",
+				"timestamp" : 1564747908,
+				"cameratype" : "IPCamera",
+				"docker" : true,
+				"kios" : false,
+				"raspberrypi" : false
+			}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.MACs, system.IPs, "0", "0", "0", uptimeString, config.HubSite, onvifEnabled)
+
+			fmt.Println(object)
 
 			var jsonStr = []byte(object)
 			buffy := bytes.NewBuffer(jsonStr)
@@ -351,8 +423,6 @@ func VerifyHub(c *gin.Context) {
 
 	if err == nil {
 		hubKey := config.HubKey
-		//hubPrivateKey := config.HubPrivateKey
-		//hubSite := config.HubSite
 		hubURI := config.HubURI
 
 		content := []byte(`{"message": "fake-message"}`)

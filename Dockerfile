@@ -21,6 +21,12 @@ RUN mkdir -p /go/src/github.com/kerberos-io/agent
 COPY machinery /go/src/github.com/kerberos-io/agent/machinery
 COPY ui /go/src/github.com/kerberos-io/agent/ui
 
+##################################################################
+# Get the latest commit hash, so we know which version we're running
+COPY .git /go/src/github.com/kerberos-io/agent/.git
+RUN cd /go/src/github.com/kerberos-io/agent/.git && git log --format="%H" -n 1 | head -c7 > /go/src/github.com/kerberos-io/agent/machinery/version
+RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
+
 ########################
 # Download NPM and Yarns
 
@@ -52,6 +58,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv www /agent && \
+	mv version /agent && \
 	mv data /agent && \
 	mkdir -p /agent/data/cloud && \
 	mkdir -p /agent/data/snapshots && \
@@ -73,6 +80,18 @@ RUN cp -r /agent ./
 
 RUN /agent/main version
 
+###############################################
+# Build Bento4 -> we want fragmented mp4 files
+
+ENV BENTO4_VERSION 1.6.0-639
+RUN cd /tmp && git clone https://github.com/axiomatic-systems/Bento4 && cd Bento4 && \
+	git checkout tags/v${BENTO4_VERSION} && \
+	cd Build && \
+	cmake -DCMAKE_BUILD_TYPE=Release .. && \
+	make && \
+	mv /tmp/Bento4/Build/mp4fragment /dist/ && \
+	rm -rf /tmp/Bento4
+
 ############################################
 # Publish main binary to GitHub release
 
@@ -87,18 +106,9 @@ RUN addgroup -S kerberosio && adduser -S agent -G kerberosio && addgroup agent v
 # Copy files from previous images
 
 COPY --chown=0:0 --from=build /dist /
-COPY --chown=0:0 --from=build /usr/local/go/lib/time/zoneinfo.zip /zoneinfo.zip
 
-ENV ZONEINFO=/zoneinfo.zip
-
-RUN apk update && apk add ca-certificates --no-cache && \
-	apk add tzdata curl libgcc libstdc++ libc6-compat gcompat libbsd --no-cache && rm -rf /var/cache/apk/*
-
-#################
-# Install Bento4
-RUN cd && wget https://www.bok.net/Bento4/binaries/Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && \
-	unzip Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && rm Bento4-SDK-1-6-0-639.x86_64-unknown-linux.zip && \
-	cp ~/Bento4-SDK-1-6-0-639.x86_64-unknown-linux/bin/mp4fragment /usr/bin/
+RUN apk update && apk add ca-certificates curl libstdc++ libc6-compat --no-cache && rm -rf /var/cache/apk/*
+RUN mv /mp4fragment /usr/local/bin/
 
 ##################
 # Try running agent
