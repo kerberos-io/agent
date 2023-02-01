@@ -4,39 +4,64 @@ on:
   push:
     branches: [ master ]
 
+env:
+  REPO: kerberos-io/agent
+  
 jobs:
   build-amd64:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     strategy:
       matrix:
         architecture: [amd64]
     steps:
-    - name: Login to DockerHub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Checkout
-      uses: actions/checkout@v3
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    - name: Available platforms
-      run: echo ${{ steps.buildx.outputs.platforms }}
-    - name: Run Buildx
-      run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
-    - name: Create new and append to manifest
-      run: docker buildx imagetools create -t kerberos/agent:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
-    - name: Create new and append to manifest latest
-      run: docker buildx imagetools create -t kerberos/agent:latest kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: benjlevesque/short-sha@v2.1
+        id: short-sha
+        with:
+          length: 7
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Available platforms
+        run: echo ${{ steps.buildx.outputs.platforms }}
+      - name: Run Buildx
+        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}} --push . 
+      - name: Create new and append to manifest
+        run: docker buildx imagetools create -t $REPO:${{ steps.short-sha.outputs.sha }} $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}}
+      - name: Create new and append to manifest latest
+        run: docker buildx imagetools create -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}}
+      - name: Run Buildx with output
+        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{steps.short-sha.outputs.sha}} --output type=tar,dest=output-${{matrix.architecture}}.tar . 
+      - name: Strip binary
+        run: tar -xf output-${{matrix.architecture}}.tar && rm output-${{matrix.architecture}}.tar && tar -cf output-${{matrix.architecture}}.tar -C /home/agent .
+      - uses: rickstaa/action-create-tag@v1
+        with:
+          tag: ${{ steps.short-sha.outputs.sha }}
+          message: "Release ${{ steps.short-sha.outputs.sha }}"
+      - name: Create a release  
+        uses: ncipollo/release-action@v1
+        with:
+          latest: true
+          name: ${{ steps.short-sha.outputs.sha }}
+          tag: ${{ steps.short-sha.outputs.sha }}
+          artifacts: "output-${{matrix.architecture}}.tar"
   build-other:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     needs: build-amd64
     strategy:
       matrix:
-        #architecture: [arm64, arm/v7, arm/v6]
-        architecture: [arm64, arm/v7]
+        architecture: [arm64, arm-v7]
     steps:
     - name: Login to DockerHub
       uses: docker/login-action@v2
@@ -45,6 +70,10 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
     - name: Checkout
       uses: actions/checkout@v3
+    - uses: benjlevesque/short-sha@v2.1
+      id: short-sha
+      with:
+        length: 7
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v2
     - name: Set up Docker Buildx
@@ -52,8 +81,21 @@ jobs:
     - name: Available platforms
       run: echo ${{ steps.buildx.outputs.platforms }}
     - name: Run Buildx
-      run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
+      run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REP-archO:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}} --push . 
     - name: Create new and append to manifest
-      run: docker buildx imagetools create --append -t kerberos/agent:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+      run: docker buildx imagetools create --append -t $REPO:${{ steps.short-sha.outputs.sha }} $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}}
     - name: Create new and append to manifest latest
-      run: docker buildx imagetools create --append -t kerberos/agent:latest kerberos/agent-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+      run: docker buildx imagetools create --append -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}}
+    - name: Run Buildx with output
+      run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{steps.short-sha.outputs.sha}} --output type=tar,dest=output-${{matrix.architecture}}.tar . 
+    - name: Strip binary
+      run: tar -xf output-${{matrix.architecture}}.tar && rm output-${{matrix.architecture}}.tar && tar -cf output-${{matrix.architecture}}.tar -C /home/agent .
+    - name: Create a release  
+      uses: ncipollo/release-action@v1
+      with:
+        latest: true
+        allowUpdates: true
+        name: ${{ steps.short-sha.outputs.sha }}
+        tag: ${{ steps.short-sha.outputs.sha }}
+        artifacts: "output-${{matrix.architecture}}.tar"
+  
