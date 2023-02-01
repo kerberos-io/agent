@@ -6,6 +6,7 @@ Due to it's nature, of acting as a micro service, there are many different ways 
 
 We will discuss following deployment models.
 
+- [0. Static binary](#0-static-binary)
 - [1. Docker](#1-docker)
 - [2. Docker Compose](#2-docker-compose)
 - [3. Kubernetes](#3-kubernetes)
@@ -13,6 +14,19 @@ We will discuss following deployment models.
 - [5. Kerberos Factory](#5-kerberos-factory)
 - [6. Terraform](#6-terraform)
 - [7. Salt](#7-salt)
+
+## 0. Static binary
+
+Kerberos Agents are now also shipped as static binaries. Within the Docker image build, we are extracting the Kerberos Agent binary and are [uploading them to the releases page](https://github.com/kerberos-io/agent/releases) in the repository. By opening a release you'll find a `.tar` with the relevant files.
+
+- `main`: this is the Kerberos Agent binary.
+- `data`: the folder containing the recorded video, configuration, etc.
+- `mp4fragment`: a binary to transform MP4s to Fragmented MP4s.
+- `www`: the Kerberos Agent ui (compiled React app).
+
+You can run the binary as following on port `8080`:
+
+    main run cameraname 8080
 
 ## 1. Docker
 

@@ -110,6 +110,7 @@ As described before a Kerberos Agent is a container, which can be deployed throu
 
 We have documented the different deployment models [in the `deployments` directory](https://github.com/kerberos-io/agent/tree/master/deployments) of this repository. There you'll learn and find how to deploy using:
 
+- [Static binary](https://github.com/kerberos-io/agent/tree/master/deployments#0-static-binary)
 - [Docker](https://github.com/kerberos-io/agent/tree/master/deployments#1-docker)
 - [Docker Compose](https://github.com/kerberos-io/agent/tree/master/deployments#2-docker-compose)
 - [Kubernetes](https://github.com/kerberos-io/agent/tree/master/deployments#3-kubernetes)
