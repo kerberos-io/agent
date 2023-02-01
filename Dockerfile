@@ -35,7 +35,6 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go build -tags timetzdata --ldflags '-s -w -extldflags "-static -latomic"' main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
-	mv www /agent && \
 	mv version /agent && \
 	mv data /agent && \
 	mkdir -p /agent/data/cloud && \
