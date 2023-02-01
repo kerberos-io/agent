@@ -42,7 +42,7 @@ jobs:
       - name: Run Buildx with output
         run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{steps.short-sha.outputs.sha}} --output type=tar,dest=output-${{matrix.architecture}}.tar . 
       - name: Strip binary
-        run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../output-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
+        run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
       - uses: rickstaa/action-create-tag@v1
         with:
           tag: ${{ steps.short-sha.outputs.sha }}
@@ -53,7 +53,7 @@ jobs:
           latest: true
           name: ${{ steps.short-sha.outputs.sha }}
           tag: ${{ steps.short-sha.outputs.sha }}
-          artifacts: "output-${{matrix.architecture}}.tar"
+          artifacts: "agent-${{matrix.architecture}}.tar"
   build-other:
     runs-on: ubuntu-latest
     permissions:
@@ -89,7 +89,7 @@ jobs:
     - name: Run Buildx with output
       run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{steps.short-sha.outputs.sha}} --output type=tar,dest=output-${{matrix.architecture}}.tar . 
     - name: Strip binary
-      run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../output-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
+      run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
     - name: Create a release  
       uses: ncipollo/release-action@v1
       with:
@@ -97,5 +97,5 @@ jobs:
         allowUpdates: true
         name: ${{ steps.short-sha.outputs.sha }}
         tag: ${{ steps.short-sha.outputs.sha }}
-        artifacts: "output-${{matrix.architecture}}.tar"
+        artifacts: "agent-${{matrix.architecture}}.tar"
   
