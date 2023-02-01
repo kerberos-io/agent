@@ -107,6 +107,7 @@ RUN apk update && apk add ca-certificates curl libstdc++ libc6-compat --no-cache
 # Try running agent
 
 RUN mv /agent/* /home/agent/
+RUN cp /home/agent/mp4fragment /usr/local/bin/
 RUN /home/agent/main version
 
 #######################

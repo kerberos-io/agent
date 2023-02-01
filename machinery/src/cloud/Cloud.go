@@ -224,7 +224,8 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 
 			var object = fmt.Sprintf(`{
 				"key" : "%s",
-				"version" : "%s",
+				"version" : "3.0.0",
+				"release" : "%s",
 				"cpuid" : "%s",
 				"clouduser" : "%s",
 				"cloudpublickey" : "%s",
@@ -251,8 +252,6 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				"kios" : false,
 				"raspberrypi" : false
 			}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.MACs, system.IPs, "0", "0", "0", uptimeString, config.HubSite, onvifEnabled)
-
-			fmt.Println(object)
 
 			var jsonStr = []byte(object)
 			buffy := bytes.NewBuffer(jsonStr)
@@ -486,7 +485,6 @@ func VerifyPersistence(c *gin.Context) {
 
 		if config.Cloud == "s3" {
 
-			//fmt.Println("Uploading...")
 			// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 			// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
 			// - Timestamp

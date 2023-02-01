@@ -14,6 +14,8 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 )
 
+var VERSION = "3.0.0"
+
 func main() {
 
 	// You might be interested in debugging the agent.
@@ -48,7 +50,6 @@ func main() {
 	}
 
 	// Start the show ;)
-	const VERSION = "3.0"
 	action := os.Args[1]
 
 	timezone, _ := time.LoadLocation("CET")
