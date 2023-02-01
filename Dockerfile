@@ -52,7 +52,6 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 
 WORKDIR /dist
 RUN cp -r /agent ./
-RUN rm -rf ./www
 
 ####################################################################################
 # This will collect dependent libraries so they're later copied to the final image.
