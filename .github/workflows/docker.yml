@@ -81,7 +81,7 @@ jobs:
     - name: Available platforms
       run: echo ${{ steps.buildx.outputs.platforms }}
     - name: Run Buildx
-      run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REP-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}} --push . 
+      run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}} --push . 
     - name: Create new and append to manifest
       run: docker buildx imagetools create --append -t $REPO:${{ steps.short-sha.outputs.sha }} $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}}
     - name: Create new and append to manifest latest
