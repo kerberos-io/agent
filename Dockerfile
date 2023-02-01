@@ -102,7 +102,6 @@ COPY --chown=0:0 --from=build-machinery /dist /
 COPY --chown=0:0 --from=build-ui /dist /
 
 RUN apk update && apk add ca-certificates curl libstdc++ libc6-compat --no-cache && rm -rf /var/cache/apk/*
-RUN mv /mp4fragment /usr/local/bin/
 
 ##################
 # Try running agent
