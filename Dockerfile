@@ -1,4 +1,5 @@
-FROM kerberos/base:0d646f8 AS build
+
+FROM kerberos/base:70d69dc AS build-machinery
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
@@ -19,19 +20,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN mkdir -p /go/src/github.com/kerberos-io/agent
 COPY machinery /go/src/github.com/kerberos-io/agent/machinery
-COPY ui /go/src/github.com/kerberos-io/agent/ui
 
 ##################################################################
 # Get the latest commit hash, so we know which version we're running
 COPY .git /go/src/github.com/kerberos-io/agent/.git
 RUN cd /go/src/github.com/kerberos-io/agent/.git && git log --format="%H" -n 1 | head -c7 > /go/src/github.com/kerberos-io/agent/machinery/version
 RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
-
-##################################################################
-# Build Web
-# this will move the /build directory to ../machinery/www
-
-RUN cd /go/src/github.com/kerberos-io/agent/ui && yarn && yarn build
 
 ##################
 # Build Machinery
@@ -58,6 +52,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 
 WORKDIR /dist
 RUN cp -r /agent ./
+RUN rm -rf ./www
 
 ####################################################################################
 # This will collect dependent libraries so they're later copied to the final image.
@@ -76,6 +71,22 @@ RUN cd /tmp && git clone https://github.com/axiomatic-systems/Bento4 && cd Bento
 	mv /tmp/Bento4/Build/mp4fragment /dist/ && \
 	rm -rf /tmp/Bento4
 
+FROM node:16.13.0-alpine3.11 AS build-ui
+
+########################
+# Build Web (React app)
+
+RUN mkdir -p /go/src/github.com/kerberos-io/agent/machinery/www
+COPY ui /go/src/github.com/kerberos-io/agent/ui
+RUN cd /go/src/github.com/kerberos-io/agent/ui && yarn && yarn build
+
+####################################
+# Let's create a /dist folder containing just the files necessary for runtime.
+# Later, it will be copied as the / (root) of the output image.
+
+WORKDIR /dist
+RUN cp -r /go/src/github.com/kerberos-io/agent/machinery/www ./
+
 ############################################
 # Publish main binary to GitHub release
 
@@ -89,7 +100,8 @@ RUN addgroup -S kerberosio && adduser -S agent -G kerberosio && addgroup agent v
 #################################
 # Copy files from previous images
 
-COPY --chown=0:0 --from=build /dist /
+COPY --chown=0:0 --from=build-machinery /dist /
+COPY --chown=0:0 --from=build-ui /dist /
 
 RUN apk update && apk add ca-certificates curl libstdc++ libc6-compat --no-cache && rm -rf /var/cache/apk/*
 RUN mv /mp4fragment /usr/local/bin/
