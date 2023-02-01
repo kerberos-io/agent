@@ -55,7 +55,7 @@ RUN cp -r /agent ./
 ####################################################################################
 # This will collect dependent libraries so they're later copied to the final image.
 
-RUN /agent/main version
+RUN /dist/agent/main version
 
 ###############################################
 # Build Bento4 -> we want fragmented mp4 files
@@ -66,7 +66,7 @@ RUN cd /tmp && git clone https://github.com/axiomatic-systems/Bento4 && cd Bento
 	cd Build && \
 	cmake -DCMAKE_BUILD_TYPE=Release .. && \
 	make && \
-	mv /tmp/Bento4/Build/mp4fragment /dist/ && \
+	mv /tmp/Bento4/Build/mp4fragment /dist/agent/ && \
 	rm -rf /tmp/Bento4
 
 FROM node:16.13.0-alpine3.11 AS build-ui
@@ -83,7 +83,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/ui && yarn && yarn build
 # Later, it will be copied as the / (root) of the output image.
 
 WORKDIR /dist
-RUN cp -r /go/src/github.com/kerberos-io/agent/machinery/www ./
+RUN mkdir -p ./agent && cp -r /go/src/github.com/kerberos-io/agent/machinery/www ./agent/
 
 ############################################
 # Publish main binary to GitHub release
