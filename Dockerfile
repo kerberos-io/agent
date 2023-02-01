@@ -1,4 +1,4 @@
-FROM kerberos/base:37a6e69 AS build
+FROM kerberos/base:4e004ab AS build
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
@@ -26,13 +26,6 @@ COPY ui /go/src/github.com/kerberos-io/agent/ui
 COPY .git /go/src/github.com/kerberos-io/agent/.git
 RUN cd /go/src/github.com/kerberos-io/agent/.git && git log --format="%H" -n 1 | head -c7 > /go/src/github.com/kerberos-io/agent/machinery/version
 RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
-
-########################
-# Download NPM and Yarns
-
-RUN curl -sL https://deb.nodesource.com/setup_14.x | bash - && \
-	apt-get install -y nodejs && \
-	npm install -g yarn
 
 ##################################################################
 # Build Web
