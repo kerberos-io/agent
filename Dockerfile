@@ -71,7 +71,7 @@ RUN cd /tmp && git clone https://github.com/axiomatic-systems/Bento4 && cd Bento
 
 FROM node:18.14.0-alpine3.16 AS build-ui
 
-RUN apt-get update -y && apt-get -y upgrade 
+RUN apk update && apk upgrade --available && sync
 
 ########################
 # Build Web (React app)
