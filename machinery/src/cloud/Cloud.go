@@ -171,7 +171,6 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 		} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
 			key = config.KStorage.CloudKey
 			username = config.KStorage.Directory
-			vaultURI = config.KStorage.URI
 		}
 
 		// This is the new way ;)
@@ -270,8 +269,9 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Hub.")
 			}
 
-			// If we have a vault connect, we will also send some analytics
+			// If we have a Kerberos Vault connected, we will also send some analytics
 			// to that service.
+			vaultURI = config.KStorage.URI
 			if vaultURI != "" {
 				buffy = bytes.NewBuffer(jsonStr)
 				req, _ = http.NewRequest("POST", vaultURI+"/devices/heartbeat", buffy)
