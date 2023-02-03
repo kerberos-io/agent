@@ -78,7 +78,7 @@ RUN apk update && apk upgrade --available && sync
 
 RUN mkdir -p /go/src/github.com/kerberos-io/agent/machinery/www
 COPY ui /go/src/github.com/kerberos-io/agent/ui
-RUN cd /go/src/github.com/kerberos-io/agent/ui && yarn && yarn build
+RUN cd /go/src/github.com/kerberos-io/agent/ui && rm -rf yarn.lock && yarn && yarn build
 
 ####################################
 # Let's create a /dist folder containing just the files necessary for runtime.
