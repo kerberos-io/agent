@@ -69,7 +69,7 @@ RUN cd /tmp && git clone https://github.com/axiomatic-systems/Bento4 && cd Bento
 	mv /tmp/Bento4/Build/mp4fragment /dist/agent/ && \
 	rm -rf /tmp/Bento4
 
-FROM node:16.13.0-alpine3.11 AS build-ui
+FROM node:18.14.0-alpine3.16 AS build-ui
 
 ########################
 # Build Web (React app)
