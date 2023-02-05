@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"runtime"
-	"runtime/debug"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -152,8 +150,6 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 					if err := peerConnection.Close(); err != nil {
 						panic(err)
 					}
-					runtime.GC()
-					debug.FreeOSMemory()
 				} else if connectionState == pionWebRTC.ICEConnectionStateConnected {
 					atomic.AddInt64(&peerConnectionCount, 1)
 				} else if connectionState == pionWebRTC.ICEConnectionStateChecking {
@@ -316,7 +312,8 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 			}
 
 			if config.Capture.TranscodingWebRTC == "true" {
-				decoderMutex.Lock()
+
+				/*decoderMutex.Lock()
 				decoder.SetFramerate(30, 1)
 				frame, err := decoder.Decode(pkt.Data)
 				decoderMutex.Unlock()
@@ -332,10 +329,8 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 						pkt = _outpkts[0]
 						codecData, _ = encoder.CodecData()
 					}
-				}
-				if frame != nil {
-					frame.Free()
-				}
+				}*/
+
 			}
 
 			switch int(pkt.Idx) {

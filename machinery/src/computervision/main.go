@@ -54,6 +54,9 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 
 		key := config.HubKey
 
+		// Allocate a VideoFrame
+		frame := ffmpeg.AllocVideoFrame()
+
 		// Initialise first 2 elements
 		var imageArray [3]*image.Gray
 
@@ -66,7 +69,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 			pkt, cursorError = motionCursor.ReadPacket()
 			// Check If valid package.
 			if len(pkt.Data) > 0 && pkt.IsKeyFrame {
-				grayImage, err := GetGrayImage(pkt, decoder, decoderMutex)
+				grayImage, err := GetGrayImage(frame, pkt, decoder, decoderMutex)
 				if err == nil {
 					imageArray[j] = grayImage
 					j++
@@ -125,7 +128,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					continue
 				}
 
-				grayImage, err := GetGrayImage(pkt, decoder, decoderMutex)
+				grayImage, err := GetGrayImage(frame, pkt, decoder, decoderMutex)
 				if err == nil {
 					imageArray[2] = grayImage
 				}
@@ -133,7 +136,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				// Store snapshots (jpg) for hull.
 				files, err := ioutil.ReadDir("./data/snapshots")
 				if err == nil {
-					rgbImage, err := GetRawImage(pkt, decoder, decoderMutex)
+					rgbImage, err := GetRawImage(frame, pkt, decoder, decoderMutex)
 					if err == nil {
 						sort.Slice(files, func(i, j int) bool {
 							return files[i].ModTime().Before(files[j].ModTime())
@@ -150,7 +153,6 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 							f.Close()
 						}
 					}
-					rgbImage.Free()
 				}
 
 				// Check if within time interval
@@ -202,6 +204,8 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				img = nil
 			}
 		}
+
+		frame.Free()
 	}
 
 	log.Log.Debug("ProcessMotion: finished")
@@ -216,24 +220,20 @@ func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChange
 	return changes > pixelChangeThreshold, changes
 }
 
-func GetGrayImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*image.Gray, error) {
-	img, err := capture.DecodeImage(pkt, dec, decoderMutex)
+func GetGrayImage(frame *ffmpeg.VideoFrame, pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*image.Gray, error) {
+	_, err := capture.DecodeImage(frame, pkt, dec, decoderMutex)
 
 	// Do a deep copy of the image
-	imgDeepCopy := image.NewGray(img.ImageGray.Bounds())
-	imgDeepCopy.Stride = img.ImageGray.Stride
-	copy(imgDeepCopy.Pix, img.ImageGray.Pix)
-
-	// Cleanup of underlaying data
-	img.Free()
+	imgDeepCopy := image.NewGray(frame.ImageGray.Bounds())
+	imgDeepCopy.Stride = frame.ImageGray.Stride
+	copy(imgDeepCopy.Pix, frame.ImageGray.Pix)
 
 	return imgDeepCopy, err
 }
 
-func GetRawImage(pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
-	img, err := capture.DecodeImage(pkt, dec, decoderMutex)
-	// We'll need to free up ourselves ;) using -> img.Free()
-	return img, err
+func GetRawImage(frame *ffmpeg.VideoFrame, pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
+	_, err := capture.DecodeImage(frame, pkt, dec, decoderMutex)
+	return frame, err
 }
 
 func ImageToBytes(img image.Image) ([]byte, error) {

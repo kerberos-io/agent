@@ -2,7 +2,7 @@ module github.com/kerberos-io/agent/machinery
 
 go 1.19
 
-//replace github.com/kerberos-io/joy4 v1.0.48 => ../../../../github.com/kerberos-io/joy4
+//replace github.com/kerberos-io/joy4 v1.0.50 => ../../../../github.com/kerberos-io/joy4
 //replace github.com/kerberos-io/onvif v0.0.5 => ../../../../github.com/kerberos-io/onvif
 
 require (
@@ -20,13 +20,12 @@ require (
 	github.com/golang-module/carbon/v2 v2.2.3
 	github.com/gorilla/websocket v1.5.0
 	github.com/kellydunn/golang-geo v0.7.0
-	github.com/kerberos-io/joy4 v1.0.50
+	github.com/kerberos-io/joy4 v1.0.51
 	github.com/kerberos-io/onvif v0.0.5
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/nsmith5/mjpeg v0.0.0-20200913181537-54b8ada0e53e
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pion/webrtc/v3 v3.1.50
-	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/sirupsen/logrus v1.9.0
 	github.com/swaggo/files v1.0.0
 	github.com/swaggo/gin-swagger v1.5.3
@@ -58,7 +57,6 @@ require (
 	github.com/elgs/gostrgen v0.0.0-20161222160715-9d61ae07eeae // indirect
 	github.com/erikstmartin/go-testdb v0.0.0-20160219214506-8d10e4a1bae5 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
-	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.6 // indirect
 	github.com/go-openapi/spec v0.20.4 // indirect
@@ -110,7 +108,6 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/tinylib/msgp v1.1.6 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
-	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/ziutek/mymysql v1.5.4 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect

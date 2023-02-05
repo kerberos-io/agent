@@ -12,6 +12,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 )
 
 type Message struct {
@@ -129,6 +130,9 @@ func ForwardSDStream(ctx context.Context, clientID string, connection *Connectio
 	decoder := communication.Decoder
 	decoderMutex := communication.DecoderMutex
 
+	// Allocate ffmpeg.VideoFrame
+	frame := ffmpeg.AllocVideoFrame()
+
 logreader:
 	for {
 		var encodedImage string
@@ -138,13 +142,11 @@ logreader:
 				if !pkt.IsKeyFrame {
 					continue
 				}
-				img, err := computervision.GetRawImage(pkt, decoder, decoderMutex)
+				img, err := computervision.GetRawImage(frame, pkt, decoder, decoderMutex)
 				if err == nil {
 					bytes, _ := computervision.ImageToBytes(&img.Image)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				}
-				// Cleanup the image.
-				img.Free()
 			} else {
 				log.Log.Error("ForwardSDStream:" + err.Error())
 				break logreader
@@ -169,5 +171,8 @@ logreader:
 		default:
 		}
 	}
+
+	frame.Free()
+
 	log.Log.Info("ForwardSDStream: stop sending streaming over websocket")
 }

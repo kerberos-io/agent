@@ -39,9 +39,9 @@ func GetVideoDecoder(streams []av.CodecData) *ffmpeg.VideoDecoder {
 	return dec
 }
 
-func DecodeImage(pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
+func DecodeImage(frame *ffmpeg.VideoFrame, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
 	decoderMutex.Lock()
-	img, err := decoder.Decode(pkt.Data)
+	img, err := decoder.Decode(frame, pkt.Data)
 	decoderMutex.Unlock()
 	return img, err
 }

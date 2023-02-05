@@ -312,6 +312,9 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 		log.Log.Debug("HandleLiveStreamSD: stopping as Offline is enabled.")
 	} else {
 
+		// Allocate frame
+		frame := ffmpeg.AllocVideoFrame()
+
 		key := ""
 		if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
 			key = config.S3.Publickey
@@ -345,22 +348,23 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 				continue
 			}
 			log.Log.Info("HandleLiveStreamSD: Sending base64 encoded images to MQTT.")
-			sendImage(topic, mqttClient, pkt, decoder, decoderMutex)
+			sendImage(frame, topic, mqttClient, pkt, decoder, decoderMutex)
 		}
+
+		// Cleanup the frame.
+		frame.Free()
 	}
 
 	log.Log.Debug("HandleLiveStreamSD: finished")
 }
 
-func sendImage(topic string, mqttClient mqtt.Client, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
-	img, err := computervision.GetRawImage(pkt, decoder, decoderMutex)
+func sendImage(frame *ffmpeg.VideoFrame, topic string, mqttClient mqtt.Client, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+	_, err := computervision.GetRawImage(frame, pkt, decoder, decoderMutex)
 	if err == nil {
-		bytes, _ := computervision.ImageToBytes(&img.Image)
+		bytes, _ := computervision.ImageToBytes(&frame.Image)
 		encoded := base64.StdEncoding.EncodeToString(bytes)
 		mqttClient.Publish(topic, 0, false, encoded)
 	}
-	// Cleanup the image.
-	img.Free()
 }
 
 func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, codecs []av.CodecData, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
