@@ -39,12 +39,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 		pixelThreshold = 150
 	}
 
-	if config.Capture.Recording == "false" {
-
-		// We might later add the option to still detect motion, but not record.
-		log.Log.Info("ProcessMotion: Recording disabled, so we do not need motion detection either.")
-
-	} else if config.Capture.Continuous == "true" {
+	if config.Capture.Continuous == "true" {
 
 		log.Log.Info("ProcessMotion: Continuous recording, so no motion detection.")
 
@@ -134,23 +129,25 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				}
 
 				// Store snapshots (jpg) for hull.
-				files, err := ioutil.ReadDir("./data/snapshots")
-				if err == nil {
-					rgbImage, err := GetRawImage(frame, pkt, decoder, decoderMutex)
+				if config.Capture.Snapshots != "false" {
+					files, err := ioutil.ReadDir("./data/snapshots")
 					if err == nil {
-						sort.Slice(files, func(i, j int) bool {
-							return files[i].ModTime().Before(files[j].ModTime())
-						})
-						if len(files) > 3 {
-							os.Remove("./data/snapshots/" + files[0].Name())
-						}
-
-						// Save image
-						t := strconv.FormatInt(time.Now().Unix(), 10)
-						f, err := os.Create("./data/snapshots/" + t + ".jpg")
+						rgbImage, err := GetRawImage(frame, pkt, decoder, decoderMutex)
 						if err == nil {
-							jpeg.Encode(f, &rgbImage.Image, &jpeg.Options{Quality: 15})
-							f.Close()
+							sort.Slice(files, func(i, j int) bool {
+								return files[i].ModTime().Before(files[j].ModTime())
+							})
+							if len(files) > 3 {
+								os.Remove("./data/snapshots/" + files[0].Name())
+							}
+
+							// Save image
+							t := strconv.FormatInt(time.Now().Unix(), 10)
+							f, err := os.Create("./data/snapshots/" + t + ".jpg")
+							if err == nil {
+								jpeg.Encode(f, &rgbImage.Image, &jpeg.Options{Quality: 15})
+								f.Close()
+							}
 						}
 					}
 				}
@@ -178,26 +175,29 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					}
 				}
 
-				// Remember additional information about the result of findmotion
-				isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
+				if config.Capture.Motion != "false" {
 
-				if detectMotion && isPixelChangeThresholdReached {
+					// Remember additional information about the result of findmotion
+					isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
+					if detectMotion && isPixelChangeThresholdReached {
 
-					if mqttClient != nil {
-						mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
+						if mqttClient != nil {
+							mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
+						}
+
+						if config.Capture.Recording != "false" {
+							dataToPass := models.MotionDataPartial{
+								Timestamp:       time.Now().Unix(),
+								NumberOfChanges: changesToReturn,
+							}
+							communication.HandleMotion <- dataToPass //Save data to the channel
+						}
 					}
 
-					//FIXME: In the future MotionDataPartial should be replaced with MotionDataFull
-					dataToPass := models.MotionDataPartial{
-						Timestamp:       time.Now().Unix(),
-						NumberOfChanges: changesToReturn,
-					}
-					communication.HandleMotion <- dataToPass //Save data to the channel
+					imageArray[0] = imageArray[1]
+					imageArray[1] = imageArray[2]
+					i++
 				}
-
-				imageArray[0] = imageArray[1]
-				imageArray[1] = imageArray[2]
-				i++
 			}
 
 			if img != nil {
@@ -239,7 +239,6 @@ func GetRawImage(frame *ffmpeg.VideoFrame, pkt av.Packet, dec *ffmpeg.VideoDecod
 func ImageToBytes(img image.Image) ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	w := bufio.NewWriter(buffer)
-	//err := jpeg.Encode(w, img, &jpeg.EncoderOptions{Quality: 70})
 	err := jpeg.Encode(w, img, &jpeg.Options{Quality: 15})
 	return buffer.Bytes(), err
 }

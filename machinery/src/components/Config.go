@@ -244,6 +244,12 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 			case "AGENT_CAPTURE_CONTINUOUS":
 				configuration.Config.Capture.Continuous = value
 				break
+			case "AGENT_CAPTURE_MOTION":
+				configuration.Config.Capture.Motion = value
+				break
+			case "AGENT_CAPTURE_SNAPSHOTS":
+				configuration.Config.Capture.Snapshots = value
+				break
 			case "AGENT_CAPTURE_PRERECORDING":
 				duration, err := strconv.ParseInt(value, 10, 64)
 				if err == nil {
