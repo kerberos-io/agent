@@ -253,7 +253,7 @@ func CreateFragmentedMP4(fullName string, fragmentedDuration int64) {
 	path, _ := os.Getwd()
 	duration := fragmentedDuration * 1000
 	// This timescale is crucial, as it should be the same as the one defined in JOY4.
-	cmd := exec.Command("mp4fragment", "--timescale", "90000", "--fragment-duration", strconv.FormatInt(duration, 10), fullName, fullName+"f.mp4")
+	cmd := exec.Command("mp4fragment", "--timescale", "10000000", "--fragment-duration", strconv.FormatInt(duration, 10), fullName, fullName+"f.mp4")
 	cmd.Dir = path
 	log.Log.Info(cmd.String())
 	var out bytes.Buffer
