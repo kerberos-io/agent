@@ -131,14 +131,14 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// processed by the different consumers: motion detection, recording, etc.
 		queue = pubsub.NewQueue()
 		communication.Queue = queue
-		queue.SetMaxGopCount(int(config.Capture.PreRecording)) // GOP time frame is set to prerecording.
-		log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)))
+		queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
+		log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
 		queue.WriteHeader(streams)
 
 		// We might have a substream, if so we'll create a seperate queue.
 		var subQueue *pubsub.Queue
 		if subStreamEnabled {
-			log.Log.Info("RunAgent: Creating sub stream queue with SetMaxGopCount set to " + strconv.Itoa(int(config.Capture.PreRecording)))
+			log.Log.Info("RunAgent: Creating sub stream queue with SetMaxGopCount set to " + strconv.Itoa(int(1)))
 			subQueue = pubsub.NewQueue()
 			subQueue.SetMaxGopCount(1)
 			subQueue.WriteHeader(subStreams)

@@ -278,6 +278,12 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				startRecording = time.Now().Unix() // we mark the current time when the record started.
 				numberOfChanges := motion.NumberOfChanges
 
+				// If we have prerecording we will substract the number of seconds.
+				// Taking into account FPS = GOP size (Keyfram interval)
+				if config.Capture.PreRecording > 0 {
+					startRecording = startRecording - int64(config.Capture.PreRecording) + 1
+				}
+
 				// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 				// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
 				// - Timestamp
@@ -318,7 +324,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				var cursorError error
 				var pkt av.Packet
 				var nextPkt av.Packet
-				recordingCursor := queue.Oldest()
+				recordingCursor := queue.DelayedGopCount(int(config.Capture.PreRecording))
 
 				if cursorError == nil {
 					pkt, cursorError = recordingCursor.ReadPacket()
