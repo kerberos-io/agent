@@ -272,6 +272,9 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 			var file *os.File
 			var err error
 
+			var lastDuration time.Duration
+			var lastRecordingTime int64
+
 			for motion := range communication.HandleMotion {
 
 				timestamp = time.Now().Unix()
@@ -281,7 +284,16 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				// If we have prerecording we will substract the number of seconds.
 				// Taking into account FPS = GOP size (Keyfram interval)
 				if config.Capture.PreRecording > 0 {
-					startRecording = startRecording - int64(config.Capture.PreRecording) + 1
+
+					// Might be that recordings are coming short after each other.
+					// Therefore we do some math with the current time and the last recording time.
+
+					timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
+					if timeBetweenNowAndLastRecording > int64(config.Capture.PreRecording) {
+						startRecording = startRecording - int64(config.Capture.PreRecording) + 1
+					} else {
+						startRecording = startRecording - timeBetweenNowAndLastRecording
+					}
 				}
 
 				// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
@@ -351,7 +363,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 						log.Log.Info("HandleRecordStream: closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", recordingPeriod: " + strconv.FormatInt(recordingPeriod, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 						break
 					}
-					if pkt.IsKeyFrame && !start {
+					if pkt.IsKeyFrame && !start && pkt.Time >= lastDuration {
 						log.Log.Info("HandleRecordStream: write frames")
 						start = true
 					}
@@ -377,6 +389,9 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				// This will write the trailer as well.
 				myMuxer.WriteTrailerWithPacket(nextPkt)
 				log.Log.Info("HandleRecordStream:  file save: " + name)
+
+				lastDuration = pkt.Time
+				lastRecordingTime = time.Now().Unix()
 
 				// Cleanup muxer
 				myMuxer.Close()
