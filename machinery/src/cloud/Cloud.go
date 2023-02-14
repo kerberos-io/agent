@@ -221,6 +221,10 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				isEnterprise = true
 			}
 
+			// Congert to string
+			macs, _ := json.Marshal(system.MACs)
+			ips, _ := json.Marshal(system.IPs)
+
 			var object = fmt.Sprintf(`{
 				"key" : "%s",
 				"version" : "3.0.0",
@@ -235,8 +239,8 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				"totalMemory" : "%d",
 				"usedMemory" : "%d",
 				"freeMemory" : "%d",
-				"macs" : "%v",
-				"ips" : "%v",
+				"macs" : %s,
+				"ips" : %s,
 				"board" : "",
 				"disk1size" : "%s",
 				"disk3size" : "%s",
@@ -250,7 +254,7 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				"docker" : true,
 				"kios" : false,
 				"raspberrypi" : false
-			}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.MACs, system.IPs, "0", "0", "0", uptimeString, config.HubSite, onvifEnabled)
+			}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, ips, macs, "0", "0", "0", uptimeString, config.HubSite, onvifEnabled)
 
 			var jsonStr = []byte(object)
 			buffy := bytes.NewBuffer(jsonStr)
