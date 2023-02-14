@@ -308,51 +308,59 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 
 	config := configuration.Config
 
+	// If offline made is enabled, we will stop the thread.
 	if config.Offline == "true" {
 		log.Log.Debug("HandleLiveStreamSD: stopping as Offline is enabled.")
 	} else {
 
-		// Allocate frame
-		frame := ffmpeg.AllocVideoFrame()
+		// Check if we need to enable the live stream
+		if config.Capture.Liveview != "false" {
 
-		key := ""
-		if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
-			key = config.S3.Publickey
-		} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
-			key = config.KStorage.CloudKey
-		}
-		// This is the new way ;)
-		if config.HubKey != "" {
-			key = config.HubKey
-		}
+			// Allocate frame
+			frame := ffmpeg.AllocVideoFrame()
 
-		topic := "kerberos/" + key + "/device/" + config.Key + "/live"
-
-		lastLivestreamRequest := int64(0)
-
-		var cursorError error
-		var pkt av.Packet
-
-		for cursorError == nil {
-			pkt, cursorError = livestreamCursor.ReadPacket()
-			if len(pkt.Data) == 0 || !pkt.IsKeyFrame {
-				continue
+			key := ""
+			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
+				key = config.S3.Publickey
+			} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
+				key = config.KStorage.CloudKey
 			}
-			now := time.Now().Unix()
-			select {
-			case <-communication.HandleLiveSD:
-				lastLivestreamRequest = now
-			default:
+			// This is the new way ;)
+			if config.HubKey != "" {
+				key = config.HubKey
 			}
-			if now-lastLivestreamRequest > 3 {
-				continue
-			}
-			log.Log.Info("HandleLiveStreamSD: Sending base64 encoded images to MQTT.")
-			sendImage(frame, topic, mqttClient, pkt, decoder, decoderMutex)
-		}
 
-		// Cleanup the frame.
-		frame.Free()
+			topic := "kerberos/" + key + "/device/" + config.Key + "/live"
+
+			lastLivestreamRequest := int64(0)
+
+			var cursorError error
+			var pkt av.Packet
+
+			for cursorError == nil {
+				pkt, cursorError = livestreamCursor.ReadPacket()
+				if len(pkt.Data) == 0 || !pkt.IsKeyFrame {
+					continue
+				}
+				now := time.Now().Unix()
+				select {
+				case <-communication.HandleLiveSD:
+					lastLivestreamRequest = now
+				default:
+				}
+				if now-lastLivestreamRequest > 3 {
+					continue
+				}
+				log.Log.Info("HandleLiveStreamSD: Sending base64 encoded images to MQTT.")
+				sendImage(frame, topic, mqttClient, pkt, decoder, decoderMutex)
+			}
+
+			// Cleanup the frame.
+			frame.Free()
+
+		} else {
+			log.Log.Debug("HandleLiveStreamSD: stopping as Liveview is disabled.")
+		}
 	}
 
 	log.Log.Debug("HandleLiveStreamSD: finished")
@@ -375,34 +383,41 @@ func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 		log.Log.Debug("HandleLiveStreamHD: stopping as Offline is enabled.")
 	} else {
 
-		// Should create a track here.
-		track := webrtc.NewVideoTrack()
-		go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, track, codecs, decoder, decoderMutex)
+		// Check if we need to enable the live stream
+		if config.Capture.Liveview != "false" {
 
-		if config.Capture.ForwardWebRTC == "true" {
-			// We get a request with an offer, but we'll forward it.
-			for m := range communication.HandleLiveHDHandshake {
-				// Forward SDP
-				m.CloudKey = config.Key
-				request, err := json.Marshal(m)
-				if err == nil {
-					mqttClient.Publish("kerberos/webrtc/request", 2, false, request)
+			// Should create a track here.
+			track := webrtc.NewVideoTrack()
+			go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, track, codecs, decoder, decoderMutex)
+
+			if config.Capture.ForwardWebRTC == "true" {
+				// We get a request with an offer, but we'll forward it.
+				for m := range communication.HandleLiveHDHandshake {
+					// Forward SDP
+					m.CloudKey = config.Key
+					request, err := json.Marshal(m)
+					if err == nil {
+						mqttClient.Publish("kerberos/webrtc/request", 2, false, request)
+					}
+				}
+			} else {
+				log.Log.Info("HandleLiveStreamHD: Waiting for peer connections.")
+				for handshake := range communication.HandleLiveHDHandshake {
+					log.Log.Info("HandleLiveStreamHD: setting up a peer connection.")
+					key := config.Key + "/" + handshake.Cuuid
+					webrtc.CandidatesMutex.Lock()
+					_, ok := webrtc.CandidateArrays[key]
+					if !ok {
+						webrtc.CandidateArrays[key] = make(chan string, 30)
+					}
+					webrtc.CandidatesMutex.Unlock()
+					webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, track, handshake, webrtc.CandidateArrays[key])
+
 				}
 			}
+
 		} else {
-			log.Log.Info("HandleLiveStreamHD: Waiting for peer connections.")
-			for handshake := range communication.HandleLiveHDHandshake {
-				log.Log.Info("HandleLiveStreamHD: setting up a peer connection.")
-				key := config.Key + "/" + handshake.Cuuid
-				webrtc.CandidatesMutex.Lock()
-				_, ok := webrtc.CandidateArrays[key]
-				if !ok {
-					webrtc.CandidateArrays[key] = make(chan string, 30)
-				}
-				webrtc.CandidatesMutex.Unlock()
-				webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, track, handshake, webrtc.CandidateArrays[key])
-
-			}
+			log.Log.Debug("HandleLiveStreamHD: stopping as Liveview is disabled.")
 		}
 	}
 }
