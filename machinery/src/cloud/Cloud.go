@@ -95,6 +95,9 @@ func GetSystemInfo() (models.System, error) {
 	var usedMem uint64 = 0
 	var totalMem uint64 = 0
 	var freeMem uint64 = 0
+
+	var processUsedMem uint64 = 0
+
 	architecture := ""
 	cpuId := ""
 	KernelVersion := ""
@@ -133,18 +136,27 @@ func GetSystemInfo() (models.System, error) {
 		}
 	}
 
+	process, err := sysinfo.Self()
+	if err == nil {
+		memInfo, err := process.Memory()
+		if err == nil {
+			processUsedMem = memInfo.Resident
+		}
+	}
+
 	system := models.System{
-		Hostname:      hostname,
-		CPUId:         cpuId,
-		KernelVersion: KernelVersion,
-		Version:       agentVersion,
-		MACs:          MACs,
-		IPs:           IPs,
-		BootTime:      uint64(bootTime.Unix()),
-		Architecture:  architecture,
-		UsedMemory:    usedMem,
-		TotalMemory:   totalMem,
-		FreeMemory:    freeMem,
+		Hostname:          hostname,
+		CPUId:             cpuId,
+		KernelVersion:     KernelVersion,
+		Version:           agentVersion,
+		MACs:              MACs,
+		IPs:               IPs,
+		BootTime:          uint64(bootTime.Unix()),
+		Architecture:      architecture,
+		UsedMemory:        usedMem,
+		TotalMemory:       totalMem,
+		FreeMemory:        freeMem,
+		ProcessUsedMemory: processUsedMem,
 	}
 
 	return system, nil
@@ -200,6 +212,11 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 			uptimeString := carbon.Parse(uptimeFormatted).DiffForHumans()
 			uptimeString = strings.ReplaceAll(uptimeString, "ago", "")
 
+			// Do the same for boottime
+			bootTimeFormatted := time.Unix(int64(system.BootTime), 0).Format("2006-01-02 15:04:05")
+			boottimeString := carbon.Parse(bootTimeFormatted).DiffForHumans()
+			boottimeString = strings.ReplaceAll(boottimeString, "ago", "")
+
 			// We'll check which mode is enabled for the camera.
 			onvifEnabled := "false"
 			if config.Capture.IPCamera.ONVIFXAddr != "" {
@@ -239,6 +256,7 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				"totalMemory" : "%d",
 				"usedMemory" : "%d",
 				"freeMemory" : "%d",
+				"processMemory" : "%d",
 				"mac_list" : %s,
 				"ip_list" : %s,
 				"board" : "",
@@ -246,6 +264,7 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				"disk3size" : "%s",
 				"diskvdasize" :  "%s",
 				"uptime" : "%s",
+				"boot_time" : "%s",
 				"siteID" : "%s",
 				"onvif" : "%s",
 				"numberoffiles" : "33",
@@ -254,7 +273,7 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				"docker" : true,
 				"kios" : false,
 				"raspberrypi" : false
-			}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, macs, ips, "0", "0", "0", uptimeString, config.HubSite, onvifEnabled)
+			}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled)
 
 			var jsonStr = []byte(object)
 			buffy := bytes.NewBuffer(jsonStr)
