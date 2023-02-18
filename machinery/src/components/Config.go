@@ -56,6 +56,9 @@ func GetSnapshot() string {
 		content, _ := ioutil.ReadAll(reader)
 		// Encode as base64.
 		snapshot = base64.StdEncoding.EncodeToString(content)
+
+		// Close reader
+		reader = nil
 	}
 	return snapshot
 }
@@ -145,6 +148,9 @@ func OpenConfig(configuration *models.Configuration) {
 		conjungo.Merge(&s3, configuration.GlobalConfig.S3, opts)
 		conjungo.Merge(&s3, configuration.CustomConfig.S3, opts)
 		configuration.Config.S3 = &s3
+
+		// Cleanup
+		opts = nil
 
 	} else if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
 

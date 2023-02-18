@@ -193,8 +193,16 @@ func MQTTListenerHandleONVIF(mqttClient mqtt.Client, hubKey string, configuratio
 	})
 }
 
-func DisconnectMQTT(mqttClient mqtt.Client) {
+func DisconnectMQTT(mqttClient mqtt.Client, config *models.Config) {
 	if mqttClient != nil {
+		// Cleanup all subscriptions.
+		mqttClient.Unsubscribe("kerberos/" + config.HubKey + "/device/" + config.Key + "/request-live")
+		mqttClient.Unsubscribe(config.Key + "/register")
+		mqttClient.Unsubscribe("kerberos/webrtc/keepalivehub/" + config.Key)
+		mqttClient.Unsubscribe("kerberos/webrtc/peers/" + config.Key)
+		mqttClient.Unsubscribe("candidate/cloud")
+		mqttClient.Unsubscribe("kerberos/onvif/" + config.Key)
 		mqttClient.Disconnect(1000)
+		mqttClient = nil
 	}
 }

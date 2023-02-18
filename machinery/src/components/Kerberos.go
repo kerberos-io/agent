@@ -222,7 +222,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		close(communication.HandleONVIF)
 		close(communication.HandleLiveHDHandshake)
 		close(communication.HandleMotion)
-		routers.DisconnectMQTT(mqttClient)
+		routers.DisconnectMQTT(mqttClient, &configuration.Config)
 
 		// Wait a few seconds to stop the decoder.
 		time.Sleep(time.Second * 3)
