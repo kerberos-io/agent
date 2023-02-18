@@ -214,10 +214,14 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		time.Sleep(time.Second * 1)
 
 		infile.Close()
+		infile = nil
 		queue.Close()
+		queue = nil
 		if subStreamEnabled {
 			subInfile.Close()
+			subInfile = nil
 			subQueue.Close()
+			subQueue = nil
 		}
 		close(communication.HandleONVIF)
 		close(communication.HandleLiveHDHandshake)
@@ -227,8 +231,10 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// Wait a few seconds to stop the decoder.
 		time.Sleep(time.Second * 3)
 		decoder.Close()
+		decoder = nil
 		if subStreamEnabled {
 			subDecoder.Close()
+			subDecoder = nil
 		}
 		// Waiting for some seconds to make sure everything is properly closed.
 		log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")
