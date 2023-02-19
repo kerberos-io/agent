@@ -84,6 +84,10 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 	infile, streams, err := capture.OpenRTSP(rtspUrl)
 
 	var queue *pubsub.Queue
+	var subQueue *pubsub.Queue
+
+	var decoderMutex sync.Mutex
+	var subDecoderMutex sync.Mutex
 
 	status := "not started"
 
@@ -106,8 +110,6 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// At some routines we will need to decode the image.
 		// Make sure its properly locked as we only have a single decoder.
-		var decoderMutex sync.Mutex
-		var subDecoderMutex sync.Mutex
 		decoder := capture.GetVideoDecoder(streams)
 
 		var subDecoder *ffmpeg.VideoDecoder
@@ -136,10 +138,10 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		queue.WriteHeader(streams)
 
 		// We might have a substream, if so we'll create a seperate queue.
-		var subQueue *pubsub.Queue
 		if subStreamEnabled {
 			log.Log.Info("RunAgent: Creating sub stream queue with SetMaxGopCount set to " + strconv.Itoa(int(1)))
 			subQueue = pubsub.NewQueue()
+			communication.SubQueue = subQueue
 			subQueue.SetMaxGopCount(1)
 			subQueue.WriteHeader(subStreams)
 		}
@@ -217,24 +219,33 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		infile = nil
 		queue.Close()
 		queue = nil
+		communication.Queue = nil
 		if subStreamEnabled {
 			subInfile.Close()
 			subInfile = nil
 			subQueue.Close()
 			subQueue = nil
+			communication.SubQueue = nil
 		}
 		close(communication.HandleONVIF)
+		communication.HandleONVIF = nil
 		close(communication.HandleLiveHDHandshake)
+		communication.HandleLiveHDHandshake = nil
 		close(communication.HandleMotion)
+		communication.HandleMotion = nil
+
+		// Disconnect MQTT
 		routers.DisconnectMQTT(mqttClient, &configuration.Config)
 
 		// Wait a few seconds to stop the decoder.
 		time.Sleep(time.Second * 3)
 		decoder.Close()
 		decoder = nil
+		communication.Decoder = nil
 		if subStreamEnabled {
 			subDecoder.Close()
 			subDecoder = nil
+			communication.SubDecoder = nil
 		}
 		// Waiting for some seconds to make sure everything is properly closed.
 		log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")

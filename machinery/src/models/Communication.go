@@ -28,6 +28,7 @@ type Communication struct {
 	HandleONVIF           chan OnvifAction
 	IsConfiguring         *abool.AtomicBool
 	Queue                 *pubsub.Queue
+	SubQueue              *pubsub.Queue
 	DecoderMutex          *sync.Mutex
 	SubDecoderMutex       *sync.Mutex
 	Decoder               *ffmpeg.VideoDecoder
