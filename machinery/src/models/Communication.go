@@ -33,4 +33,5 @@ type Communication struct {
 	SubDecoderMutex       *sync.Mutex
 	Decoder               *ffmpeg.VideoDecoder
 	SubDecoder            *ffmpeg.VideoDecoder
+	Image                 string
 }

@@ -1,8 +1,6 @@
 package components
 
 import (
-	"bufio"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,27 +38,6 @@ func GetImageFromFilePath() (image.Image, error) {
 		return image, err
 	}
 	return nil, errors.New("Could not find a snapshot in " + snapshotDirectory)
-}
-
-func GetSnapshot() string {
-	var snapshot string
-	files, err := ioutil.ReadDir("./data/snapshots")
-	if err == nil && len(files) > 1 {
-		sort.Slice(files, func(i, j int) bool {
-			return files[i].ModTime().Before(files[j].ModTime())
-		})
-		f, _ := os.Open("./data/snapshots/" + files[1].Name())
-		defer f.Close()
-		// Read entire JPG into byte slice.
-		reader := bufio.NewReader(f)
-		content, _ := ioutil.ReadAll(reader)
-		// Encode as base64.
-		snapshot = base64.StdEncoding.EncodeToString(content)
-
-		// Close reader
-		reader = nil
-	}
-	return snapshot
 }
 
 // ReadUserConfig Reads the user configuration of the Kerberos Open Source instance.

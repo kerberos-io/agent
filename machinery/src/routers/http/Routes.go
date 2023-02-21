@@ -29,7 +29,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			"config":   configuration.Config,
 			"custom":   configuration.CustomConfig,
 			"global":   configuration.GlobalConfig,
-			"snapshot": components.GetSnapshot(),
+			"snapshot": communication.Image,
 		})
 	})
 
@@ -157,7 +157,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 				"config":   configuration.Config,
 				"custom":   configuration.CustomConfig,
 				"global":   configuration.GlobalConfig,
-				"snapshot": components.GetSnapshot(),
+				"snapshot": communication.Image,
 			})
 		})
 

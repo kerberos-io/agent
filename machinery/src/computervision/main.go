@@ -3,9 +3,9 @@ package computervision
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"image"
 	"image/jpeg"
-	"os"
 	"sync"
 	"time"
 
@@ -127,7 +127,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 
 				// Store snapshots (jpg) for hull.
 				if config.Capture.Snapshots != "false" {
-					StoreSnapshot(frame, pkt, decoder, decoderMutex)
+					StoreSnapshot(communication, frame, pkt, decoder, decoderMutex)
 				}
 
 				// Check if within time interval
@@ -234,16 +234,15 @@ func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.
 	return changes
 }
 
-func StoreSnapshot(frame *ffmpeg.VideoFrame, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func StoreSnapshot(communication *models.Communication, frame *ffmpeg.VideoFrame, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
 	rgbImage, err := GetRawImage(frame, pkt, decoder, decoderMutex)
 	if err == nil {
-		// Save image
-		f, err := os.Create("./data/snapshots/0.jpg")
+		buffer := new(bytes.Buffer)
+		w := bufio.NewWriter(buffer)
+		err := jpeg.Encode(w, &rgbImage.Image, &jpeg.Options{Quality: 15})
 		if err == nil {
-			jpeg.Encode(f, &rgbImage.Image, &jpeg.Options{Quality: 15})
-		} else {
-			log.Log.Error("StoreSnapshot: " + err.Error())
+			snapshot := base64.StdEncoding.EncodeToString(buffer.Bytes())
+			communication.Image = snapshot
 		}
-		f.Close()
 	}
 }
