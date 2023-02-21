@@ -242,7 +242,7 @@ func StoreSnapshot(frame *ffmpeg.VideoFrame, pkt av.Packet, decoder *ffmpeg.Vide
 		if err == nil {
 			jpeg.Encode(f, &rgbImage.Image, &jpeg.Options{Quality: 15})
 		} else {
-			log.Log.Error("StoreSnapshot: ", err)
+			log.Log.Error("StoreSnapshot: " + err.Error())
 		}
 		f.Close()
 	}
