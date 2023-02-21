@@ -5,10 +5,7 @@ import (
 	"bytes"
 	"image"
 	"image/jpeg"
-	"io/ioutil"
 	"os"
-	"sort"
-	"strconv"
 	"sync"
 	"time"
 
@@ -238,24 +235,15 @@ func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.
 }
 
 func StoreSnapshot(frame *ffmpeg.VideoFrame, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
-	files, err := ioutil.ReadDir("./data/snapshots")
+	rgbImage, err := GetRawImage(frame, pkt, decoder, decoderMutex)
 	if err == nil {
-		rgbImage, err := GetRawImage(frame, pkt, decoder, decoderMutex)
+		// Save image
+		f, err := os.Create("./data/snapshots/0.jpg")
 		if err == nil {
-			sort.Slice(files, func(i, j int) bool {
-				return files[i].ModTime().Before(files[j].ModTime())
-			})
-			if len(files) > 3 {
-				os.Remove("./data/snapshots/" + files[0].Name())
-			}
-
-			// Save image
-			t := strconv.FormatInt(time.Now().Unix(), 10)
-			f, err := os.Create("./data/snapshots/" + t + ".jpg")
-			if err == nil {
-				jpeg.Encode(f, &rgbImage.Image, &jpeg.Options{Quality: 15})
-				f.Close()
-			}
+			jpeg.Encode(f, &rgbImage.Image, &jpeg.Options{Quality: 15})
+		} else {
+			log.Log.Error("StoreSnapshot: ", err)
 		}
+		f.Close()
 	}
 }
