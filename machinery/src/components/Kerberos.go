@@ -7,6 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kerberos-io/joy4/cgo/ffmpeg"
+
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -109,12 +111,12 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// At some routines we will need to decode the image.
 		// Make sure its properly locked as we only have a single decoder.
-		//decoder := capture.GetVideoDecoder(streams)
+		decoder := capture.GetVideoDecoder(streams)
 
-		//var subDecoder *ffmpeg.VideoDecoder
-		//if subStreamEnabled {
-		//	subDecoder = capture.GetVideoDecoder(subStreams)
-		//}
+		var subDecoder *ffmpeg.VideoDecoder
+		if subStreamEnabled {
+			subDecoder = capture.GetVideoDecoder(subStreams)
+		}
 
 		//communication.Decoder = decoder
 		//communication.SubDecoder = subDecoder
@@ -238,12 +240,12 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// Wait a few seconds to stop the decoder.
 		time.Sleep(time.Second * 3)
-		//decoder.Close()
-		//decoder = nil
+		decoder.Close()
+		decoder = nil
 		communication.Decoder = nil
 		if subStreamEnabled {
-			//subDecoder.Close()
-			//subDecoder = nil
+			subDecoder.Close()
+			subDecoder = nil
 			communication.SubDecoder = nil
 		}
 		// Waiting for some seconds to make sure everything is properly closed.
