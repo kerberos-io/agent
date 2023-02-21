@@ -9,14 +9,12 @@ import (
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
-	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
 	routers "github.com/kerberos-io/agent/machinery/src/routers/mqtt"
 	"github.com/kerberos-io/joy4/av"
 	"github.com/kerberos-io/joy4/av/pubsub"
-	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 	"github.com/tevino/abool"
 )
 
@@ -111,15 +109,15 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// At some routines we will need to decode the image.
 		// Make sure its properly locked as we only have a single decoder.
-		decoder := capture.GetVideoDecoder(streams)
+		//decoder := capture.GetVideoDecoder(streams)
 
-		var subDecoder *ffmpeg.VideoDecoder
-		if subStreamEnabled {
-			subDecoder = capture.GetVideoDecoder(subStreams)
-		}
+		//var subDecoder *ffmpeg.VideoDecoder
+		//if subStreamEnabled {
+		//	subDecoder = capture.GetVideoDecoder(subStreams)
+		//}
 
-		communication.Decoder = decoder
-		communication.SubDecoder = subDecoder
+		//communication.Decoder = decoder
+		//communication.SubDecoder = subDecoder
 		communication.DecoderMutex = &decoderMutex
 		communication.SubDecoderMutex = &subDecoderMutex
 
@@ -165,31 +163,31 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// Handle processing of motion
 		communication.HandleMotion = make(chan models.MotionDataPartial, 1)
 		if subStreamEnabled {
-			motionCursor := subQueue.Latest()
-			go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, subDecoder, &subDecoderMutex)
+			//motionCursor := subQueue.Latest()
+			//go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, subDecoder, &subDecoderMutex)
 		} else {
-			motionCursor := queue.Latest()
-			go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
+			//motionCursor := queue.Latest()
+			//go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 		}
 
 		// Handle livestream SD (low resolution over MQTT)
 		if subStreamEnabled {
-			livestreamCursor := subQueue.Latest()
-			go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, subDecoder, &subDecoderMutex)
+			//livestreamCursor := subQueue.Latest()
+			//go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, subDecoder, &subDecoderMutex)
 		} else {
-			livestreamCursor := queue.Latest()
-			go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
+			//livestreamCursor := queue.Latest()
+			//go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
 		}
 
 		// Handle livestream HD (high resolution over WEBRTC)
 		communication.HandleLiveHDHandshake = make(chan models.SDPPayload, 1)
-		if subStreamEnabled {
-			livestreamHDCursor := subQueue.Latest()
-			go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, subStreams, subDecoder, &decoderMutex)
-		} else {
-			livestreamHDCursor := queue.Latest()
-			go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, streams, decoder, &decoderMutex)
-		}
+		//if subStreamEnabled {
+		//	livestreamHDCursor := subQueue.Latest()
+		//	go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, subStreams, subDecoder, &decoderMutex)
+		//} else {
+		//	livestreamHDCursor := queue.Latest()
+		//	go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, streams, decoder, &decoderMutex)
+		//}
 
 		// Handle recording, will write an mp4 to disk.
 		go capture.HandleRecordStream(queue, configuration, communication, streams)
@@ -240,12 +238,12 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// Wait a few seconds to stop the decoder.
 		time.Sleep(time.Second * 3)
-		decoder.Close()
-		decoder = nil
+		//decoder.Close()
+		//decoder = nil
 		communication.Decoder = nil
 		if subStreamEnabled {
-			subDecoder.Close()
-			subDecoder = nil
+			//subDecoder.Close()
+			//subDecoder = nil
 			communication.SubDecoder = nil
 		}
 		// Waiting for some seconds to make sure everything is properly closed.
