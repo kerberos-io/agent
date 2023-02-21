@@ -1,6 +1,7 @@
 package components
 
 import (
+	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -256,6 +257,9 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 	}
 
 	log.Log.Debug("RunAgent: finished")
+
+	// Clean up, force garbage collection
+	runtime.GC()
 
 	return status
 }
