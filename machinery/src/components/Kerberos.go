@@ -61,13 +61,14 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	// Create some global variables
 	decoder := &ffmpeg.VideoDecoder{}
 	subDecoder := &ffmpeg.VideoDecoder{}
+	cameraSettings := &models.Camera{}
 
 	// Run the agent and fire up all the other
 	// goroutines which do image capture, motion detection, onvif, etc.
 
 	for {
 		// This will blocking until receiving a signal to be restarted, reconfigured, stopped, etc.
-		status := RunAgent(configuration, communication, uptimeStart, decoder, subDecoder)
+		status := RunAgent(configuration, communication, uptimeStart, cameraSettings, decoder, subDecoder)
 		if status == "stop" {
 			break
 		}
@@ -77,7 +78,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	log.Log.Debug("Bootstrap: finished")
 }
 
-func RunAgent(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time, decoder *ffmpeg.VideoDecoder, subDecoder *ffmpeg.VideoDecoder) string {
+func RunAgent(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time, cameraSettings *models.Camera, decoder *ffmpeg.VideoDecoder, subDecoder *ffmpeg.VideoDecoder) string {
 	log.Log.Debug("RunAgent: started")
 
 	config := configuration.Config
@@ -113,12 +114,33 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 			}
 		}
 
-		// At some routines we will need to decode the image.
-		// Make sure its properly locked as we only have a single decoder.
-		capture.GetVideoDecoder(decoder, streams)
+		// We will initialise the camera settings object
+		// so we can check if the camera settings have changed, and we need
+		// to reload the decoders.
+		videoStream, _ := capture.GetVideoStream(streams)
+		num, denum := videoStream.(av.VideoCodecData).Framerate()
+		width := videoStream.(av.VideoCodecData).Width()
+		height := videoStream.(av.VideoCodecData).Height()
 
-		if subStreamEnabled {
-			capture.GetVideoDecoder(subDecoder, subStreams)
+		if cameraSettings.RTSP != rtspUrl || cameraSettings.SubRTSP != subRtspUrl || cameraSettings.Width != width || cameraSettings.Height != height || cameraSettings.Num != num || cameraSettings.Denum != denum || cameraSettings.Codec != videoStream.(av.VideoCodecData).Type() {
+			// At some routines we will need to decode the image.
+			// Make sure its properly locked as we only have a single decoder.
+			log.Log.Info("RunAgent: camera settings changed, reloading decoder")
+			capture.GetVideoDecoder(decoder, streams)
+			if subStreamEnabled {
+				capture.GetVideoDecoder(subDecoder, subStreams)
+			}
+
+			cameraSettings.RTSP = rtspUrl
+			cameraSettings.SubRTSP = subRtspUrl
+			cameraSettings.Width = width
+			cameraSettings.Height = height
+			cameraSettings.Framerate = float64(num) / float64(denum)
+			cameraSettings.Num = num
+			cameraSettings.Denum = denum
+			cameraSettings.Codec = videoStream.(av.VideoCodecData).Type()
+		} else {
+			log.Log.Info("RunAgent: camera settings did not change, keeping decoder")
 		}
 
 		communication.Decoder = decoder

@@ -25,6 +25,18 @@ func OpenRTSP(url string) (av.DemuxCloser, []av.CodecData, error) {
 	return nil, []av.CodecData{}, err
 }
 
+func GetVideoStream(streams []av.CodecData) (av.CodecData, error) {
+	var videoStream av.CodecData
+	for _, stream := range streams {
+		if stream.Type().IsAudio() {
+			//astream := stream.(av.AudioCodecData)
+		} else if stream.Type().IsVideo() {
+			videoStream = stream
+		}
+	}
+	return videoStream, nil
+}
+
 func GetVideoDecoder(decoder *ffmpeg.VideoDecoder, streams []av.CodecData) {
 	// Load video codec
 	var vstream av.VideoCodecData
