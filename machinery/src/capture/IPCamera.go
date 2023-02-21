@@ -25,7 +25,7 @@ func OpenRTSP(url string) (av.DemuxCloser, []av.CodecData, error) {
 	return nil, []av.CodecData{}, err
 }
 
-func GetVideoDecoder(streams []av.CodecData) *ffmpeg.VideoDecoder {
+func GetVideoDecoder(decoder *ffmpeg.VideoDecoder, streams []av.CodecData) {
 	// Load video codec
 	var vstream av.VideoCodecData
 	for _, stream := range streams {
@@ -35,8 +35,10 @@ func GetVideoDecoder(streams []av.CodecData) *ffmpeg.VideoDecoder {
 			vstream = stream.(av.VideoCodecData)
 		}
 	}
-	dec, _ := ffmpeg.NewVideoDecoder(vstream)
-	return dec
+	err := ffmpeg.NewVideoDecoder(decoder, vstream)
+	if err != nil {
+		log.Log.Error("GetVideoDecoder: " + err.Error())
+	}
 }
 
 func DecodeImage(frame *ffmpeg.VideoFrame, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {

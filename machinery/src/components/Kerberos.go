@@ -58,12 +58,16 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	// do several checks to see if the agent is still operational.
 	go ControlAgent(communication)
 
+	// Create some global variables
+	decoder := &ffmpeg.VideoDecoder{}
+	subDecoder := &ffmpeg.VideoDecoder{}
+
 	// Run the agent and fire up all the other
 	// goroutines which do image capture, motion detection, onvif, etc.
 
 	for {
 		// This will blocking until receiving a signal to be restarted, reconfigured, stopped, etc.
-		status := RunAgent(configuration, communication, uptimeStart)
+		status := RunAgent(configuration, communication, uptimeStart, decoder, subDecoder)
 		if status == "stop" {
 			break
 		}
@@ -73,7 +77,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	log.Log.Debug("Bootstrap: finished")
 }
 
-func RunAgent(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time) string {
+func RunAgent(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time, decoder *ffmpeg.VideoDecoder, subDecoder *ffmpeg.VideoDecoder) string {
 	log.Log.Debug("RunAgent: started")
 
 	config := configuration.Config
@@ -111,15 +115,14 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// At some routines we will need to decode the image.
 		// Make sure its properly locked as we only have a single decoder.
-		decoder := capture.GetVideoDecoder(streams)
+		capture.GetVideoDecoder(decoder, streams)
 
-		var subDecoder *ffmpeg.VideoDecoder
 		if subStreamEnabled {
-			subDecoder = capture.GetVideoDecoder(subStreams)
+			capture.GetVideoDecoder(subDecoder, subStreams)
 		}
 
-		//communication.Decoder = decoder
-		//communication.SubDecoder = subDecoder
+		communication.Decoder = decoder
+		communication.SubDecoder = subDecoder
 		communication.DecoderMutex = &decoderMutex
 		communication.SubDecoderMutex = &subDecoderMutex
 
