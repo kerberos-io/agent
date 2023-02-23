@@ -240,13 +240,6 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// the agent will cleanup and restart.
 		status = <-communication.HandleBootstrap
 
-		close(communication.HandleONVIF)
-		communication.HandleONVIF = nil
-		close(communication.HandleLiveHDHandshake)
-		communication.HandleLiveHDHandshake = nil
-		close(communication.HandleMotion)
-		communication.HandleMotion = nil
-
 		// Here we are cleaning up everything!
 		if configuration.Config.Offline != "true" {
 			communication.HandleHeartBeat <- "stop"
@@ -270,6 +263,12 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 			subQueue = nil
 			communication.SubQueue = nil
 		}
+		close(communication.HandleONVIF)
+		communication.HandleONVIF = nil
+		close(communication.HandleLiveHDHandshake)
+		communication.HandleLiveHDHandshake = nil
+		close(communication.HandleMotion)
+		communication.HandleMotion = nil
 
 		// Disconnect MQTT
 		routers.DisconnectMQTT(mqttClient, &configuration.Config)
