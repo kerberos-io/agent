@@ -7,14 +7,18 @@ const websocketprotocol = protocol === 'http:' ? 'ws:' : 'wss:';
 
 const dev = {
   ENV: 'dev',
+  
+  // Comment the below lines, when using codespaces or other special DNS names (which you can't control)
   HOSTNAME: hostname,
   API_URL: `${protocol}//${hostname}:8080/api`,
   URL: `${protocol}//${hostname}:8080`,
   WS_URL: `${websocketprotocol}//${hostname}:8080/ws`,
 
   // Uncomment, and comment the above lines, when using codespaces or other special DNS names (which you can't control)
-  // API_URL: `${protocol}//${externalHost}/api`,
-  // URL: `${protocol}//${externalHost}`,
+  //HOSTNAME: externalHost,
+  //API_URL: `${protocol}//${externalHost}/api`,
+  //URL: `${protocol}//${externalHost}`,
+  //WS_URL: `${websocketprotocol}//${externalHost}/ws`,
 };
 
 const prod = {
