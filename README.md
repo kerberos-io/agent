@@ -231,20 +231,21 @@ On opening of the GitHub Codespace, some dependencies will be installed. Once th
 
 Go and open two terminals one for the `ui` project and one for the `machinery` project.
 
-1. Terminal A:
+1.  Terminal A:
 
         cd machinery/
         go run main.go run camera 80
- 
-2. Terminal B:
-  
+
+2.  Terminal B:
+
         cd ui/
         yarn start
-  
- Once executed, a popup will show up mentioning `portforwarding`. You should see two ports being opened, one for the ui `3000` and one for the machinery `80`. `Right-click` on the port `80` and change visibility from `private` to `public`, this is required to avoid `CORS` errors.
- 
- As mentioned above, copy the hostname of the `machinery` DNS name, and past it in the `ui/src/config.json` file. Once done reload, the `ui` page in your browser, and you should be able to access the login page with the default credentials `root` and `root`.
- 
+
+Once executed, a popup will show up mentioning `portforwarding`. You should see two ports being opened, one for the ui `3000` and one for the machinery `80`. `Right-click` on the port `80` and change visibility from `private` to `public`, this is required to avoid `CORS` errors.
+
+![Codespace make public](./assets/img/codespace-make-public.png)
+
+As mentioned above, copy the hostname of the `machinery` DNS name, and past it in the `ui/src/config.json` file. Once done reload, the `ui` page in your browser, and you should be able to access the login page with the default credentials `root` and `root`.
 
 ## Develop and build
 
