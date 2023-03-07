@@ -210,6 +210,42 @@ After a few minutes, you will see a beautiful `Visual Studio Code` shown in your
 
 ![Kerberos Agent VSCode](assets/img/codespace-vscode.png)
 
+On opening of the GitHub Codespace, some dependencies will be installed. Once this is done go ahead to the `ui/src/config.json` file, and (un)comment following section. Make sure to replace the `externalHost` variable with the DNS name you will retrieve from the next step.
+
+    // Uncomment this when using codespaces or other special DNS names (which you can't control)
+    // replace this with the DNS name of the kerberos agent server (the codespace url)
+    const externalHost = 'cedricve-automatic-computing-machine-v647rxvj4whx9qp-80.preview.app.github.dev';
+
+    const dev = {
+      ENV: 'dev',
+      HOSTNAME: externalHost,
+      //API_URL: `${protocol}//${hostname}:8080/api`,
+      //URL: `${protocol}//${hostname}:8080`,
+      //WS_URL: `${websocketprotocol}//${hostname}:8080/ws`,
+
+      // Uncomment, and comment the above lines, when using codespaces or other special DNS names (which you can't control)
+      API_URL: `${protocol}//${externalHost}/api`,
+      URL: `${protocol}//${externalHost}`,
+      WS_URL: `${websocketprotocol}//${externalHost}/ws`,
+    };
+
+Go and open two terminals one for the `ui` project and one for the `machinery` project.
+
+1. Terminal A:
+
+        cd machinery/
+        go run main.go run camera 80
+ 
+2. Terminal B:
+  
+        cd ui/
+        yarn start
+  
+ Once executed, a popup will show up mentioning `portforwarding`. You should see two ports being opened, one for the ui `3000` and one for the machinery `80`. `Right-click` on the port `80` and change visibility from `private` to `public`, this is required to avoid `CORS` errors.
+ 
+ As mentioned above, copy the hostname of the `machinery` DNS name, and past it in the `ui/src/config.json` file. Once done reload, the `ui` page in your browser, and you should be able to access the login page with the default credentials `root` and `root`.
+ 
+
 ## Develop and build
 
 Kerberos Agent is divided in two parts a `machinery` and `web`. Both parts live in this repository in their relative folders. For development or running the application on your local machine, you have to run both the `machinery` and the `web` as described below. When running in production everything is shipped as only one artifact, read more about this at [Building for production](#building-for-production).
