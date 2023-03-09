@@ -22,6 +22,10 @@
 			"device": ""
 		},
 		"continuous": "false",
+		"recording": "true",
+		"snapshots": "true",
+		"liveview": "true",
+		"motion": "true",
 		"postrecording": 20,
 		"prerecording": 10,
 		"maxlengthrecording": 30,
