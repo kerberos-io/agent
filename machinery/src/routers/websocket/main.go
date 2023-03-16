@@ -136,7 +136,7 @@ func ForwardSDStream(ctx context.Context, clientID string, connection *Connectio
 logreader:
 	for {
 		var encodedImage string
-		if cursor != nil && decoder != nil {
+		if queue != nil && cursor != nil && decoder != nil {
 			pkt, err := cursor.ReadPacket()
 			if err == nil {
 				if !pkt.IsKeyFrame {
