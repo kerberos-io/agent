@@ -19,6 +19,7 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string, d
 		config.KStorage.Directory == "" ||
 		config.KStorage.URI == "" {
 		log.Log.Info("UploadKerberosVault: Kerberos Vault not properly configured.")
+		return false
 	}
 
 	//fmt.Println("Uploading...")

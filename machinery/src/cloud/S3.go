@@ -44,6 +44,12 @@ func UploadS3(configuration *models.Configuration, fileName string, directory st
 		aws_secret_access_key = config.HubPrivateKey
 	}
 
+	// Check if we have some credentials otherwise we abort the request.
+	if aws_access_key_id == "" || aws_secret_access_key == "" {
+		log.Log.Error("UploadS3: Uploading Failed, as no credentials found")
+		return false
+	}
+
 	s3Client, err := minio.NewWithRegion("s3.amazonaws.com", aws_access_key_id, aws_secret_access_key, true, aws_region)
 	if err != nil {
 		log.Log.Error(err.Error())
