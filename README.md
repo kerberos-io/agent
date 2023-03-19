@@ -185,6 +185,9 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_HUB_PRIVATE_KEY`                 | The secret access key linked to your account in Kerberos Hub.                                   | ""                              |
 | `AGENT_HUB_USERNAME`                    | Your Kerberos Hub username, which owns the above access and secret keys.                        | ""                              |
 | `AGENT_HUB_SITE`                        | The site ID of a site you've created in your Kerberos Hub account.                              | ""                              |
+| `AGENT_HUB_TIME`                        | Enable the timetable for Kerberos Agent                                                         | "false"                         |
+| `AGENT_HUB_TIMETABLE`                   | A (weekly) time table to specify when to make recordings "start1,end1,start2,end2;start1..      | ""                              |
+| `AGENT_HUB_REGION_POLYGON`              | A single polygon set for motion detection: "x1,y1;x2,y2;x3,y3;...                               | ""                              |
 | `AGENT_MQTT_URI`                        | A MQTT broker endpoint that is used for bi-directional communication (live view, onvif, etc)    | "tcp://mqtt.kerberos.io:1883"   |
 | `AGENT_MQTT_USERNAME`                   | Username of the MQTT broker.                                                                    | ""                              |
 | `AGENT_MQTT_PASSWORD`                   | Password of the MQTT broker.                                                                    | ""                              |
