@@ -47,8 +47,7 @@ func ReadUserConfig() (userConfig models.User) {
 	for {
 		jsonFile, err := os.Open("./data/config/user.json")
 		if err != nil {
-			fmt.Println(err)
-			fmt.Println("Config file is not found " + "./data/config/user.json" + ", trying again in 5s.")
+			fmt.Println("Config file is not found " + "./data/config/user.json, trying again in 5s: " + err.Error())
 			time.Sleep(5 * time.Second)
 		} else {
 			fmt.Println("Successfully Opened user.json")
@@ -290,6 +289,84 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				break
 			case "AGENT_HUB_SITE":
 				configuration.Config.HubSite = value
+				break
+
+			/* Conditions */
+
+			case "AGENT_HUB_TIME":
+				configuration.Config.Time = value
+				break
+			case "AGENT_HUB_TIMETABLE":
+				var timetable []*models.Timetable
+
+				// Convert value to timetable array with (start1, end1, start2, end2)
+				// Where days are limited by ; and time by ,
+				// su;mo;tu;we;th;fr;sa
+				// 0,43199,43200,86400;0,43199,43200,86400
+
+				// Split days
+				daysString := strings.Split(value, ";")
+				for _, dayString := range daysString {
+					// Split time
+					timeString := strings.Split(dayString, ",")
+					if len(timeString) == 4 {
+						start1, err := strconv.ParseInt(timeString[0], 10, 64)
+						if err != nil {
+							continue
+						}
+						end1, err := strconv.ParseInt(timeString[1], 10, 64)
+						if err != nil {
+							continue
+						}
+						start2, err := strconv.ParseInt(timeString[2], 10, 64)
+						if err != nil {
+							continue
+						}
+						end2, err := strconv.ParseInt(timeString[3], 10, 64)
+						if err != nil {
+							continue
+						}
+						timetable = append(timetable, &models.Timetable{
+							Start1: int(start1),
+							End1:   int(end1),
+							Start2: int(start2),
+							End2:   int(end2),
+						})
+					}
+				}
+				configuration.Config.Timetable = timetable
+				break
+
+			case "AGENT_HUB_REGION_POLYGON":
+				var coordinates []models.Coordinate
+
+				// Convert value to coordinates array
+				// 0,0;1,1;2,2;3,3
+				coordinatesString := strings.Split(value, ";")
+				for _, coordinateString := range coordinatesString {
+					coordinate := strings.Split(coordinateString, ",")
+					if len(coordinate) == 2 {
+						x, err := strconv.ParseFloat(coordinate[0], 64)
+						if err != nil {
+							continue
+						}
+						y, err := strconv.ParseFloat(coordinate[1], 64)
+						if err != nil {
+							continue
+						}
+						coordinates = append(coordinates, models.Coordinate{
+							X: x,
+							Y: y,
+						})
+					}
+				}
+
+				configuration.Config.Region.Polygon = []models.Polygon{
+					{
+						Coordinates: coordinates,
+						ID:          "0",
+					},
+				}
 				break
 
 			/* MQTT settings for bi-directional communication */
