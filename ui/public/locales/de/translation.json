@@ -198,7 +198,10 @@
       "kerberosvault_description_accesskey": "Der Zugriffsschlüssel des Kerberos Vault Accounts..",
       "kerberosvault_secretkey": "Geheimer Schlüssel",
       "kerberosvault_description_secretkey": "Der geheime Schlüssel des Kerberos Vault Accounts.",
-      "verify_connection": "Verbindung prüfen"
+      "verify_connection": "Verbindung prüfen",
+      "remove_after_upload": "Once recordings are uploaded to some persistence, you might want to remove them from the local Kerberos Agent.",
+      "remove_after_upload_description": "Remove recordings after they are uploaded successfully.",
+      "remove_after_upload_enabled": "Enabled delete on upload"
     }
   }
 }

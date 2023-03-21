@@ -199,7 +199,10 @@
       "kerberosvault_description_accesskey": "De access key van jouw Kerberos Vault account.",
       "kerberosvault_secretkey": "Secret key",
       "kerberosvault_description_secretkey": "De secret key van jouw Kerberos Vault account.",
-      "verify_connection": "Verifieer verbinding"
+      "verify_connection": "Verifieer verbinding",
+      "remove_after_upload": "Wanneer opnames opgeslagen zijn, kan je ze verwijderen in de lokale Kerberos Agent.",
+      "remove_after_upload_description": "Verwijder opnames wanneer ze zijn geupload naar een opslag locatie.",
+      "remove_after_upload_enabled": "Activeer verwijderen na uploaden"
     }
   }
 }

@@ -230,10 +230,7 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 	// Later when we read a packet we need to figure out which track to send it to.
 	videoIdx := -1
 	audioIdx := -1
-	log.Log.Info("WriteToTrack: listing codecs.")
 	for i, codec := range codecs {
-		log.Log.Info("WriteToTrack: codec - " + codec.Type().String() + " found.")
-		log.Log.Info(codec.Type().String())
 		if codec.Type().String() == "H264" && videoIdx < 0 {
 			videoIdx = i
 		} else if codec.Type().String() == "PCM_MULAW" && audioIdx < 0 {
@@ -367,7 +364,7 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 						}
 					} else {
 						if err := track.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
-							fmt.Println("WriteToTrack: something went wrong while writing sample: " + err.Error())
+							log.Log.Error("WriteToTrack: something went wrong while writing sample: " + err.Error())
 						}
 					}
 				}

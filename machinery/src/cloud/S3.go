@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"crypto/tls"
+	"errors"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,11 +14,10 @@ import (
 	"github.com/minio/minio-go/v6"
 )
 
-func UploadS3(configuration *models.Configuration, fileName string, directory string) bool {
+func UploadS3(configuration *models.Configuration, fileName string) (bool, bool, error) {
 
 	config := configuration.Config
 
-	//fmt.Println("Uploading...")
 	// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 	// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
 	// - Timestamp
@@ -28,10 +28,12 @@ func UploadS3(configuration *models.Configuration, fileName string, directory st
 	// - Token
 
 	if config.S3 == nil {
-		log.Log.Error("UploadS3: Uploading Failed, as no settings found")
-		return false
+		errorMessage := "UploadS3: Uploading Failed, as no settings found"
+		log.Log.Error(errorMessage)
+		return false, false, errors.New(errorMessage)
 	}
 
+	// Legacy support, should get rid of it!
 	aws_access_key_id := config.S3.Publickey
 	aws_secret_access_key := config.S3.Secretkey
 	aws_region := config.S3.Region
@@ -46,13 +48,16 @@ func UploadS3(configuration *models.Configuration, fileName string, directory st
 
 	// Check if we have some credentials otherwise we abort the request.
 	if aws_access_key_id == "" || aws_secret_access_key == "" {
-		log.Log.Error("UploadS3: Uploading Failed, as no credentials found")
-		return false
+		errorMessage := "UploadS3: Uploading Failed, as no credentials found"
+		log.Log.Error(errorMessage)
+		return false, false, errors.New(errorMessage)
 	}
 
 	s3Client, err := minio.NewWithRegion("s3.amazonaws.com", aws_access_key_id, aws_secret_access_key, true, aws_region)
 	if err != nil {
-		log.Log.Error(err.Error())
+		errorMessage := "UploadS3: " + err.Error()
+		log.Log.Error(errorMessage)
+		return false, true, errors.New(errorMessage)
 	}
 
 	// Check if we need to use the proxy.
@@ -68,9 +73,9 @@ func UploadS3(configuration *models.Configuration, fileName string, directory st
 
 	fileParts := strings.Split(fileName, "_")
 	if len(fileParts) == 1 {
-		log.Log.Error("ERROR: " + fileName + " is not a valid name.")
-		os.Remove(directory + "/" + fileName)
-		return false
+		errorMessage := "UploadS3: " + fileName + " is not a valid name."
+		log.Log.Error(errorMessage)
+		return false, true, errors.New(errorMessage)
 	}
 
 	deviceKey := config.Key
@@ -84,18 +89,21 @@ func UploadS3(configuration *models.Configuration, fileName string, directory st
 	fullname := "data/recordings/" + fileName
 
 	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
-	defer file.Close()
+	if file != nil {
+		defer file.Close()
+	}
+
 	if err != nil {
-		log.Log.Error("UploadS3: " + err.Error())
-		os.Remove(directory + "/" + fileName)
-		return false
+		errorMessage := "UploadS3: " + err.Error()
+		log.Log.Error(errorMessage)
+		return false, true, errors.New(errorMessage)
 	}
 
 	fileInfo, err := file.Stat()
 	if err != nil {
-		log.Log.Error("UploadS3: " + err.Error())
-		os.Remove(directory + "/" + fileName)
-		return false
+		errorMessage := "UploadS3: " + err.Error()
+		log.Log.Error(errorMessage)
+		return false, true, errors.New(errorMessage)
 	}
 
 	n, err := s3Client.PutObject(config.S3.Bucket,
@@ -119,11 +127,11 @@ func UploadS3(configuration *models.Configuration, fileName string, directory st
 		})
 
 	if err != nil {
-		log.Log.Error("UploadS3: Uploading Failed, " + err.Error())
-		return false
+		errorMessage := "UploadS3: Uploading Failed, " + err.Error()
+		log.Log.Error(errorMessage)
+		return false, true, errors.New(errorMessage)
 	} else {
 		log.Log.Info("UploadS3: Upload Finished, file has been uploaded to bucket: " + strconv.FormatInt(n, 10))
-		os.Remove(directory + "/" + fileName)
-		return true
+		return true, true, nil
 	}
 }

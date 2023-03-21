@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -26,7 +25,7 @@ func main() {
 		} else {
 			service := os.Getenv("DATADOG_AGENT_SERVICE")
 			environment := os.Getenv("DATADOG_AGENT_ENVIRONMENT")
-			fmt.Println("Starting Datadog Agent with service: " + service + " and environment: " + environment)
+			log.Log.Info("Starting Datadog Agent with service: " + service + " and environment: " + environment)
 			rules := []tracer.SamplingRule{tracer.RateRule(1)}
 			tracer.Start(
 				tracer.WithSamplingRules(rules),
@@ -60,25 +59,20 @@ func main() {
 	case "version":
 		log.Log.Info("You are currrently running Kerberos Agent " + VERSION)
 
-	case "pending-upload":
-		name := os.Args[2]
-		fmt.Println(name)
-
 	case "discover":
 		timeout := os.Args[2]
-		fmt.Println(timeout)
+		log.Log.Info(timeout)
 
 	case "run":
 		{
 			name := os.Args[2]
 			port := os.Args[3]
 
-			// Check the folder permissions, it might be that we do not have permissions to write
-			// recordings, update the configuration or save snapshots.
-			err := utils.CheckDataDirectoryPermissions()
-			if err != nil {
-				log.Log.Fatal(err.Error())
-			}
+			// Print Kerberos.io ASCII art
+			utils.PrintASCIIArt()
+
+			// Print the environment variables which include "AGENT_" as prefix.
+			utils.PrintEnvironmentVariables()
 
 			// Read the config on start, and pass it to the other
 			// function and features. Please note that this might be changed
@@ -92,6 +86,13 @@ func main() {
 
 			// We will override the configuration with the environment variables
 			components.OverrideWithEnvironmentVariables(&configuration)
+
+			// Printing final configuration
+			utils.PrintConfiguration(&configuration)
+
+			// Check the folder permissions, it might be that we do not have permissions to write
+			// recordings, update the configuration or save snapshots.
+			utils.CheckDataDirectoryPermissions()
 
 			// Set timezone
 			timezone, _ := time.LoadLocation(configuration.Config.Timezone)
@@ -120,6 +121,6 @@ func main() {
 			routers.StartWebserver(&configuration, &communication)
 		}
 	default:
-		fmt.Println("Sorry I don't understand :(")
+		log.Log.Error("Main: Sorry I don't understand :(")
 	}
 }

@@ -12,34 +12,35 @@ type Configuration struct {
 // Config is the highlevel struct which contains all the configuration of
 // your Kerberos Open Source instance.
 type Config struct {
-	Type             string       `json:"type"`
-	Key              string       `json:"key"`
-	Name             string       `json:"name"`
-	FriendlyName     string       `json:"friendly_name"`
-	Time             string       `json:"time" bson:"time"`
-	Offline          string       `json:"offline"`
-	AutoClean        string       `json:"auto_clean"`
-	MaxDirectorySize int64        `json:"max_directory_size"`
-	Timezone         string       `json:"timezone,omitempty" bson:"timezone,omitempty"`
-	Capture          Capture      `json:"capture"`
-	Timetable        []*Timetable `json:"timetable"`
-	Region           *Region      `json:"region"`
-	Cloud            string       `json:"cloud" bson:"cloud"`
-	S3               *S3          `json:"s3,omitempty" bson:"s3,omitempty"`
-	KStorage         *KStorage    `json:"kstorage,omitempty" bson:"kstorage,omitempty"`
-	MQTTURI          string       `json:"mqtturi" bson:"mqtturi,omitempty"`
-	MQTTUsername     string       `json:"mqtt_username" bson:"mqtt_username"`
-	MQTTPassword     string       `json:"mqtt_password" bson:"mqtt_password"`
-	STUNURI          string       `json:"stunuri" bson:"stunuri"`
-	TURNURI          string       `json:"turnuri" bson:"turnuri"`
-	TURNUsername     string       `json:"turn_username" bson:"turn_username"`
-	TURNPassword     string       `json:"turn_password" bson:"turn_password"`
-	HeartbeatURI     string       `json:"heartbeaturi" bson:"heartbeaturi"` /*obsolete*/
-	HubURI           string       `json:"hub_uri" bson:"hub_uri"`
-	HubKey           string       `json:"hub_key" bson:"hub_key"`
-	HubPrivateKey    string       `json:"hub_private_key" bson:"hub_private_key"`
-	HubSite          string       `json:"hub_site" bson:"hub_site"`
-	ConditionURI     string       `json:"condition_uri" bson:"condition_uri"`
+	Type              string       `json:"type"`
+	Key               string       `json:"key"`
+	Name              string       `json:"name"`
+	FriendlyName      string       `json:"friendly_name"`
+	Time              string       `json:"time" bson:"time"`
+	Offline           string       `json:"offline"`
+	AutoClean         string       `json:"auto_clean"`
+	RemoveAfterUpload string       `json:"remove_after_upload"`
+	MaxDirectorySize  int64        `json:"max_directory_size"`
+	Timezone          string       `json:"timezone,omitempty" bson:"timezone,omitempty"`
+	Capture           Capture      `json:"capture"`
+	Timetable         []*Timetable `json:"timetable"`
+	Region            *Region      `json:"region"`
+	Cloud             string       `json:"cloud" bson:"cloud"`
+	S3                *S3          `json:"s3,omitempty" bson:"s3,omitempty"`
+	KStorage          *KStorage    `json:"kstorage,omitempty" bson:"kstorage,omitempty"`
+	MQTTURI           string       `json:"mqtturi" bson:"mqtturi,omitempty"`
+	MQTTUsername      string       `json:"mqtt_username" bson:"mqtt_username"`
+	MQTTPassword      string       `json:"mqtt_password" bson:"mqtt_password"`
+	STUNURI           string       `json:"stunuri" bson:"stunuri"`
+	TURNURI           string       `json:"turnuri" bson:"turnuri"`
+	TURNUsername      string       `json:"turn_username" bson:"turn_username"`
+	TURNPassword      string       `json:"turn_password" bson:"turn_password"`
+	HeartbeatURI      string       `json:"heartbeaturi" bson:"heartbeaturi"` /*obsolete*/
+	HubURI            string       `json:"hub_uri" bson:"hub_uri"`
+	HubKey            string       `json:"hub_key" bson:"hub_key"`
+	HubPrivateKey     string       `json:"hub_private_key" bson:"hub_private_key"`
+	HubSite           string       `json:"hub_site" bson:"hub_site"`
+	ConditionURI      string       `json:"condition_uri" bson:"condition_uri"`
 }
 
 // Capture defines which camera type (Id) you are using (IP, USB or Raspberry Pi camera),

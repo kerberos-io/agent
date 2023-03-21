@@ -56,8 +56,6 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 
 	loop:
 		for {
-			ff, err := utils.ReadDirectory(watchDirectory)
-
 			// This will check if we need to stop the thread,
 			// because of a reconfiguration.
 			select {
@@ -66,9 +64,11 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 			case <-time.After(2 * time.Second):
 			}
 
-			if err == nil {
+			ff, err := utils.ReadDirectory(watchDirectory)
+			if err != nil {
+				log.Log.Error("HandleUpload: " + err.Error())
+			} else {
 				for _, f := range ff {
-
 					// This will check if we need to stop the thread,
 					// because of a reconfiguration.
 					select {
@@ -78,11 +78,37 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 					}
 
 					fileName := f.Name()
+					uploaded := false
+					configured := false
+					err = nil
 					if config.Cloud == "s3" {
-						UploadS3(configuration, fileName, watchDirectory)
+						uploaded, configured, err = UploadS3(configuration, fileName)
 					} else if config.Cloud == "kstorage" {
-						UploadKerberosVault(configuration, fileName, watchDirectory)
+						uploaded, configured, err = UploadKerberosVault(configuration, fileName)
 					}
+
+					// Check if the file is uploaded, if so, remove it.
+					if uploaded {
+						err := os.Remove(watchDirectory + fileName)
+						if err != nil {
+							log.Log.Error("HandleUpload: " + err.Error())
+						}
+
+						// Check if we need to remove the original recording
+						// removeAfterUpload is set to false by default
+						if config.RemoveAfterUpload == "true" {
+							err := os.Remove("./data/recordings/" + fileName)
+							if err != nil {
+								log.Log.Error("HandleUpload: " + err.Error())
+							}
+						}
+					} else if !configured {
+						err := os.Remove(watchDirectory + fileName)
+						if err != nil {
+							log.Log.Error("HandleUpload: " + err.Error())
+						}
+					}
+
 				}
 			}
 		}
@@ -196,120 +222,124 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 	loop:
 		for {
 
-			// Check if we have a friendly name or not.
-			name := config.Name
-			if config.FriendlyName != "" {
-				name = config.FriendlyName
-			}
+			if key != "" {
+				// Check if we have a friendly name or not.
+				name := config.Name
+				if config.FriendlyName != "" {
+					name = config.FriendlyName
+				}
 
-			// Get some system information
-			// like the uptime, hostname, memory usage, etc.
-			system, _ := GetSystemInfo()
+				// Get some system information
+				// like the uptime, hostname, memory usage, etc.
+				system, _ := GetSystemInfo()
 
-			// We will formated the uptime to a human readable format
-			// this will be used on Kerberos Hub: Uptime -> 1 day and 2 hours.
-			uptimeFormatted := uptimeStart.Format("2006-01-02 15:04:05")
-			uptimeString := carbon.Parse(uptimeFormatted).DiffForHumans()
-			uptimeString = strings.ReplaceAll(uptimeString, "ago", "")
+				// We will formated the uptime to a human readable format
+				// this will be used on Kerberos Hub: Uptime -> 1 day and 2 hours.
+				uptimeFormatted := uptimeStart.Format("2006-01-02 15:04:05")
+				uptimeString := carbon.Parse(uptimeFormatted).DiffForHumans()
+				uptimeString = strings.ReplaceAll(uptimeString, "ago", "")
 
-			// Do the same for boottime
-			bootTimeFormatted := time.Unix(int64(system.BootTime), 0).Format("2006-01-02 15:04:05")
-			boottimeString := carbon.Parse(bootTimeFormatted).DiffForHumans()
-			boottimeString = strings.ReplaceAll(boottimeString, "ago", "")
+				// Do the same for boottime
+				bootTimeFormatted := time.Unix(int64(system.BootTime), 0).Format("2006-01-02 15:04:05")
+				boottimeString := carbon.Parse(bootTimeFormatted).DiffForHumans()
+				boottimeString = strings.ReplaceAll(boottimeString, "ago", "")
 
-			// We'll check which mode is enabled for the camera.
-			onvifEnabled := "false"
-			if config.Capture.IPCamera.ONVIFXAddr != "" {
-				device, err := onvif.ConnectToOnvifDevice(configuration)
-				if err == nil {
-					capabilities := onvif.GetCapabilitiesFromDevice(device)
-					for _, v := range capabilities {
-						if v == "PTZ" || v == "ptz" {
-							onvifEnabled = "true"
+				// We'll check which mode is enabled for the camera.
+				onvifEnabled := "false"
+				if config.Capture.IPCamera.ONVIFXAddr != "" {
+					device, err := onvif.ConnectToOnvifDevice(configuration)
+					if err == nil {
+						capabilities := onvif.GetCapabilitiesFromDevice(device)
+						for _, v := range capabilities {
+							if v == "PTZ" || v == "ptz" {
+								onvifEnabled = "true"
+							}
 						}
 					}
 				}
-			}
 
-			// Check if the agent is running inside a cluster (Kerberos Factory) or as
-			// an open source agent
-			isEnterprise := false
-			if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
-				isEnterprise = true
-			}
+				// Check if the agent is running inside a cluster (Kerberos Factory) or as
+				// an open source agent
+				isEnterprise := false
+				if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
+					isEnterprise = true
+				}
 
-			// Congert to string
-			macs, _ := json.Marshal(system.MACs)
-			ips, _ := json.Marshal(system.IPs)
+				// Congert to string
+				macs, _ := json.Marshal(system.MACs)
+				ips, _ := json.Marshal(system.IPs)
 
-			var object = fmt.Sprintf(`{
-				"key" : "%s",
-				"version" : "3.0.0",
-				"release" : "%s",
-				"cpuid" : "%s",
-				"clouduser" : "%s",
-				"cloudpublickey" : "%s",
-				"cameraname" : "%s",
-				"enterprise" : %t,
-				"hostname" : "%s",
-				"architecture" : "%s",
-				"totalMemory" : "%d",
-				"usedMemory" : "%d",
-				"freeMemory" : "%d",
-				"processMemory" : "%d",
-				"mac_list" : %s,
-				"ip_list" : %s,
-				"board" : "",
-				"disk1size" : "%s",
-				"disk3size" : "%s",
-				"diskvdasize" :  "%s",
-				"uptime" : "%s",
-				"boot_time" : "%s",
-				"siteID" : "%s",
-				"onvif" : "%s",
-				"numberoffiles" : "33",
-				"timestamp" : 1564747908,
-				"cameratype" : "IPCamera",
-				"docker" : true,
-				"kios" : false,
-				"raspberrypi" : false
-			}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled)
+				var object = fmt.Sprintf(`{
+					"key" : "%s",
+					"version" : "3.0.0",
+					"release" : "%s",
+					"cpuid" : "%s",
+					"clouduser" : "%s",
+					"cloudpublickey" : "%s",
+					"cameraname" : "%s",
+					"enterprise" : %t,
+					"hostname" : "%s",
+					"architecture" : "%s",
+					"totalMemory" : "%d",
+					"usedMemory" : "%d",
+					"freeMemory" : "%d",
+					"processMemory" : "%d",
+					"mac_list" : %s,
+					"ip_list" : %s,
+					"board" : "",
+					"disk1size" : "%s",
+					"disk3size" : "%s",
+					"diskvdasize" :  "%s",
+					"uptime" : "%s",
+					"boot_time" : "%s",
+					"siteID" : "%s",
+					"onvif" : "%s",
+					"numberoffiles" : "33",
+					"timestamp" : 1564747908,
+					"cameratype" : "IPCamera",
+					"docker" : true,
+					"kios" : false,
+					"raspberrypi" : false
+				}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled)
 
-			var jsonStr = []byte(object)
-			buffy := bytes.NewBuffer(jsonStr)
-			req, _ := http.NewRequest("POST", url, buffy)
-			req.Header.Set("Content-Type", "application/json")
-
-			client := &http.Client{}
-			resp, err := client.Do(req)
-			if resp != nil {
-				resp.Body.Close()
-			}
-			if err == nil && resp.StatusCode == 200 {
-				communication.CloudTimestamp.Store(time.Now().Unix())
-				log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Hub.")
-			} else {
-				log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Hub.")
-			}
-
-			// If we have a Kerberos Vault connected, we will also send some analytics
-			// to that service.
-			vaultURI = config.KStorage.URI
-			if vaultURI != "" {
-				buffy = bytes.NewBuffer(jsonStr)
-				req, _ = http.NewRequest("POST", vaultURI+"/devices/heartbeat", buffy)
+				var jsonStr = []byte(object)
+				buffy := bytes.NewBuffer(jsonStr)
+				req, _ := http.NewRequest("POST", url, buffy)
 				req.Header.Set("Content-Type", "application/json")
 
-				client = &http.Client{}
-				resp, err = client.Do(req)
+				client := &http.Client{}
+				resp, err := client.Do(req)
 				if resp != nil {
 					resp.Body.Close()
 				}
 				if err == nil && resp.StatusCode == 200 {
-					log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Vault.")
+					communication.CloudTimestamp.Store(time.Now().Unix())
+					log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Hub.")
 				} else {
-					log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Vault.")
+					log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Hub.")
 				}
+
+				// If we have a Kerberos Vault connected, we will also send some analytics
+				// to that service.
+				vaultURI = config.KStorage.URI
+				if vaultURI != "" {
+					buffy = bytes.NewBuffer(jsonStr)
+					req, _ = http.NewRequest("POST", vaultURI+"/devices/heartbeat", buffy)
+					req.Header.Set("Content-Type", "application/json")
+
+					client = &http.Client{}
+					resp, err = client.Do(req)
+					if resp != nil {
+						resp.Body.Close()
+					}
+					if err == nil && resp.StatusCode == 200 {
+						log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Vault.")
+					} else {
+						log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Vault.")
+					}
+				}
+			} else {
+				log.Log.Error("HandleHeartBeat: Disabled as we do not have a public key defined.")
 			}
 
 			// This will check if we need to stop the thread,

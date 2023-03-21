@@ -60,60 +60,6 @@ func DecodeImage(frame *ffmpeg.VideoFrame, pkt av.Packet, decoder *ffmpeg.VideoD
 	return img, err
 }
 
-func GetStreamInsights(infile av.DemuxCloser, streams []av.CodecData) (int, int, int, int) {
-	var width, height, fps, gopsize int
-	for _, stream := range streams {
-		if stream.Type().IsAudio() {
-			//astream := stream.(av.AudioCodecData)
-		} else if stream.Type().IsVideo() {
-			vstream := stream.(av.VideoCodecData)
-			width = vstream.Width()
-			height = vstream.Height()
-		}
-	}
-
-loop:
-	for timeout := time.After(1 * time.Second); ; {
-		var err error
-		if _, err = infile.ReadPacket(); err != nil { // sometimes this throws an end of file..
-			log.Log.Error("HandleStream: " + err.Error())
-		}
-		fps++
-		select {
-		case <-timeout:
-			break loop
-		default:
-		}
-	}
-
-	gopCounter := 0
-	start := false
-	for {
-		var pkt av.Packet
-		var err error
-		if pkt, err = infile.ReadPacket(); err != nil { // sometimes this throws an end of file..
-			log.Log.Error("HandleStream: " + err.Error())
-		}
-		// Could be that a decode is throwing errors.
-		if len(pkt.Data) > 0 {
-			if start {
-				gopCounter = gopCounter + 1
-			}
-
-			if pkt.IsKeyFrame {
-				if start == false {
-					start = true
-				} else {
-					gopsize = gopCounter
-					break
-				}
-			}
-		}
-	}
-
-	return width, height, fps, gopsize
-}
-
 func HandleStream(infile av.DemuxCloser, queue *pubsub.Queue, communication *models.Communication) { //, wg *sync.WaitGroup) {
 
 	log.Log.Debug("HandleStream: started")

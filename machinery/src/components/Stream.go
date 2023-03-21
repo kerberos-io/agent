@@ -66,7 +66,6 @@ func (s Stream) GetCodecs() []av.CodecData {
 
 func (s Stream) ReadPackets(packetChannel chan av.Packet) {
 	session := s.Open()
-	fmt.Println("Start reading H264 packages from stream")
 	for {
 		packet, err := session.ReadPacket()
 		if err != nil {

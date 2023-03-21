@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -9,20 +10,19 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
-func UploadKerberosVault(configuration *models.Configuration, fileName string, directory string) bool {
+func UploadKerberosVault(configuration *models.Configuration, fileName string) (bool, bool, error) {
 
 	config := configuration.Config
 
 	if config.KStorage.AccessKey == "" ||
 		config.KStorage.SecretAccessKey == "" ||
-		config.KStorage.Provider == "" ||
 		config.KStorage.Directory == "" ||
 		config.KStorage.URI == "" {
-		log.Log.Info("UploadKerberosVault: Kerberos Vault not properly configured.")
-		return false
+		err := "UploadKerberosVault: Kerberos Vault not properly configured."
+		log.Log.Info(err)
+		return false, false, errors.New(err)
 	}
 
-	//fmt.Println("Uploading...")
 	// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 	// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
 	// - Timestamp
@@ -31,21 +31,20 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string, d
 	// - Region
 	// - Number of changes
 	// - Token
-
 	// KerberosCloud, this means storage is disabled and proxy enabled.
 	log.Log.Info("UploadKerberosVault: Uploading to Kerberos Vault (" + config.KStorage.URI + ")")
-
 	log.Log.Info("UploadKerberosVault: Upload started for " + fileName)
 	fullname := "data/recordings/" + fileName
 
 	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
-	if err != nil {
-		log.Log.Info("UploadKerberosVault: Upload Failed, file doesn't exists anymore.")
-		os.Remove(directory + "/" + fileName)
-		return false
+	if file != nil {
+		defer file.Close()
 	}
-
-	defer file.Close()
+	if err != nil {
+		err := "UploadKerberosVault: Upload Failed, file doesn't exists anymore."
+		log.Log.Info(err)
+		return false, true, errors.New(err)
+	}
 
 	publicKey := config.KStorage.CloudKey
 	// This is the new way ;)
@@ -55,7 +54,9 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string, d
 
 	req, err := http.NewRequest("POST", config.KStorage.URI+"/storage", file)
 	if err != nil {
-		log.Log.Error("Error reading request. " + err.Error())
+		errorMessage := "UploadKerberosVault: error reading request, " + config.KStorage.URI + "/storage: " + err.Error()
+		log.Log.Error(errorMessage)
+		return false, true, errors.New(errorMessage)
 	}
 	req.Header.Set("Content-Type", "video/mp4")
 	req.Header.Set("X-Kerberos-Storage-CloudKey", publicKey)
@@ -66,11 +67,9 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string, d
 	req.Header.Set("X-Kerberos-Storage-Device", config.Key)
 	req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
 	req.Header.Set("X-Kerberos-Storage-Directory", config.KStorage.Directory)
-	//client := &http.Client{Timeout: time.Second * 30}
 	client := &http.Client{}
 
 	resp, err := client.Do(req)
-
 	if resp != nil {
 		defer resp.Body.Close()
 	}
@@ -81,17 +80,16 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string, d
 			if err == nil {
 				if resp.StatusCode == 200 {
 					log.Log.Info("UploadKerberosVault: Upload Finished, " + resp.Status + ", " + string(body))
-					// We will remove the file from disk as well
-					os.Remove(fullname)
-					os.Remove(directory + "/" + fileName)
+					return true, true, nil
 				} else {
 					log.Log.Info("UploadKerberosVault: Upload Failed, " + resp.Status + ", " + string(body))
+					return false, true, nil
 				}
-				resp.Body.Close()
 			}
 		}
-	} else {
-		log.Log.Info("UploadKerberosVault: Upload Failed, " + err.Error())
 	}
-	return true
+
+	errorMessage := "UploadKerberosVault: Upload Failed, " + err.Error()
+	log.Log.Info(errorMessage)
+	return false, true, errors.New(errorMessage)
 }

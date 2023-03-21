@@ -162,8 +162,11 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
 					if detectMotion && isPixelChangeThresholdReached {
 
-						if mqttClient != nil {
-							mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
+						// If offline mode is disabled, send a message to the hub
+						if config.Offline == "false" {
+							if mqttClient != nil && key != "" {
+								mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
+							}
 						}
 
 						if config.Capture.Recording != "false" {

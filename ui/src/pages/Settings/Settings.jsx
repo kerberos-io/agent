@@ -1966,6 +1966,32 @@ class Settings extends React.Component {
                   <h4>{t('settings.persistence.persistence')}</h4>
                 </BlockHeader>
                 <BlockBody>
+                  <p>{t('settings.persistence.remove_after_upload')}</p>
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={config.remove_after_upload === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle(
+                          '',
+                          'remove_after_upload',
+                          event,
+                          config
+                        )
+                      }
+                    />
+                    <div>
+                      <span>
+                        {t('settings.persistence.remove_after_upload_enabled')}
+                      </span>
+                      <p>
+                        {t(
+                          'settings.persistence.remove_after_upload_description'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
                   <p>
                     {t('settings.persistence.description_persistence')}{' '}
                     <a

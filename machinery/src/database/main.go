@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/log"
 	"gopkg.in/mgo.v2"
 )
 
@@ -35,7 +36,7 @@ func New() *mgo.Session {
 		}
 		session, err := mgo.DialWithInfo(mongoDBDialInfo)
 		if err != nil {
-			fmt.Printf("Error en mongo: %+v\n", err)
+			log.Log.Error(fmt.Sprintf("Failed to connect to database: %s", err.Error()))
 			os.Exit(1)
 		}
 		_instance.Session = session

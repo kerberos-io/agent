@@ -3,7 +3,6 @@ package websocket
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"sync"
 
@@ -86,7 +85,7 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication) {
 					sockets[clientID].Cancels["stream-sd"]()
 					delete(sockets[clientID].Cancels, "stream-sd")
 				} else {
-					fmt.Println("Streaming sd does not exists for " + clientID)
+					log.Log.Error("Streaming sd does not exists for " + clientID)
 				}
 
 			case "stream-sd":
@@ -101,7 +100,7 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication) {
 
 				_, exists := sockets[clientID].Cancels["stream-sd"]
 				if exists {
-					fmt.Println("Already streaming sd for " + clientID)
+					log.Log.Info("Already streaming sd for " + clientID)
 				} else {
 					ctx, cancel := context.WithCancel(context.Background())
 					sockets[clientID].Cancels["stream-sd"] = cancel

@@ -3,7 +3,6 @@ package components
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"image"
 	_ "image/png"
 	"io/ioutil"
@@ -47,14 +46,14 @@ func ReadUserConfig() (userConfig models.User) {
 	for {
 		jsonFile, err := os.Open("./data/config/user.json")
 		if err != nil {
-			fmt.Println("Config file is not found " + "./data/config/user.json, trying again in 5s: " + err.Error())
+			log.Log.Error("Config file is not found " + "./data/config/user.json, trying again in 5s: " + err.Error())
 			time.Sleep(5 * time.Second)
 		} else {
-			fmt.Println("Successfully Opened user.json")
+			log.Log.Info("Successfully Opened user.json")
 			byteValue, _ := ioutil.ReadAll(jsonFile)
 			err = json.Unmarshal(byteValue, &userConfig)
 			if err != nil {
-				fmt.Println("JSON file not valid: " + err.Error())
+				log.Log.Error("JSON file not valid: " + err.Error())
 			} else {
 				jsonFile.Close()
 				break
@@ -145,11 +144,11 @@ func OpenConfig(configuration *models.Configuration) {
 				err = json.Unmarshal(byteValue, &configuration.Config)
 				jsonFile.Close()
 				if err != nil {
-					fmt.Println("JSON file not valid: " + err.Error())
+					log.Log.Error("JSON file not valid: " + err.Error())
 				} else {
 					err = json.Unmarshal(byteValue, &configuration.CustomConfig)
 					if err != nil {
-						fmt.Println("JSON file not valid: " + err.Error())
+						log.Log.Error("JSON file not valid: " + err.Error())
 					} else {
 						break
 					}
@@ -269,34 +268,12 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				}
 				break
 
-			/* Cloud settings for persisting recordings */
-			case "AGENT_CLOUD":
-				configuration.Config.Cloud = value
-				break
-
-			/* When connected and storing in Kerberos Hub (SAAS) */
-			case "AGENT_HUB_URI":
-				configuration.Config.HubURI = value
-				break
-			case "AGENT_HUB_KEY":
-				configuration.Config.HubKey = value
-				break
-			case "AGENT_HUB_PRIVATE_KEY":
-				configuration.Config.HubPrivateKey = value
-				break
-			case "AGENT_HUB_USERNAME":
-				configuration.Config.S3.Username = value
-				break
-			case "AGENT_HUB_SITE":
-				configuration.Config.HubSite = value
-				break
-
 			/* Conditions */
 
-			case "AGENT_HUB_TIME":
+			case "AGENT_TIME":
 				configuration.Config.Time = value
 				break
-			case "AGENT_HUB_TIMETABLE":
+			case "AGENT_TIMETABLE":
 				var timetable []*models.Timetable
 
 				// Convert value to timetable array with (start1, end1, start2, end2)
@@ -337,7 +314,7 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				configuration.Config.Timetable = timetable
 				break
 
-			case "AGENT_HUB_REGION_POLYGON":
+			case "AGENT_REGION_POLYGON":
 				var coordinates []models.Coordinate
 
 				// Convert value to coordinates array
@@ -392,6 +369,32 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				break
 			case "AGENT_TURN_PASSWORD":
 				configuration.Config.TURNPassword = value
+				break
+
+			/* Cloud settings for persisting recordings */
+			case "AGENT_CLOUD":
+				configuration.Config.Cloud = value
+				break
+
+			case "AGENT_REMOVE_AFTER_UPLOAD":
+				configuration.Config.RemoveAfterUpload = value
+				break
+
+			/* When connected and storing in Kerberos Hub (SAAS) */
+			case "AGENT_HUB_URI":
+				configuration.Config.HubURI = value
+				break
+			case "AGENT_HUB_KEY":
+				configuration.Config.HubKey = value
+				break
+			case "AGENT_HUB_PRIVATE_KEY":
+				configuration.Config.HubPrivateKey = value
+				break
+			case "AGENT_HUB_USERNAME":
+				configuration.Config.S3.Username = value
+				break
+			case "AGENT_HUB_SITE":
+				configuration.Config.HubSite = value
 				break
 
 			/* When storing in a Kerberos Vault */

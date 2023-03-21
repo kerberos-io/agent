@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -37,6 +38,17 @@ const (
 	letterIdxMask = 1<<letterIdxBits - 1 // All 1-bits, as many as letterIdxBits
 	letterIdxMax  = 63 / letterIdxBits   // # of letter indices fitting in 63 bits
 )
+
+func PrintASCIIArt() {
+	asciiArt := `	 _  __         _                          _       
+	| |/ /___ _ __| |__   ___ _ __ ___  ___  (_) ___  
+	| ' // _ \ '__| '_ \ / _ \ '__/ _ \/ __| | |/ _ \ 
+	| . \  __/ |  | |_) |  __/ | | (_) \__ \_| | (_) |
+	|_|\_\___|_|  |_.__/ \___|_|  \___/|___(_)_|\___/ 
+													  
+	`
+	fmt.Println(asciiArt)
+}
 
 func DirSize(path string) (int64, error) {
 	var size int64
@@ -102,26 +114,42 @@ func CheckDataDirectoryPermissions() error {
 	recordingsDirectory := "./data/recordings"
 	configDirectory := "./data/config"
 	snapshotsDirectory := "./data/snapshots"
+	cloudDirectory := "./data/cloud"
 
 	err := CheckDirectoryPermissions(recordingsDirectory)
+	if err == nil {
+		err = CheckDirectoryPermissions(configDirectory)
+		if err == nil {
+			err = CheckDirectoryPermissions(snapshotsDirectory)
+			if err == nil {
+				err = CheckDirectoryPermissions(cloudDirectory)
+			}
+		}
+	}
+
 	if err != nil {
+		log.Log.Error("Checking data directory permissions: " + err.Error())
 		return err
 	}
-	err = CheckDirectoryPermissions(configDirectory)
-	if err != nil {
-		return err
-	}
-	err = CheckDirectoryPermissions(snapshotsDirectory)
-	if err != nil {
-		return err
-	}
+
+	log.Log.Info("Checking data directory permissions: OK")
 	return nil
 }
 
 func CheckDirectoryPermissions(directory string) error {
+	// Check if the directory exists
+	if _, err := os.Stat(directory); os.IsNotExist(err) {
+		return errors.New("Directory does not exist, " + directory)
+	}
+
+	// Try to create a file
 	file := directory + "/.test"
 	f, err := os.Create(file)
-	defer f.Close()
+	if f != nil {
+		defer f.Close()
+	}
+
+	// We will remove the file if it was created
 	if err == nil {
 		err := os.Remove(file)
 		if err == nil {
@@ -136,7 +164,6 @@ func CheckDirectoryPermissions(directory string) error {
 func ReadDirectory(directory string) ([]os.FileInfo, error) {
 	ff, err := ioutil.ReadDir(directory)
 	if err != nil {
-		log.Log.Error(err.Error())
 		return []os.FileInfo{}, nil
 	}
 	return ff, err
@@ -270,4 +297,36 @@ func CreateFragmentedMP4(fullName string, fragmentedDuration int64) {
 	// We will swap the files.
 	os.Remove(fullName)
 	os.Rename(fullName+"f.mp4", fullName)
+}
+
+func PrintEnvironmentVariables() {
+	// Print environment variables that include "AGENT_" as a prefix.
+	environmentVariables := ""
+	for _, e := range os.Environ() {
+		if strings.Contains(e, "AGENT_") {
+			pair := strings.Split(e, "=")
+			environmentVariables = environmentVariables + pair[0] + "=" + pair[1] + " "
+		}
+	}
+	log.Log.Info("Printing out environmentVariables (AGENT_...): " + environmentVariables)
+}
+
+func PrintConfiguration(configuration *models.Configuration) {
+	// We will print out the struct.
+	if configuration == nil {
+		log.Log.Info("Configuration is nil")
+		return
+	}
+	config := configuration.Config
+	// Iterate over the struct and printout the values.
+	v := reflect.ValueOf(config)
+	typeOfS := v.Type()
+	configurationVariables := ""
+	for i := 0; i < v.NumField(); i++ {
+		key := typeOfS.Field(i).Name
+		value := v.Field(i).Interface()
+		// Convert to string.
+		configurationVariables = configurationVariables + key + ": " + fmt.Sprintf("%v", value) + " "
+	}
+	log.Log.Info("Printing our configuration (config.json): " + configurationVariables)
 }

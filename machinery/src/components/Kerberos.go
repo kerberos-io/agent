@@ -80,13 +80,12 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 }
 
 func RunAgent(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time, cameraSettings *models.Camera, decoder *ffmpeg.VideoDecoder, subDecoder *ffmpeg.VideoDecoder) string {
-	log.Log.Debug("RunAgent: started")
+	log.Log.Debug("RunAgent: bootstrapping agent")
 
 	config := configuration.Config
 
 	// Currently only support H264 encoded cameras, this will change.
 	// Establishing the camera connection
-	log.Log.Info("RunAgent: opening RTSP stream")
 	rtspUrl := config.Capture.IPCamera.RTSP
 	infile, streams, err := capture.OpenRTSP(rtspUrl)
 
@@ -100,7 +99,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 	if err == nil {
 
-		log.Log.Info("RunAgent: opened RTSP stream")
+		log.Log.Info("RunAgent: opened RTSP stream" + rtspUrl)
 
 		// We might have a secondary rtsp url, so we might need to use that.
 		var subInfile av.DemuxCloser
@@ -110,7 +109,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		if subRtspUrl != "" && subRtspUrl != rtspUrl {
 			subInfile, subStreams, err = capture.OpenRTSP(subRtspUrl)
 			if err == nil {
-				log.Log.Info("RunAgent: opened RTSP sub stream")
+				log.Log.Info("RunAgent: opened RTSP sub stream " + subRtspUrl)
 				subStreamEnabled = true
 			}
 		}
