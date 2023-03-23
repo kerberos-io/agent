@@ -12,6 +12,10 @@
     }
 }
 
+.MuiPopover-root {
+    z-index: 99999999 !important;
+}
+
 .offline-mode, .cloud-not-installed {
     background: var(--upper-gradient);
     width: 100%;
