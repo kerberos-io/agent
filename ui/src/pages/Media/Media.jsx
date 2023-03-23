@@ -3,11 +3,8 @@ import PropTypes from 'prop-types';
 import { withTranslation } from 'react-i18next';
 import {
   Breadcrumb,
-  VideoContainer,
   VideoCard,
-  ControlBar,
   Button,
-  Input,
   Modal,
   ModalHeader,
   ModalBody,
@@ -105,17 +102,7 @@ class Media extends React.Component {
           </Link>
         </Breadcrumb>
 
-        <ControlBar>
-          <Input
-            iconleft="search"
-            onChange={() => {}}
-            placeholder={t('recordings.search_media')}
-            layout="controlbar"
-            type="text"
-          />
-        </ControlBar>
-
-        <VideoContainer cols={4} isVideoWall={false}>
+        <div className="stats grid-container --four-columns">
           {events.map((event) => (
             <div
               key={event.key}
@@ -135,7 +122,7 @@ class Media extends React.Component {
               />
             </div>
           ))}
-        </VideoContainer>
+        </div>
         {open && (
           <Modal>
             <ModalHeader

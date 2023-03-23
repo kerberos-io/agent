@@ -220,14 +220,21 @@ class Dashboard extends React.Component {
                         id="cells1"
                         bodycells={[
                           <>
-                            <div className="time">
+                            <div
+                              className="time"
+                              onClick={() =>
+                                this.openModal(
+                                  `${config.URL}/file/${event.key}`
+                                )
+                              }
+                            >
                               <Ellipse status="success" />{' '}
                               <p data-tip="10m and 5s ago">{event.time}</p>
                             </div>
                           </>,
                           <>
                             <p
-                              className="pointer"
+                              className="pointer event-description"
                               onClick={() =>
                                 this.openModal(
                                   `${config.URL}/file/${event.key}`

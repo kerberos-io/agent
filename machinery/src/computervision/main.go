@@ -164,8 +164,12 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 
 						// If offline mode is disabled, send a message to the hub
 						if config.Offline == "false" {
-							if mqttClient != nil && key != "" {
-								mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
+							if mqttClient != nil {
+								if key != "" {
+									mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
+								} else {
+									mqttClient.Publish("kerberos/device/"+config.Key+"/motion", 2, false, "motion")
+								}
 							}
 						}
 

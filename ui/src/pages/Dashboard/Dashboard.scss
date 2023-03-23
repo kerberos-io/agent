@@ -1,3 +1,5 @@
+@import "../../app.variables";
+
 #dashboard {
 
     hr {
@@ -14,6 +16,13 @@
 
     video {
         width: 100%;
+    }
+
+    p.event-description {
+        display: none;
+        @media (min-width: 800px) {
+            display: block;
+        }
     }
     
     a {

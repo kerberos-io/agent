@@ -1,5 +1,16 @@
 @import "./app.variables";
 
+.grid-container {
+    row-gap: size(2);
+}
+
+.main {
+    padding-top: size(7);
+
+    @media (min-width: 800px) {
+        padding-top: 0;
+    }
+}
 
 .offline-mode, .cloud-not-installed {
     background: var(--upper-gradient);

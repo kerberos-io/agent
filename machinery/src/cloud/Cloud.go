@@ -54,6 +54,9 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 		log.Log.Debug("HandleUpload: stopping as Offline is enabled.")
 	} else {
 
+		// Half a second delay between two uploads
+		delay := 500 * time.Millisecond
+
 	loop:
 		for {
 			// This will check if we need to stop the thread,
@@ -69,6 +72,7 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 				log.Log.Error("HandleUpload: " + err.Error())
 			} else {
 				for _, f := range ff {
+
 					// This will check if we need to stop the thread,
 					// because of a reconfiguration.
 					select {
@@ -89,6 +93,7 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 
 					// Check if the file is uploaded, if so, remove it.
 					if uploaded {
+						delay = 500 * time.Millisecond // reset
 						err := os.Remove(watchDirectory + fileName)
 						if err != nil {
 							log.Log.Error("HandleUpload: " + err.Error())
@@ -107,8 +112,12 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 						if err != nil {
 							log.Log.Error("HandleUpload: " + err.Error())
 						}
+					} else {
+						delay = 5 * time.Second // slow down
+						log.Log.Error("HandleUpload: " + err.Error())
 					}
 
+					time.Sleep(delay)
 				}
 			}
 		}

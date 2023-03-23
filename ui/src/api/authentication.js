@@ -46,11 +46,3 @@ export function doCheckIfInstalled(onSuccess, onError) {
       }
     });
 }
-
-/* export function doAuth(onSuccess, onError) {
-
-}
-
-export function doRefreshToken(onSuccess, onError) {
-
-} */
