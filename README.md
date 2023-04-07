@@ -97,11 +97,16 @@ This repository contains everything you'll need to know about our core product, 
 - Simplified and modern user interface.
 - Multi architecture (ARMv7, ARMv8, amd64, etc).
 - Multi camera support: IP Cameras (H264), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp).
-- Single camera per instance (e.g. oneå container per camera).
-- Ability to specifiy conditions: motion region, time table, continuous recording, etc.
+- Single camera per instance (e.g. one container per camera).
+- Primary and secondary stream setup (record full-res, stream low-res).
+- Low resolution streaming through MQTT and full resolution streaming through WebRTC.
+- Ability to specifiy conditions: offline mode, motion region, time table, continuous recording, etc.
+- Post- and pre-recording on motion detection.
+- Ability to create fragmented recordings, and streaming though HLS fMP4.
 - [Deploy where you want](#how-to-run-and-deploy-a-kerberos-agent) with the tools you use: `docker`, `docker compose`, `ansible`, `terraform`, `kubernetes`, etc.
-- Cloud storage (Kerberos Hub, Kerberos Vault). WIP: Minio, Storj, etc.
+- Cloud storage (Kerberos Hub, Kerberos Vault). WIP: Minio, Storj, Dropbox, Google Drive etc.
 - WIP: Integrations (Webhooks, MQTT, Script, etc).
+- REST API access and documentation through Swagger (trigger recording, update configuration, etc).
 - MIT License
 
 ## How to run and deploy a Kerberos Agent
