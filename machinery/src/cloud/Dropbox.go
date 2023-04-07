@@ -1,3 +1,6 @@
+// Dropbox.go
+// This file contains the Dropbox implementation of the Cloud interface.
+// It uses the Dropbox SDK to upload files to Dropbox.
 package cloud
 
 import (
@@ -13,6 +16,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
+// UploadDropbox uploads the file to your Dropbox account using the access token and directory.
 func UploadDropbox(configuration *models.Configuration, fileName string) (bool, bool, error) {
 
 	config := configuration.Config
@@ -73,6 +77,7 @@ func UploadDropbox(configuration *models.Configuration, fileName string) (bool, 
 	}
 }
 
+// VerifyDropbox verifies if the Dropbox token is valid and it is able to upload a file.
 func VerifyDropbox(config models.Config, c *gin.Context) {
 
 	token := config.Dropbox.AccessToken
