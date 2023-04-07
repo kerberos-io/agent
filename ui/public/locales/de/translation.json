@@ -199,6 +199,10 @@
       "kerberosvault_secretkey": "Geheimer Schlüssel",
       "kerberosvault_description_secretkey": "Der geheime Schlüssel des Kerberos Vault Accounts.",
       "verify_connection": "Verbindung prüfen",
+      "dropbox_directory": "Directory",
+      "dropbox_description_directory": "The sub directory where the recordings will be stored in your Dropbox account.",
+      "dropbox_accesstoken": "Access token",
+      "dropbox_description_accesstoken": "The access token of your Dropbox account/app.",
       "remove_after_upload": "Once recordings are uploaded to some persistence, you might want to remove them from the local Kerberos Agent.",
       "remove_after_upload_description": "Remove recordings after they are uploaded successfully.",
       "remove_after_upload_enabled": "Enabled delete on upload"

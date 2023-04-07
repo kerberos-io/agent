@@ -579,7 +579,9 @@ func VerifyPersistence(c *gin.Context) {
 	err := c.BindJSON(&config)
 	if err != nil || config.Cloud != "" {
 
-		if config.Cloud == "s3" {
+		if config.Cloud == "dropbox" {
+			VerifyDropbox(config, c)
+		} else if config.Cloud == "s3" {
 
 			// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 			// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
@@ -660,9 +662,7 @@ func VerifyPersistence(c *gin.Context) {
 					})
 				}
 			}
-		}
-
-		if config.Cloud == "kstorage" {
+		} else if config.Cloud == "kstorage" {
 
 			uri := config.KStorage.URI
 			accessKey := config.KStorage.AccessKey
