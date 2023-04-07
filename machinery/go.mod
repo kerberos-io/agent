@@ -11,6 +11,7 @@ require (
 	github.com/appleboy/gin-jwt/v2 v2.9.1
 	github.com/cedricve/go-onvif v0.0.0-20200222191200-567e8ce298f6
 	github.com/deepch/vdk v0.0.19
+	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/eclipse/paho.mqtt.golang v1.4.2
 	github.com/elastic/go-sysinfo v1.9.0
 	github.com/gin-contrib/cors v1.4.0
@@ -68,6 +69,7 @@ require (
 	github.com/goccy/go-json v0.10.0 // indirect
 	github.com/gofrs/uuid v3.2.0+incompatible // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/pprof v0.0.0-20210423192551-a2663126120b // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
@@ -114,12 +116,14 @@ require (
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
 	golang.org/x/crypto v0.4.0 // indirect
 	golang.org/x/net v0.4.0 // indirect
+	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5 // indirect
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.3.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/grpc v1.32.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/ini.v1 v1.42.0 // indirect

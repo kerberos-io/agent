@@ -40,6 +40,8 @@ class Settings extends React.Component {
 
   KERBEROS_HUB = 's3'; // @TODO needs to change
 
+  DROPBOX = 'dropbox';
+
   constructor() {
     super();
     this.state = {
@@ -74,6 +76,10 @@ class Settings extends React.Component {
         label: 'Kerberos Vault',
         value: this.KERBEROS_VAULT,
       },
+      {
+        label: 'Dropbox',
+        value: this.DROPBOX,
+      },
     ];
 
     this.tags = {
@@ -95,6 +101,7 @@ class Settings extends React.Component {
         'gcp',
         'aws',
         'minio',
+        'dropbox',
       ],
     };
     this.timezones = [];
@@ -2160,6 +2167,44 @@ class Settings extends React.Component {
                             'secret_access_key',
                             value,
                             config.kstorage
+                          )
+                        }
+                      />
+                    </>
+                  )}
+                  {config.cloud === this.DROPBOX && (
+                    <>
+                      <Input
+                        noPadding
+                        label={t('settings.persistence.dropbox_directory')}
+                        placeholder={t(
+                          'settings.persistence.dropbox_description_directory'
+                        )}
+                        value={config.dropbox ? config.dropbox.directory : ''}
+                        onChange={(value) =>
+                          this.onUpdateField(
+                            'dropbox',
+                            'directory',
+                            value,
+                            config.dropbox
+                          )
+                        }
+                      />
+                      <Input
+                        noPadding
+                        label={t('settings.persistence.dropbox_accesstoken')}
+                        placeholder={t(
+                          'settings.persistence.dropbox_description_accesstoken'
+                        )}
+                        value={
+                          config.dropbox ? config.dropbox.access_token : ''
+                        }
+                        onChange={(value) =>
+                          this.onUpdateField(
+                            'dropbox',
+                            'access_token',
+                            value,
+                            config.dropbox
                           )
                         }
                       />
