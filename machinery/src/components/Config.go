@@ -414,6 +414,13 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				configuration.Config.KStorage.Directory = value
 				break
 
+			/* When storing in dropbox */
+			case "AGENT_DROPBOX_ACCESS_TOKEN":
+				configuration.Config.Dropbox.AccessToken = value
+				break
+			case "AGENT_DROPBOX_DIRECTORY":
+				configuration.Config.Dropbox.Directory = value
+				break
 			}
 		}
 	}

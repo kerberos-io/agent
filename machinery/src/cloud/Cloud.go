@@ -89,7 +89,22 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 						uploaded, configured, err = UploadS3(configuration, fileName)
 					} else if config.Cloud == "kstorage" {
 						uploaded, configured, err = UploadKerberosVault(configuration, fileName)
+					} else if config.Cloud == "dropbox" {
+						uploaded, configured, err = UploadDropbox(configuration, fileName)
+					} else if config.Cloud == "gdrive" {
+						// Todo: implement gdrive upload
+					} else if config.Cloud == "onedrive" {
+						// Todo: implement onedrive upload
+					} else if config.Cloud == "minio" {
+						// Todo: implement minio upload
+					} else if config.Cloud == "webdav" {
+						// Todo: implement webdav upload
+					} else if config.Cloud == "ftp" {
+						// Todo: implement ftp upload
+					} else if config.Cloud == "sftp" {
+						// Todo: implement sftp upload
 					}
+					// And so on... (have a look here -> https://github.com/kerberos-io/agent/issues/95)
 
 					// Check if the file is uploaded, if so, remove it.
 					if uploaded {
