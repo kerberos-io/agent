@@ -1,5 +1,4 @@
-// Dropbox.go
-// This file contains the Dropbox implementation of the Cloud interface.
+// Package cloud contains the Dropbox implementation of the Cloud interface.
 // It uses the Dropbox SDK to upload files to Dropbox.
 package cloud
 
@@ -67,14 +66,14 @@ func UploadDropbox(configuration *models.Configuration, fileName string) (bool, 
 		if err != nil {
 			log.Log.Error("UploadDropbox: Error uploading file: " + err.Error())
 			return false, false, err
-		} else {
-			log.Log.Info("UploadDropbox: File uploaded successfully, " + res.Name)
-			return true, true, nil
 		}
-	} else {
-		log.Log.Error("UploadDropbox: Error opening file: " + err.Error())
-		return false, true, err
+
+		log.Log.Info("UploadDropbox: File uploaded successfully, " + res.Name)
+		return true, true, nil
 	}
+
+	log.Log.Error("UploadDropbox: Error opening file: " + err.Error())
+	return false, true, err
 }
 
 // VerifyDropbox verifies if the Dropbox token is valid and it is able to upload a file.
