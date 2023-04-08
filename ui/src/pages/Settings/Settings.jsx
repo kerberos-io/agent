@@ -1089,18 +1089,26 @@ class Settings extends React.Component {
                   <p>{t('settings.encryption.description_keys')} </p>
                   <Input
                     noPadding
-                    label={t('settings.encryption.publickey')}
-                    value={config.publickey}
+                    label={t('settings.encryption.sharedkey')}
+                    value={config.shared_key}
                     onChange={(value) =>
-                      this.onUpdateField('', 'publickey', value, config)
+                      this.onUpdateField('', 'shared_key', value, config)
+                    }
+                  />
+                  <Input
+                    noPadding
+                    label={t('settings.encryption.publickey')}
+                    value={config.public_key}
+                    onChange={(value) =>
+                      this.onUpdateField('', 'public_key', value, config)
                     }
                   />
                   <Input
                     noPadding
                     label={t('settings.encryption.privatekey')}
-                    value={config.privatekey}
+                    value={config.private_key}
                     onChange={(value) =>
-                      this.onUpdateField('', 'privatekey', value, config)
+                      this.onUpdateField('', 'private_key', value, config)
                     }
                   />
                 </BlockBody>

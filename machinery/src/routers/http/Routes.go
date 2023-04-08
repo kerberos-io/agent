@@ -230,6 +230,8 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 		// Secured endpoints..
 		api.Use(authMiddleware.MiddlewareFunc())
 		{
+			// Encryption methods. Doesn't require any authorization.
+			api.POST("/keys/generate", components.GenerateKeys)
 		}
 	}
 	return api

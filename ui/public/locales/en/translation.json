@@ -213,6 +213,7 @@
       "description_keys": "Kerberos Agents can be configured to encrypt recordings. This is useful when you want to store securely your recordings in a 3rd party provider.",
       "publickey": "Public key",
       "privatekey": "Private key",
+      "sharedkey": "Shared key",
       "generate": "Generate keys"
     }
   }

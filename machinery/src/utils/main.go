@@ -2,8 +2,15 @@ package utils
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	crand "crypto/rand"
+	"crypto/rsa"
+	"crypto/sha512"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -329,4 +336,79 @@ func PrintConfiguration(configuration *models.Configuration) {
 		configurationVariables = configurationVariables + key + ": " + fmt.Sprintf("%v", value) + " "
 	}
 	log.Log.Info("Printing our configuration (config.json): " + configurationVariables)
+}
+
+func EncryptFileWithSharedKey(fullname string, sharedKey string) (encryptedFile []byte, err error) {
+	// Encode file with AES-256-CBC.
+	// We will use the shared key as the key.
+
+	// AES key is 32 bytes.
+	// We will use the first 32 bytes of the shared key.
+	block, err := aes.NewCipher([]byte(sharedKey))
+	if err != nil {
+		log.Log.Error(err.Error())
+		return
+	}
+
+	// Never use more than 2^32 random nonces with a given key
+	// because of the risk of repeat.
+	//iv := make([]byte, block.BlockSize())
+	//if _, err = io.ReadFull(crand.Reader, iv); err != nil {
+	//	log.Log.Error(err.Error())
+	//	return
+	//}
+	iv := make([]byte, block.BlockSize())
+	// We will use the last 16 bytes of the shared key.
+	copy(iv, []byte(sharedKey))
+	log.Log.Info("IV: " + hex.EncodeToString(iv))
+
+	// Open the file.
+	file, err := os.Open(fullname)
+	if err != nil {
+		log.Log.Error(err.Error())
+		return
+	}
+	defer file.Close()
+
+	// The buffer size must be multiple of 16 bytes
+	buf := make([]byte, 1024)
+	stream := cipher.NewCTR(block, iv)
+
+	// Append Salt to the beginning of the file.
+	salt := "Salted__"
+	encryptedFile = append(encryptedFile, salt...)
+
+	// Encrypt the file.
+	for {
+		n, err := file.Read(buf)
+		if err != nil && err != io.EOF {
+			log.Log.Error(err.Error())
+			return nil, err
+		}
+		if n == 0 {
+			break
+		}
+		stream.XORKeyStream(buf[:n], buf[:n])
+		encryptedFile = append(encryptedFile, buf[:n]...)
+	}
+	return
+}
+
+// EncryptWithPublicKey encrypts data with public key
+func EncryptWithPublicKey(msg []byte, pub *rsa.PublicKey) []byte {
+	hash := sha512.New()
+	ciphertext, err := rsa.EncryptOAEP(hash, crand.Reader, pub, msg, nil)
+	if err != nil {
+
+	}
+	return ciphertext
+}
+
+// DecryptWithPrivateKey decrypts data with private key
+func DecryptWithPrivateKey(ciphertext []byte, priv *rsa.PrivateKey) []byte {
+	hash := sha512.New()
+	plaintext, err := rsa.DecryptOAEP(hash, crand.Reader, priv, ciphertext, nil)
+	if err != nil {
+	}
+	return plaintext
 }

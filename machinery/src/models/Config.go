@@ -42,6 +42,10 @@ type Config struct {
 	HubPrivateKey     string       `json:"hub_private_key" bson:"hub_private_key"`
 	HubSite           string       `json:"hub_site" bson:"hub_site"`
 	ConditionURI      string       `json:"condition_uri" bson:"condition_uri"`
+	Encryption        string       `json:"encryption" bson:"encryption"`
+	SharedKey         string       `json:"shared_key" bson:"shared_key"`
+	PublicKey         string       `json:"public_key" bson:"public_key"`
+	PrivateKey        string       `json:"private_key" bson:"private_key"`
 }
 
 // Capture defines which camera type (Id) you are using (IP, USB or Raspberry Pi camera),

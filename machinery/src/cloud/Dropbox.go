@@ -5,6 +5,7 @@ package cloud
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox"
@@ -13,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 )
 
 // UploadDropbox uploads the file to your Dropbox account using the access token and directory.
@@ -44,9 +46,26 @@ func UploadDropbox(configuration *models.Configuration, fileName string) (bool, 
 		LogLevel: dropbox.LogInfo, // if needed, set the desired logging level. Default is off
 	}
 
-	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
-	if file != nil {
-		defer file.Close()
+	var fileReader io.Reader
+	var err error
+	// if encryption enabled, we will encrypt the file before uploading.
+	if config.Encryption == "true" {
+		// Encrypt the file
+		log.Log.Info("UploadDropbox: Encrypting file")
+		//file, err :=
+		encryptedFile, err := utils.EncryptFileWithSharedKey(fullname, config.SharedKey)
+		if err != nil {
+			log.Log.Error("UploadDropbox: Error encrypting file: " + err.Error())
+			return false, false, err
+		}
+		// Convert the encrypted file to a reader
+		fileReader = bytes.NewReader(encryptedFile)
+	} else {
+		file, _ := os.OpenFile(fullname, os.O_RDWR, 0755)
+		if file != nil {
+			defer file.Close()
+		}
+		fileReader = file
 	}
 
 	if err == nil {
@@ -61,7 +80,7 @@ func UploadDropbox(configuration *models.Configuration, fileName string) (bool, 
 					},
 				},
 			},
-		}, file)
+		}, fileReader)
 
 		if err != nil {
 			log.Log.Error("UploadDropbox: Error uploading file: " + err.Error())
