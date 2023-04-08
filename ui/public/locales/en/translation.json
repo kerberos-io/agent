@@ -55,7 +55,8 @@
       "recording": "Recording",
       "streaming": "Streaming",
       "conditions": "Conditions",
-      "persistence": "Persistence"
+      "persistence": "Persistence",
+      "encryption": "Encryption"
     },
     "info": {
       "kerberos_hub_demo": "Have a look at our Kerberos Hub demo environment, to see Kerberos Hub in action!",
@@ -206,6 +207,13 @@
       "remove_after_upload": "Once recordings are uploaded to some persistence, you might want to remove them from the local Kerberos Agent.",
       "remove_after_upload_description": "Remove recordings after they are uploaded successfully.",
       "remove_after_upload_enabled": "Enabled delete on upload"
+    },
+    "encryption": {
+      "keys": "Keys",
+      "description_keys": "Kerberos Agents can be configured to encrypt recordings. This is useful when you want to store securely your recordings in a 3rd party provider.",
+      "publickey": "Public key",
+      "privatekey": "Private key",
+      "generate": "Generate keys"
     }
   }
 }

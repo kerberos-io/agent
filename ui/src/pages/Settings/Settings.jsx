@@ -32,6 +32,7 @@ import {
   verifyPersistence,
   getConfig,
   updateConfig,
+  generateKeys,
 } from '../../actions/agent';
 
 // eslint-disable-next-line react/prefer-stateless-function
@@ -127,6 +128,7 @@ class Settings extends React.Component {
     this.onAddRegion = this.onAddRegion.bind(this);
     this.onUpdateRegion = this.onUpdateRegion.bind(this);
     this.onDeleteRegion = this.onDeleteRegion.bind(this);
+    this.generateKeys = this.generateKeys.bind(this);
   }
 
   componentDidMount() {
@@ -260,6 +262,11 @@ class Settings extends React.Component {
     this.setState({
       selectedTab: tab,
     });
+  }
+
+  generateKeys() {
+    const { dispatchGenerateKeys } = this.props;
+    dispatchGenerateKeys();
   }
 
   saveConfig() {
@@ -467,6 +474,7 @@ class Settings extends React.Component {
     let showStreamingSection = false;
     let showConditionsHubSection = false;
     let showPersistenceSection = false;
+    let showEncryptionSection = false;
 
     switch (selectedTab) {
       case 'all':
@@ -476,6 +484,7 @@ class Settings extends React.Component {
         showStreamingSection = true;
         showConditionsHubSection = true;
         showPersistenceSection = true;
+        showEncryptionSection = true;
         break;
       case 'overview':
         showOverviewSection = true;
@@ -494,6 +503,9 @@ class Settings extends React.Component {
         break;
       case 'persistence':
         showPersistenceSection = true;
+        break;
+      case 'encryption':
+        showEncryptionSection = true;
         break;
       default:
     }
@@ -529,6 +541,9 @@ class Settings extends React.Component {
               break;
             case 'persistence':
               showPersistenceSection = match;
+              break;
+            case 'encryption':
+              showEncryptionSection = match;
               break;
             default:
           }
@@ -604,6 +619,15 @@ class Settings extends React.Component {
                 active={selectedTab === 'persistence'}
                 onClick={() => this.changeTab('persistence')}
                 icon={<Icon label="cloud" />}
+              />
+            )}
+            {config.offline !== 'true' && (
+              <Tab
+                label={t('settings.submenu.encryption')}
+                value="encryption"
+                active={selectedTab === 'encryption'}
+                onClick={() => this.changeTab('encryption')}
+                icon={<Icon label="locked" />}
               />
             )}
           </Tabs>
@@ -1045,6 +1069,48 @@ class Settings extends React.Component {
                     type={loadingHub ? 'neutral' : 'default'}
                     onClick={this.verifyHubSettings}
                     icon="verify"
+                  />
+                  <Button
+                    label={t('buttons.save')}
+                    onClick={this.saveConfig}
+                    type="default"
+                    icon="pencil"
+                  />
+                </BlockFooter>
+              </Block>
+            )}
+
+            {showEncryptionSection && config.offline !== 'true' && (
+              <Block>
+                <BlockHeader>
+                  <h4>{t('settings.encryption.keys')}</h4>
+                </BlockHeader>
+                <BlockBody>
+                  <p>{t('settings.encryption.description_keys')} </p>
+                  <Input
+                    noPadding
+                    label={t('settings.encryption.publickey')}
+                    value={config.publickey}
+                    onChange={(value) =>
+                      this.onUpdateField('', 'publickey', value, config)
+                    }
+                  />
+                  <Input
+                    noPadding
+                    label={t('settings.encryption.privatekey')}
+                    value={config.privatekey}
+                    onChange={(value) =>
+                      this.onUpdateField('', 'privatekey', value, config)
+                    }
+                  />
+                </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label={t('settings.encryption.generate')}
+                    disabled={loading}
+                    onClick={this.generateKeys}
+                    type={loading ? 'neutral' : 'default'}
+                    icon="refresh"
                   />
                   <Button
                     label={t('buttons.save')}
@@ -2256,6 +2322,8 @@ const mapDispatchToProps = (dispatch /* , ownProps */) => ({
   dispatchAddRegion: (id, polygon) => dispatch(addRegion(id, polygon)),
   dispatchRemoveRegion: (id, polygon) => dispatch(removeRegion(id, polygon)),
   dispatchUpdateRegion: (id, polygon) => dispatch(updateRegion(id, polygon)),
+  dispatchGenerateKeys: (success, error) =>
+    dispatch(generateKeys(success, error)),
 });
 
 Settings.propTypes = {
@@ -2270,6 +2338,7 @@ Settings.propTypes = {
   dispatchUpdateRegion: PropTypes.func.isRequired,
   dispatchRemoveRegion: PropTypes.func.isRequired,
   dispatchVerifyCamera: PropTypes.func.isRequired,
+  dispatchGenerateKeys: PropTypes.func.isRequired,
 };
 
 export default withTranslation()(

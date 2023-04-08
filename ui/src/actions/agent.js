@@ -7,6 +7,7 @@ import {
   doGetDashboardInformation,
   doGetEvents,
   doVerifyCamera,
+  doGenerateKeys,
 } from '../api/agent';
 
 export const addRegion = (id, polygon) => {
@@ -157,6 +158,26 @@ export const getEvents = (eventfilter, onSuccess, onError) => {
           type: 'GET_EVENTS',
           events: data.events,
           filter: eventfilter,
+        });
+        if (onSuccess) {
+          onSuccess();
+        }
+      },
+      () => {
+        if (onError) {
+          onError();
+        }
+      }
+    );
+  };
+};
+
+export const generateKeys = (onSuccess, onError) => {
+  return (dispatch) => {
+    doGenerateKeys(
+      () => {
+        dispatch({
+          type: 'GENERATE_KEYS',
         });
         if (onSuccess) {
           onSuccess();

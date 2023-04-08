@@ -91,6 +91,23 @@ export function doVerifyHub(config, onSuccess, onError) {
     });
 }
 
+export function doGenerateKeys(onSuccess, onError) {
+  const endpoint = API.post(`keys/generate`);
+  endpoint
+    .then((res) => {
+      if (res.status !== 200) {
+        throw new Error(res.data);
+      }
+      return res.data;
+    })
+    .then((data) => {
+      onSuccess(data);
+    })
+    .catch((error) => {
+      onError(error);
+    });
+}
+
 export function doVerifyCamera(streamType, config, onSuccess, onError) {
   const cameraStreams = {
     rtsp: '',
