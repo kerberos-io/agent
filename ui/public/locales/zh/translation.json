@@ -195,9 +195,9 @@
       "kerberosvault_directory": "目录",
       "kerberosvault_description_directory": "录像将存储在提供商中的子目录",
       "kerberosvault_accesskey": "访问密钥",
-      "kerberosvault_description_accesskey": "Kerberos Vault帐户的访问密钥",
+      "kerberosvault_description_accesskey": "Kerberos Vault 帐户的访问密钥",
       "kerberosvault_secretkey": "密钥",
-      "kerberosvault_description_secretkey": "Kerberos Vault帐户的密钥",
+      "kerberosvault_description_secretkey": "Kerberos Vault 帐户的密钥",
       "verify_connection": "验证连接"
     }
   }
