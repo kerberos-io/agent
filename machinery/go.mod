@@ -14,6 +14,7 @@ require (
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/eclipse/paho.mqtt.golang v1.4.2
 	github.com/elastic/go-sysinfo v1.9.0
+	github.com/forgoer/openssl v1.5.0
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-contrib/pprof v1.4.0
 	github.com/gin-gonic/contrib v0.0.0-20221130124618-7e01895a63f2

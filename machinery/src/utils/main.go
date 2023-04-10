@@ -2,15 +2,11 @@ package utils
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
 	crand "crypto/rand"
 	"crypto/rsa"
 	"crypto/sha512"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -339,28 +335,13 @@ func PrintConfiguration(configuration *models.Configuration) {
 }
 
 func EncryptFileWithSharedKey(fullname string, sharedKey string) (encryptedFile []byte, err error) {
-	// Encode file with AES-256-CBC.
-	// We will use the shared key as the key.
 
-	// AES key is 32 bytes.
-	// We will use the first 32 bytes of the shared key.
-	block, err := aes.NewCipher([]byte(sharedKey))
-	if err != nil {
-		log.Log.Error(err.Error())
-		return
-	}
+	// same key and initialization vector as in ruby example
+	key := []byte("my32digitkey12345678901234567890")
+	iv := []byte("my16digitIvKey12")
 
-	// Never use more than 2^32 random nonces with a given key
-	// because of the risk of repeat.
-	//iv := make([]byte, block.BlockSize())
-	//if _, err = io.ReadFull(crand.Reader, iv); err != nil {
-	//	log.Log.Error(err.Error())
-	//	return
-	//}
-	iv := make([]byte, block.BlockSize())
-	// We will use the last 16 bytes of the shared key.
-	copy(iv, []byte(sharedKey))
-	log.Log.Info("IV: " + hex.EncodeToString(iv))
+	// Initialize new crypter struct. Errors are ignored.
+	crypter, _ := NewCrypter(key, iv)
 
 	// Open the file.
 	file, err := os.Open(fullname)
@@ -370,27 +351,9 @@ func EncryptFileWithSharedKey(fullname string, sharedKey string) (encryptedFile 
 	}
 	defer file.Close()
 
-	// The buffer size must be multiple of 16 bytes
-	buf := make([]byte, 1024)
-	stream := cipher.NewCTR(block, iv)
+	by, _ := ioutil.ReadAll(file)
+	encryptedFile, err = crypter.Encrypt(by)
 
-	// Append Salt to the beginning of the file.
-	salt := "Salted__"
-	encryptedFile = append(encryptedFile, salt...)
-
-	// Encrypt the file.
-	for {
-		n, err := file.Read(buf)
-		if err != nil && err != io.EOF {
-			log.Log.Error(err.Error())
-			return nil, err
-		}
-		if n == 0 {
-			break
-		}
-		stream.XORKeyStream(buf[:n], buf[:n])
-		encryptedFile = append(encryptedFile, buf[:n]...)
-	}
 	return
 }
 

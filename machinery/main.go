@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io/ioutil"
 	"os"
 	"time"
 
@@ -58,6 +59,31 @@ func main() {
 
 	case "version":
 		log.Log.Info("You are currrently running Kerberos Agent " + VERSION)
+
+		// same key and initialization vector as in ruby example
+		key := []byte("7676BE0BA5945E52C37F13C8A5B2998DC9FE96F2E47D1B251B5B591B68C86BBE")
+		iv := []byte("AF92C042E02A2FF88C939932AE342C90")
+
+		// Initialize new crypter struct. Errors are ignored.
+		crypter, _ := utils.NewCrypter(key, iv)
+
+		// Lets encode plaintext using the same key and iv.
+		// This will produce the very same result: "RanFyUZSP9u/HLZjyI5zXQ=="
+
+		// Open file /Users/cedricverstraeten/Downloads/1681022365_6-967003_yolo23_200-200-400-400_0_769.mp4
+		// and encode it to base64
+
+		encrypted := "/Users/cedricverstraeten/Downloads/file.mp4"
+		decrypted := "/Users/cedricverstraeten/Downloads/file_decry.mp4"
+		f, _ := os.Open(encrypted)
+		defer f.Close()
+		bb, _ := ioutil.ReadAll(f)
+
+		// Decode previous result. Should print "hello world"
+		decoded, _ := crypter.DecryptECB(bb)
+		fd, _ := os.Create(decrypted)
+		defer fd.Close()
+		fd.Write(decoded)
 
 	case "discover":
 		timeout := os.Args[2]
