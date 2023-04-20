@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"image"
-	_ "image/png"
 	"io/ioutil"
 	"os"
 	"reflect"
