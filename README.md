@@ -104,7 +104,7 @@ This repository contains everything you'll need to know about our core product, 
 - Post- and pre-recording on motion detection.
 - Ability to create fragmented recordings, and streaming though HLS fMP4.
 - [Deploy where you want](#how-to-run-and-deploy-a-kerberos-agent) with the tools you use: `docker`, `docker compose`, `ansible`, `terraform`, `kubernetes`, etc.
-- Cloud storage (Kerberos Hub, Kerberos Vault). WIP: Minio, Storj, Dropbox, Google Drive etc.
+- Cloud storage/persistance: Kerberos Hub, Kerberos Vault and Dropbox. [(WIP: Minio, Storj, Google Drive, FTP etc.)](https://github.com/kerberos-io/agent/issues/95)
 - WIP: Integrations (Webhooks, MQTT, Script, etc).
 - REST API access and documentation through Swagger (trigger recording, update configuration, etc).
 - MIT License
@@ -147,7 +147,10 @@ You attach a volume to your container by leveraging the `-v` option. To mount yo
     -v $(pwd)/agent/recordings:/home/agent/data/recordings \
     -d --restart=always kerberos/agent:latest
 
-More example [can be found in the deployment section](https://github.com/kerberos-io/agent/tree/master/deployments) for each deployment and automation tool.
+More example [can be found in the deployment section](https://github.com/kerberos-io/agent/tree/master/deployments) for each deployment and automation tool. Please note to verify the permissions of the directory/volume you are attaching. More information in [this issue](https://github.com/kerberos-io/agent/issues/80).
+
+    chmod -R 755 kerberos-agent/
+    chown 100:101 kerberos-agent/ -R
 
 ## Configure with environment variables
 
@@ -193,9 +196,9 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_MQTT_PASSWORD`                   | Password of the MQTT broker.                                                                    | ""                              |
 | `AGENT_STUN_URI`                        | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn.kerberos.io:8443"    |
 | `AGENT_TURN_URI`                        | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn.kerberos.io:8443"    |
-| `AGENT_TURN_USERNAME`                   | TURN username used for WebRTC.                                                                  | "username1"                     |0
+| `AGENT_TURN_USERNAME`                   | TURN username used for WebRTC.                                                                  | "username1"                     |
 | `AGENT_TURN_PASSWORD`                   | TURN password used for WebRTC.                                                                  | "password1"                     |
-| `AGENT_CLOUD`                           | Store recordings in a Kerberos Hub (s3) or your Kerberos Vault (kstorage).                      | "s3"                            |
+| `AGENT_CLOUD`                           | Store recordings in Kerberos Hub (s3), Kerberos Vault (kstorage) or Dropbox (dropbox).          | "s3"                            |
 | `AGENT_HUB_URI`                         | The Kerberos Hub API, defaults to our Kerberos Hub SAAS.                                        | "https://api.cloud.kerberos.io" |
 | `AGENT_HUB_KEY`                         | The access key linked to your account in Kerberos Hub.                                          | ""                              |
 | `AGENT_HUB_PRIVATE_KEY`                 | The secret access key linked to your account in Kerberos Hub.                                   | ""                              |
@@ -206,6 +209,8 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_KERBEROSVAULT_SECRET_KEY`        | The secret key of a Kerberos Vault account.                                                     | ""                              |
 | `AGENT_KERBEROSVAULT_PROVIDER`          | A Kerberos Vault provider you have created (optional).                                          | ""                              |
 | `AGENT_KERBEROSVAULT_DIRECTORY`         | The directory, in the provider, where the recordings will be stored in.                         | ""                              |
+| `AGENT_DROPBOX_ACCESS_TOKEN`            | The Access Token from your Dropbox app, that is used to leverage the Dropbox SDK.               | ""                              |
+| `AGENT_DROPBOX_DIRECTORY`               | The directory, in the provider, where the recordings will be stored in.                         | ""                              |
 
 ## Contribute with Codespaces
 
