@@ -9,7 +9,10 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${fileDirname}"
-        }
+            "program": "main.go",
+            "args": ["run", "cameraname", "8080"],
+            "envFile": "${workspaceFolder}/.env",
+            "buildFlags": "--tags dynamic",
+        },
     ]
 }
