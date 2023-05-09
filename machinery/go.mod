@@ -9,6 +9,9 @@ go 1.19
 require (
 	github.com/InVisionApp/conjungo v1.1.0
 	github.com/appleboy/gin-jwt/v2 v2.9.1
+	github.com/asticode/go-astits v1.11.0
+	github.com/bluenviron/gortsplib/v3 v3.6.1
+	github.com/bluenviron/mediacommon v0.5.0
 	github.com/cedricve/go-onvif v0.0.0-20200222191200-567e8ce298f6
 	github.com/deepch/vdk v0.0.19
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
@@ -27,6 +30,7 @@ require (
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/nsmith5/mjpeg v0.0.0-20200913181537-54b8ada0e53e
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
+	github.com/pion/rtp v1.7.13
 	github.com/pion/webrtc/v3 v3.1.50
 	github.com/sirupsen/logrus v1.9.0
 	github.com/swaggo/files v1.0.0
@@ -50,6 +54,7 @@ require (
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
+	github.com/asticode/go-astikit v0.30.0 // indirect
 	github.com/beevik/etree v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/clbanning/mxj v1.8.4 // indirect
@@ -69,7 +74,8 @@ require (
 	github.com/goccy/go-json v0.10.0 // indirect
 	github.com/gofrs/uuid v3.2.0+incompatible // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/pprof v0.0.0-20210423192551-a2663126120b // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
@@ -86,6 +92,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/onsi/gomega v1.27.4 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/philhofer/fwd v1.1.1 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
@@ -96,7 +103,6 @@ require (
 	github.com/pion/mdns v0.0.5 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/rtcp v1.2.10 // indirect
-	github.com/pion/rtp v1.7.13 // indirect
 	github.com/pion/sctp v1.8.5 // indirect
 	github.com/pion/sdp/v3 v3.0.6 // indirect
 	github.com/pion/srtp/v2 v2.0.10 // indirect
@@ -115,13 +121,13 @@ require (
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
 	golang.org/x/crypto v0.4.0 // indirect
-	golang.org/x/net v0.4.0 // indirect
+	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5 // indirect
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
-	golang.org/x/sys v0.3.0 // indirect
-	golang.org/x/text v0.5.0 // indirect
+	golang.org/x/sync v0.1.0 // indirect
+	golang.org/x/sys v0.7.0 // indirect
+	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
-	golang.org/x/tools v0.1.12 // indirect
+	golang.org/x/tools v0.7.0 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/grpc v1.32.0 // indirect
