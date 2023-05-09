@@ -64,6 +64,9 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	subDecoder := &ffmpeg.VideoDecoder{}
 	cameraSettings := &models.Camera{}
 
+	// Handle heartbeats
+	go cloud.HandleHeartBeat(configuration, communication, uptimeStart)
+
 	// Run the agent and fire up all the other
 	// goroutines which do image capture, motion detection, onvif, etc.
 
@@ -75,13 +78,16 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 		}
 		// We will re open the configuration, might have changed :O!
 		OpenConfig(configuration)
+
+		// We will override the configuration with the environment variables
+		OverrideWithEnvironmentVariables(configuration)
 	}
 	log.Log.Debug("Bootstrap: finished")
 }
 
 func RunAgent(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time, cameraSettings *models.Camera, decoder *ffmpeg.VideoDecoder, subDecoder *ffmpeg.VideoDecoder) string {
-	log.Log.Debug("RunAgent: bootstrapping agent")
 
+	log.Log.Debug("RunAgent: bootstrapping agent")
 	config := configuration.Config
 
 	// Currently only support H264 encoded cameras, this will change.
@@ -185,9 +191,6 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		communication.HandleONVIF = make(chan models.OnvifAction, 1)
 		mqttClient := routers.ConfigureMQTT(configuration, communication)
 
-		// Handle heartbeats
-		go cloud.HandleHeartBeat(configuration, communication, uptimeStart)
-
 		// Handle the camera stream
 		go capture.HandleStream(infile, queue, communication)
 
@@ -241,14 +244,14 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 		// Here we are cleaning up everything!
 		if configuration.Config.Offline != "true" {
-			communication.HandleHeartBeat <- "stop"
 			communication.HandleUpload <- "stop"
 		}
 		communication.HandleStream <- "stop"
 		if subStreamEnabled {
 			communication.HandleSubStream <- "stop"
 		}
-		time.Sleep(time.Second * 1)
+
+		time.Sleep(time.Second * 3)
 
 		infile.Close()
 		infile = nil
@@ -278,6 +281,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// Waiting for some seconds to make sure everything is properly closed.
 		log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")
 		time.Sleep(time.Second * 3)
+
 	} else {
 		log.Log.Error("Something went wrong while opening RTSP: " + err.Error())
 		time.Sleep(time.Second * 3)

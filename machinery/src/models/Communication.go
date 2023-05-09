@@ -34,4 +34,5 @@ type Communication struct {
 	Decoder               *ffmpeg.VideoDecoder
 	SubDecoder            *ffmpeg.VideoDecoder
 	Image                 string
+	CameraConnected       bool
 }

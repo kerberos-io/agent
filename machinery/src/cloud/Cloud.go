@@ -128,8 +128,10 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 							log.Log.Error("HandleUpload: " + err.Error())
 						}
 					} else {
-						delay = 5 * time.Second // slow down
-						log.Log.Error("HandleUpload: " + err.Error())
+						delay = 20 * time.Second // slow down
+						if err != nil {
+							log.Log.Error("HandleUpload: " + err.Error())
+						}
 					}
 
 					time.Sleep(delay)
@@ -215,36 +217,36 @@ func GetSystemInfo() (models.System, error) {
 func HandleHeartBeat(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time) {
 	log.Log.Debug("HandleHeartBeat: started")
 
-	config := configuration.Config
+loop:
+	for {
 
-	if config.Offline == "true" {
-		log.Log.Debug("HandleHeartBeat: stopping as Offline is enabled.")
-	} else {
+		config := configuration.Config
 
-		url := config.HeartbeatURI
-		key := ""
-		username := ""
-		vaultURI := ""
+		if config.Offline == "true" {
+			log.Log.Debug("HandleHeartBeat: stopping as Offline is enabled.")
+		} else {
 
-		username = config.S3.Username
-		if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
+			url := config.HeartbeatURI
+			key := ""
+			username := ""
+			vaultURI := ""
+
 			username = config.S3.Username
-			key = config.S3.Publickey
-		} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
-			key = config.KStorage.CloudKey
-			username = config.KStorage.Directory
-		}
+			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
+				username = config.S3.Username
+				key = config.S3.Publickey
+			} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
+				key = config.KStorage.CloudKey
+				username = config.KStorage.Directory
+			}
 
-		// This is the new way ;)
-		if config.HubURI != "" {
-			url = config.HubURI + "/devices/heartbeat"
-		}
-		if config.HubKey != "" {
-			key = config.HubKey
-		}
-
-	loop:
-		for {
+			// This is the new way ;)
+			if config.HubURI != "" {
+				url = config.HubURI + "/devices/heartbeat"
+			}
+			if config.HubKey != "" {
+				key = config.HubKey
+			}
 
 			if key != "" {
 				// Check if we have a friendly name or not.
@@ -292,39 +294,44 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				// Congert to string
 				macs, _ := json.Marshal(system.MACs)
 				ips, _ := json.Marshal(system.IPs)
+				cameraConnected := "true"
+				if communication.CameraConnected == false {
+					cameraConnected = "false"
+				}
 
 				var object = fmt.Sprintf(`{
-					"key" : "%s",
-					"version" : "3.0.0",
-					"release" : "%s",
-					"cpuid" : "%s",
-					"clouduser" : "%s",
-					"cloudpublickey" : "%s",
-					"cameraname" : "%s",
-					"enterprise" : %t,
-					"hostname" : "%s",
-					"architecture" : "%s",
-					"totalMemory" : "%d",
-					"usedMemory" : "%d",
-					"freeMemory" : "%d",
-					"processMemory" : "%d",
-					"mac_list" : %s,
-					"ip_list" : %s,
-					"board" : "",
-					"disk1size" : "%s",
-					"disk3size" : "%s",
-					"diskvdasize" :  "%s",
-					"uptime" : "%s",
-					"boot_time" : "%s",
-					"siteID" : "%s",
-					"onvif" : "%s",
-					"numberoffiles" : "33",
-					"timestamp" : 1564747908,
-					"cameratype" : "IPCamera",
-					"docker" : true,
-					"kios" : false,
-					"raspberrypi" : false
-				}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled)
+						"key" : "%s",
+						"version" : "3.0.0",
+						"release" : "%s",
+						"cpuid" : "%s",
+						"clouduser" : "%s",
+						"cloudpublickey" : "%s",
+						"cameraname" : "%s",
+						"enterprise" : %t,
+						"hostname" : "%s",
+						"architecture" : "%s",
+						"totalMemory" : "%d",
+						"usedMemory" : "%d",
+						"freeMemory" : "%d",
+						"processMemory" : "%d",
+						"mac_list" : %s,
+						"ip_list" : %s,
+						"board" : "",
+						"disk1size" : "%s",
+						"disk3size" : "%s",
+						"diskvdasize" :  "%s",
+						"uptime" : "%s",
+						"boot_time" : "%s",
+						"siteID" : "%s",
+						"onvif" : "%s",
+						"cameraConnected": "%s",
+						"numberoffiles" : "33",
+						"timestamp" : 1564747908,
+						"cameratype" : "IPCamera",
+						"docker" : true,
+						"kios" : false,
+						"raspberrypi" : false
+					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, cameraConnected)
 
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)
@@ -365,14 +372,14 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 			} else {
 				log.Log.Error("HandleHeartBeat: Disabled as we do not have a public key defined.")
 			}
+		}
 
-			// This will check if we need to stop the thread,
-			// because of a reconfiguration.
-			select {
-			case <-communication.HandleHeartBeat:
-				break loop
-			case <-time.After(15 * time.Second):
-			}
+		// This will check if we need to stop the thread,
+		// because of a reconfiguration.
+		select {
+		case <-communication.HandleHeartBeat:
+			break loop
+		case <-time.After(15 * time.Second):
 		}
 	}
 
