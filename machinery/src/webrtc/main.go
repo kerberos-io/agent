@@ -278,7 +278,6 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 		lastKeepAlive := "0"
 		peerCount := "0"
 
-		count := 0
 		for cursorError == nil {
 
 			pkt, cursorError = livestreamCursor.ReadPacket()
