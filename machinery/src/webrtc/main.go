@@ -27,7 +27,7 @@ var (
 	CandidateArrays     map[string](chan string)
 	peerConnectionCount int64
 	peerConnections     map[string]*pionWebRTC.PeerConnection
-	encoder             *ffmpeg.VideoEncoder
+	//encoder             *ffmpeg.VideoEncoder
 )
 
 type WebRTC struct {
@@ -40,7 +40,8 @@ type WebRTC struct {
 	PacketsCount          chan int
 }
 
-func init() {
+// No longer used, is for transcoding, might comeback on this!
+/*func init() {
 	// Encoder is created for once and for all.
 	var err error
 	encoder, err = ffmpeg.NewVideoEncoderByCodecType(av.H264)
@@ -55,7 +56,7 @@ func init() {
 	encoder.SetPixelFormat(av.I420)
 	encoder.SetBitrate(1000000) // 1MB
 	encoder.SetGopSize(30 / 1)  // 1s
-}
+}*/
 
 func CreateWebRTC(name string, stunServers []string, turnServers []string, turnServersUsername string, turnServersCredential string) *WebRTC {
 	return &WebRTC{
@@ -86,7 +87,7 @@ func (w WebRTC) CreateOffer(sd []byte) pionWebRTC.SessionDescription {
 	return offer
 }
 
-func InitializeWebRTCConnection(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, track *pionWebRTC.TrackLocalStaticSample, handshake models.SDPPayload, candidates chan string) {
+func InitializeWebRTCConnection(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, handshake models.SDPPayload, candidates chan string) {
 
 	config := configuration.Config
 
@@ -127,15 +128,13 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 		if err == nil && peerConnection != nil {
 
-			if _, err = peerConnection.AddTrack(track); err != nil {
+			if _, err = peerConnection.AddTrack(videoTrack); err != nil {
 				panic(err)
 			}
 
-			_, err = peerConnection.AddTransceiverFromTrack(track,
-				pionWebRTC.RtpTransceiverInit{
-					Direction: pionWebRTC.RTPTransceiverDirectionSendonly,
-				},
-			)
+			if _, err = peerConnection.AddTrack(audioTrack); err != nil {
+				panic(err)
+			}
 
 			if err != nil {
 				panic(err)
@@ -214,12 +213,29 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 	}
 }
 
-func NewVideoTrack() *pionWebRTC.TrackLocalStaticSample {
-	outboundVideoTrack, _ := pionWebRTC.NewTrackLocalStaticSample(pionWebRTC.RTPCodecCapability{MimeType: "video/h264"}, "video", "pion124")
+func NewVideoTrack(codecs []av.CodecData) *pionWebRTC.TrackLocalStaticSample {
+	var mimeType string
+	mimeType = pionWebRTC.MimeTypeH264
+	outboundVideoTrack, _ := pionWebRTC.NewTrackLocalStaticSample(pionWebRTC.RTPCodecCapability{MimeType: mimeType}, "video", "pion124")
 	return outboundVideoTrack
 }
 
-func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, track *pionWebRTC.TrackLocalStaticSample, codecs []av.CodecData, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func NewAudioTrack(codecs []av.CodecData) *pionWebRTC.TrackLocalStaticSample {
+	var mimeType string
+	for _, codec := range codecs {
+		if codec.Type().String() == "OPUS" {
+			mimeType = pionWebRTC.MimeTypeOpus
+		} else if codec.Type().String() == "PCM_MULAW" {
+			mimeType = pionWebRTC.MimeTypePCMU
+		} else if codec.Type().String() == "PCM_ALAW" {
+			mimeType = pionWebRTC.MimeTypePCMA
+		}
+	}
+	outboundAudioTrack, _ := pionWebRTC.NewTrackLocalStaticSample(pionWebRTC.RTPCodecCapability{MimeType: mimeType}, "audio", "pion124")
+	return outboundAudioTrack
+}
+
+func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, codecs []av.CodecData, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
 
 	config := configuration.Config
 
@@ -233,7 +249,7 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 	for i, codec := range codecs {
 		if codec.Type().String() == "H264" && videoIdx < 0 {
 			videoIdx = i
-		} else if codec.Type().String() == "PCM_MULAW" && audioIdx < 0 {
+		} else if (codec.Type().String() == "OPUS" || codec.Type().String() == "PCM_MULAW" || codec.Type().String() == "PCM_ALAW") && audioIdx < 0 {
 			audioIdx = i
 		}
 	}
@@ -262,6 +278,7 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 		lastKeepAlive := "0"
 		peerCount := "0"
 
+		count := 0
 		for cursorError == nil {
 
 			pkt, cursorError = livestreamCursor.ReadPacket()
@@ -363,13 +380,18 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 							log.Log.Info("WriteToTrack: Error marshalling frame, " + err.Error())
 						}
 					} else {
-						if err := track.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
+						if err := videoTrack.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
 							log.Log.Error("WriteToTrack: something went wrong while writing sample: " + err.Error())
 						}
 					}
 				}
 			case audioIdx:
-				//log.Log.Info("WriteToTrack: not writing audio for the moment.")
+				// We will send the audio
+				sample := pionMedia.Sample{Data: pkt.Data, Duration: pkt.Time}
+				fmt.Println(pkt.Time)
+				if err := audioTrack.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
+					log.Log.Error("WriteToTrack: something went wrong while writing sample: " + err.Error())
+				}
 			}
 		}
 	}
@@ -378,6 +400,7 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 			p.Close()
 		}
 	}
+
 	peerConnectionCount = 0
 	log.Log.Info("WriteToTrack: stop writing to track.")
 }

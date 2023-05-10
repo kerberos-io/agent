@@ -471,8 +471,9 @@ func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 		if config.Capture.Liveview != "false" {
 
 			// Should create a track here.
-			track := webrtc.NewVideoTrack()
-			go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, track, codecs, decoder, decoderMutex)
+			videoTrack := webrtc.NewVideoTrack(codecs)
+			audioTrack := webrtc.NewAudioTrack(codecs)
+			go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, videoTrack, audioTrack, codecs, decoder, decoderMutex)
 
 			if config.Capture.ForwardWebRTC == "true" {
 				// We get a request with an offer, but we'll forward it.
@@ -495,7 +496,7 @@ func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 						webrtc.CandidateArrays[key] = make(chan string, 30)
 					}
 					webrtc.CandidatesMutex.Unlock()
-					webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, track, handshake, webrtc.CandidateArrays[key])
+					webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, videoTrack, audioTrack, handshake, webrtc.CandidateArrays[key])
 
 				}
 			}
