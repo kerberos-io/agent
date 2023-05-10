@@ -387,7 +387,6 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 			case audioIdx:
 				// We will send the audio
 				sample := pionMedia.Sample{Data: pkt.Data, Duration: pkt.Time}
-				fmt.Println(pkt.Time)
 				if err := audioTrack.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
 					log.Log.Error("WriteToTrack: something went wrong while writing sample: " + err.Error())
 				}
