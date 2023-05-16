@@ -324,14 +324,6 @@ By running the `docker build` command, you will create the Kerberos Agent Docker
 
     docker build -t kerberos/agent .
 
-## Support our project
-
-If you like our product please feel free to execute an Ethereum donation. All donations will flow back and split to our Open Source contributors, as they are the heart of this community.
-
-<img width="272" alt="Ethereum donation linke" src="https://user-images.githubusercontent.com/1546779/173443671-3d773068-ae10-4862-a990-dc7c89f3d9c2.png">
-
-Ethereum Address: `0xf4a759C9436E2280Ea9cdd23d3144D95538fF4bE`
-
 ## What is new?
 
 This repository contains the next generation of Kerberos.io, **Kerberos Agent (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/agent/tree/develop) and [project overview](https://github.com/kerberos-io/agent/projects/1).
