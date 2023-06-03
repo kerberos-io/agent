@@ -28,8 +28,8 @@ Kerberos Agent is an isolated and scalable video (surveillance) management agent
 ## :thinking: Prerequisites
 
 - An IP camera which supports a RTSP H264 encoded stream,
-  - (or) a USB camera, Raspberry Pi camera or other camera, that [you can tranform to a valid RTSP stream](https://github.com/kerberos-io/camera-to-rtsp).
-- Any hardware that can run a container, for example: a Raspberry Pi, NVidia Jetson, Intel NUC, a VM, Bare metal machine or a full blown Kubernetes cluster.
+  - (or) a USB camera, Raspberry Pi camera or other camera, that [you can tranform to a valid RTSP H264 stream](https://github.com/kerberos-io/camera-to-rtsp).
+- Any hardware (ARMv6, ARMv7, ARM64, AMD) that can run a binary or container, for example: a Raspberry Pi, NVidia Jetson, Intel NUC, a VM, Bare metal machine or a full blown Kubernetes cluster.
 
 ## :video_camera: Is my camera working?
 
