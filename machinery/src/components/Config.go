@@ -1,6 +1,7 @@
 package components
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"image"
@@ -76,19 +77,23 @@ func OpenConfig(configuration *models.Configuration) {
 		// Multiple agents have there configuration stored, and can benefit from
 		// the concept of a global concept.
 
-		session := database.New().Copy()
-		defer session.Close()
-		db := session.DB(database.DatabaseName)
-		collection := db.C("configuration")
+		// Write to mongodb
+		client := database.New()
 
-		collection.Find(bson.M{
+		db := client.Database(database.DatabaseName)
+		collection := db.Collection("configuration")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		collection.FindOne(ctx, bson.M{
 			"type": "global",
-		}).One(&configuration.GlobalConfig)
+		}).Decode(configuration.GlobalConfig)
 
-		collection.Find(bson.M{
+		collection.FindOne(ctx, bson.M{
 			"type": "config",
 			"name": os.Getenv("DEPLOYMENT_NAME"),
-		}).One(&configuration.CustomConfig)
+		}).Decode(configuration.CustomConfig)
 
 		// We will merge both configs in a single config file.
 		// Read again from database but this store overwrite the same object.
@@ -452,15 +457,19 @@ func StoreConfig(config models.Config) error {
 	// Save into database
 	if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
 		// Write to mongodb
-		session := database.New().Copy()
-		defer session.Close()
-		db := session.DB(database.DatabaseName)
-		collection := db.C("configuration")
+		client := database.New()
 
-		err := collection.Update(bson.M{
+		db := client.Database(database.DatabaseName)
+		collection := db.Collection("configuration")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		_, err := collection.UpdateOne(ctx, bson.M{
 			"type": "config",
 			"name": os.Getenv("DEPLOYMENT_NAME"),
-		}, &config)
+		}, bson.M{"$set": config})
+
 		return err
 
 		// Save into file

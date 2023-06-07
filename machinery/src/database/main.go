@@ -1,46 +1,55 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
-	"gopkg.in/mgo.v2"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type DB struct {
-	Session *mgo.Session
+	Client *mongo.Client
 }
 
 var _init_ctx sync.Once
 var _instance *DB
 var DatabaseName = "KerberosFactory"
 
-func New() *mgo.Session {
+func New() *mongo.Client {
+
 	host := os.Getenv("MONGODB_HOST")
-	database := os.Getenv("MONGODB_DATABASE_CREDENTIALS")
+	databaseCredentials := os.Getenv("MONGODB_DATABASE_CREDENTIALS")
+	replicaset := os.Getenv("MONGODB_REPLICASET")
 	username := os.Getenv("MONGODB_USERNAME")
 	password := os.Getenv("MONGODB_PASSWORD")
+	authentication := "SCRAM-SHA-256"
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	_init_ctx.Do(func() {
 		_instance = new(DB)
-		mongoDBDialInfo := &mgo.DialInfo{
-			Addrs:    strings.Split(host, ","),
-			Timeout:  3 * time.Second,
-			Database: database,
-			Username: username,
-			Password: password,
+		mongodbURI := fmt.Sprintf("mongodb://%s:%s@%s", username, password, host)
+		if replicaset != "" {
+			mongodbURI = fmt.Sprintf("%s/?replicaSet=%s", mongodbURI, replicaset)
 		}
-		session, err := mgo.DialWithInfo(mongoDBDialInfo)
+
+		client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongodbURI).SetAuth(options.Credential{
+			AuthMechanism: authentication,
+			AuthSource:    databaseCredentials,
+			Username:      username,
+			Password:      password,
+		}))
 		if err != nil {
-			log.Log.Error(fmt.Sprintf("Failed to connect to database: %s", err.Error()))
+			fmt.Printf("Error setting up mongodb connection: %+v\n", err)
 			os.Exit(1)
 		}
-		_instance.Session = session
+		_instance.Client = client
 	})
 
-	return _instance.Session
+	return _instance.Client
 }
