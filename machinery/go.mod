@@ -35,7 +35,6 @@ require (
 	github.com/tevino/abool v1.2.0
 	go.mongodb.org/mongo-driver v1.7.5
 	gopkg.in/DataDog/dd-trace-go.v1 v1.46.0
-	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 

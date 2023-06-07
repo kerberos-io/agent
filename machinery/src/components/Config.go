@@ -17,7 +17,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/database"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func GetImageFromFilePath() (image.Image, error) {

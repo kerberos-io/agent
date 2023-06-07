@@ -77,18 +77,21 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 
 			// Calculate mask
 			var polyObjects []geo.Polygon
-			for _, polygon := range config.Region.Polygon {
-				coords := polygon.Coordinates
-				poly := geo.Polygon{}
-				for _, c := range coords {
-					x := c.X
-					y := c.Y
-					p := geo.NewPoint(x, y)
-					if !poly.Contains(p) {
-						poly.Add(p)
+
+			if config.Region != nil {
+				for _, polygon := range config.Region.Polygon {
+					coords := polygon.Coordinates
+					poly := geo.Polygon{}
+					for _, c := range coords {
+						x := c.X
+						y := c.Y
+						p := geo.NewPoint(x, y)
+						if !poly.Contains(p) {
+							poly.Add(p)
+						}
 					}
+					polyObjects = append(polyObjects, poly)
 				}
-				polyObjects = append(polyObjects, poly)
 			}
 
 			bounds := img.Bounds()
