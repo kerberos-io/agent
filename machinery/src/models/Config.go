@@ -73,7 +73,7 @@ type IPCamera struct {
 	RTSP          string `json:"rtsp"`
 	SubRTSP       string `json:"sub_rtsp"`
 	FPS           string `json:"fps"`
-	ONVIF         bool   `json:"onvif,omitempty" bson:"onvif"`
+	ONVIF         string `json:"onvif,omitempty" bson:"onvif"`
 	ONVIFXAddr    string `json:"onvif_xaddr,omitempty" bson:"onvif_xaddr"`
 	ONVIFUsername string `json:"onvif_username,omitempty" bson:"onvif_username"`
 	ONVIFPassword string `json:"onvif_password,omitempty" bson:"onvif_password"`

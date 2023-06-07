@@ -83,20 +83,24 @@ func OpenConfig(configuration *models.Configuration) {
 		db := client.Database(database.DatabaseName)
 		collection := db.Collection("configuration")
 
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
 		var globalConfig models.Config
-		collection.FindOne(ctx, bson.M{
+		err := collection.FindOne(context.Background(), bson.M{
 			"type": "global",
 		}).Decode(&globalConfig)
+		if err != nil {
+			log.Log.Error("Could not find global configuration, using default configuration.")
+		}
 		configuration.GlobalConfig = globalConfig
 
 		var customConfig models.Config
-		collection.FindOne(ctx, bson.M{
+		deploymentName := os.Getenv("DEPLOYMENT_NAME")
+		err = collection.FindOne(context.Background(), bson.M{
 			"type": "config",
-			"name": os.Getenv("DEPLOYMENT_NAME"),
+			"name": deploymentName,
 		}).Decode(&customConfig)
+		if err != nil {
+			log.Log.Error("Could not find configuration for " + deploymentName + ", using global configuration.")
+		}
 		configuration.CustomConfig = customConfig
 
 		// We will merge both configs in a single config file.
@@ -213,8 +217,7 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 
 				/* ONVIF connnection settings */
 			case "AGENT_CAPTURE_IPCAMERA_ONVIF":
-				isEnabled := value == " true"
-				configuration.Config.Capture.IPCamera.ONVIF = isEnabled
+				configuration.Config.Capture.IPCamera.ONVIF = value
 				break
 			case "AGENT_CAPTURE_IPCAMERA_ONVIF_XADDR":
 				configuration.Config.Capture.IPCamera.ONVIFXAddr = value
