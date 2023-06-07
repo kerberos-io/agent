@@ -224,13 +224,15 @@ class Settings extends React.Component {
 
   calculateTimetable(timetable) {
     this.timetable = timetable;
-    for (let i = 0; i < timetable.length; i += 1) {
-      const time = timetable[i];
-      const { start1, start2, end1, end2 } = time;
-      this.timetable[i].start1Full = this.convertSecondsToHourMinute(start1);
-      this.timetable[i].start2Full = this.convertSecondsToHourMinute(start2);
-      this.timetable[i].end1Full = this.convertSecondsToHourMinute(end1);
-      this.timetable[i].end2Full = this.convertSecondsToHourMinute(end2);
+    if (this.timetable) {
+      for (let i = 0; i < timetable.length; i += 1) {
+        const time = timetable[i];
+        const { start1, start2, end1, end2 } = time;
+        this.timetable[i].start1Full = this.convertSecondsToHourMinute(start1);
+        this.timetable[i].start2Full = this.convertSecondsToHourMinute(start2);
+        this.timetable[i].end1Full = this.convertSecondsToHourMinute(end1);
+        this.timetable[i].end2Full = this.convertSecondsToHourMinute(end2);
+      }
     }
   }
 
