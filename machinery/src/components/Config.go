@@ -86,14 +86,18 @@ func OpenConfig(configuration *models.Configuration) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
+		var globalConfig models.Config
 		collection.FindOne(ctx, bson.M{
 			"type": "global",
-		}).Decode(&configuration.GlobalConfig)
+		}).Decode(&globalConfig)
+		configuration.GlobalConfig = globalConfig
 
+		var customConfig models.Config
 		collection.FindOne(ctx, bson.M{
 			"type": "config",
 			"name": os.Getenv("DEPLOYMENT_NAME"),
-		}).Decode(&configuration.CustomConfig)
+		}).Decode(&customConfig)
+		configuration.CustomConfig = customConfig
 
 		// We will merge both configs in a single config file.
 		// Read again from database but this store overwrite the same object.
