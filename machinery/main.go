@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 var VERSION = "3.0.0"
 
 func main() {
-
 	// You might be interested in debugging the agent.
 	if os.Getenv("DATADOG_AGENT_ENABLED") == "true" {
 		if os.Getenv("DATADOG_AGENT_K8S_ENABLED") == "true" {
@@ -111,8 +111,14 @@ func main() {
 				}
 			}
 
+			// Create a cancelable context, which will be used to cancel and restart.
+			// This is used to restart the agent when the configuration is updated.
+			ctx, cancel := context.WithCancel(context.Background())
+
 			// Bootstrapping the agent
 			communication := models.Communication{
+				Context:         &ctx,
+				CancelContext:   &cancel,
 				HandleBootstrap: make(chan string, 1),
 			}
 			go components.Bootstrap(&configuration, &communication)

@@ -10,15 +10,12 @@ import (
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	geo "github.com/kellydunn/golang-geo"
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"github.com/kerberos-io/joy4/av/pubsub"
-
-	//"github.com/whorfin/go-libjpeg/jpeg"
-
-	geo "github.com/kellydunn/golang-geo"
 	"github.com/kerberos-io/joy4/av"
+	"github.com/kerberos-io/joy4/av/pubsub"
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 )
 

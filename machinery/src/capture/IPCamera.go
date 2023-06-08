@@ -1,6 +1,7 @@
 package capture
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"time"
@@ -15,9 +16,9 @@ import (
 	"github.com/kerberos-io/joy4/format"
 )
 
-func OpenRTSP(url string) (av.DemuxCloser, []av.CodecData, error) {
+func OpenRTSP(ctx context.Context, url string) (av.DemuxCloser, []av.CodecData, error) {
 	format.RegisterAll()
-	infile, err := avutil.Open(url)
+	infile, err := avutil.Open(ctx, url)
 	if err == nil {
 		streams, errstreams := infile.Streams()
 		return infile, streams, errstreams

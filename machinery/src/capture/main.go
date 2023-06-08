@@ -2,6 +2,7 @@
 package capture
 
 import (
+	"context"
 	"os"
 	"strconv"
 	"time"
@@ -431,6 +432,10 @@ func VerifyCamera(c *gin.Context) {
 	var cameraStreams models.CameraStreams
 	err := c.BindJSON(&cameraStreams)
 
+	// Should return in 5 seconds.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	if err == nil {
 
 		streamType := c.Param("streamType")
@@ -442,7 +447,7 @@ func VerifyCamera(c *gin.Context) {
 		if streamType == "secondary" {
 			rtspUrl = cameraStreams.SubRTSP
 		}
-		_, codecs, err := OpenRTSP(rtspUrl)
+		_, codecs, err := OpenRTSP(ctx, rtspUrl)
 		if err == nil {
 
 			videoIdx := -1

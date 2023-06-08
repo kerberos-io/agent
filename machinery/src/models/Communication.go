@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 
@@ -12,6 +13,8 @@ import (
 // The communication struct that is managing
 // all the communication between the different goroutines.
 type Communication struct {
+	Context               *context.Context
+	CancelContext         *context.CancelFunc
 	PackageCounter        *atomic.Value
 	LastPacketTimer       *atomic.Value
 	CloudTimestamp        *atomic.Value

@@ -1,6 +1,7 @@
 package components
 
 import (
+	"context"
 	"runtime"
 	"strconv"
 	"sync"
@@ -73,14 +74,22 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	for {
 		// This will blocking until receiving a signal to be restarted, reconfigured, stopped, etc.
 		status := RunAgent(configuration, communication, uptimeStart, cameraSettings, decoder, subDecoder)
+
 		if status == "stop" {
 			break
 		}
+
 		// We will re open the configuration, might have changed :O!
 		OpenConfig(configuration)
 
 		// We will override the configuration with the environment variables
 		OverrideWithEnvironmentVariables(configuration)
+
+		// We will create a new cancelable context, which will be used to cancel and restart.
+		// This is used to restart the agent when the configuration is updated.
+		ctx, cancel := context.WithCancel(context.Background())
+		communication.Context = &ctx
+		communication.CancelContext = &cancel
 	}
 	log.Log.Debug("Bootstrap: finished")
 }
@@ -90,18 +99,33 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 	log.Log.Debug("RunAgent: bootstrapping agent")
 	config := configuration.Config
 
+	status := "not started"
+
 	// Currently only support H264 encoded cameras, this will change.
 	// Establishing the camera connection
 	rtspUrl := config.Capture.IPCamera.RTSP
-	infile, streams, err := capture.OpenRTSP(rtspUrl)
+	infile, streams, err := capture.OpenRTSP(context.Background(), rtspUrl)
+
+	// We will initialise the camera settings object
+	// so we can check if the camera settings have changed, and we need
+	// to reload the decoders.
+
+	videoStream, _ := capture.GetVideoStream(streams)
+	if videoStream == nil {
+		log.Log.Error("RunAgent: no video stream found, might be the wrong codec (we only support H264 for the moment)")
+		time.Sleep(time.Second * 3)
+		return status
+	}
+
+	num, denum := videoStream.(av.VideoCodecData).Framerate()
+	width := videoStream.(av.VideoCodecData).Width()
+	height := videoStream.(av.VideoCodecData).Height()
 
 	var queue *pubsub.Queue
 	var subQueue *pubsub.Queue
 
 	var decoderMutex sync.Mutex
 	var subDecoderMutex sync.Mutex
-
-	status := "not started"
 
 	if err == nil {
 
@@ -113,23 +137,21 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		subStreamEnabled := false
 		subRtspUrl := config.Capture.IPCamera.SubRTSP
 		if subRtspUrl != "" && subRtspUrl != rtspUrl {
-			subInfile, subStreams, err = capture.OpenRTSP(subRtspUrl)
+			subInfile, subStreams, err = capture.OpenRTSP(context.Background(), subRtspUrl)
 			if err == nil {
 				log.Log.Info("RunAgent: opened RTSP sub stream " + subRtspUrl)
 				subStreamEnabled = true
 			}
+
+			videoStream, _ := capture.GetVideoStream(subStreams)
+			if videoStream == nil {
+				log.Log.Error("RunAgent: no video substream found, might be the wrong codec (we only support H264 for the moment)")
+				time.Sleep(time.Second * 3)
+				return status
+			}
 		}
 
-		// We will initialise the camera settings object
-		// so we can check if the camera settings have changed, and we need
-		// to reload the decoders.
-		videoStream, _ := capture.GetVideoStream(streams)
-		num, denum := videoStream.(av.VideoCodecData).Framerate()
-		width := videoStream.(av.VideoCodecData).Width()
-		height := videoStream.(av.VideoCodecData).Height()
-
 		if cameraSettings.RTSP != rtspUrl || cameraSettings.SubRTSP != subRtspUrl || cameraSettings.Width != width || cameraSettings.Height != height || cameraSettings.Num != num || cameraSettings.Denum != denum || cameraSettings.Codec != videoStream.(av.VideoCodecData).Type() {
-
 			if cameraSettings.Initialized {
 				decoder.Close()
 				if subStreamEnabled {
@@ -240,7 +262,11 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		// This will go into a blocking state, once this channel is triggered
 		// the agent will cleanup and restart.
+
 		status = <-communication.HandleBootstrap
+
+		// Cancel the main context, this will stop all the other goroutines.
+		(*communication.CancelContext)()
 
 		// Here we are cleaning up everything!
 		if configuration.Config.Offline != "true" {
