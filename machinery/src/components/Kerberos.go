@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
@@ -54,6 +55,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	communication.HandleLiveSD = make(chan int64, 1)
 	communication.HandleLiveHDKeepalive = make(chan string, 1)
 	communication.HandleLiveHDPeers = make(chan string, 1)
+	communication.HandleONVIF = make(chan models.OnvifAction, 1)
 	communication.IsConfiguring = abool.New()
 
 	// Before starting the agent, we have a control goroutine, that might
@@ -68,22 +70,35 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	// Handle heartbeats
 	go cloud.HandleHeartBeat(configuration, communication, uptimeStart)
 
+	// We'll create a MQTT handler, which will be used to communicate with Kerberos Hub.
+	// Configure a MQTT client which helps for a bi-directional communication
+	mqttClient := routers.ConfigureMQTT(configuration, communication)
+
 	// Run the agent and fire up all the other
 	// goroutines which do image capture, motion detection, onvif, etc.
-
 	for {
+
 		// This will blocking until receiving a signal to be restarted, reconfigured, stopped, etc.
-		status := RunAgent(configuration, communication, uptimeStart, cameraSettings, decoder, subDecoder)
+		status := RunAgent(configuration, communication, mqttClient, uptimeStart, cameraSettings, decoder, subDecoder)
 
 		if status == "stop" {
 			break
 		}
+
+		// We will reconfigure or restart the agent, we will mark the agent as not connected.
+		communication.CameraConnected = false
 
 		// We will re open the configuration, might have changed :O!
 		OpenConfig(configuration)
 
 		// We will override the configuration with the environment variables
 		OverrideWithEnvironmentVariables(configuration)
+
+		// Reset the MQTT client, might have provided new information, so we need to reconnect.
+		if routers.HasMQTTClientModified(configuration) {
+			routers.DisconnectMQTT(mqttClient, &configuration.Config)
+			mqttClient = routers.ConfigureMQTT(configuration, communication)
+		}
 
 		// We will create a new cancelable context, which will be used to cancel and restart.
 		// This is used to restart the agent when the configuration is updated.
@@ -94,7 +109,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	log.Log.Debug("Bootstrap: finished")
 }
 
-func RunAgent(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time, cameraSettings *models.Camera, decoder *ffmpeg.VideoDecoder, subDecoder *ffmpeg.VideoDecoder) string {
+func RunAgent(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, uptimeStart time.Time, cameraSettings *models.Camera, decoder *ffmpeg.VideoDecoder, subDecoder *ffmpeg.VideoDecoder) string {
 
 	log.Log.Debug("RunAgent: bootstrapping agent")
 	config := configuration.Config
@@ -129,7 +144,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 
 	if err == nil {
 
-		log.Log.Info("RunAgent: opened RTSP stream" + rtspUrl)
+		log.Log.Info("RunAgent: opened RTSP stream: " + rtspUrl)
 
 		// We might have a secondary rtsp url, so we might need to use that.
 		var subInfile av.DemuxCloser
@@ -209,9 +224,8 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 			subQueue.WriteHeader(subStreams)
 		}
 
-		// Configure a MQTT client which helps for a bi-directional communication
-		communication.HandleONVIF = make(chan models.OnvifAction, 1)
-		mqttClient := routers.ConfigureMQTT(configuration, communication)
+		// If we reach this point, we have a working RTSP connection.
+		communication.CameraConnected = true
 
 		// Handle the camera stream
 		go capture.HandleStream(infile, queue, communication)
@@ -291,15 +305,8 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 			subQueue = nil
 			communication.SubQueue = nil
 		}
-		close(communication.HandleONVIF)
-		communication.HandleONVIF = nil
-		close(communication.HandleLiveHDHandshake)
-		communication.HandleLiveHDHandshake = nil
 		close(communication.HandleMotion)
 		communication.HandleMotion = nil
-
-		// Disconnect MQTT
-		routers.DisconnectMQTT(mqttClient, &configuration.Config)
 
 		// Wait a few seconds to stop the decoder.
 		time.Sleep(time.Second * 3)
@@ -329,28 +336,31 @@ func ControlAgent(communication *models.Communication) {
 		var previousPacket int64 = 0
 		var occurence = 0
 		for {
-			packetsR := packageCounter.Load().(int64)
-			if packetsR == previousPacket {
-				// If we are already reconfiguring,
-				// we dont need to check if the stream is blocking.
-				if !communication.IsConfiguring.IsSet() {
-					occurence = occurence + 1
+
+			// If camera is connected, we'll check if we are still receiving packets.
+			if communication.CameraConnected {
+				packetsR := packageCounter.Load().(int64)
+				if packetsR == previousPacket {
+					// If we are already reconfiguring,
+					// we dont need to check if the stream is blocking.
+					if !communication.IsConfiguring.IsSet() {
+						occurence = occurence + 1
+					}
+				} else {
+					occurence = 0
 				}
-			} else {
 
-				occurence = 0
+				log.Log.Info("ControlAgent: Number of packets read " + strconv.FormatInt(packetsR, 10))
+
+				// After 15 seconds without activity this is thrown..
+				if occurence == 3 {
+					log.Log.Info("Main: Restarting machinery.")
+					communication.HandleBootstrap <- "restart"
+					time.Sleep(2 * time.Second)
+					occurence = 0
+				}
+				previousPacket = packageCounter.Load().(int64)
 			}
-
-			log.Log.Info("ControlAgent: Number of packets read " + strconv.FormatInt(packetsR, 10))
-
-			// After 15 seconds without activity this is thrown..
-			if occurence == 3 {
-				log.Log.Info("Main: Restarting machinery.")
-				communication.HandleBootstrap <- "restart"
-				time.Sleep(2 * time.Second)
-				occurence = 0
-			}
-			previousPacket = packageCounter.Load().(int64)
 
 			time.Sleep(5 * time.Second)
 		}

@@ -447,9 +447,11 @@ func SaveConfig(config models.Config, configuration *models.Configuration, commu
 			return err
 		}
 
-		select {
-		case communication.HandleBootstrap <- "restart":
-		default:
+		if communication.CameraConnected {
+			select {
+			case communication.HandleBootstrap <- "restart":
+			default:
+			}
 		}
 
 		communication.IsConfiguring.UnSet()

@@ -13,9 +13,37 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
 )
 
+// We'll cache the MQTT settings to know if we need to reinitialize the MQTT client connection.
+// If we update the configuration but no new MQTT settings are provided, we don't need to restart it.
+var PREV_MQTTURI string
+var PREV_MQTTUsername string
+var PREV_MQTTPassword string
+var PREV_HubKey string
+var PREV_AgentKey string
+
+func HasMQTTClientModified(configuration *models.Configuration) bool {
+	MTTURI := configuration.Config.MQTTURI
+	MTTUsername := configuration.Config.MQTTUsername
+	MQTTPassword := configuration.Config.MQTTPassword
+	HubKey := configuration.Config.HubKey
+	AgentKey := configuration.Config.Key
+	if PREV_MQTTURI != MTTURI || PREV_MQTTUsername != MTTUsername || PREV_MQTTPassword != MQTTPassword || PREV_HubKey != HubKey || PREV_AgentKey != AgentKey {
+		log.Log.Info("HasMQTTClientModified: MQTT settings have been modified, restarting MQTT client.")
+		return true
+	}
+	return false
+}
+
 func ConfigureMQTT(configuration *models.Configuration, communication *models.Communication) mqtt.Client {
 
 	config := configuration.Config
+
+	// Set the MQTT settings.
+	PREV_MQTTURI = configuration.Config.MQTTURI
+	PREV_MQTTUsername = configuration.Config.MQTTUsername
+	PREV_MQTTPassword = configuration.Config.MQTTPassword
+	PREV_HubKey = configuration.Config.HubKey
+	PREV_AgentKey = configuration.Config.Key
 
 	if config.Offline == "true" {
 		log.Log.Info("ConfigureMQTT: not starting as running in Offline mode.")
@@ -78,7 +106,6 @@ func ConfigureMQTT(configuration *models.Configuration, communication *models.Co
 			webrtc.CandidateArrays = make(map[string](chan string))
 
 			opts.OnConnect = func(c mqtt.Client) {
-
 				// We managed to connect to the MQTT broker, hurray!
 				log.Log.Info("ConfigureMQTT: " + mqttClientID + " connected to " + mqttURL)
 
@@ -117,11 +144,15 @@ func MQTTListenerHandleLiveSD(mqttClient mqtt.Client, hubKey string, configurati
 	config := configuration.Config
 	topicRequest := "kerberos/" + hubKey + "/device/" + config.Key + "/request-live"
 	mqttClient.Subscribe(topicRequest, 0, func(c mqtt.Client, msg mqtt.Message) {
-		select {
-		case communication.HandleLiveSD <- time.Now().Unix():
-		default:
+		if communication.CameraConnected {
+			select {
+			case communication.HandleLiveSD <- time.Now().Unix():
+			default:
+			}
+			log.Log.Info("MQTTListenerHandleLiveSD: received request to livestream.")
+		} else {
+			log.Log.Info("MQTTListenerHandleLiveSD: received request to livestream, but camera is not connected.")
 		}
-		log.Log.Info("MQTTListenerHandleLiveSD: received request to livestream.")
 		msg.Ack()
 	})
 }
@@ -130,12 +161,16 @@ func MQTTListenerHandleLiveHDHandshake(mqttClient mqtt.Client, hubKey string, co
 	config := configuration.Config
 	topicRequestWebRtc := config.Key + "/register"
 	mqttClient.Subscribe(topicRequestWebRtc, 0, func(c mqtt.Client, msg mqtt.Message) {
-		log.Log.Info("MQTTListenerHandleLiveHDHandshake: received request to setup webrtc.")
-		var sdp models.SDPPayload
-		json.Unmarshal(msg.Payload(), &sdp)
-		select {
-		case communication.HandleLiveHDHandshake <- sdp:
-		default:
+		if communication.CameraConnected {
+			var sdp models.SDPPayload
+			json.Unmarshal(msg.Payload(), &sdp)
+			select {
+			case communication.HandleLiveHDHandshake <- sdp:
+			default:
+			}
+			log.Log.Info("MQTTListenerHandleLiveHDHandshake: received request to setup webrtc.")
+		} else {
+			log.Log.Info("MQTTListenerHandleLiveHDHandshake: received request to setup webrtc, but camera is not connected.")
 		}
 		msg.Ack()
 	})
@@ -145,9 +180,13 @@ func MQTTListenerHandleLiveHDKeepalive(mqttClient mqtt.Client, hubKey string, co
 	config := configuration.Config
 	topicKeepAlive := fmt.Sprintf("kerberos/webrtc/keepalivehub/%s", config.Key)
 	mqttClient.Subscribe(topicKeepAlive, 0, func(c mqtt.Client, msg mqtt.Message) {
-		alive := string(msg.Payload())
-		communication.HandleLiveHDKeepalive <- alive
-		log.Log.Info("MQTTListenerHandleLiveHDKeepalive: Received keepalive: " + alive)
+		if communication.CameraConnected {
+			alive := string(msg.Payload())
+			communication.HandleLiveHDKeepalive <- alive
+			log.Log.Info("MQTTListenerHandleLiveHDKeepalive: Received keepalive: " + alive)
+		} else {
+			log.Log.Info("MQTTListenerHandleLiveHDKeepalive: received keepalive, but camera is not connected.")
+		}
 	})
 }
 
@@ -155,9 +194,13 @@ func MQTTListenerHandleLiveHDPeers(mqttClient mqtt.Client, hubKey string, config
 	config := configuration.Config
 	topicPeers := fmt.Sprintf("kerberos/webrtc/peers/%s", config.Key)
 	mqttClient.Subscribe(topicPeers, 0, func(c mqtt.Client, msg mqtt.Message) {
-		peerCount := string(msg.Payload())
-		communication.HandleLiveHDPeers <- peerCount
-		log.Log.Info("MQTTListenerHandleLiveHDPeers: Number of peers listening: " + peerCount)
+		if communication.CameraConnected {
+			peerCount := string(msg.Payload())
+			communication.HandleLiveHDPeers <- peerCount
+			log.Log.Info("MQTTListenerHandleLiveHDPeers: Number of peers listening: " + peerCount)
+		} else {
+			log.Log.Info("MQTTListenerHandleLiveHDPeers: received peer count, but camera is not connected.")
+		}
 	})
 }
 
@@ -165,19 +208,23 @@ func MQTTListenerHandleLiveHDCandidates(mqttClient mqtt.Client, hubKey string, c
 	config := configuration.Config
 	topicCandidates := "candidate/cloud"
 	mqttClient.Subscribe(topicCandidates, 0, func(c mqtt.Client, msg mqtt.Message) {
-		var candidate models.Candidate
-		json.Unmarshal(msg.Payload(), &candidate)
-		if candidate.CloudKey == config.Key {
-			key := candidate.CloudKey + "/" + candidate.Cuuid
-			candidatesExists := false
-			var channel chan string
-			for !candidatesExists {
-				webrtc.CandidatesMutex.Lock()
-				channel, candidatesExists = webrtc.CandidateArrays[key]
-				webrtc.CandidatesMutex.Unlock()
+		if communication.CameraConnected {
+			var candidate models.Candidate
+			json.Unmarshal(msg.Payload(), &candidate)
+			if candidate.CloudKey == config.Key {
+				key := candidate.CloudKey + "/" + candidate.Cuuid
+				candidatesExists := false
+				var channel chan string
+				for !candidatesExists {
+					webrtc.CandidatesMutex.Lock()
+					channel, candidatesExists = webrtc.CandidateArrays[key]
+					webrtc.CandidatesMutex.Unlock()
+				}
+				log.Log.Info("MQTTListenerHandleLiveHDCandidates: " + string(msg.Payload()))
+				channel <- string(msg.Payload())
 			}
-			log.Log.Info("MQTTListenerHandleLiveHDCandidates: " + string(msg.Payload()))
-			channel <- string(msg.Payload())
+		} else {
+			log.Log.Info("MQTTListenerHandleLiveHDCandidates: received candidate, but camera is not connected.")
 		}
 	})
 }
@@ -186,23 +233,28 @@ func MQTTListenerHandleONVIF(mqttClient mqtt.Client, hubKey string, configuratio
 	config := configuration.Config
 	topicOnvif := fmt.Sprintf("kerberos/onvif/%s", config.Key)
 	mqttClient.Subscribe(topicOnvif, 0, func(c mqtt.Client, msg mqtt.Message) {
-		var onvifAction models.OnvifAction
-		json.Unmarshal(msg.Payload(), &onvifAction)
-		communication.HandleONVIF <- onvifAction
-		log.Log.Info("MQTTListenerHandleONVIF: Received an action - " + onvifAction.Action)
+		if communication.CameraConnected {
+			var onvifAction models.OnvifAction
+			json.Unmarshal(msg.Payload(), &onvifAction)
+			communication.HandleONVIF <- onvifAction
+			log.Log.Info("MQTTListenerHandleONVIF: Received an action - " + onvifAction.Action)
+		} else {
+			log.Log.Info("MQTTListenerHandleONVIF: received action, but camera is not connected.")
+		}
 	})
 }
 
 func DisconnectMQTT(mqttClient mqtt.Client, config *models.Config) {
 	if mqttClient != nil {
-		// Cleanup all subscriptions.
-		mqttClient.Unsubscribe("kerberos/" + config.HubKey + "/device/" + config.Key + "/request-live")
-		mqttClient.Unsubscribe(config.Key + "/register")
-		mqttClient.Unsubscribe("kerberos/webrtc/keepalivehub/" + config.Key)
-		mqttClient.Unsubscribe("kerberos/webrtc/peers/" + config.Key)
+		// Cleanup all subscriptions
+		mqttClient.Unsubscribe("kerberos/" + PREV_HubKey + "/device/" + PREV_AgentKey + "/request-live")
+		mqttClient.Unsubscribe(PREV_AgentKey + "/register")
+		mqttClient.Unsubscribe("kerberos/webrtc/keepalivehub/" + PREV_AgentKey)
+		mqttClient.Unsubscribe("kerberos/webrtc/peers/" + PREV_AgentKey)
 		mqttClient.Unsubscribe("candidate/cloud")
-		mqttClient.Unsubscribe("kerberos/onvif/" + config.Key)
+		mqttClient.Unsubscribe("kerberos/onvif/" + PREV_AgentKey)
 		mqttClient.Disconnect(1000)
 		mqttClient = nil
+		log.Log.Info("DisconnectMQTT: MQTT client disconnected.")
 	}
 }
