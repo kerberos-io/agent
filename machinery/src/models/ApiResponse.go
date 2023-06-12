@@ -1,8 +1,11 @@
 package models
 
 type APIResponse struct {
-	Data    interface{} `json:"data" bson:"data"`
-	Message interface{} `json:"message" bson:"message"`
+	Data         interface{} `json:"data" bson:"data"`
+	Message      interface{} `json:"message" bson:"message"`
+	PTZFunctions interface{} `json:"ptz_functions" bson:"ptz_functions"`
+	CanZoom      bool        `json:"can_zoom" bson:"can_zoom"`
+	CanPanTilt   bool        `json:"can_pan_tilt" bson:"can_pan_tilt"`
 }
 
 type OnvifCredentials struct {

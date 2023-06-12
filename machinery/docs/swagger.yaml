@@ -44,8 +44,12 @@ definitions:
         type: integer
       ipcamera:
         $ref: '#/definitions/models.IPCamera'
+      liveview:
+        type: string
       maxlengthrecording:
         type: integer
+      motion:
+        type: string
       name:
         type: string
       pixelChangeThreshold:
@@ -56,6 +60,10 @@ definitions:
         type: integer
       raspicamera:
         $ref: '#/definitions/models.RaspiCamera'
+      recording:
+        type: string
+      snapshots:
+        type: string
       transcodingresolution:
         type: integer
       transcodingwebrtc:
@@ -72,6 +80,10 @@ definitions:
       cloud:
         type: string
       condition_uri:
+        type: string
+      dropbox:
+        $ref: '#/definitions/models.Dropbox'
+      friendly_name:
         type: string
       heartbeaturi:
         description: obsolete
@@ -102,6 +114,8 @@ definitions:
         type: string
       region:
         $ref: '#/definitions/models.Region'
+      remove_after_upload:
+        type: string
       s3:
         $ref: '#/definitions/models.S3'
       stunuri:
@@ -130,12 +144,19 @@ definitions:
       "y":
         type: number
     type: object
+  models.Dropbox:
+    properties:
+      access_token:
+        type: string
+      directory:
+        type: string
+    type: object
   models.IPCamera:
     properties:
       fps:
         type: string
       onvif:
-        type: boolean
+        type: string
       onvif_password:
         type: string
       onvif_username:
@@ -414,6 +435,27 @@ paths:
       summary: Get Authorization token.
       tags:
       - authentication
+  /api/onvif/verify:
+    post:
+      description: Will verify the ONVIF connectivity.
+      operationId: verify-onvif
+      parameters:
+      - description: Camera Config
+        in: body
+        name: cameraConfig
+        required: true
+        schema:
+          $ref: '#/definitions/models.IPCamera'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will verify the ONVIF connectivity.
+      tags:
+      - config
   /api/persistence/verify:
     post:
       description: Will verify the persistence.

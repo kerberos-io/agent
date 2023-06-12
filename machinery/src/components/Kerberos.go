@@ -85,9 +85,6 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 			break
 		}
 
-		// We will reconfigure or restart the agent, we will mark the agent as not connected.
-		communication.CameraConnected = false
-
 		// We will re open the configuration, might have changed :O!
 		OpenConfig(configuration)
 
@@ -224,9 +221,6 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 			subQueue.WriteHeader(subStreams)
 		}
 
-		// If we reach this point, we have a working RTSP connection.
-		communication.CameraConnected = true
-
 		// Handle the camera stream
 		go capture.HandleStream(infile, queue, communication)
 
@@ -273,11 +267,17 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// Handle ONVIF actions
 		go onvif.HandleONVIFActions(configuration, communication)
 
+		// If we reach this point, we have a working RTSP connection.
+		communication.CameraConnected = true
+
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		// This will go into a blocking state, once this channel is triggered
 		// the agent will cleanup and restart.
 
 		status = <-communication.HandleBootstrap
+
+		// If we reach this point, we are stopping the stream.
+		communication.CameraConnected = false
 
 		// Cancel the main context, this will stop all the other goroutines.
 		(*communication.CancelContext)()

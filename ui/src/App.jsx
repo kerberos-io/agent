@@ -38,6 +38,16 @@ class App extends React.Component {
     dispatchGetDashboardInformation();
     dispatchConnect();
 
+    const connectInterval = interval(1000);
+    this.connectionSubscription = connectInterval.subscribe(() => {
+      const { connected } = this.props;
+      if (connected) {
+        // Already connected
+      } else {
+        dispatchConnect();
+      }
+    });
+
     const interval$ = interval(5000);
     this.subscription = interval$.subscribe(() => {
       dispatchGetDashboardInformation();
@@ -64,6 +74,7 @@ class App extends React.Component {
 
   componentWillUnmount() {
     this.subscription.unsubscribe();
+    this.connectionSubscription.unsubscribe();
     const message = {
       client_id: uuid(),
       message_type: 'goodbye',

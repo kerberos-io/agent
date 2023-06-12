@@ -4,7 +4,8 @@
     "configure": "配置"
   },
   "buttons": {
-    "save": "保存"
+    "save": "保存",
+    "verify_connection": "Verify Connection"
   },
   "navigation": {
     "profile": "配置文件",
@@ -69,7 +70,10 @@
       "verify_persistence_error": "验证持久化存储时出错",
       "verify_camera": "验证您的相机设置",
       "verify_camera_success": "相机设置验证成功",
-      "verify_camera_error": "验证相机设置时出错"
+      "verify_camera_error": "验证相机设置时出错",
+      "verify_onvif": "Verifying your ONVIF settings.",
+      "verify_onvif_success": "ONVIF settings are successfully verified.",
+      "verify_onvif_error": "Something went wrong while verifying the ONVIF settings"
     },
     "overview": {
       "general": "常规",
@@ -186,13 +190,13 @@
       "kerberoshub_description_region": "存储录像的区域",
       "kerberoshub_bucket": "Bucket",
       "kerberoshub_description_bucket": "存储录像的桶",
-      "kerberoshub_username": "账户/目录",
+      "kerberoshub_username": "账户/目录 (should match Kerberos Hub username)",
       "kerberoshub_description_username": "您的 Kerberos Hub 帐户的用户名",
       "kerberosvault_apiurl": "Kerberos Vault API URL",
       "kerberosvault_description_apiurl": "Kerberos Vault API",
       "kerberosvault_provider": "供应商",
       "kerberosvault_description_provider": "您的录像将会被发送到的提供商",
-      "kerberosvault_directory": "目录",
+      "kerberosvault_directory": "目录 (should match Kerberos Hub username)",
       "kerberosvault_description_directory": "录像将存储在提供商中的子目录",
       "kerberosvault_accesskey": "访问密钥",
       "kerberosvault_description_accesskey": "Kerberos Vault 帐户的访问密钥",

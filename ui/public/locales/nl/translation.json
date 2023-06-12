@@ -4,7 +4,8 @@
     "configure": "Instellingen"
   },
   "buttons": {
-    "save": "Opslaan"
+    "save": "Opslaan",
+    "verify_connection": "Verifieer Connectie"
   },
   "navigation": {
     "profile": "Profiel",
@@ -69,7 +70,10 @@
       "verify_persistence_error": "Er ging iets fout tijdens het controleren van de opslag instellingen",
       "verify_camera": "We controleren de camera instellingen.",
       "verify_camera_success": "De camera instellingen zijn gevalideerd.",
-      "verify_camera_error": "Er ging iets mis met de camera instellingen."
+      "verify_camera_error": "Er ging iets mis met de camera instellingen.",
+      "verify_onvif": "Verifying your ONVIF settings.",
+      "verify_onvif_success": "ONVIF settings are successfully verified.",
+      "verify_onvif_error": "Something went wrong while verifying the ONVIF settings"
     },
     "overview": {
       "general": "Algemeen",
@@ -187,13 +191,13 @@
       "kerberoshub_description_region": "De regio waar jouw opnames worden opgeslagen.",
       "kerberoshub_bucket": "Bucket",
       "kerberoshub_description_bucket": "De bucket opslag locatie",
-      "kerberoshub_username": "Gebruikersnaam/Map",
+      "kerberoshub_username": "Gebruikersnaam/Map (moet overeenkomen met de Kerberos Hub username)",
       "kerberoshub_description_username": "De gebruikersnaam van jouw Kerberos Hub account.",
       "kerberosvault_apiurl": "Kerberos Vault API URL",
       "kerberosvault_description_apiurl": "De Kerberos Vault API",
       "kerberosvault_provider": "Provider",
       "kerberosvault_description_provider": "De provider verantwoordelijk voor de opnames op te slaan.",
-      "kerberosvault_directory": "Map",
+      "kerberosvault_directory": "Map (moet overeenkomen met de Kerberos Hub username)",
       "kerberosvault_description_directory": "Sub map waarin de opnames worden opgeslagen.",
       "kerberosvault_accesskey": "Access key",
       "kerberosvault_description_accesskey": "De access key van jouw Kerberos Vault account.",

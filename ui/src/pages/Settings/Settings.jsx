@@ -27,6 +27,7 @@ import {
   updateRegion,
   removeRegion,
   saveConfig,
+  verifyOnvif,
   verifyCamera,
   verifyHub,
   verifyPersistence,
@@ -63,6 +64,9 @@ class Settings extends React.Component {
       verifyCameraSuccess: false,
       verifyCameraError: false,
       verifyCameraMessage: '',
+      verifyOnvifSuccess: false,
+      verifyOnvifError: false,
+      verifyOnvifErrorMessage: '',
       loading: false,
       loadingHub: false,
       loadingCamera: false,
@@ -127,6 +131,7 @@ class Settings extends React.Component {
     this.onAddRegion = this.onAddRegion.bind(this);
     this.onUpdateRegion = this.onUpdateRegion.bind(this);
     this.onDeleteRegion = this.onDeleteRegion.bind(this);
+    this.verifyONVIF = this.verifyONVIF.bind(this);
   }
 
   componentDidMount() {
@@ -274,6 +279,8 @@ class Settings extends React.Component {
       verifyHubError: false,
       configSuccess: false,
       configError: false,
+      verifyOnvifSuccess: false,
+      verifyOnvifError: false,
     });
 
     if (config) {
@@ -289,6 +296,53 @@ class Settings extends React.Component {
           this.setState({
             configSuccess: false,
             configError: true,
+          });
+        }
+      );
+    }
+  }
+
+  verifyONVIF() {
+    const { config, dispatchVerifyOnvif } = this.props;
+
+    // Get camera configuration (subset of config).
+    const cameraConfig = {
+      onvif_xaddr: config.config.capture.ipcamera.onvif_xaddr,
+      onvif_username: config.config.capture.ipcamera.onvif_username,
+      onvif_password: config.config.capture.ipcamera.onvif_password,
+    };
+
+    this.setState({
+      verifyOnvifSuccess: false,
+      verifyOnvifError: false,
+      verifyOnvifErrorMessage: '',
+      verifyCameraSuccess: false,
+      verifyCameraError: false,
+      verifyCameraErrorMessage: '',
+      configSuccess: false,
+      configError: false,
+      loadingCamera: false,
+      loadingOnvif: true,
+    });
+
+    if (config) {
+      dispatchVerifyOnvif(
+        cameraConfig,
+        (data) => {
+          console.log(data);
+          this.setState({
+            verifyOnvifSuccess: true,
+            verifyOnvifError: false,
+            verifyOnvifErrorMessage: '',
+            loadingOnvif: false,
+          });
+        },
+        (error) => {
+          this.setState({
+            verifyOnvifSuccess: false,
+            verifyOnvifError: true,
+            verifyOnvifErrorMessage: error,
+            loadingOnvif: false,
           });
         }
       );
@@ -317,6 +371,8 @@ class Settings extends React.Component {
         verifyCameraSuccess: false,
         verifyCameraError: false,
         verifyCameraErrorMessage: '',
+        verifyOnvifSuccess: false,
+        verifyOnvifError: false,
         loadingHub: true,
       });
 
@@ -362,6 +418,8 @@ class Settings extends React.Component {
         persistenceError: false,
         verifyCameraSuccess: false,
         verifyCameraError: false,
+        verifyOnvifSuccess: false,
+        verifyOnvifError: false,
         verifyCameraErrorMessage: '',
         loading: true,
       });
@@ -402,6 +460,7 @@ class Settings extends React.Component {
       this.setState({
         configSuccess: false,
         configError: false,
+        loadingCamera: true,
         verifyPersistenceSuccess: false,
         verifyPersistenceError: false,
         verifyHubSuccess: false,
@@ -410,9 +469,10 @@ class Settings extends React.Component {
         verifyCameraSuccess: false,
         verifyCameraError: false,
         verifyCameraErrorMessage: '',
+        verifyOnvifSuccess: false,
+        verifyOnvifError: false,
         hubSuccess: false,
         hubError: false,
-        loadingCamera: true,
       });
 
       dispatchVerifyCamera(
@@ -453,6 +513,10 @@ class Settings extends React.Component {
       verifyCameraSuccess,
       verifyCameraError,
       verifyCameraErrorMessage,
+      loadingOnvif,
+      verifyOnvifSuccess,
+      verifyOnvifError,
+      verifyOnvifErrorMessage,
       loadingCamera,
       loading,
       loadingHub,
@@ -652,8 +716,21 @@ class Settings extends React.Component {
             type="alert"
             message={`${t(
               'settings.info.verify_camera_error'
-            )} :${verifyCameraErrorMessage}`}
+            )}: ${verifyCameraErrorMessage}`}
           />
+        )}
+
+        {loadingOnvif && (
+          <InfoBar type="loading" message={t('settings.info.verify_onvif')} />
+        )}
+        {verifyOnvifSuccess && (
+          <InfoBar
+            type="success"
+            message={t('settings.info.verify_onvif_success')}
+          />
+        )}
+        {verifyOnvifError && (
+          <InfoBar type="alert" message={`${verifyOnvifErrorMessage}`} />
         )}
 
         {loadingHub && (
@@ -1103,7 +1180,7 @@ class Settings extends React.Component {
                     noPadding
                     label={t('settings.camera.onvif_xaddr')}
                     value={config.capture.ipcamera.onvif_xaddr}
-                    placeholder="http://x.x.x.x/onvif/device_service"
+                    placeholder="x.x.x.x:yyyy"
                     onChange={(value) =>
                       this.onUpdateField(
                         'capture.ipcamera',
@@ -1143,6 +1220,12 @@ class Settings extends React.Component {
                   />
                 </BlockBody>
                 <BlockFooter>
+                  <Button
+                    label={t('buttons.verify_connection')}
+                    type="default"
+                    icon="verify"
+                    onClick={this.verifyONVIF}
+                  />
                   <Button
                     label={t('buttons.save')}
                     type="default"
@@ -2245,6 +2328,8 @@ const mapStateToProps = (state /* , ownProps */) => ({
 });
 
 const mapDispatchToProps = (dispatch /* , ownProps */) => ({
+  dispatchVerifyOnvif: (config, success, error) =>
+    dispatch(verifyOnvif(config, success, error)),
   dispatchVerifyCamera: (streamType, config, success, error) =>
     dispatch(verifyCamera(streamType, config, success, error)),
   dispatchVerifyHub: (config, success, error) =>
@@ -2272,6 +2357,7 @@ Settings.propTypes = {
   dispatchUpdateRegion: PropTypes.func.isRequired,
   dispatchRemoveRegion: PropTypes.func.isRequired,
   dispatchVerifyCamera: PropTypes.func.isRequired,
+  dispatchVerifyOnvif: PropTypes.func.isRequired,
 };
 
 export default withTranslation()(

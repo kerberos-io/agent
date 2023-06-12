@@ -273,7 +273,8 @@ loop:
 				// We'll check which mode is enabled for the camera.
 				onvifEnabled := "false"
 				if config.Capture.IPCamera.ONVIFXAddr != "" {
-					device, err := onvif.ConnectToOnvifDevice(configuration)
+					cameraConfiguration := configuration.Config.Capture.IPCamera
+					device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 					if err == nil {
 						capabilities := onvif.GetCapabilitiesFromDevice(device)
 						for _, v := range capabilities {

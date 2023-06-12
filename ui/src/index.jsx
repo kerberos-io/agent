@@ -50,7 +50,9 @@ function getAuthState() {
   }
 }
 
-const reduxWebsocketMiddleware = reduxWebsocket();
+const reduxWebsocketMiddleware = reduxWebsocket({
+  reconnectOnClose: true,
+});
 
 const store = createStore(
   rootReducer(history),

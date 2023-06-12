@@ -4,6 +4,7 @@ import { Link, withRouter } from 'react-router-dom';
 import { withTranslation } from 'react-i18next';
 import { send } from '@giantmachines/redux-websocket';
 import { connect } from 'react-redux';
+import { interval } from 'rxjs';
 import {
   Breadcrumb,
   KPI,
@@ -66,6 +67,11 @@ class Dashboard extends React.Component {
         message_type: 'stream-sd',
       };
       dispatchSend(message);
+
+      const requestStreamInterval = interval(3000);
+      this.requestStreamSubscription = requestStreamInterval.subscribe(() => {
+        dispatchSend(message);
+      });
     }
   }
 
@@ -75,6 +81,9 @@ class Dashboard extends React.Component {
       liveview[0].remove();
     }
 
+    if (this.requestStreamSubscription) {
+      this.requestStreamSubscription.unsubscribe();
+    }
     const { dispatchSend } = this.props;
     const message = {
       message_type: 'stop-sd',

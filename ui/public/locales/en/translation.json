@@ -4,7 +4,8 @@
     "configure": "Configure"
   },
   "buttons": {
-    "save": "Save"
+    "save": "Save",
+    "verify_connection": "Verify Connection"
   },
   "navigation": {
     "profile": "Profile",
@@ -69,7 +70,10 @@
       "verify_persistence_error": "Something went wrong while verifying the persistence",
       "verify_camera": "Verifying your camera settings.",
       "verify_camera_success": "Camera settings are successfully verified.",
-      "verify_camera_error": "Something went wrong while verifying the camera settings"
+      "verify_camera_error": "Something went wrong while verifying the camera settings",
+      "verify_onvif": "Verifying your ONVIF settings.",
+      "verify_onvif_success": "ONVIF settings are successfully verified.",
+      "verify_onvif_error": "Something went wrong while verifying the ONVIF settings"
     },
     "overview": {
       "general": "General",
@@ -186,13 +190,13 @@
       "kerberoshub_description_region": "The region we are storing our recordings in.",
       "kerberoshub_bucket": "Bucket",
       "kerberoshub_description_bucket": "The bucket we are storing our recordings in.",
-      "kerberoshub_username": "Username/Directory",
+      "kerberoshub_username": "Username/Directory (should match Kerberos Hub username)",
       "kerberoshub_description_username": "The username of your Kerberos Hub account.",
       "kerberosvault_apiurl": "Kerberos Vault API URL",
       "kerberosvault_description_apiurl": "The Kerberos Vault API",
       "kerberosvault_provider": "Provider",
       "kerberosvault_description_provider": "The provider to which your recordings will be send.",
-      "kerberosvault_directory": "Directory",
+      "kerberosvault_directory": "Directory (should match Kerberos Hub username)",
       "kerberosvault_description_directory": "Sub directory the recordings will be stored in your provider.",
       "kerberosvault_accesskey": "Access key",
       "kerberosvault_description_accesskey": "The access key of your Kerberos Vault account.",

@@ -42,7 +42,8 @@ func LoginToOnvif(c *gin.Context) {
 			},
 		}
 
-		device, err := onvif.ConnectToOnvifDevice(configuration)
+		cameraConfiguration := configuration.Config.Capture.IPCamera
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			c.JSON(200, gin.H{
 				"device": device,
@@ -85,7 +86,8 @@ func GetOnvifCapabilities(c *gin.Context) {
 			},
 		}
 
-		device, err := onvif.ConnectToOnvifDevice(configuration)
+		cameraConfiguration := configuration.Config.Capture.IPCamera
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			c.JSON(200, gin.H{
 				"capabilities": onvif.GetCapabilitiesFromDevice(device),
@@ -128,7 +130,8 @@ func DoOnvifPanTilt(c *gin.Context) {
 			},
 		}
 
-		device, err := onvif.ConnectToOnvifDevice(configuration)
+		cameraConfiguration := configuration.Config.Capture.IPCamera
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 
 		if err == nil {
 			// Get token from the first profile
@@ -137,13 +140,13 @@ func DoOnvifPanTilt(c *gin.Context) {
 			if err == nil {
 
 				// Get the configurations from the device
-				configurations, err := onvif.GetConfigurationsFromDevice(device)
+				ptzConfigurations, err := onvif.GetPTZConfigurationsFromDevice(device)
 
 				if err == nil {
 
 					pan := onvifPanTilt.Pan
 					tilt := onvifPanTilt.Tilt
-					err := onvif.ContinuousPanTilt(device, configurations, token, pan, tilt)
+					err := onvif.ContinuousPanTilt(device, ptzConfigurations, token, pan, tilt)
 					if err == nil {
 						c.JSON(200, models.APIResponse{
 							Message: "Successfully pan/tilted the camera",
@@ -201,7 +204,8 @@ func DoOnvifZoom(c *gin.Context) {
 			},
 		}
 
-		device, err := onvif.ConnectToOnvifDevice(configuration)
+		cameraConfiguration := configuration.Config.Capture.IPCamera
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 
 		if err == nil {
 			// Get token from the first profile
@@ -209,13 +213,13 @@ func DoOnvifZoom(c *gin.Context) {
 
 			if err == nil {
 
-				// Get the configurations from the device
-				configurations, err := onvif.GetConfigurationsFromDevice(device)
+				// Get the PTZ configurations from the device
+				ptzConfigurations, err := onvif.GetPTZConfigurationsFromDevice(device)
 
 				if err == nil {
 
 					zoom := onvifZoom.Zoom
-					err := onvif.ContinuousZoom(device, configurations, token, zoom)
+					err := onvif.ContinuousZoom(device, ptzConfigurations, token, zoom)
 					if err == nil {
 						c.JSON(200, models.APIResponse{
 							Message: "Successfully zoomed the camera",

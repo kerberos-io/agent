@@ -51,6 +51,7 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication) {
 	w := c.Writer
 	r := c.Request
 	conn, err := upgrader.Upgrade(w, r, nil)
+
 	// error handling here
 	if err == nil {
 		defer conn.Close()
@@ -83,28 +84,29 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication) {
 				_, exists := sockets[clientID].Cancels["stream-sd"]
 				if exists {
 					sockets[clientID].Cancels["stream-sd"]()
-					delete(sockets[clientID].Cancels, "stream-sd")
 				} else {
 					log.Log.Error("Streaming sd does not exists for " + clientID)
 				}
 
 			case "stream-sd":
-				startStrean := Message{
-					ClientID:    clientID,
-					MessageType: "stream-sd",
-					Message: map[string]string{
-						"message": "Start streaming low resolution",
-					},
-				}
-				sockets[clientID].WriteJson(startStrean)
+				if communication.CameraConnected {
+					_, exists := sockets[clientID].Cancels["stream-sd"]
+					if exists {
+						log.Log.Info("Already streaming sd for " + clientID)
+					} else {
+						startStream := Message{
+							ClientID:    clientID,
+							MessageType: "stream-sd",
+							Message: map[string]string{
+								"message": "Start streaming low resolution",
+							},
+						}
+						sockets[clientID].WriteJson(startStream)
 
-				_, exists := sockets[clientID].Cancels["stream-sd"]
-				if exists {
-					log.Log.Info("Already streaming sd for " + clientID)
-				} else {
-					ctx, cancel := context.WithCancel(context.Background())
-					sockets[clientID].Cancels["stream-sd"] = cancel
-					go ForwardSDStream(ctx, clientID, sockets[clientID], communication)
+						ctx, cancel := context.WithCancel(context.Background())
+						sockets[clientID].Cancels["stream-sd"] = cancel
+						go ForwardSDStream(ctx, clientID, sockets[clientID], communication)
+					}
 				}
 			}
 
@@ -173,5 +175,14 @@ logreader:
 
 	frame.Free()
 
+	// Close socket for streaming
+	_, exists := connection.Cancels["stream-sd"]
+	if exists {
+		delete(connection.Cancels, "stream-sd")
+	} else {
+		log.Log.Error("Streaming sd does not exists for " + clientID)
+	}
+
+	// Send stop streaming message
 	log.Log.Info("ForwardSDStream: stop sending streaming over websocket")
 }

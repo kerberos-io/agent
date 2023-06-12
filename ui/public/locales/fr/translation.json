@@ -69,7 +69,10 @@
       "verify_persistence_error": "Quelque chose s'est mal déroulé lors de la vérification de la persistance",
       "verify_camera": "Vérifier les paramètres de votre caméra.",
       "verify_camera_success": "Les paramètres de la caméra sont vérifiés avec succès.",
-      "verify_camera_error": "Quelque chose s'est mal déroulé lors de la vérification des paramètres de la caméra"
+      "verify_camera_error": "Quelque chose s'est mal déroulé lors de la vérification des paramètres de la caméra",
+      "verify_onvif": "Verifying your ONVIF settings.",
+      "verify_onvif_success": "ONVIF settings are successfully verified.",
+      "verify_onvif_error": "Something went wrong while verifying the ONVIF settings"
     },
     "overview": {
       "general": "Général",
@@ -186,13 +189,13 @@
       "kerberoshub_description_region": "La région dans laquelle nous stockons vos enregistrements.",
       "kerberoshub_bucket": "Compartiment",
       "kerberoshub_description_bucket": "Le compartiment dans lequel nous stockons vos enregistrements.",
-      "kerberoshub_username": "Utilisateur/Répertoire",
+      "kerberoshub_username": "Utilisateur/Répertoire (should match Kerberos Hub username)",
       "kerberoshub_description_username": "Le nom d'utilisateur de votre compte Kerberos Hub.",
       "kerberosvault_apiurl": "URL de l'API Kerberos Vault",
       "kerberosvault_description_apiurl": "L'API Kerberos Vault",
       "kerberosvault_provider": "Fournisseur",
       "kerberosvault_description_provider": "Le fournisseur auquel vos enregistrements seront envoyés.",
-      "kerberosvault_directory": "Répertoire",
+      "kerberosvault_directory": "Répertoire (should match Kerberos Hub username)",
       "kerberosvault_description_directory": "Le sous-répertoire dans lequel les enregistrements seront stockés chez votre fournisseur.",
       "kerberosvault_accesskey": "Clé d'accès",
       "kerberosvault_description_accesskey": "La clé d'accès de votre compte Kerberos Vault.",

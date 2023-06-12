@@ -244,6 +244,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/onvif/verify": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Will verify the ONVIF connectivity.",
+                "tags": [
+                    "config"
+                ],
+                "summary": "Will verify the ONVIF connectivity.",
+                "operationId": "verify-onvif",
+                "parameters": [
+                    {
+                        "description": "Camera Config",
+                        "name": "cameraConfig",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.IPCamera"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/persistence/verify": {
             "post": {
                 "security": [
@@ -347,8 +381,14 @@ const docTemplate = `{
                 "ipcamera": {
                     "$ref": "#/definitions/models.IPCamera"
                 },
+                "liveview": {
+                    "type": "string"
+                },
                 "maxlengthrecording": {
                     "type": "integer"
+                },
+                "motion": {
+                    "type": "string"
                 },
                 "name": {
                     "type": "string"
@@ -364,6 +404,12 @@ const docTemplate = `{
                 },
                 "raspicamera": {
                     "$ref": "#/definitions/models.RaspiCamera"
+                },
+                "recording": {
+                    "type": "string"
+                },
+                "snapshots": {
+                    "type": "string"
                 },
                 "transcodingresolution": {
                     "type": "integer"
@@ -389,6 +435,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "condition_uri": {
+                    "type": "string"
+                },
+                "dropbox": {
+                    "$ref": "#/definitions/models.Dropbox"
+                },
+                "friendly_name": {
                     "type": "string"
                 },
                 "heartbeaturi": {
@@ -434,6 +486,9 @@ const docTemplate = `{
                 "region": {
                     "$ref": "#/definitions/models.Region"
                 },
+                "remove_after_upload": {
+                    "type": "string"
+                },
                 "s3": {
                     "$ref": "#/definitions/models.S3"
                 },
@@ -477,6 +532,17 @@ const docTemplate = `{
                 }
             }
         },
+        "models.Dropbox": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "directory": {
+                    "type": "string"
+                }
+            }
+        },
         "models.IPCamera": {
             "type": "object",
             "properties": {
@@ -484,7 +550,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "onvif": {
-                    "type": "boolean"
+                    "type": "string"
                 },
                 "onvif_password": {
                     "type": "string"

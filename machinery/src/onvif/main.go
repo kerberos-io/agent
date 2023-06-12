@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/onvif/media"
@@ -31,7 +32,8 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 		json.Unmarshal(b, &ptzAction)
 
 		// Connect to Onvif device
-		device, err := ConnectToOnvifDevice(configuration)
+		cameraConfiguration := configuration.Config.Capture.IPCamera
+		device, err := ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 
 			// Get token from the first profile
@@ -39,7 +41,7 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 			if err == nil {
 
 				// Get the configurations from the device
-				configurations, err := GetConfigurationsFromDevice(device)
+				configurations, err := GetPTZConfigurationsFromDevice(device)
 
 				if err == nil {
 
@@ -100,16 +102,13 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 	log.Log.Debug("HandleONVIFActions: finished")
 }
 
-func ConnectToOnvifDevice(configuration *models.Configuration) (*onvif.Device, error) {
+func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, error) {
 	log.Log.Debug("ConnectToOnvifDevice: started")
 
-	config := configuration.Config
-
-	// Get the capabilities of the ONVIF device
 	device, err := onvif.NewDevice(onvif.DeviceParams{
-		Xaddr:    config.Capture.IPCamera.ONVIFXAddr,
-		Username: config.Capture.IPCamera.ONVIFUsername,
-		Password: config.Capture.IPCamera.ONVIFPassword,
+		Xaddr:    cameraConfiguration.ONVIFXAddr,
+		Username: cameraConfiguration.ONVIFUsername,
+		Password: cameraConfiguration.ONVIFPassword,
 	})
 
 	if err != nil {
@@ -154,11 +153,11 @@ func GetTokenFromProfile(device *onvif.Device, profileId int) (xsd.ReferenceToke
 	return profileToken, err
 }
 
-func GetConfigurationsFromDevice(device *onvif.Device) (ptz.GetConfigurationsResponse, error) {
+func GetPTZConfigurationsFromDevice(device *onvif.Device) (ptz.GetConfigurationsResponse, error) {
 	// We'll try to receive the PTZ configurations from the server
 	var configurations ptz.GetConfigurationsResponse
 
-	// Get the configurations from the device
+	// Get the PTZ configurations from the device
 	resp, err := device.CallMethod(ptz.GetConfigurations{})
 	if err == nil {
 		defer resp.Body.Close()
@@ -167,11 +166,11 @@ func GetConfigurationsFromDevice(device *onvif.Device) (ptz.GetConfigurationsRes
 			stringBody := string(b)
 			decodedXML, et, err := getXMLNode(stringBody, "GetConfigurationsResponse")
 			if err != nil {
-				log.Log.Error("GetConfigurationsFromDevice: " + err.Error())
+				log.Log.Error("GetPTZConfigurationsFromDevice: " + err.Error())
 				return configurations, err
 			} else {
 				if err := decodedXML.DecodeElement(&configurations, et); err != nil {
-					log.Log.Error("GetConfigurationsFromDevice: " + err.Error())
+					log.Log.Error("GetPTZConfigurationsFromDevice: " + err.Error())
 					return configurations, err
 				}
 			}
@@ -316,4 +315,90 @@ func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElemen
 		}
 	}
 	return nil, nil, errors.New("error in NodeName - username and password might be wrong")
+}
+
+func GetPTZFunctionsFromDevice(configurations ptz.GetConfigurationsResponse) ([]string, bool, bool) {
+	var functions []string
+	canZoom := false
+	canPanTilt := false
+
+	if configurations.PTZConfiguration.DefaultAbsolutePantTiltPositionSpace != "" {
+		functions = append(functions, "AbsolutePanTiltMove")
+		canPanTilt = true
+	}
+	if configurations.PTZConfiguration.DefaultAbsoluteZoomPositionSpace != "" {
+		functions = append(functions, "AbsoluteZoomMove")
+		canZoom = true
+	}
+	if configurations.PTZConfiguration.DefaultRelativePanTiltTranslationSpace != "" {
+		functions = append(functions, "RelativePanTiltMove")
+		canPanTilt = true
+	}
+	if configurations.PTZConfiguration.DefaultRelativeZoomTranslationSpace != "" {
+		functions = append(functions, "RelativeZoomMove")
+		canZoom = true
+	}
+	if configurations.PTZConfiguration.DefaultContinuousPanTiltVelocitySpace != "" {
+		functions = append(functions, "ContinuousPanTiltMove")
+		canPanTilt = true
+	}
+	if configurations.PTZConfiguration.DefaultContinuousZoomVelocitySpace != "" {
+		functions = append(functions, "ContinuousZoomMove")
+		canZoom = true
+	}
+	if configurations.PTZConfiguration.DefaultPTZSpeed != nil {
+		functions = append(functions, "PTZSpeed")
+	}
+	if configurations.PTZConfiguration.DefaultPTZTimeout != "" {
+		functions = append(functions, "PTZTimeout")
+	}
+
+	return functions, canZoom, canPanTilt
+}
+
+// VerifyOnvifConnection godoc
+// @Router /api/onvif/verify [post]
+// @ID verify-onvif
+// @Security Bearer
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @Tags config
+// @Param cameraConfig body models.IPCamera true "Camera Config"
+// @Summary Will verify the ONVIF connectivity.
+// @Description Will verify the ONVIF connectivity.
+// @Success 200 {object} models.APIResponse
+func VerifyOnvifConnection(c *gin.Context) {
+	var cameraConfig models.IPCamera
+	err := c.BindJSON(&cameraConfig)
+	if err == nil {
+		device, err := ConnectToOnvifDevice(&cameraConfig)
+		if err == nil {
+			// Get the list of configurations
+			configurations, err := GetPTZConfigurationsFromDevice(device)
+			if err == nil {
+
+				// Check if can zoom and/or pan/tilt is supported
+				ptzFunctions, canZoom, canPanTilt := GetPTZFunctionsFromDevice(configurations)
+				c.JSON(200, models.APIResponse{
+					Data:         device,
+					PTZFunctions: ptzFunctions,
+					CanZoom:      canZoom,
+					CanPanTilt:   canPanTilt,
+				})
+			} else {
+				c.JSON(400, models.APIResponse{
+					Message: "Something went wrong while getting the configurations " + err.Error(),
+				})
+			}
+		} else {
+			c.JSON(400, models.APIResponse{
+				Message: "Something went wrong while verifying the ONVIF connection " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, models.APIResponse{
+			Message: "Something went wrong while receiving the config " + err.Error(),
+		})
+	}
 }

@@ -4,7 +4,8 @@
     "configure": "設定"
   },
   "buttons": {
-    "save": "保存"
+    "save": "保存",
+    "verify_connection": "Verify Connection"
   },
   "navigation": {
     "profile": "プロフィール",
@@ -69,7 +70,10 @@
       "verify_persistence_error": "持続性の検証中に問題が発生しました",
       "verify_camera": "カメラの設定を確認しています。",
       "verify_camera_success": "カメラの設定が正常に検証されました。",
-      "verify_camera_error": "カメラ設定の確認中に問題が発生しました"
+      "verify_camera_error": "カメラ設定の確認中に問題が発生しました",
+      "verify_onvif": "Verifying your ONVIF settings.",
+      "verify_onvif_success": "ONVIF settings are successfully verified.",
+      "verify_onvif_error": "Something went wrong while verifying the ONVIF settings"
     },
     "overview": {
       "general": "全般的",
@@ -186,13 +190,13 @@
       "kerberoshub_description_region": "録音を保存しているリージョン。",
       "kerberoshub_bucket": "bucket",
       "kerberoshub_description_bucket": "録音を保存しているbucket",
-      "kerberoshub_username": "ユーザー名/ディレクトリ",
+      "kerberoshub_username": "ユーザー名/ディレクトリ (should match Kerberos Hub username)",
       "kerberoshub_description_username": "Kerberos Hub アカウントのユーザー名。",
       "kerberosvault_apiurl": "Kerberos ボールト API URL",
       "kerberosvault_description_apiurl": "Kerberos ボールト API",
       "kerberosvault_provider": "プロバイダ",
       "kerberosvault_description_provider": "録音の送信先のプロバイダー。",
-      "kerberosvault_directory": "ディレクトリ",
+      "kerberosvault_directory": "ディレクトリ (should match Kerberos Hub username)",
       "kerberosvault_description_directory": "録音がプロバイダーに保存されるサブディレクトリ。",
       "kerberosvault_accesskey": "アクセスキー",
       "kerberosvault_description_accesskey": "Kerberos Vault アカウントのアクセス キー。",

@@ -4,7 +4,8 @@
     "configure": "Configurar"
   },
   "buttons": {
-    "save": "Salvar"
+    "save": "Salvar",
+    "verify_connection": "Verify Connection"
   },
   "navigation": {
     "profile": "Perfil",
@@ -69,7 +70,10 @@
       "verify_persistence_error": "Algo deu errado ao verificar o armazenamento",
       "verify_camera": "Verificando as configurações de sua câmera.",
       "verify_camera_success": "As configurações da câmera foram verificadas com sucesso.",
-      "verify_camera_error": "Algo deu errado ao verificar as configurações da câmera."
+      "verify_camera_error": "Algo deu errado ao verificar as configurações da câmera.",
+      "verify_onvif": "Verifying your ONVIF settings.",
+      "verify_onvif_success": "ONVIF settings are successfully verified.",
+      "verify_onvif_error": "Something went wrong while verifying the ONVIF settings"
     },
     "overview": {
       "general": "Geral",
@@ -186,13 +190,13 @@
       "kerberoshub_description_region": "A região em que estamos armazenando nossas gravações.",
       "kerberoshub_bucket": "Bucket",
       "kerberoshub_description_bucket": "O bucket no qual estamos armazenando nossas gravações.",
-      "kerberoshub_username": "Nome de usuário/diretório (Username/Directory)",
+      "kerberoshub_username": "Nome de usuário/diretório (should match Kerberos Hub username)",
       "kerberoshub_description_username": "O nome de usuário da sua conta do Kerberos Hub.",
       "kerberosvault_apiurl": "Url da API do Kerberos Vault",
       "kerberosvault_description_apiurl": "a API Kerberos Vault",
       "kerberosvault_provider": "Provedor",
       "kerberosvault_description_provider": "O provedor para o qual suas gravações serão enviadas.",
-      "kerberosvault_directory": "Diretório",
+      "kerberosvault_directory": "Diretório (should match Kerberos Hub username)",
       "kerberosvault_description_directory": "Subdiretório as gravações serão armazenadas em seu provedor.",
       "kerberosvault_accesskey": "Chave de acesso(Access key)",
       "kerberosvault_description_accesskey": "A chave de acesso da sua conta do Kerberos Vault.",

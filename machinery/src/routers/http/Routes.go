@@ -7,6 +7,7 @@ import (
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/capture"
+	"github.com/kerberos-io/agent/machinery/src/onvif"
 	"github.com/kerberos-io/agent/machinery/src/routers/websocket"
 
 	"github.com/kerberos-io/agent/machinery/src/cloud"
@@ -194,6 +195,10 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			c.JSON(200, gin.H{
 				"stopped": true,
 			})
+		})
+
+		api.POST("/onvif/verify", func(c *gin.Context) {
+			onvif.VerifyOnvifConnection(c)
 		})
 
 		api.POST("/hub/verify", func(c *gin.Context) {

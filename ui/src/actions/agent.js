@@ -1,6 +1,7 @@
 import {
   doGetConfig,
   doSaveConfig,
+  doVerifyOnvif,
   doVerifyHub,
   doVerifyPersistence,
   doGetKerberosAgentTags,
@@ -36,6 +37,28 @@ export const updateRegion = (id, polygon) => {
       id,
       polygon,
     });
+  };
+};
+
+export const verifyOnvif = (config, onSuccess, onError) => {
+  return (dispatch) => {
+    doVerifyOnvif(
+      config,
+      (data) => {
+        dispatch({
+          type: 'VERIFY_ONVIF',
+        });
+        if (onSuccess) {
+          onSuccess(data);
+        }
+      },
+      (error) => {
+        const { message } = error;
+        if (onError) {
+          onError(message);
+        }
+      }
+    );
   };
 };
 

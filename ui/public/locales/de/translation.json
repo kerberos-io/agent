@@ -4,7 +4,8 @@
     "configure": "Konfigurieren"
   },
   "buttons": {
-    "save": "Speichern"
+    "save": "Speichern",
+    "verify_connection": "Verify Connection"
   },
   "navigation": {
     "profile": "Profil",
@@ -69,7 +70,10 @@
       "verify_persistence_error": "Beim überprüfen der Speichereinstellungen ist ein Fehler aufgetreten",
       "verify_camera": "Überprüfen der Kameraeinstellungen.",
       "verify_camera_success": "Die Kameraeinstellungen wurden erfolgreich überprüft.",
-      "verify_camera_error": "Beim überprüfen der Kameraeinstellungen ist ein Fehler aufgetreten"
+      "verify_camera_error": "Beim überprüfen der Kameraeinstellungen ist ein Fehler aufgetreten",
+      "verify_onvif": "Verifying your ONVIF settings.",
+      "verify_onvif_success": "ONVIF settings are successfully verified.",
+      "verify_onvif_error": "Something went wrong while verifying the ONVIF settings"
     },
     "overview": {
       "general": "Allgemein",
@@ -186,13 +190,13 @@
       "kerberoshub_description_region": "Die Region in der die Aufnahmen gespeichert werden sollen.",
       "kerberoshub_bucket": "Bucket",
       "kerberoshub_description_bucket": "Der Bucket in dem die Aufnahmen gespeichert werden.",
-      "kerberoshub_username": "Benutzername/Verzeichnis",
+      "kerberoshub_username": "Benutzername/Verzeichnis (should match Kerberos Hub username)",
       "kerberoshub_description_username": "Der Benutzername des Kerberos Hub Accounts.",
       "kerberosvault_apiurl": "Kerberos Vault API URL",
       "kerberosvault_description_apiurl": "Die Kerberos Vault API URL.",
       "kerberosvault_provider": "Anbieter",
       "kerberosvault_description_provider": "Der Anbieter zu dem die Aufnahmen gesendet werden.",
-      "kerberosvault_directory": "Verzeichnis",
+      "kerberosvault_directory": "Verzeichnis (should match Kerberos Hub username)",
       "kerberosvault_description_directory": "Das Uneterverzeichnis in dem die Aufnahmen gespeichert werden sollen.",
       "kerberosvault_accesskey": "Zugriffsschlüssel",
       "kerberosvault_description_accesskey": "Der Zugriffsschlüssel des Kerberos Vault Accounts..",

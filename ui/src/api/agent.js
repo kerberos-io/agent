@@ -91,6 +91,26 @@ export function doVerifyHub(config, onSuccess, onError) {
     });
 }
 
+export function doVerifyOnvif(config, onSuccess, onError) {
+  const endpoint = API.post(`onvif/verify`, {
+    ...config,
+  });
+  endpoint
+    .then((res) => {
+      if (res.status !== 200) {
+        throw new Error(res.data);
+      }
+      return res.data;
+    })
+    .then((data) => {
+      onSuccess(data);
+    })
+    .catch((e) => {
+      const { data } = e.response;
+      onError(data);
+    });
+}
+
 export function doVerifyCamera(streamType, config, onSuccess, onError) {
   const cameraStreams = {
     rtsp: '',
