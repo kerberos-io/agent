@@ -329,7 +329,6 @@ class Settings extends React.Component {
       dispatchVerifyOnvif(
         cameraConfig,
         (data) => {
-          console.log(data);
           this.setState({
             verifyOnvifSuccess: true,
             verifyOnvifError: false,
