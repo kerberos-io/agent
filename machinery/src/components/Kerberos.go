@@ -85,11 +85,12 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 			break
 		}
 
-		// We will re open the configuration, might have changed :O!
-		OpenConfig(configuration)
-
-		// We will override the configuration with the environment variables
-		OverrideWithEnvironmentVariables(configuration)
+		if status == "not started" {
+			// We will re open the configuration, might have changed :O!
+			OpenConfig(configuration)
+			// We will override the configuration with the environment variables
+			OverrideWithEnvironmentVariables(configuration)
+		}
 
 		// Reset the MQTT client, might have provided new information, so we need to reconnect.
 		if routers.HasMQTTClientModified(configuration) {
@@ -282,6 +283,12 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		// Cancel the main context, this will stop all the other goroutines.
 		(*communication.CancelContext)()
 
+		// We will re open the configuration, might have changed :O!
+		OpenConfig(configuration)
+
+		// We will override the configuration with the environment variables
+		OverrideWithEnvironmentVariables(configuration)
+
 		// Here we are cleaning up everything!
 		if configuration.Config.Offline != "true" {
 			communication.HandleUpload <- "stop"
@@ -307,9 +314,6 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		}
 		close(communication.HandleMotion)
 		communication.HandleMotion = nil
-
-		// Wait a few seconds to stop the decoder.
-		time.Sleep(time.Second * 3)
 
 		// Waiting for some seconds to make sure everything is properly closed.
 		log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")

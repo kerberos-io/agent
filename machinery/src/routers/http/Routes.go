@@ -63,19 +63,18 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 
 		api.GET("/dashboard", func(c *gin.Context) {
 
-			// This will return the timestamp when the last packet was correctyl received
-			// this is to calculate if the camera connection is still working.
-			lastPacketReceived := int64(0)
-			if communication.LastPacketTimer != nil && communication.LastPacketTimer.Load() != nil {
-				lastPacketReceived = communication.LastPacketTimer.Load().(int64)
-			}
+			// Check if camera is online.
+			cameraIsOnline := communication.CameraConnected
 
 			// If an agent is properly setup with Kerberos Hub, we will send
 			// a ping to Kerberos Hub every 15seconds. On receiving a positive response
 			// it will update the CloudTimestamp value.
-			cloudTimestamp := int64(0)
+			cloudIsOnline := false
 			if communication.CloudTimestamp != nil && communication.CloudTimestamp.Load() != nil {
-				cloudTimestamp = communication.CloudTimestamp.Load().(int64)
+				timestamp := communication.CloudTimestamp.Load().(int64)
+				if timestamp > 0 {
+					cloudIsOnline = true
+				}
 			}
 
 			// The total number of recordings stored in the directory.
@@ -100,8 +99,8 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 
 			c.JSON(200, gin.H{
 				"offlineMode":        configuration.Config.Offline,
-				"cameraOnline":       lastPacketReceived,
-				"cloudOnline":        cloudTimestamp,
+				"cameraOnline":       cameraIsOnline,
+				"cloudOnline":        cloudIsOnline,
 				"numberOfRecordings": numberOfRecordings,
 				"days":               days,
 				"latestEvents":       latestEvents,

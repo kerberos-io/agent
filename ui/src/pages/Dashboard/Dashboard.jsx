@@ -35,6 +35,7 @@ class Dashboard extends React.Component {
       liveviewLoaded: false,
       open: false,
       currentRecording: '',
+      initialised: false,
     };
   }
 
@@ -47,30 +48,28 @@ class Dashboard extends React.Component {
         });
       });
     }
-
-    const { connected } = this.props;
-    if (connected === true) {
-      const { dispatchSend } = this.props;
-      const message = {
-        message_type: 'stream-sd',
-      };
-      dispatchSend(message);
-    }
   }
 
-  componentDidUpdate(prevProps) {
-    const { connected: connectedPrev } = prevProps;
-    const { connected } = this.props;
-    if (connectedPrev === false && connected === true) {
-      const { dispatchSend } = this.props;
+  componentDidUpdate() {
+    const { initialised } = this.state;
+    if (!initialised) {
+      const { connected, dispatchSend } = this.props;
       const message = {
         message_type: 'stream-sd',
       };
-      dispatchSend(message);
-
-      const requestStreamInterval = interval(3000);
-      this.requestStreamSubscription = requestStreamInterval.subscribe(() => {
+      if (connected) {
         dispatchSend(message);
+      }
+
+      const requestStreamInterval = interval(2000);
+      this.requestStreamSubscription = requestStreamInterval.subscribe(() => {
+        if (connected) {
+          dispatchSend(message);
+        }
+      });
+
+      this.setState({
+        initialised: true,
       });
     }
   }
@@ -115,17 +114,16 @@ class Dashboard extends React.Component {
 
     // We check if the camera was getting a valid frame
     // during the last 5 seconds, otherwise we assume the camera is offline.
-    const isCameraOnline =
-      this.getCurrentTimestamp() - dashboard.cameraOnline < 15;
+    const isCameraOnline = dashboard.cameraOnline;
 
     // We check if a connection is made to Kerberos Hub, or if Offline mode
     // has been turned on.
-    const cloudOnline = this.getCurrentTimestamp() - dashboard.cloudOnline < 30;
+    const isCloudOnline = dashboard.cloudOnline;
     let cloudConnection = t('dashboard.not_connected');
     if (dashboard.offlineMode === 'true') {
       cloudConnection = t('dashboard.offline_mode');
     } else {
-      cloudConnection = cloudOnline
+      cloudConnection = isCloudOnline
         ? t('dashboard.connected')
         : t('dashboard.not_connected');
     }
@@ -185,7 +183,7 @@ class Dashboard extends React.Component {
               subtitle={cloudConnection}
               footer="Cloud"
               icon={
-                cloudOnline && dashboard.offlineMode !== 'true'
+                isCloudOnline && dashboard.offlineMode !== 'true'
                   ? 'circle-check-big'
                   : 'circle-cross-big'
               }
@@ -306,7 +304,7 @@ class Dashboard extends React.Component {
           </div>
           <div>
             <h2>{t('dashboard.live_view')}</h2>
-            {!liveviewLoaded && (
+            {(!liveviewLoaded || !isCameraOnline) && (
               <SetupBox
                 btnicon="preferences"
                 btnlabel={t('dashboard.configure_connection')}
@@ -316,7 +314,12 @@ class Dashboard extends React.Component {
                 text={t('dashboard.loading_live_view_description')}
               />
             )}
-            <div style={{ visibility: liveviewLoaded ? 'visible' : 'hidden' }}>
+            <div
+              style={{
+                visibility:
+                  liveviewLoaded && isCameraOnline ? 'visible' : 'hidden',
+              }}
+            >
               <ImageCard
                 imageSrc={`data:image/png;base64, ${
                   images.length ? images[0] : ''

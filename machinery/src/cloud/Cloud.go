@@ -272,14 +272,21 @@ loop:
 
 				// We'll check which mode is enabled for the camera.
 				onvifEnabled := "false"
+				onvifZoom := "false"
+				onvifPanTilt := "false"
 				if config.Capture.IPCamera.ONVIFXAddr != "" {
 					cameraConfiguration := configuration.Config.Capture.IPCamera
 					device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 					if err == nil {
-						capabilities := onvif.GetCapabilitiesFromDevice(device)
-						for _, v := range capabilities {
-							if v == "PTZ" || v == "ptz" {
-								onvifEnabled = "true"
+						configurations, err := onvif.GetPTZConfigurationsFromDevice(device)
+						if err == nil {
+							onvifEnabled = "true"
+							_, canZoom, canPanTilt := onvif.GetPTZFunctionsFromDevice(configurations)
+							if canZoom {
+								onvifZoom = "true"
+							}
+							if canPanTilt {
+								onvifPanTilt = "true"
 							}
 						}
 					}
@@ -325,6 +332,8 @@ loop:
 						"boot_time" : "%s",
 						"siteID" : "%s",
 						"onvif" : "%s",
+						"onvif_zoom" : "%s",
+						"onvif_pantilt" : "%s",
 						"cameraConnected": "%s",
 						"numberoffiles" : "33",
 						"timestamp" : 1564747908,
@@ -332,7 +341,7 @@ loop:
 						"docker" : true,
 						"kios" : false,
 						"raspberrypi" : false
-					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, cameraConnected)
+					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, cameraConnected)
 
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)
@@ -348,6 +357,7 @@ loop:
 					communication.CloudTimestamp.Store(time.Now().Unix())
 					log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Hub.")
 				} else {
+					communication.CloudTimestamp.Store(0)
 					log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Hub.")
 				}
 
