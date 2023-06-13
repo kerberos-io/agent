@@ -139,7 +139,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					hour := now.Hour()
 					minute := now.Minute()
 					second := now.Second()
-					if config.Timetable != nil {
+					if config.Timetable != nil && len(config.Timetable) > 0 {
 						timeInterval := config.Timetable[int(weekday)]
 						if timeInterval != nil {
 							start1 := timeInterval.Start1
