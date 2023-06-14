@@ -122,6 +122,7 @@ RUN cp /home/agent/data/config/config.json /home/agent/data/config.template.json
 # Set permissions correctly
 
 RUN chown -R agent:kerberosio /home/agent/data
+RUN chown -R agent:kerberosio /home/agent/www
 
 ###########################
 # Grant the necessary root capabilities to the process trying to bind to the privileged port
