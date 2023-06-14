@@ -157,9 +157,7 @@ body {
   color: rgba(255, 255, 255, 0.75);
   padding: size(1) 0;
 }
-.environment {
-  padding: 15px 0;
-}
+
 .environment.demo {
   background: repeating-linear-gradient(
     -55deg,
@@ -170,7 +168,7 @@ body {
   );
   text-align: center;
   color: rgba(255, 255, 255, 0.75);
-  padding: size(1) 0;
+  padding: 12px 0;
 }
 
 .environment.staging {
@@ -183,7 +181,7 @@ body {
   );
   text-align: center;
   color: white;
-  padding: size(1) 0;
+  padding: 12px 0;
 }
 
 .environment.acceptance {
@@ -196,5 +194,5 @@ body {
   );
   text-align: center;
   color: white;
-  padding: size(1) 0;
+  padding: 12px 0;
 }
