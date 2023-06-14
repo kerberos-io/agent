@@ -49,60 +49,98 @@ class Login extends React.Component {
     const { loginError, error } = this.props;
 
     return (
-      <LandingLayout
-        title="Kerberos Agent"
-        version={config.VERSION}
-        description="Video surveillance for everyone"
-      >
-        <section className="login-body">
-          <Block>
-            <form onSubmit={this.handleSubmit} noValidate>
-              <BlockHeader>
-                <div>
-                  <Icon label="login" /> <h4>Login</h4>
-                </div>
-              </BlockHeader>
-              {loginError && (
-                <AlertMessage
-                  message={error}
-                  onClick={() => this.hideMessage()}
-                />
-              )}
-              <BlockBody>
-                <Input
-                  label="username or email"
-                  placeholder="Your username/email"
-                  readonly={false}
-                  disabled={false}
-                  type="text"
-                  name="username"
-                  iconleft="accounts"
-                />
-                <Input
-                  label="password"
-                  placeholder="Your password"
-                  readonly={false}
-                  disabled={false}
-                  type="password"
-                  name="password"
-                  iconleft="locked"
-                  iconright="activity"
-                  seperate
-                />
-              </BlockBody>
-              <BlockFooter>
-                <p />
-                <Button
-                  buttonType="submit"
-                  type="submit"
-                  icon="logout"
-                  label="Login"
-                />
-              </BlockFooter>
-            </form>
-          </Block>
-        </section>
-      </LandingLayout>
+      <>
+        {config.MODE !== 'release' && (
+          <div className={`environment ${config.MODE}`}>
+            Environment: {config.MODE}
+          </div>
+        )}
+        <LandingLayout
+          title="Kerberos Agent"
+          version={config.VERSION}
+          description="Video surveillance for everyone"
+        >
+          <section className="login-body">
+            <Block>
+              <form onSubmit={this.handleSubmit} noValidate>
+                <BlockHeader>
+                  <div>
+                    <Icon label="login" /> <h4>Login</h4>
+                  </div>
+                </BlockHeader>
+                {loginError && (
+                  <AlertMessage
+                    message={error}
+                    onClick={() => this.hideMessage()}
+                  />
+                )}
+                <BlockBody>
+                  {config.MODE === 'demo' && (
+                    <>
+                      <Input
+                        label="username or email"
+                        placeholder="Your username/email"
+                        readonly
+                        disabled={false}
+                        value="root"
+                        type="text"
+                        name="username"
+                        iconleft="accounts"
+                      />
+                      <Input
+                        label="password"
+                        placeholder="Your password"
+                        readonly
+                        disabled={false}
+                        value="root"
+                        type="password"
+                        name="password"
+                        iconleft="locked"
+                        iconright="activity"
+                        seperate
+                      />
+                    </>
+                  )}
+
+                  {config.MODE !== 'demo' && (
+                    <>
+                      <Input
+                        label="username or email"
+                        placeholder="Your username/email"
+                        readonly={false}
+                        disabled={false}
+                        type="text"
+                        name="username"
+                        iconleft="accounts"
+                      />
+                      <Input
+                        label="password"
+                        placeholder="Your password"
+                        readonly={false}
+                        disabled={false}
+                        type="password"
+                        name="password"
+                        iconleft="locked"
+                        iconright="activity"
+                        seperate
+                      />
+                    </>
+                  )}
+                </BlockBody>
+                <BlockFooter>
+                  <p />
+                  <Button
+                    buttonType="submit"
+                    type="submit"
+                    icon="logout"
+                    label="Login"
+                  />
+                </BlockFooter>
+              </form>
+            </Block>
+          </section>
+        </LandingLayout>
+      </>
     );
   }
 }

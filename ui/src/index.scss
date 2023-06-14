@@ -144,3 +144,57 @@ body {
   padding: 0;
   font-family: 'Inter', sans-serif; // use regular Inter font by default..
 }
+
+.environment.develop {
+  background: repeating-linear-gradient(
+    -55deg,
+    #222,
+    #222 10px,
+    #035e1f 10px,
+    #035e1f 20px
+  );
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
+  padding: size(1) 0;
+}
+.environment {
+  padding: 15px 0;
+}
+.environment.demo {
+  background: repeating-linear-gradient(
+    -55deg,
+    #222,
+    #222 10px,
+    #035e1f 10px,
+    #035e1f 20px
+  );
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
+  padding: size(1) 0;
+}
+
+.environment.staging {
+  background: repeating-linear-gradient(
+    -55deg,
+    #222,
+    #222 10px,
+    #6d0e0e 10px,
+    #6d0e0e 20px
+  );
+  text-align: center;
+  color: white;
+  padding: size(1) 0;
+}
+
+.environment.acceptance {
+  background: repeating-linear-gradient(
+    -55deg,
+    #222,
+    #222 10px,
+    #8b8203 10px,
+    #8b8203 20px
+  );
+  text-align: center;
+  color: white;
+  padding: size(1) 0;
+}

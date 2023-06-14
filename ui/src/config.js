@@ -12,6 +12,7 @@ const dev = {
   API_URL: `${protocol}//${hostname}:8080/api`,
   URL: `${protocol}//${hostname}:8080`,
   WS_URL: `${websocketprotocol}//${hostname}:8080/ws`,
+  MODE: window['env']['mode'],
   // Uncomment, and comment the above lines, when using codespaces or other special DNS names (which you can't control)
   // HOSTNAME: externalHost,
   // API_URL: `${protocol}//${externalHost}/api`,
@@ -25,6 +26,7 @@ const prod = {
   API_URL: `${protocol}//${host}/api`,
   URL: `${protocol}//${host}`,
   WS_URL: `${websocketprotocol}//${host}/ws`,
+  MODE: window['env']['mode'],
 };
 
 const config = process.env.REACT_APP_ENVIRONMENT === 'production' ? prod : dev;

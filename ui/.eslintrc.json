@@ -21,6 +21,7 @@
     "react/forbid-prop-types": "off",
     "no-case-declarations": "off",
     "camelcase": "off",
+    "dot-notation": "off",
     "jsx-a11y/media-has-caption": "off",
     "jsx-a11y/anchor-is-valid": "off",
     "jsx-a11y/click-events-have-key-events": "off",

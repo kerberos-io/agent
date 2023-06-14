@@ -93,111 +93,122 @@ class App extends React.Component {
     const { children, username, dashboard, dispatchLogout } = this.props;
     const cloudOnline = this.getCurrentTimestamp() - dashboard.cloudOnline < 30;
     return (
-      <div id="page-root">
-        <Sidebar logo={logo} title="Kerberos Agent" version="v1-beta" mobile>
-          <Profilebar
-            username={username}
-            email="support@kerberos.io"
-            userrole={t('navigation.admin')}
-            logout={dispatchLogout}
-          />
-          <Navigation>
-            <NavigationSection title={t('navigation.management')} />
-            <NavigationGroup>
-              <NavigationItem
-                title={t('navigation.dashboard')}
-                icon="dashboard"
-                link="dashboard"
-              />
-              <NavigationItem
-                title={t('navigation.recordings')}
-                icon="media"
-                link="media"
-              />
-              <NavigationItem
-                title={t('navigation.settings')}
-                icon="preferences"
-                link="settings"
-              />
-            </NavigationGroup>
-            <NavigationSection title={t('navigation.help_support')} />
-            <NavigationGroup>
-              <NavigationItem
-                title={t('navigation.swagger')}
-                icon="api"
-                external
-                link={`${config.URL}/swagger/index.html`}
-              />
-              <NavigationItem
-                title={t('navigation.documentation')}
-                icon="book"
-                external
-                link="https://doc.kerberos.io/agent/announcement"
-              />
-              <NavigationItem
-                title="Kerberos Hub"
-                icon="cloud"
-                external
-                link="https://app.kerberos.io"
-              />
-              <NavigationItem
-                title={t('navigation.ui_library')}
-                icon="paint"
-                external
-                link="https://ui.kerberos.io/"
-              />
-              <NavigationItem
-                title="Github"
-                icon="github-nav"
-                external
-                link="https://github.com/kerberos-io/agent"
-              />
-            </NavigationGroup>
-            <NavigationSection title={t('navigation.layout')} />
-            <NavigationGroup>
-              <LanguageSelect />
-            </NavigationGroup>
-
-            <NavigationSection title="Websocket" />
-            <NavigationGroup>
-              <div className="websocket-badge">
-                <Badge
-                  title={connected ? 'connected' : 'disconnected'}
-                  status={connected ? 'success' : 'warning'}
+      <>
+        {config.MODE !== 'release' && (
+          <div className={`environment ${config.MODE}`}>
+            Environment: {config.MODE}
+          </div>
+        )}
+        <div id="page-root">
+          <Sidebar logo={logo} title="Kerberos Agent" version="v1-beta" mobile>
+            <Profilebar
+              username={username}
+              email="support@kerberos.io"
+              userrole={t('navigation.admin')}
+              logout={dispatchLogout}
+            />
+            <Navigation>
+              <NavigationSection title={t('navigation.management')} />
+              <NavigationGroup>
+                <NavigationItem
+                  title={t('navigation.dashboard')}
+                  icon="dashboard"
+                  link="dashboard"
                 />
-              </div>
-            </NavigationGroup>
-          </Navigation>
-        </Sidebar>
-        <Main>
-          <Gradient />
+                <NavigationItem
+                  title={t('navigation.recordings')}
+                  icon="media"
+                  link="media"
+                />
+                <NavigationItem
+                  title={t('navigation.settings')}
+                  icon="preferences"
+                  link="settings"
+                />
+              </NavigationGroup>
+              <NavigationSection title={t('navigation.help_support')} />
+              <NavigationGroup>
+                <NavigationItem
+                  title={t('navigation.swagger')}
+                  icon="api"
+                  external
+                  link={`${config.URL}/swagger/index.html`}
+                />
+                <NavigationItem
+                  title={t('navigation.documentation')}
+                  icon="book"
+                  external
+                  link="https://doc.kerberos.io/agent/announcement"
+                />
+                <NavigationItem
+                  title="Kerberos Hub"
+                  icon="cloud"
+                  external
+                  link="https://app.kerberos.io"
+                />
+                <NavigationItem
+                  title={t('navigation.ui_library')}
+                  icon="paint"
+                  external
+                  link="https://ui.kerberos.io/"
+                />
+                <NavigationItem
+                  title="Github"
+                  icon="github-nav"
+                  external
+                  link="https://github.com/kerberos-io/agent"
+                />
+              </NavigationGroup>
+              <NavigationSection title={t('navigation.layout')} />
+              <NavigationGroup>
+                <LanguageSelect />
+              </NavigationGroup>
 
-          {!cloudOnline && (
-            <a href="https://app.kerberos.io" target="_blank" rel="noreferrer">
-              <div className="cloud-not-installed">
-                <div>
-                  <Icon label="cloud" />
-                  Activate Kerberos Hub, and make your cameras and recordings
-                  available through a secured cloud!
+              <NavigationSection title="Websocket" />
+              <NavigationGroup>
+                <div className="websocket-badge">
+                  <Badge
+                    title={connected ? 'connected' : 'disconnected'}
+                    status={connected ? 'success' : 'warning'}
+                  />
                 </div>
-              </div>
-            </a>
-          )}
+              </NavigationGroup>
+            </Navigation>
+          </Sidebar>
+          <Main>
+            <Gradient />
 
-          {dashboard.offlineMode === 'true' && (
-            <Link to="/settings">
-              <div className="offline-mode">
-                <div>
-                  <Icon label="info" />
-                  Attention! Kerberos is currently running in Offline mode.
+            {!cloudOnline && (
+              <a
+                href="https://app.kerberos.io"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <div className="cloud-not-installed">
+                  <div>
+                    <Icon label="cloud" />
+                    Activate Kerberos Hub, and make your cameras and recordings
+                    available through a secured cloud!
+                  </div>
                 </div>
-              </div>
-            </Link>
-          )}
+              </a>
+            )}
 
-          <MainBody>{children}</MainBody>
-        </Main>
-      </div>
+            {dashboard.offlineMode === 'true' && (
+              <Link to="/settings">
+                <div className="offline-mode">
+                  <div>
+                    <Icon label="info" />
+                    Attention! Kerberos is currently running in Offline mode.
+                  </div>
+                </div>
+              </Link>
+            )}
+
+            <MainBody>{children}</MainBody>
+          </Main>
+        </div>
+      </>
     );
   }
 }

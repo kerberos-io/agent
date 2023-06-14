@@ -1,6 +1,8 @@
 package http
 
 import (
+	"os"
+
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/contrib/static"
@@ -56,6 +58,17 @@ func StartServer(configuration *models.Configuration, communication *models.Comm
 
 	// Add all routes
 	AddRoutes(r, authMiddleware, configuration, communication)
+
+	// Update environment variables
+	environmentVariables := "./www/env.js"
+	if os.Getenv("AGENT_MODE") == "demo" {
+		demoEnvironmentVariables := "./www/env.demo.js"
+		// Move demo environment variables to environment variables
+		err := os.Rename(demoEnvironmentVariables, environmentVariables)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	// Add static routes to UI
 	r.Use(static.Serve("/", static.LocalFile("./www", true)))

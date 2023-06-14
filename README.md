@@ -165,6 +165,7 @@ Next to attaching the configuration file, it is also possible to override the co
 
 | Name                                    | Description                                                                                     | Default Value                  |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
+| `AGENT_MODE`                            | You can choose to run this in 'release' for production, and or 'demo' for showcasing.           | "release"                      |
 | `AGENT_USERNAME`                        | The username used to authenticate against the Kerberos Agent login page.                        | "root"                         |
 | `AGENT_PASSWORD`                        | The password used to authenticate against the Kerberos Agent login page.                        | "root"                         |
 | `AGENT_KEY`                             | A unique identifier for your Kerberos Agent, this is auto-generated but can be overriden.       | ""                             |
