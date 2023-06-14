@@ -37,6 +37,7 @@ class Dashboard extends React.Component {
       currentRecording: '',
       initialised: false,
     };
+    this.initialiseLiveview = this.initialiseLiveview.bind(this);
   }
 
   componentDidMount() {
@@ -48,30 +49,11 @@ class Dashboard extends React.Component {
         });
       });
     }
+    this.initialiseLiveview();
   }
 
   componentDidUpdate() {
-    const { initialised } = this.state;
-    if (!initialised) {
-      const { connected, dispatchSend } = this.props;
-      const message = {
-        message_type: 'stream-sd',
-      };
-      if (connected) {
-        dispatchSend(message);
-      }
-
-      const requestStreamInterval = interval(2000);
-      this.requestStreamSubscription = requestStreamInterval.subscribe(() => {
-        if (connected) {
-          dispatchSend(message);
-        }
-      });
-
-      this.setState({
-        initialised: true,
-      });
-    }
+    this.initialiseLiveview();
   }
 
   componentWillUnmount() {
@@ -99,6 +81,30 @@ class Dashboard extends React.Component {
 
   getCurrentTimestamp() {
     return Math.round(Date.now() / 1000);
+  }
+
+  initialiseLiveview() {
+    const { initialised } = this.state;
+    if (!initialised) {
+      const message = {
+        message_type: 'stream-sd',
+      };
+      const { connected, dispatchSend } = this.props;
+      if (connected) {
+        dispatchSend(message);
+      }
+
+      const requestStreamInterval = interval(2000);
+      this.requestStreamSubscription = requestStreamInterval.subscribe(() => {
+        const { connected: isConnected } = this.props;
+        if (isConnected) {
+          dispatchSend(message);
+        }
+      });
+      this.setState({
+        initialised: true,
+      });
+    }
   }
 
   openModal(file) {
