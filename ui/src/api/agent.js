@@ -92,7 +92,7 @@ export function doVerifyHub(config, onSuccess, onError) {
 }
 
 export function doVerifyOnvif(config, onSuccess, onError) {
-  const endpoint = API.post(`onvif/verify`, {
+  const endpoint = API.post(`camera/onvif/verify`, {
     ...config,
   });
   endpoint

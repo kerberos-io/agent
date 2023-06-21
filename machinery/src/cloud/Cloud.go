@@ -274,6 +274,8 @@ loop:
 				onvifEnabled := "false"
 				onvifZoom := "false"
 				onvifPanTilt := "false"
+				onvifVersion := "unknown"
+
 				if config.Capture.IPCamera.ONVIFXAddr != "" {
 					cameraConfiguration := configuration.Config.Capture.IPCamera
 					device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
@@ -289,6 +291,8 @@ loop:
 								onvifPanTilt = "true"
 							}
 						}
+						// Get the ONVIF version from the device.
+						onvifVersion, err = onvif.GetONVIFVersionFromDevice(device)
 					}
 				}
 
@@ -334,6 +338,7 @@ loop:
 						"onvif" : "%s",
 						"onvif_zoom" : "%s",
 						"onvif_pantilt" : "%s",
+						"onvif_version" : "%s",
 						"cameraConnected": "%s",
 						"numberoffiles" : "33",
 						"timestamp" : 1564747908,
@@ -341,7 +346,7 @@ loop:
 						"docker" : true,
 						"kios" : false,
 						"raspberrypi" : false
-					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, cameraConnected)
+					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifVersion, cameraConnected)
 
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)

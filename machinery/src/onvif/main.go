@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	"github.com/kerberos-io/onvif/media"
 
 	"github.com/kerberos-io/onvif"
+	dev "github.com/kerberos-io/onvif/device"
 	"github.com/kerberos-io/onvif/ptz"
 	xsd "github.com/kerberos-io/onvif/xsd/onvif"
 )
@@ -299,6 +302,68 @@ func GetCapabilitiesFromDevice(device *onvif.Device) []string {
 	return capabilities
 }
 
+func GetONVIFVersionFromDevice(device *onvif.Device) (string, error) {
+	// Get the ONVIF version from the device
+	resp, err := device.CallMethod(dev.GetServices{IncludeCapability: false})
+	if err == nil {
+		defer resp.Body.Close()
+		b, err := io.ReadAll(resp.Body)
+		if err == nil {
+			stringBody := string(b)
+			decodedXML, et, err := getXMLNode(stringBody, "GetServicesResponse")
+			if err != nil {
+				log.Log.Error("GetServicesResponse: " + err.Error())
+				return "", err
+			} else {
+				// Decode the profiles from the server
+				var mServiceResp dev.GetServicesResponse
+				if err := decodedXML.DecodeElement(&mServiceResp, et); err != nil {
+					log.Log.Error("GetServicesResponse: " + err.Error())
+				}
+
+				// We'll try to get the version of the ONVIF server
+				version := mServiceResp.Service.Version
+
+				// Convert version int to string
+				major := strconv.Itoa(version.Major)
+				minor := strconv.Itoa(version.Minor)
+				return major + "." + minor, nil
+
+			}
+		}
+	}
+	return "", err
+}
+
+func GetAudioOutputConfiguration(device *onvif.Device) (media.GetAudioDecoderConfigurationOptionsResponse, error) {
+	// Get the ONVIF version from the device
+	resp, err := device.CallMethod(media.GetAudioDecoderConfigurationOptions{})
+	var mAudioEncoderConfigurationOptionsResponse media.GetAudioDecoderConfigurationOptionsResponse
+	if err == nil {
+		defer resp.Body.Close()
+		b, err := io.ReadAll(resp.Body)
+		if err == nil {
+			stringBody := string(b)
+			decodedXML, et, err := getXMLNode(stringBody, "GetAudioDecoderConfigurationOptionsResponse")
+			if err != nil {
+				log.Log.Error("GetAudioDecoderConfigurationOptionsResponse: " + err.Error())
+				return mAudioEncoderConfigurationOptionsResponse, err
+
+			} else {
+				// Decode the profiles from the server
+				if err := decodedXML.DecodeElement(&mAudioEncoderConfigurationOptionsResponse, et); err != nil {
+					log.Log.Error("GetAudioDecoderConfigurationOptionsResponse: " + err.Error())
+				}
+
+				// We'll try to get the version of the ONVIF server
+				audioDecoders := mAudioEncoderConfigurationOptionsResponse
+				return audioDecoders, nil
+			}
+		}
+	}
+	return mAudioEncoderConfigurationOptionsResponse, err
+}
+
 func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, error) {
 	xmlBytes := bytes.NewBufferString(xmlBody)
 	decodedXML := xml.NewDecoder(xmlBytes)
@@ -357,13 +422,13 @@ func GetPTZFunctionsFromDevice(configurations ptz.GetConfigurationsResponse) ([]
 }
 
 // VerifyOnvifConnection godoc
-// @Router /api/onvif/verify [post]
+// @Router /api/camera/onvif/verify [post]
 // @ID verify-onvif
 // @Security Bearer
 // @securityDefinitions.apikey Bearer
 // @in header
 // @name Authorization
-// @Tags config
+// @Tags camera
 // @Param cameraConfig body models.IPCamera true "Camera Config"
 // @Summary Will verify the ONVIF connectivity.
 // @Description Will verify the ONVIF connectivity.
@@ -374,21 +439,114 @@ func VerifyOnvifConnection(c *gin.Context) {
 	if err == nil {
 		device, err := ConnectToOnvifDevice(&cameraConfig)
 		if err == nil {
-			// Get the list of configurations
-			configurations, err := GetPTZConfigurationsFromDevice(device)
+			version, err := GetONVIFVersionFromDevice(device)
 			if err == nil {
-
 				// Check if can zoom and/or pan/tilt is supported
-				ptzFunctions, canZoom, canPanTilt := GetPTZFunctionsFromDevice(configurations)
 				c.JSON(200, models.APIResponse{
-					Data:         device,
-					PTZFunctions: ptzFunctions,
-					CanZoom:      canZoom,
-					CanPanTilt:   canPanTilt,
+					Data: version,
 				})
 			} else {
 				c.JSON(400, models.APIResponse{
-					Message: "Something went wrong while getting the configurations " + err.Error(),
+					Message: "Something went wrong while getting the ONVIF version " + err.Error(),
+				})
+			}
+		} else {
+			c.JSON(400, models.APIResponse{
+				Message: "Something went wrong while verifying the ONVIF connection " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, models.APIResponse{
+			Message: "Something went wrong while receiving the config " + err.Error(),
+		})
+	}
+}
+
+// VerifyOnvifConnection godoc
+// @Router /api/camera/onvif/version [post]
+// @ID version-onvif
+// @Security Bearer
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @Tags camera
+// @Param cameraConfig body models.IPCamera true "Camera Config"
+// @Summary Get the ONVIF version installed on the camera.
+// @Description Get the ONVIF version installed on the camera.
+// @Success 200 {object} models.APIResponse
+func GetVersionONVIF(c *gin.Context) {
+	var cameraConfig models.IPCamera
+	err := c.BindJSON(&cameraConfig)
+	if err == nil {
+		device, err := ConnectToOnvifDevice(&cameraConfig)
+		if err == nil {
+			// Get the list of configurations
+			version, err := GetONVIFVersionFromDevice(device)
+			if err == nil {
+				// Check if can zoom and/or pan/tilt is supported
+				c.JSON(200, models.APIResponse{
+					Data: version,
+				})
+			} else {
+				c.JSON(400, models.APIResponse{
+					Message: "Something went wrong while getting the ONVIF version " + err.Error(),
+				})
+			}
+		} else {
+			c.JSON(400, models.APIResponse{
+				Message: "Something went wrong while verifying the ONVIF connection " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, models.APIResponse{
+			Message: "Something went wrong while receiving the config " + err.Error(),
+		})
+	}
+}
+
+// GetAudioOutputConfigurationONVIF godoc
+// @Router /api/camera/onvif/audio-backchannel [post]
+// @ID audio-output-onvif
+// @Security Bearer
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @Tags camera
+// @Param cameraConfig body models.IPCamera true "Camera Config"
+// @Summary Get the audio decoders for the audio backchannel.
+// @Description Get the audio decoders for the audio backchannel.
+// @Success 200 {object} models.APIResponse
+func GetAudioOutputConfigurationONVIF(c *gin.Context) {
+	var cameraConfig models.IPCamera
+	err := c.BindJSON(&cameraConfig)
+	if err == nil {
+		device, err := ConnectToOnvifDevice(&cameraConfig)
+
+		// Get token from the first profile
+		token, err := GetTokenFromProfile(device, 0)
+		fmt.Println(token)
+		if err == nil {
+			// Get the list of configurations
+			decoders, err := GetAudioOutputConfiguration(device)
+			if err == nil {
+
+				// Filter the available decoders
+				var availableDecoders []string
+				options := decoders.Options
+
+				// Check if G711 is supported
+				if options.G711DecOptions.SampleRateRange.Items != nil && len(options.G711DecOptions.SampleRateRange.Items) > 0 &&
+					options.G711DecOptions.Bitrate.Items != nil && len(options.G711DecOptions.Bitrate.Items) > 0 {
+					availableDecoders = append(availableDecoders, "G711")
+				}
+
+				// Check if can zoom and/or pan/tilt is supported
+				c.JSON(200, models.APIResponse{
+					Data: availableDecoders,
+				})
+			} else {
+				c.JSON(400, models.APIResponse{
+					Message: "Something went wrong while getting the audio output configuration " + err.Error(),
 				})
 			}
 		} else {

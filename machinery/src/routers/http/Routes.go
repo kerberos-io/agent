@@ -196,10 +196,6 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			})
 		})
 
-		api.POST("/onvif/verify", func(c *gin.Context) {
-			onvif.VerifyOnvifConnection(c)
-		})
-
 		api.POST("/hub/verify", func(c *gin.Context) {
 			cloud.VerifyHub(c)
 		})
@@ -229,6 +225,9 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 		api.POST("/camera/onvif/capabilities", GetOnvifCapabilities)
 		api.POST("/camera/onvif/pantilt", DoOnvifPanTilt)
 		api.POST("/camera/onvif/zoom", DoOnvifZoom)
+		api.POST("/camera/onvif/version", onvif.GetVersionONVIF)
+		api.POST("/camera/onvif/audio-backchannel", onvif.GetAudioOutputConfigurationONVIF)
+		api.POST("/camera/onvif/verify", onvif.VerifyOnvifConnection)
 		api.POST("/camera/verify/:streamType", capture.VerifyCamera)
 
 		// Secured endpoints..
