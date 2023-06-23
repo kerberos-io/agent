@@ -2,7 +2,6 @@ package cloud
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -15,14 +14,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-module/carbon/v2"
 	"github.com/kerberos-io/joy4/av/pubsub"
-	"github.com/minio/minio-go/v6"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	av "github.com/kerberos-io/joy4/av"
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -609,88 +606,80 @@ func VerifyPersistence(c *gin.Context) {
 
 		if config.Cloud == "dropbox" {
 			VerifyDropbox(config, c)
-		} else if config.Cloud == "s3" {
+		} else if config.Cloud == "s3" || config.Cloud == "kerberoshub" {
 
-			// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
-			// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
-			// - Timestamp
-			// - Size + - + microseconds
-			// - device
-			// - Region
-			// - Number of changes
-			// - Token
-
-			aws_access_key_id := config.S3.Publickey
-			aws_secret_access_key := config.S3.Secretkey
-			aws_region := config.S3.Region
-
-			// This is the new way ;)
-			if config.HubKey != "" {
-				aws_access_key_id = config.HubKey
-			}
-			if config.HubPrivateKey != "" {
-				aws_secret_access_key = config.HubPrivateKey
-			}
-
-			s3Client, err := minio.NewWithRegion("s3.amazonaws.com", aws_access_key_id, aws_secret_access_key, true, aws_region)
-			if err != nil {
+			if config.HubURI == "" ||
+				config.HubKey == "" ||
+				config.HubPrivateKey == "" ||
+				config.S3.Region == "" {
+				msg := "VerifyPersistence: Kerberos Hub not properly configured."
+				log.Log.Info(msg)
 				c.JSON(400, models.APIResponse{
-					Data: "Creation of Kerberos Hub connection failed: " + err.Error(),
+					Data: msg,
 				})
 			} else {
 
-				// Check if we need to use the proxy.
-				if config.S3.ProxyURI != "" {
-					var transport http.RoundTripper = &http.Transport{
-						Proxy: func(*http.Request) (*url.URL, error) {
-							return url.Parse(config.S3.ProxyURI)
-						},
-						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-					}
-					s3Client.SetCustomTransport(transport)
+				// Open test-480p.mp4
+				file, err := os.Open("./data/test-480p.mp4")
+				if err != nil {
+					msg := "VerifyPersistence: error reading test-480p.mp4: " + err.Error()
+					log.Log.Error(msg)
+					c.JSON(400, models.APIResponse{
+						Data: msg,
+					})
+				}
+				defer file.Close()
+
+				req, err := http.NewRequest("POST", config.HubURI+"/storage/upload", file)
+				if err != nil {
+					msg := "VerifyPersistence: error reading Kerberos Hub HEAD request, " + config.HubURI + "/storage: " + err.Error()
+					log.Log.Error(msg)
+					c.JSON(400, models.APIResponse{
+						Data: msg,
+					})
 				}
 
-				deviceKey := "fake-key"
-				devicename := "justatest"
-				coordinates := "200-200-400-400"
-				eventToken := "769"
-
 				timestamp := time.Now().Unix()
-				fileName := strconv.FormatInt(timestamp, 10) + "_6-967003_justatest_200-200-400-400_24_769.mp4"
-				content := []byte("test-file")
-				body := bytes.NewReader(content)
+				fileName := strconv.FormatInt(timestamp, 10) +
+					"_6-967003_" + config.Name + "_200-200-400-400_24_769.mp4"
+				req.Header.Set("X-Kerberos-Storage-FileName", fileName)
+				req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
+				req.Header.Set("X-Kerberos-Storage-Device", config.Key)
+				req.Header.Set("X-Kerberos-Hub-PublicKey", config.HubKey)
+				req.Header.Set("X-Kerberos-Hub-PrivateKey", config.HubPrivateKey)
+				req.Header.Set("X-Kerberos-Hub-Region", config.S3.Region)
 
-				n, err := s3Client.PutObject(config.S3.Bucket,
-					config.S3.Username+"/"+fileName,
-					body,
-					body.Size(),
-					minio.PutObjectOptions{
-						ContentType:  "video/mp4",
-						StorageClass: "ONEZONE_IA",
-						UserMetadata: map[string]string{
-							"event-timestamp":         strconv.FormatInt(timestamp, 10),
-							"event-microseconds":      deviceKey,
-							"event-instancename":      devicename,
-							"event-regioncoordinates": coordinates,
-							"event-numberofchanges":   deviceKey,
-							"event-token":             eventToken,
-							"productid":               deviceKey,
-							"publickey":               aws_access_key_id,
-							"uploadtime":              "now",
-						},
-					})
+				client := &http.Client{}
 
-				if err != nil {
-					c.JSON(400, models.APIResponse{
-						Data: "Upload of fake recording failed: " + err.Error(),
-					})
+				resp, err := client.Do(req)
+				if resp != nil {
+					defer resp.Body.Close()
+				}
+
+				if err == nil && resp != nil {
+					if resp.StatusCode == 200 {
+						msg := "VerifyPersistence: Upload allowed using the credentials provided (" + config.HubKey + ", " + config.HubPrivateKey + ")"
+						log.Log.Info(msg)
+						c.JSON(200, models.APIResponse{
+							Data: msg,
+						})
+					} else {
+						msg := "VerifyPersistence: Upload NOT allowed using the credentials provided (" + config.HubKey + ", " + config.HubPrivateKey + ")"
+						log.Log.Info(msg)
+						c.JSON(400, models.APIResponse{
+							Data: msg,
+						})
+					}
 				} else {
-					c.JSON(200, models.APIResponse{
-						Data: "Upload Finished: file has been uploaded to bucket: " + strconv.FormatInt(n, 10),
+					msg := "VerifyPersistence: Error creating Kerberos Hub request"
+					log.Log.Info(msg)
+					c.JSON(400, models.APIResponse{
+						Data: msg,
 					})
 				}
 			}
-		} else if config.Cloud == "kstorage" {
+
+		} else if config.Cloud == "kstorage" || config.Cloud == "kerberosvault" {
 
 			uri := config.KStorage.URI
 			accessKey := config.KStorage.AccessKey
@@ -699,10 +688,20 @@ func VerifyPersistence(c *gin.Context) {
 			provider := config.KStorage.Provider
 
 			if err == nil && uri != "" && accessKey != "" && secretAccessKey != "" {
-				var postData = []byte(`{"title":"Buy cheese and bread for breakfast."}`)
-				client := &http.Client{}
-				req, err := http.NewRequest("POST", uri+"/ping", bytes.NewReader(postData))
 
+				// Open test-480p.mp4
+				file, err := os.Open("./data/test-480p.mp4")
+				if err != nil {
+					msg := "VerifyPersistence: error reading test-480p.mp4: " + err.Error()
+					log.Log.Error(msg)
+					c.JSON(400, models.APIResponse{
+						Data: msg,
+					})
+				}
+				defer file.Close()
+
+				client := &http.Client{}
+				req, err := http.NewRequest("POST", uri+"/ping", file)
 				req.Header.Add("X-Kerberos-Storage-AccessKey", accessKey)
 				req.Header.Add("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
 				resp, err := client.Do(req)
@@ -714,32 +713,26 @@ func VerifyPersistence(c *gin.Context) {
 
 						if provider != "" || directory != "" {
 
-							hubKey := config.KStorage.CloudKey
-							// This is the new way ;)
-							if config.HubKey != "" {
-								hubKey = config.HubKey
-							}
-
 							// Generate a random name.
 							timestamp := time.Now().Unix()
 							fileName := strconv.FormatInt(timestamp, 10) +
-								"_6-967003_justatest_200-200-400-400_24_769.mp4"
+								"_6-967003_" + config.Name + "_200-200-400-400_24_769.mp4"
 							content := []byte("test-file")
 							body := bytes.NewReader(content)
-							//fileSize := int64(len(content))
 
 							req, err := http.NewRequest("POST", uri+"/storage", body)
 							if err == nil {
 
 								req.Header.Set("Content-Type", "video/mp4")
-								req.Header.Set("X-Kerberos-Storage-CloudKey", hubKey)
+								req.Header.Set("X-Kerberos-Storage-CloudKey", config.HubKey)
 								req.Header.Set("X-Kerberos-Storage-AccessKey", accessKey)
 								req.Header.Set("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
 								req.Header.Set("X-Kerberos-Storage-Provider", provider)
 								req.Header.Set("X-Kerberos-Storage-FileName", fileName)
-								req.Header.Set("X-Kerberos-Storage-Device", "test")
+								req.Header.Set("X-Kerberos-Storage-Device", config.Key)
 								req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
 								req.Header.Set("X-Kerberos-Storage-Directory", directory)
+
 								client := &http.Client{}
 
 								resp, err := client.Do(req)
@@ -753,41 +746,41 @@ func VerifyPersistence(c *gin.Context) {
 												c.JSON(200, body)
 											} else {
 												c.JSON(400, models.APIResponse{
-													Data: "Something went wrong while verifying your persistence settings. Make sure your provider is the same as the storage provider in your Kerberos Vault, and the relevant storage provider is configured properly.",
+													Data: "VerifyPersistence: Something went wrong while verifying your persistence settings. Make sure your provider is the same as the storage provider in your Kerberos Vault, and the relevant storage provider is configured properly.",
 												})
 											}
 										}
 									}
 								} else {
 									c.JSON(400, models.APIResponse{
-										Data: "Upload of fake recording failed: " + err.Error(),
+										Data: "VerifyPersistence: Upload of fake recording failed: " + err.Error(),
 									})
 								}
 							} else {
 								c.JSON(400, models.APIResponse{
-									Data: "Something went wrong while creating /storage POST request." + err.Error(),
+									Data: "VerifyPersistence: Something went wrong while creating /storage POST request." + err.Error(),
 								})
 							}
 						} else {
 							c.JSON(400, models.APIResponse{
-								Data: "Provider and/or directory is missing from the request.",
+								Data: "VerifyPersistence: Provider and/or directory is missing from the request.",
 							})
 						}
 					} else {
 						c.JSON(400, models.APIResponse{
-							Data: "Something went wrong while verifying storage credentials: " + string(body),
+							Data: "VerifyPersistence: Something went wrong while verifying storage credentials: " + string(body),
 						})
 					}
 				} else {
 					c.JSON(400, models.APIResponse{
-						Data: "Something went wrong while verifying storage credentials:" + err.Error(),
+						Data: "VerifyPersistence: Something went wrong while verifying storage credentials:" + err.Error(),
 					})
 				}
 			}
 		}
 	} else {
 		c.JSON(400, models.APIResponse{
-			Data: "No persistence was specified, so do not know what to verify:" + err.Error(),
+			Data: "VerifyPersistence: No persistence was specified, so do not know what to verify:" + err.Error(),
 		})
 	}
 }

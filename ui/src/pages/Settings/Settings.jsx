@@ -2116,17 +2116,6 @@ class Settings extends React.Component {
                     <>
                       <Input
                         noPadding
-                        label={t('settings.persistence.kerberoshub_proxyurl')}
-                        placeholder={t(
-                          'settings.persistence.kerberoshub_description_proxyurl'
-                        )}
-                        value={config.s3 ? config.s3.proxyuri : ''}
-                        onChange={(value) =>
-                          this.onUpdateField('s3', 'proxyuri', value, config.s3)
-                        }
-                      />
-                      <Input
-                        noPadding
                         label={t('settings.persistence.kerberoshub_region')}
                         placeholder={t(
                           'settings.persistence.kerberoshub_description_region'
@@ -2134,28 +2123,6 @@ class Settings extends React.Component {
                         value={config.s3 ? config.s3.region : ''}
                         onChange={(value) =>
                           this.onUpdateField('s3', 'region', value, config.s3)
-                        }
-                      />
-                      <Input
-                        noPadding
-                        label={t('settings.persistence.kerberoshub_bucket')}
-                        placeholder={t(
-                          'settings.persistence.kerberoshub_description_bucket'
-                        )}
-                        value={config.s3 ? config.s3.bucket : ''}
-                        onChange={(value) =>
-                          this.onUpdateField('s3', 'bucket', value, config.s3)
-                        }
-                      />
-                      <Input
-                        noPadding
-                        label={t('settings.persistence.kerberoshub_username')}
-                        placeholder={t(
-                          'settings.persistence.kerberoshub_description_username'
-                        )}
-                        value={config.s3 ? config.s3.username : ''}
-                        onChange={(value) =>
-                          this.onUpdateField('s3', 'username', value, config.s3)
                         }
                       />
                     </>
