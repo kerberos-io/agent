@@ -542,14 +542,14 @@ func VerifyHub(c *gin.Context) {
 	err := c.BindJSON(&config)
 
 	if err == nil {
-		hubKey := config.HubKey
 		hubURI := config.HubURI
+		publicKey := config.HubKey
+		privateKey := config.HubPrivateKey
 
-		content := []byte(`{"message": "fake-message"}`)
-		body := bytes.NewReader(content)
-		req, err := http.NewRequest("POST", hubURI+"/queue/test", body)
+		req, err := http.NewRequest("POST", hubURI+"/subscription/verify", nil)
 		if err == nil {
-			req.Header.Set("X-Kerberos-Cloud-Key", hubKey)
+			req.Header.Set("X-Kerberos-Hub-PublicKey", publicKey)
+			req.Header.Set("X-Kerberos-Hub-PrivateKey", privateKey)
 			client := &http.Client{}
 
 			resp, err := client.Do(req)
