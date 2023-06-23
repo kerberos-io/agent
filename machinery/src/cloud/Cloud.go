@@ -689,19 +689,8 @@ func VerifyPersistence(c *gin.Context) {
 
 			if err == nil && uri != "" && accessKey != "" && secretAccessKey != "" {
 
-				// Open test-480p.mp4
-				file, err := os.Open("./data/test-480p.mp4")
-				if err != nil {
-					msg := "VerifyPersistence: error reading test-480p.mp4: " + err.Error()
-					log.Log.Error(msg)
-					c.JSON(400, models.APIResponse{
-						Data: msg,
-					})
-				}
-				defer file.Close()
-
 				client := &http.Client{}
-				req, err := http.NewRequest("POST", uri+"/ping", file)
+				req, err := http.NewRequest("POST", uri+"/ping", nil)
 				req.Header.Add("X-Kerberos-Storage-AccessKey", accessKey)
 				req.Header.Add("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
 				resp, err := client.Do(req)
@@ -717,10 +706,19 @@ func VerifyPersistence(c *gin.Context) {
 							timestamp := time.Now().Unix()
 							fileName := strconv.FormatInt(timestamp, 10) +
 								"_6-967003_" + config.Name + "_200-200-400-400_24_769.mp4"
-							content := []byte("test-file")
-							body := bytes.NewReader(content)
 
-							req, err := http.NewRequest("POST", uri+"/storage", body)
+							// Open test-480p.mp4
+							file, err := os.Open("./data/test-480p.mp4")
+							if err != nil {
+								msg := "VerifyPersistence: error reading test-480p.mp4: " + err.Error()
+								log.Log.Error(msg)
+								c.JSON(400, models.APIResponse{
+									Data: msg,
+								})
+							}
+							defer file.Close()
+
+							req, err := http.NewRequest("POST", uri+"/storage", file)
 							if err == nil {
 
 								req.Header.Set("Content-Type", "video/mp4")
