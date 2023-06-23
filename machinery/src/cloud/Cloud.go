@@ -776,6 +776,10 @@ func VerifyPersistence(c *gin.Context) {
 						Data: "VerifyPersistence: Something went wrong while verifying storage credentials:" + err.Error(),
 					})
 				}
+			} else {
+				c.JSON(400, models.APIResponse{
+					Data: "VerifyPersistence: please fill-in the required Kerberos Vault credentials.",
+				})
 			}
 		}
 	} else {
