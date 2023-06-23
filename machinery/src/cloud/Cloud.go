@@ -85,9 +85,9 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 					uploaded := false
 					configured := false
 					err = nil
-					if config.Cloud == "s3" {
-						uploaded, configured, err = UploadS3(configuration, fileName)
-					} else if config.Cloud == "kstorage" {
+					if config.Cloud == "s3" || config.Cloud == "kerberoshub" {
+						uploaded, configured, err = UploadKerberosHub(configuration, fileName)
+					} else if config.Cloud == "kstorage" || config.Cloud == "kerberosvault" {
 						uploaded, configured, err = UploadKerberosVault(configuration, fileName)
 					} else if config.Cloud == "dropbox" {
 						uploaded, configured, err = UploadDropbox(configuration, fileName)
@@ -103,6 +103,13 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 						// Todo: implement ftp upload
 					} else if config.Cloud == "sftp" {
 						// Todo: implement sftp upload
+					} else if config.Cloud == "aws" {
+						// Todo: need to be updated, was previously used for hub.
+						uploaded, configured, err = UploadS3(configuration, fileName)
+					} else if config.Cloud == "azure" {
+						// Todo: implement azure upload
+					} else if config.Cloud == "google" {
+						// Todo: implement google upload
 					}
 					// And so on... (have a look here -> https://github.com/kerberos-io/agent/issues/95)
 
@@ -357,7 +364,9 @@ loop:
 					communication.CloudTimestamp.Store(time.Now().Unix())
 					log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Hub.")
 				} else {
-					communication.CloudTimestamp.Store(0)
+					if communication.CloudTimestamp != nil && communication.CloudTimestamp.Load() != nil {
+						communication.CloudTimestamp.Store(int64(0))
+					}
 					log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Hub.")
 				}
 

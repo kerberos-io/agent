@@ -401,11 +401,11 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 			case "AGENT_HUB_PRIVATE_KEY":
 				configuration.Config.HubPrivateKey = value
 				break
-			case "AGENT_HUB_USERNAME":
-				configuration.Config.S3.Username = value
-				break
 			case "AGENT_HUB_SITE":
 				configuration.Config.HubSite = value
+				break
+			case "AGENT_HUB_REGION":
+				configuration.Config.S3.Region = value
 				break
 
 			/* When storing in a Kerberos Vault */

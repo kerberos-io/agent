@@ -203,7 +203,7 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_HUB_URI`                         | The Kerberos Hub API, defaults to our Kerberos Hub SAAS.                                        | "https://api.hub.domain.com"   |
 | `AGENT_HUB_KEY`                         | The access key linked to your account in Kerberos Hub.                                          | ""                             |
 | `AGENT_HUB_PRIVATE_KEY`                 | The secret access key linked to your account in Kerberos Hub.                                   | ""                             |
-| `AGENT_HUB_USERNAME`                    | Your Kerberos Hub username, which owns the above access and secret keys.                        | ""                             |
+| `AGENT_HUB_REGION`                      | The Kerberos Hub region, to which you want to upload.                                           | ""                             |
 | `AGENT_HUB_SITE`                        | The site ID of a site you've created in your Kerberos Hub account.                              | ""                             |
 | `AGENT_KERBEROSVAULT_URI`               | The Kerberos Vault API url.                                                                     | "https://vault.domain.com/api" |
 | `AGENT_KERBEROSVAULT_ACCESS_KEY`        | The access key of a Kerberos Vault account.                                                     | ""                             |
