@@ -165,7 +165,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					if detectMotion && isPixelChangeThresholdReached {
 
 						// If offline mode is disabled, send a message to the hub
-						if config.Offline == "false" {
+						if config.Offline != "true" {
 							if mqttClient != nil {
 								if key != "" {
 									mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
