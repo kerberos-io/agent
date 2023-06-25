@@ -119,7 +119,7 @@ We have documented the different deployment models [in the `deployments` directo
 - [Red Hat OpenShift with Ansible](https://github.com/kerberos-io/agent/tree/master/deployments#4-red-hat-ansible-and-openshift)
 - [Terraform](https://github.com/kerberos-io/agent/tree/master/deployments#5-terraform)
 - [Salt](https://github.com/kerberos-io/agent/tree/master/deployments#6-salt)
-- [Balena](https://github.com/kerberos-io/agent/tree/master/deployments#1-balena)
+- [Balena](https://github.com/kerberos-io/agent/tree/master/deployments#8-balena)
 
 By default your Kerberos Agents will store all its configuration and recordings inside the container. To help you automate and have a more consistent data governance, you can attach volumes to configure and persist data of your Kerberos Agents, and/or configure each Kerberos Agent through environment variables.
 
