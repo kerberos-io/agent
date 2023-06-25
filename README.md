@@ -81,7 +81,7 @@ If you want to connect to an USB or Raspberry Pi camera, [you'll need to run our
 Run Kerberos Agent with Balena super powers. Monitor your agent with seamless remote access, and an encrypted https endpoint.
 Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=any&0%5B0%5D%5Bo%5D=full_text_search&0%5B0%5D%5Bv%5D=agent), and add your agent.
 
-[![balena deploy button](https://www.balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/agent)
+[![balena deploy button](https://www.balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/agent/tree/master/deployments/balena/app)
 
 **_Work In Progress_** - Currently we only support IP and USB Cameras, we have [an approach for leveraging the Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
 
