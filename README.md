@@ -78,12 +78,9 @@ If you want to connect to an USB or Raspberry Pi camera, [you'll need to run our
 
 ## Quickstart - Balena
 
-Run Kerberos Agent with Balena super powers. Monitor your agent with seamless remote access, and an encrypted https endpoint.
-Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=any&0%5B0%5D%5Bo%5D=full_text_search&0%5B0%5D%5Bv%5D=agent), and add your agent.
+Run Kerberos Agent with [Balena Cloud](https://www.balena.io/) super powers. Monitor your Kerberos Agent with seamless remote access, over the air updates, an encrypted public `https` endpoint and many more. Checkout our application `video-surveillance` on [Balena Hub](https://hub.balena.io/apps/2064752/video-surveillance), and create your first or fleet of Kerberos Agent(s).
 
 [![deploy with balena](https://balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/agent)
-
-**_Work In Progress_** - Currently we only support IP and USB Cameras, we have [an approach for leveraging the Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
 
 ## A world of Kerberos Agents
 
@@ -122,6 +119,7 @@ We have documented the different deployment models [in the `deployments` directo
 - [Red Hat OpenShift with Ansible](https://github.com/kerberos-io/agent/tree/master/deployments#4-red-hat-ansible-and-openshift)
 - [Terraform](https://github.com/kerberos-io/agent/tree/master/deployments#5-terraform)
 - [Salt](https://github.com/kerberos-io/agent/tree/master/deployments#6-salt)
+- [Balena](https://github.com/kerberos-io/agent/tree/master/deployments#1-balena)
 
 By default your Kerberos Agents will store all its configuration and recordings inside the container. To help you automate and have a more consistent data governance, you can attach volumes to configure and persist data of your Kerberos Agents, and/or configure each Kerberos Agent through environment variables.
 

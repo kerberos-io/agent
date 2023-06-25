@@ -14,6 +14,7 @@ We will discuss following deployment models.
 - [5. Kerberos Factory](#5-kerberos-factory)
 - [6. Terraform](#6-terraform)
 - [7. Salt](#7-salt)
+- [8. Balena](#8-balena)
 
 ## 0. Static binary
 
@@ -58,3 +59,11 @@ To be written
 ## 7. Salt
 
 To be written
+
+## 8. Balena
+
+Balena Cloud provide a seamless way of building and deploying applications at scale through the conceps of `blocks`, `apps` and `fleets`. Once you have your `app` deployed, for example our Kerberos Agent, you can benefit from features such as: remote access, over the air updates, an encrypted public `https` endpoint and many more.
+
+Together with the Balena.io team we've build a Balena App, called [`video-surveillance`](https://hub.balena.io/apps/2064752/video-surveillance), which any can use to deploy a video surveillance system in a matter of minutes with all the expected management features you can think of.
+
+> Learn more [about Kerberos Agent with Balena](https://github.com/kerberos-io/agent/tree/master/deployments/balena).
