@@ -147,4 +147,4 @@ HEALTHCHECK CMD curl --fail http://localhost:80 || exit 1
 # Leeeeettttt'ssss goooooo!!!
 # Run the shizzle from the right working directory.
 WORKDIR /home/agent
-CMD ["./main", "run", "opensource", "80"]
+CMD ["./main", "-action", "run", "-port", "80"]

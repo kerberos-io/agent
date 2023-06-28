@@ -42,11 +42,11 @@ func GetImageFromFilePath() (image.Image, error) {
 // ReadUserConfig Reads the user configuration of the Kerberos Open Source instance.
 // This will return a models.User struct including the username, password,
 // selected language, and if the installation was completed or not.
-func ReadUserConfig() (userConfig models.User) {
+func ReadUserConfig(configDirectory string) (userConfig models.User) {
 	for {
 		jsonFile, err := os.Open("./data/config/user.json")
 		if err != nil {
-			log.Log.Error("Config file is not found " + "./data/config/user.json, trying again in 5s: " + err.Error())
+			log.Log.Error("Config file is not found " + configDirectory + "/data/config/user.json, trying again in 5s: " + err.Error())
 			time.Sleep(5 * time.Second)
 		} else {
 			log.Log.Info("Successfully Opened user.json")
@@ -66,7 +66,7 @@ func ReadUserConfig() (userConfig models.User) {
 	return
 }
 
-func OpenConfig(configuration *models.Configuration) {
+func OpenConfig(configDirectory string, configuration *models.Configuration) {
 
 	// We are checking which deployment this is running, so we can load
 	// into the configuration as expected.
@@ -146,9 +146,9 @@ func OpenConfig(configuration *models.Configuration) {
 
 		// Open device config
 		for {
-			jsonFile, err := os.Open("./data/config/config.json")
+			jsonFile, err := os.Open(configDirectory + "/data/config/config.json")
 			if err != nil {
-				log.Log.Error("Config file is not found " + "./data/config/config.json" + ", trying again in 5s.")
+				log.Log.Error("Config file is not found " + configDirectory + "/data/config/config.json" + ", trying again in 5s.")
 				time.Sleep(5 * time.Second)
 			} else {
 				log.Log.Info("Successfully Opened config.json from " + configuration.Name)
@@ -437,11 +437,11 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 	}
 }
 
-func SaveConfig(config models.Config, configuration *models.Configuration, communication *models.Communication) error {
+func SaveConfig(configDirectory string, config models.Config, configuration *models.Configuration, communication *models.Communication) error {
 	if !communication.IsConfiguring.IsSet() {
 		communication.IsConfiguring.Set()
 
-		err := StoreConfig(config)
+		err := StoreConfig(configDirectory, config)
 		if err != nil {
 			communication.IsConfiguring.UnSet()
 			return err
@@ -462,7 +462,7 @@ func SaveConfig(config models.Config, configuration *models.Configuration, commu
 	}
 }
 
-func StoreConfig(config models.Config) error {
+func StoreConfig(configDirectory string, config models.Config) error {
 	// Save into database
 	if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
 		// Write to mongodb
@@ -484,7 +484,7 @@ func StoreConfig(config models.Config) error {
 		// Save into file
 	} else if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
 		res, _ := json.MarshalIndent(config, "", "\t")
-		err := ioutil.WriteFile("./data/config/config.json", res, 0644)
+		err := ioutil.WriteFile(configDirectory+"/data/config/config.json", res, 0644)
 		return err
 	}
 

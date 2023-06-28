@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 	"time"
 
@@ -49,7 +50,20 @@ func main() {
 	}
 
 	// Start the show ;)
-	action := os.Args[1]
+	// We'll parse the flags (named variables), and start the agent.
+
+	var action string
+	var configDirectory string
+	var name string
+	var port string
+	var timeout string
+
+	flag.StringVar(&action, "action", "version", "Tell us what you want do 'run' or 'version'")
+	flag.StringVar(&configDirectory, "config", ".", "Where is the configuration stored")
+	flag.StringVar(&name, "name", "agent", "Provide a name for the agent")
+	flag.StringVar(&port, "port", "80", "On which port should the agent run")
+	flag.StringVar(&timeout, "timeout", "2000", "Number of milliseconds to wait for the ONVIF discovery to complete")
+	flag.Parse()
 
 	timezone, _ := time.LoadLocation("CET")
 	log.Log.Init(timezone)
@@ -60,14 +74,10 @@ func main() {
 		log.Log.Info("You are currrently running Kerberos Agent " + VERSION)
 
 	case "discover":
-		timeout := os.Args[2]
 		log.Log.Info(timeout)
 
 	case "run":
 		{
-			name := os.Args[2]
-			port := os.Args[3]
-
 			// Print Kerberos.io ASCII art
 			utils.PrintASCIIArt()
 
@@ -82,7 +92,7 @@ func main() {
 			configuration.Port = port
 
 			// Open this configuration either from Kerberos Agent or Kerberos Factory.
-			components.OpenConfig(&configuration)
+			components.OpenConfig(configDirectory, &configuration)
 
 			// We will override the configuration with the environment variables
 			components.OverrideWithEnvironmentVariables(&configuration)
@@ -103,7 +113,7 @@ func main() {
 			if configuration.Config.Key == "" {
 				key := utils.RandStringBytesMaskImpr(30)
 				configuration.Config.Key = key
-				err := components.StoreConfig(configuration.Config)
+				err := components.StoreConfig(configDirectory, configuration.Config)
 				if err == nil {
 					log.Log.Info("Main: updated unique key for agent to: " + key)
 				} else {
@@ -121,10 +131,10 @@ func main() {
 				CancelContext:   &cancel,
 				HandleBootstrap: make(chan string, 1),
 			}
-			go components.Bootstrap(&configuration, &communication)
+			go components.Bootstrap(configDirectory, &configuration, &communication)
 
 			// Start the REST API.
-			routers.StartWebserver(&configuration, &communication)
+			routers.StartWebserver(configDirectory, &configuration, &communication)
 		}
 	default:
 		log.Log.Error("Main: Sorry I don't understand :(")

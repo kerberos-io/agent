@@ -35,7 +35,7 @@ import (
 // @in header
 // @name Authorization
 
-func StartServer(configuration *models.Configuration, communication *models.Communication) {
+func StartServer(configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 
 	// Initialize REST API
 	r := gin.Default()
@@ -57,7 +57,7 @@ func StartServer(configuration *models.Configuration, communication *models.Comm
 	}
 
 	// Add all routes
-	AddRoutes(r, authMiddleware, configuration, communication)
+	AddRoutes(r, authMiddleware, configDirectory, configuration, communication)
 
 	// Update environment variables
 	environmentVariables := "./www/env.js"

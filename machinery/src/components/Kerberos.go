@@ -23,7 +23,7 @@ import (
 	"github.com/tevino/abool"
 )
 
-func Bootstrap(configuration *models.Configuration, communication *models.Communication) {
+func Bootstrap(configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 	log.Log.Debug("Bootstrap: started")
 
 	// We will keep track of the Kerberos Agent up time
@@ -79,7 +79,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	for {
 
 		// This will blocking until receiving a signal to be restarted, reconfigured, stopped, etc.
-		status := RunAgent(configuration, communication, mqttClient, uptimeStart, cameraSettings, decoder, subDecoder)
+		status := RunAgent(configDirectory, configuration, communication, mqttClient, uptimeStart, cameraSettings, decoder, subDecoder)
 
 		if status == "stop" {
 			break
@@ -87,7 +87,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 
 		if status == "not started" {
 			// We will re open the configuration, might have changed :O!
-			OpenConfig(configuration)
+			OpenConfig(configDirectory, configuration)
 			// We will override the configuration with the environment variables
 			OverrideWithEnvironmentVariables(configuration)
 		}
@@ -107,7 +107,7 @@ func Bootstrap(configuration *models.Configuration, communication *models.Commun
 	log.Log.Debug("Bootstrap: finished")
 }
 
-func RunAgent(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, uptimeStart time.Time, cameraSettings *models.Camera, decoder *ffmpeg.VideoDecoder, subDecoder *ffmpeg.VideoDecoder) string {
+func RunAgent(configDirectory string, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, uptimeStart time.Time, cameraSettings *models.Camera, decoder *ffmpeg.VideoDecoder, subDecoder *ffmpeg.VideoDecoder) string {
 
 	log.Log.Debug("RunAgent: bootstrapping agent")
 	config := configuration.Config
@@ -284,7 +284,7 @@ func RunAgent(configuration *models.Configuration, communication *models.Communi
 		(*communication.CancelContext)()
 
 		// We will re open the configuration, might have changed :O!
-		OpenConfig(configuration)
+		OpenConfig(configDirectory, configuration)
 
 		// We will override the configuration with the environment variables
 		OverrideWithEnvironmentVariables(configuration)

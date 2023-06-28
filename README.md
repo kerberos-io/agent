@@ -248,7 +248,7 @@ Go and open two terminals one for the `ui` project and one for the `machinery` p
 1.  Terminal A:
 
         cd machinery/
-        go run main.go run camera 80
+        go run main.go -action run -port 80
 
 2.  Terminal B:
 
@@ -289,7 +289,7 @@ You can simply run the `machinery` using following commands.
 
     git clone https://github.com/kerberos-io/agent
     cd machinery
-    go run main.go run mycameraname 80
+    go run main.go -action run -port 80
 
 This will launch the Kerberos Agent and run a webserver on port `80`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/) or [Visual Studio Code](https://code.visualstudio.com/), as it comes with all the debugging and linting features builtin.
 
