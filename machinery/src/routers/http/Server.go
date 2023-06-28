@@ -60,9 +60,9 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	AddRoutes(r, authMiddleware, configDirectory, configuration, communication)
 
 	// Update environment variables
-	environmentVariables := "./www/env.js"
+	environmentVariables := configDirectory + "/www/env.js"
 	if os.Getenv("AGENT_MODE") == "demo" {
-		demoEnvironmentVariables := "./www/env.demo.js"
+		demoEnvironmentVariables := configDirectory + "/www/env.demo.js"
 		// Move demo environment variables to environment variables
 		err := os.Rename(demoEnvironmentVariables, environmentVariables)
 		if err != nil {
@@ -71,11 +71,11 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	}
 
 	// Add static routes to UI
-	r.Use(static.Serve("/", static.LocalFile("./www", true)))
-	r.Use(static.Serve("/dashboard", static.LocalFile("./www", true)))
-	r.Use(static.Serve("/media", static.LocalFile("./www", true)))
-	r.Use(static.Serve("/settings", static.LocalFile("./www", true)))
-	r.Use(static.Serve("/login", static.LocalFile("./www", true)))
+	r.Use(static.Serve("/", static.LocalFile(configDirectory+"/www", true)))
+	r.Use(static.Serve("/dashboard", static.LocalFile(configDirectory+"/www", true)))
+	r.Use(static.Serve("/media", static.LocalFile(configDirectory+"/www", true)))
+	r.Use(static.Serve("/settings", static.LocalFile(configDirectory+"/www", true)))
+	r.Use(static.Serve("/login", static.LocalFile(configDirectory+"/www", true)))
 	r.Handle("GET", "/file/*filepath", Files)
 
 	// Run the api on port

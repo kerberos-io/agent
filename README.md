@@ -233,9 +233,9 @@ On opening of the GitHub Codespace, some dependencies will be installed. Once th
     const dev = {
       ENV: 'dev',
       HOSTNAME: externalHost,
-      //API_URL: `${protocol}//${hostname}:8080/api`,
-      //URL: `${protocol}//${hostname}:8080`,
-      //WS_URL: `${websocketprotocol}//${hostname}:8080/ws`,
+      //API_URL: `${protocol}//${hostname}:80/api`,
+      //URL: `${protocol}//${hostname}:80`,
+      //WS_URL: `${websocketprotocol}//${hostname}:80/ws`,
 
       // Uncomment, and comment the above lines, when using codespaces or other special DNS names (which you can't control)
       API_URL: `${protocol}//${externalHost}/api`,
