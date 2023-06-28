@@ -32,7 +32,7 @@ RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
 
 RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go mod download && \
-	go build -tags timetzdata,netgo --ldflags '-s -w -extldflags "-static -latomic"' main.go && \
+	go build -tags timetzdata,netgo,osusergo --ldflags '-s -w -extldflags "-static -latomic"' main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv version /agent && \
