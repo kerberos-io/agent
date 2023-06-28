@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"crypto/tls"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -62,7 +63,15 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 	req.Header.Set("X-Kerberos-Hub-PrivateKey", config.HubPrivateKey)
 	req.Header.Set("X-Kerberos-Hub-Region", config.S3.Region)
 
-	client := &http.Client{}
+	var client *http.Client
+	if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client = &http.Client{Transport: tr}
+	} else {
+		client = &http.Client{}
+	}
 
 	resp, err := client.Do(req)
 	if resp != nil {
@@ -96,9 +105,6 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 	req.Header.Set("X-Kerberos-Hub-PublicKey", config.HubKey)
 	req.Header.Set("X-Kerberos-Hub-PrivateKey", config.HubPrivateKey)
 	req.Header.Set("X-Kerberos-Hub-Region", config.S3.Region)
-
-	client = &http.Client{}
-
 	resp, err = client.Do(req)
 	if resp != nil {
 		defer resp.Body.Close()

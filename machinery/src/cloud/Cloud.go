@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -352,7 +353,16 @@ loop:
 				req, _ := http.NewRequest("POST", url, buffy)
 				req.Header.Set("Content-Type", "application/json")
 
-				client := &http.Client{}
+				var client *http.Client
+				if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+					tr := &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					}
+					client = &http.Client{Transport: tr}
+				} else {
+					client = &http.Client{}
+				}
+
 				resp, err := client.Do(req)
 				if resp != nil {
 					resp.Body.Close()
@@ -374,8 +384,6 @@ loop:
 					buffy = bytes.NewBuffer(jsonStr)
 					req, _ = http.NewRequest("POST", vaultURI+"/devices/heartbeat", buffy)
 					req.Header.Set("Content-Type", "application/json")
-
-					client = &http.Client{}
 					resp, err = client.Do(req)
 					if resp != nil {
 						resp.Body.Close()
@@ -550,7 +558,15 @@ func VerifyHub(c *gin.Context) {
 		if err == nil {
 			req.Header.Set("X-Kerberos-Hub-PublicKey", publicKey)
 			req.Header.Set("X-Kerberos-Hub-PrivateKey", privateKey)
-			client := &http.Client{}
+			var client *http.Client
+			if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+				tr := &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				}
+				client = &http.Client{Transport: tr}
+			} else {
+				client = &http.Client{}
+			}
 
 			resp, err := client.Do(req)
 			if err == nil {
@@ -649,7 +665,15 @@ func VerifyPersistence(c *gin.Context) {
 				req.Header.Set("X-Kerberos-Hub-PrivateKey", config.HubPrivateKey)
 				req.Header.Set("X-Kerberos-Hub-Region", config.S3.Region)
 
-				client := &http.Client{}
+				var client *http.Client
+				if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+					tr := &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					}
+					client = &http.Client{Transport: tr}
+				} else {
+					client = &http.Client{}
+				}
 
 				resp, err := client.Do(req)
 				if resp != nil {
@@ -689,7 +713,16 @@ func VerifyPersistence(c *gin.Context) {
 
 			if err == nil && uri != "" && accessKey != "" && secretAccessKey != "" {
 
-				client := &http.Client{}
+				var client *http.Client
+				if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+					tr := &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					}
+					client = &http.Client{Transport: tr}
+				} else {
+					client = &http.Client{}
+				}
+
 				req, err := http.NewRequest("POST", uri+"/ping", nil)
 				req.Header.Add("X-Kerberos-Storage-AccessKey", accessKey)
 				req.Header.Add("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
@@ -731,7 +764,15 @@ func VerifyPersistence(c *gin.Context) {
 								req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
 								req.Header.Set("X-Kerberos-Storage-Directory", directory)
 
-								client := &http.Client{}
+								var client *http.Client
+								if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+									tr := &http.Transport{
+										TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+									}
+									client = &http.Client{Transport: tr}
+								} else {
+									client = &http.Client{}
+								}
 
 								resp, err := client.Do(req)
 
