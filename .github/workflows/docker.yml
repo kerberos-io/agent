@@ -55,17 +55,17 @@ jobs:
           name: ${{ steps.short-sha.outputs.sha }}
           tag: ${{ steps.short-sha.outputs.sha }}
           artifacts: "agent-${{matrix.architecture}}.tar"
-        # Taken from GoReleaser's own release workflow.
-        # The available Snapcraft Action has some bugs described in the issue below.
-        # The mkdirs are a hack for https://github.com/goreleaser/goreleaser/issues/1715.
-      - name: Setup Snapcraft
-        run: |
-          sudo apt-get update
-          sudo apt-get -yq --no-install-suggests --no-install-recommends install snapcraft
-          mkdir -p $HOME/.cache/snapcraft/download
-          mkdir -p $HOME/.cache/snapcraft/stage-packages
-      - name: Use Snapcraft
-        run: tar -xf agent-${{matrix.architecture}}.tar && snapcraft 
+      # Taken from GoReleaser's own release workflow.
+      # The available Snapcraft Action has some bugs described in the issue below.
+      # The mkdirs are a hack for https://github.com/goreleaser/goreleaser/issues/1715.
+      #- name: Setup Snapcraft
+      #  run: |
+      #    sudo apt-get update
+      #    sudo apt-get -yq --no-install-suggests --no-install-recommends install snapcraft
+      #    mkdir -p $HOME/.cache/snapcraft/download
+      #    mkdir -p $HOME/.cache/snapcraft/stage-packages
+      #- name: Use Snapcraft
+      #  run: tar -xf agent-${{matrix.architecture}}.tar && snapcraft 
   build-other:
     runs-on: ubuntu-latest
     permissions:
