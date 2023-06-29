@@ -183,8 +183,11 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_CAPTURE_IPCAMERA_ONVIF_XADDR`    | ONVIF endpoint/address running on the camera.                                                   | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_ONVIF_USERNAME` | ONVIF username to authenticate against.                                                         | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_ONVIF_PASSWORD` | ONVIF password to authenticate against.                                                         | ""                             |
+| `AGENT_CAPTURE_MOTION`                  | Toggle for enabling or disabling motion.                                                        | "true"                         |
+| `AGENT_CAPTURE_LIVEVIEW`                | Toggle for enabling or disabling liveview.                                                      | "true"                         |
+| `AGENT_CAPTURE_SNAPSHOTS`               | Toggle for enabling or disabling snapshot generation.                                           | "true"                         |
 | `AGENT_CAPTURE_RECORDING`               | Toggle for enabling making recordings.                                                          | "true"                         |
-| `AGENT_CAPTURE_CONTINUOUS`              | Toggle for enabling continuous or motion based recording.                                       | "false"                        |
+| `AGENT_CAPTURE_CONTINUOUS`              | Toggle for enabling continuous "true" or motion "false".                                        | "false"                        |
 | `AGENT_CAPTURE_PRERECORDING`            | If `CONTINUOUS` set to `false`, specify the recording time (seconds) before after motion event. | "10"                           |
 | `AGENT_CAPTURE_POSTRECORDING`           | If `CONTINUOUS` set to `false`, specify the recording time (seconds) after motion event.        | "20"                           |
 | `AGENT_CAPTURE_MAXLENGTH`               | The maximum length of a single recording (seconds).                                             | "30"                           |
