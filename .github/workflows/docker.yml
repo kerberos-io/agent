@@ -58,6 +58,8 @@ jobs:
       # You can now run snapcraft shell commands
       - name: Install Snapcraft
         uses: samuelmeuli/action-snapcraft@v2
+      - name: add user to lxd group
+        run: sudo usermod -a -G lxd $USER
       - name: Use Snapcraft
         run: tar -xf agent-${{matrix.architecture}}.tar && snapcraft 
   build-other:
