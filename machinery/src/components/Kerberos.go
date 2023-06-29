@@ -260,10 +260,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		}
 
 		// Handle recording, will write an mp4 to disk.
-		go capture.HandleRecordStream(queue, configuration, communication, streams)
+		go capture.HandleRecordStream(queue, configDirectory, configuration, communication, streams)
 
 		// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)
-		go cloud.HandleUpload(configuration, communication)
+		go cloud.HandleUpload(configDirectory, configuration, communication)
 
 		// Handle ONVIF actions
 		go onvif.HandleONVIFActions(configuration, communication)

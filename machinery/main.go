@@ -66,7 +66,7 @@ func main() {
 	flag.Parse()
 
 	timezone, _ := time.LoadLocation("CET")
-	log.Log.Init(timezone)
+	log.Log.Init(configDirectory, timezone)
 
 	switch action {
 
@@ -102,11 +102,11 @@ func main() {
 
 			// Check the folder permissions, it might be that we do not have permissions to write
 			// recordings, update the configuration or save snapshots.
-			utils.CheckDataDirectoryPermissions()
+			utils.CheckDataDirectoryPermissions(configDirectory)
 
 			// Set timezone
 			timezone, _ := time.LoadLocation(configuration.Config.Timezone)
-			log.Log.Init(timezone)
+			log.Log.Init(configDirectory, timezone)
 
 			// Check if we have a device Key or not, if not
 			// we will generate one.

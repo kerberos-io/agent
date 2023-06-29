@@ -78,7 +78,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 			}
 
 			// The total number of recordings stored in the directory.
-			recordingDirectory := "./data/recordings"
+			recordingDirectory := configDirectory + "/data/recordings"
 			numberOfRecordings := utils.NumberOfMP4sInDirectory(recordingDirectory)
 
 			// All days stored in this agent.
@@ -115,7 +115,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 				if eventFilter.NumberOfElements == 0 {
 					eventFilter.NumberOfElements = 10
 				}
-				recordingDirectory := "./data/recordings"
+				recordingDirectory := configDirectory + "/data/recordings"
 				files, err := utils.ReadDirectory(recordingDirectory)
 				if err == nil {
 					events := utils.GetSortedDirectory(files)
@@ -137,7 +137,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 		})
 
 		api.GET("/days", func(c *gin.Context) {
-			recordingDirectory := "./data/recordings"
+			recordingDirectory := configDirectory + "/data/recordings"
 			files, err := utils.ReadDirectory(recordingDirectory)
 			if err == nil {
 				events := utils.GetSortedDirectory(files)
@@ -205,7 +205,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 		})
 
 		api.POST("/persistence/verify", func(c *gin.Context) {
-			cloud.VerifyPersistence(c)
+			cloud.VerifyPersistence(c, configDirectory)
 		})
 
 		// Streaming handler
@@ -215,7 +215,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 				// We will only send an image once per second.
 				time.Sleep(time.Second * 1)
 				log.Log.Info("AddRoutes (/stream): reading from MJPEG stream")
-				img, err := components.GetImageFromFilePath()
+				img, err := components.GetImageFromFilePath(configDirectory)
 				return img, err
 			}
 			h := components.StartMotionJPEG(imageFunction, 80)

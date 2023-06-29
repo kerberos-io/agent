@@ -32,8 +32,8 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
 )
 
-func PendingUpload() {
-	ff, err := utils.ReadDirectory("./data/cloud/")
+func PendingUpload(configDirectory string) {
+	ff, err := utils.ReadDirectory(configDirectory + "/data/cloud/")
 	if err == nil {
 		for _, f := range ff {
 			log.Log.Info(f.Name())
@@ -41,12 +41,12 @@ func PendingUpload() {
 	}
 }
 
-func HandleUpload(configuration *models.Configuration, communication *models.Communication) {
+func HandleUpload(configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 
 	log.Log.Debug("HandleUpload: started")
 
 	config := configuration.Config
-	watchDirectory := "./data/cloud/"
+	watchDirectory := configDirectory + "/data/cloud/"
 
 	if config.Offline == "true" {
 		log.Log.Debug("HandleUpload: stopping as Offline is enabled.")
@@ -122,7 +122,7 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 						// Check if we need to remove the original recording
 						// removeAfterUpload is set to false by default
 						if config.RemoveAfterUpload == "true" {
-							err := os.Remove("./data/recordings/" + fileName)
+							err := os.Remove(configDirectory + "/data/recordings/" + fileName)
 							if err != nil {
 								log.Log.Error("HandleUpload: " + err.Error())
 							}
@@ -614,7 +614,7 @@ func VerifyHub(c *gin.Context) {
 // @Summary Will verify the persistence.
 // @Description Will verify the persistence.
 // @Success 200 {object} models.APIResponse
-func VerifyPersistence(c *gin.Context) {
+func VerifyPersistence(c *gin.Context, configDirectory string) {
 
 	var config models.Config
 	err := c.BindJSON(&config)
@@ -636,7 +636,7 @@ func VerifyPersistence(c *gin.Context) {
 			} else {
 
 				// Open test-480p.mp4
-				file, err := os.Open("./data/test-480p.mp4")
+				file, err := os.Open(configDirectory + "/data/test-480p.mp4")
 				if err != nil {
 					msg := "VerifyPersistence: error reading test-480p.mp4: " + err.Error()
 					log.Log.Error(msg)
@@ -741,7 +741,7 @@ func VerifyPersistence(c *gin.Context) {
 								"_6-967003_" + config.Name + "_200-200-400-400_24_769.mp4"
 
 							// Open test-480p.mp4
-							file, err := os.Open("./data/test-480p.mp4")
+							file, err := os.Open(configDirectory + "/test-480p.mp4")
 							if err != nil {
 								msg := "VerifyPersistence: error reading test-480p.mp4: " + err.Error()
 								log.Log.Error(msg)

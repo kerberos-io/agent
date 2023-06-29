@@ -20,14 +20,14 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func GetImageFromFilePath() (image.Image, error) {
-	snapshotDirectory := "./data/snapshots"
+func GetImageFromFilePath(configDirectory string) (image.Image, error) {
+	snapshotDirectory := configDirectory + "/data/snapshots"
 	files, err := ioutil.ReadDir(snapshotDirectory)
 	if err == nil && len(files) > 1 {
 		sort.Slice(files, func(i, j int) bool {
 			return files[i].ModTime().Before(files[j].ModTime())
 		})
-		filePath := "./data/snapshots/" + files[1].Name()
+		filePath := configDirectory + "/data/snapshots/" + files[1].Name()
 		f, err := os.Open(filePath)
 		if err != nil {
 			return nil, err
@@ -44,7 +44,7 @@ func GetImageFromFilePath() (image.Image, error) {
 // selected language, and if the installation was completed or not.
 func ReadUserConfig(configDirectory string) (userConfig models.User) {
 	for {
-		jsonFile, err := os.Open("./data/config/user.json")
+		jsonFile, err := os.Open(configDirectory + "/data/config/user.json")
 		if err != nil {
 			log.Log.Error("Config file is not found " + configDirectory + "/data/config/user.json, trying again in 5s: " + err.Error())
 			time.Sleep(5 * time.Second)

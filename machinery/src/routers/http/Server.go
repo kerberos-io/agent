@@ -76,7 +76,9 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	r.Use(static.Serve("/media", static.LocalFile(configDirectory+"/www", true)))
 	r.Use(static.Serve("/settings", static.LocalFile(configDirectory+"/www", true)))
 	r.Use(static.Serve("/login", static.LocalFile(configDirectory+"/www", true)))
-	r.Handle("GET", "/file/*filepath", Files)
+	r.Handle("GET", "/file/*filepath", func(c *gin.Context) {
+		Files(c, configDirectory)
+	})
 
 	// Run the api on port
 	err = r.Run(":" + configuration.Port)
@@ -85,8 +87,8 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	}
 }
 
-func Files(c *gin.Context) {
+func Files(c *gin.Context, configDirectory string) {
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.Header("Content-Type", "video/mp4")
-	c.File("./data/recordings" + c.Param("filepath"))
+	c.File(configDirectory + "/data/recordings" + c.Param("filepath"))
 }

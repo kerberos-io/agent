@@ -17,7 +17,7 @@ import (
 	"github.com/kerberos-io/joy4/av"
 )
 
-func CleanupRecordingDirectory(configuration *models.Configuration) {
+func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
 	autoClean := configuration.Config.AutoClean
 	if autoClean == "true" {
 		maxSize := configuration.Config.MaxDirectorySize
@@ -25,7 +25,7 @@ func CleanupRecordingDirectory(configuration *models.Configuration) {
 			maxSize = 300
 		}
 		// Total size of the recording directory.
-		recordingsDirectory := "./data/recordings"
+		recordingsDirectory := configDirectory + "/data/recordings"
 		size, err := utils.DirSize(recordingsDirectory)
 		if err == nil {
 			sizeInMB := size / 1000 / 1000
@@ -51,7 +51,7 @@ func CleanupRecordingDirectory(configuration *models.Configuration) {
 	}
 }
 
-func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration, communication *models.Communication, streams []av.CodecData) {
+func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, streams []av.CodecData) {
 
 	config := configuration.Config
 
@@ -134,13 +134,13 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					}
 
 					// Create a symbol link.
-					fc, _ := os.Create("./data/cloud/" + name)
+					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
 					fc.Close()
 
 					recordingStatus = "idle"
 
 					// Clean up the recording directory if necessary.
-					CleanupRecordingDirectory(configuration)
+					CleanupRecordingDirectory(configDirectory, configuration)
 				}
 
 				// If not yet started and a keyframe, let's make a recording
@@ -192,7 +192,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 						"769"
 
 					name = s + ".mp4"
-					fullName = "./data/recordings/" + name
+					fullName = configDirectory + "/data/recordings/" + name
 
 					// Running...
 					log.Log.Info("Recording started")
@@ -259,7 +259,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					}
 
 					// Create a symbol link.
-					fc, _ := os.Create("./data/cloud/" + name)
+					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
 					fc.Close()
 
 					recordingStatus = "idle"
@@ -315,7 +315,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					"769"
 
 				name := s + ".mp4"
-				fullName := "./data/recordings/" + name
+				fullName := configDirectory + "/data/recordings/" + name
 
 				// Running...
 				log.Log.Info("HandleRecordStream: Recording started")
@@ -406,11 +406,11 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 				}
 
 				// Create a symbol linc.
-				fc, _ := os.Create("./data/cloud/" + name)
+				fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
 				fc.Close()
 
 				// Clean up the recording directory if necessary.
-				CleanupRecordingDirectory(configuration)
+				CleanupRecordingDirectory(configDirectory, configuration)
 			}
 		}
 

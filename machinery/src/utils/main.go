@@ -110,15 +110,15 @@ func CountDigits(i int64) (count int) {
 	return count
 }
 
-func CheckDataDirectoryPermissions() error {
-	recordingsDirectory := "./data/recordings"
-	configDirectory := "./data/config"
-	snapshotsDirectory := "./data/snapshots"
-	cloudDirectory := "./data/cloud"
+func CheckDataDirectoryPermissions(configDirectory string) error {
+	recordingsDirectory := configDirectory + "/data/recordings"
+	configurationDirectory := configDirectory + "/data/config"
+	snapshotsDirectory := configDirectory + "/data/snapshots"
+	cloudDirectory := configDirectory + "/data/cloud"
 
 	err := CheckDirectoryPermissions(recordingsDirectory)
 	if err == nil {
-		err = CheckDirectoryPermissions(configDirectory)
+		err = CheckDirectoryPermissions(configurationDirectory)
 		if err == nil {
 			err = CheckDirectoryPermissions(snapshotsDirectory)
 			if err == nil {
