@@ -1,0 +1,6 @@
+#!/bin/sh -e
+
+cp -R $SNAP/data $SNAP_COMMON/
+cp -R $SNAP/www $SNAP_COMMON/
+cp -R $SNAP/version $SNAP_COMMON/
+cp -R $SNAP/mp4fragment $SNAP_COMMON/

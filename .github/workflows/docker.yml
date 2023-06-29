@@ -43,6 +43,7 @@ jobs:
         run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{steps.short-sha.outputs.sha}} --output type=tar,dest=output-${{matrix.architecture}}.tar . 
       - name: Strip binary
         run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
+      # We'll make a GitHub release and push the build (tar) as an artifact
       - uses: rickstaa/action-create-tag@v1
         with:
           tag: ${{ steps.short-sha.outputs.sha }}
@@ -54,6 +55,11 @@ jobs:
           name: ${{ steps.short-sha.outputs.sha }}
           tag: ${{ steps.short-sha.outputs.sha }}
           artifacts: "agent-${{matrix.architecture}}.tar"
+      # You can now run snapcraft shell commands
+      - name: Install Snapcraft
+        uses: samuelmeuli/action-snapcraft@v2
+      - name: Use Snapcraft
+        run: tar -xf agent-${{matrix.architecture}}.tar -C agent && cp -r snap/* agent/ && cd agent && snapcraft 
   build-other:
     runs-on: ubuntu-latest
     permissions:
