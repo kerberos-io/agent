@@ -59,7 +59,7 @@ jobs:
       - name: Install Snapcraft
         uses: samuelmeuli/action-snapcraft@v2
       - name: Use Snapcraft
-        run: tar -xf agent-${{matrix.architecture}}.tar -C agent && cp -r snap/* agent/ && cd agent && snapcraft 
+        run: tar -xf agent-${{matrix.architecture}}.tar && snapcraft 
   build-other:
     runs-on: ubuntu-latest
     permissions:
