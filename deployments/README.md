@@ -70,10 +70,8 @@ Together with the Balena.io team we've build a Balena App, called [`video-survei
 
 ## 9. Snap
 
-Run Kerberos Agent with our [Snapcraft package](https://snapcraft.io/kerberosio).
+The Snap Store, also known as the Ubuntu Store , is a commercial centralized software store operated by Canonical. Similar to AppImage or Flatpak the Snap Store is able to provide up to date software no matter what version of Linux you are running and how old your libraries are.
 
-     snap install kerberosio
+We have published our own snap `Kerberos Agent` on the Snap Store, allowing you to seamless install a Kerberos Agent on your Linux devive.
 
-Once installed you can find your Kerberos Agent configration at `/var/snap/kerberosio/common`. Run the Kerberos Agent as following
-
-    kerberosio.agent -action=run -port=80
+> Learn more [about Kerberos Agent with Snap](https://github.com/kerberos-io/agent/tree/master/deployments/snap).

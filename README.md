@@ -42,6 +42,7 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 1. [Quickstart - Docker](#quickstart---docker)
 2. [Quickstart - Balena](#quickstart---balena)
+3. [Quickstart - Snap](#quickstart---snap)
 
 ### Introduction
 
@@ -91,7 +92,7 @@ Run Kerberos Agent with our [Snapcraft package](https://snapcraft.io/kerberosio)
 
 Once installed you can find your Kerberos Agent configration at `/var/snap/kerberosio/common`. Run the Kerberos Agent as following
 
-    kerberosio.agent -action=run -port=80
+    sudo kerberosio.agent -action=run -port=80
 
 ## A world of Kerberos Agents
 
