@@ -18,6 +18,7 @@
 [![donate](https://brianmacdonald.github.io/Ethonate/svg/eth-donate-blue.svg)](https://brianmacdonald.github.io/Ethonate/address#0xf4a759C9436E2280Ea9cdd23d3144D95538fF4bE)
 <a target="_blank" href="https://twitter.com/kerberosio?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40kerberosio&style=social&url=https%3A%2F%2Ftwitter.com%2Fkerberosio" alt="Twitter Widget"></a>
 [![Discord Shield](https://discordapp.com/api/guilds/1039619181731135499/widget.png?style=shield)](https://discord.gg/Bj77Vqfp2G)
+[![kerberosio](https://snapcraft.io/kerberosio/badge.svg)](https://snapcraft.io/kerberosio)
 
 [**Docker Hub**](https://hub.docker.com/r/kerberos/agent) | [**Documentation**](https://doc.kerberos.io) | [**Website**](https://kerberos.io) | [**View Demo**](https://demo.kerberos.io)
 
@@ -82,6 +83,16 @@ Run Kerberos Agent with [Balena Cloud](https://www.balena.io/) super powers. Mon
 
 [![deploy with balena](https://balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/balena-agent)
 
+## Quickstart - Snap
+
+Run Kerberos Agent with our [Snapcraft package](https://snapcraft.io/kerberosio).
+
+     snap install kerberosio
+
+Once installed you can find your Kerberos Agent configration at `/var/snap/kerberosio/common`. Run the Kerberos Agent as following
+
+    kerberosio.agent -action=run -port=80
+
 ## A world of Kerberos Agents
 
 The Kerberos Agent is an isolated and scalable video (surveillance) management agent with a strong focus on user experience, scalability, resilience, extension and integration. Next to the Kerberos Agent, Kerberos.io provides many other tools such as [Kerberos Factory](https://github.com/kerberos-io/factory), [Kerberos Vault](https://github.com/kerberos-io/vault) and [Kerberos Hub](https://github.com/kerberos-io/hub) to provide additional capabilities: bring your own cloud, bring your own storage, central overview, live streaming, machine learning etc.
@@ -120,6 +131,7 @@ We have documented the different deployment models [in the `deployments` directo
 - [Terraform](https://github.com/kerberos-io/agent/tree/master/deployments#5-terraform)
 - [Salt](https://github.com/kerberos-io/agent/tree/master/deployments#6-salt)
 - [Balena](https://github.com/kerberos-io/agent/tree/master/deployments#8-balena)
+- [Snap](https://github.com/kerberos-io/agent/tree/master/deployments#9-snap)
 
 By default your Kerberos Agents will store all its configuration and recordings inside the container. To help you automate and have a more consistent data governance, you can attach volumes to configure and persist data of your Kerberos Agents, and/or configure each Kerberos Agent through environment variables.
 

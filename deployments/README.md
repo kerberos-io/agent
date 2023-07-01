@@ -67,3 +67,13 @@ Balena Cloud provide a seamless way of building and deploying applications at sc
 Together with the Balena.io team we've build a Balena App, called [`video-surveillance`](https://hub.balena.io/apps/2064752/video-surveillance), which any can use to deploy a video surveillance system in a matter of minutes with all the expected management features you can think of.
 
 > Learn more [about Kerberos Agent with Balena](https://github.com/kerberos-io/agent/tree/master/deployments/balena).
+
+## 9. Snap
+
+Run Kerberos Agent with our [Snapcraft package](https://snapcraft.io/kerberosio).
+
+     snap install kerberosio
+
+Once installed you can find your Kerberos Agent configration at `/var/snap/kerberosio/common`. Run the Kerberos Agent as following
+
+    kerberosio.agent -action=run -port=80
