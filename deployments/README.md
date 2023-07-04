@@ -54,7 +54,9 @@ All of the previously deployments, `docker`, `kubernetes` and `openshift` are gr
 
 ## 6. Terraform
 
-To be written
+Terraform is a tool for infrastructure provisioning to build infrastructure through code, often called Infrastructure as Code. So, Terraform allows you to automate and manage your infrastructure, your platform, and the services that run on that platform. By using Terraform you can deploy your Kerberos Agents remotely at scale.
+
+> Learn more [about Kerberos Agent with Terraform](https://github.com/kerberos-io/agent/tree/master/deployments/terraform).
 
 ## 7. Salt
 
