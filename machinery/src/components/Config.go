@@ -84,9 +84,14 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 		collection := db.Collection("configuration")
 
 		var globalConfig models.Config
-		err := collection.FindOne(context.Background(), bson.M{
+		res := collection.FindOne(context.Background(), bson.M{
 			"type": "global",
-		}).Decode(&globalConfig)
+		})
+
+		if res.Err() != nil {
+			log.Log.Error("Could not find global configuration, using default configuration.")
+		}
+		err := res.Decode(&globalConfig)
 		if err != nil {
 			log.Log.Error("Could not find global configuration, using default configuration.")
 		}
@@ -94,10 +99,14 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 
 		var customConfig models.Config
 		deploymentName := os.Getenv("DEPLOYMENT_NAME")
-		err = collection.FindOne(context.Background(), bson.M{
+		res = collection.FindOne(context.Background(), bson.M{
 			"type": "config",
 			"name": deploymentName,
-		}).Decode(&customConfig)
+		})
+		if res.Err() != nil {
+			log.Log.Error("Could not find configuration for " + deploymentName + ", using global configuration.")
+		}
+		err = res.Decode(&customConfig)
 		if err != nil {
 			log.Log.Error("Could not find configuration for " + deploymentName + ", using global configuration.")
 		}
