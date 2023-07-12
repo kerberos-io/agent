@@ -165,7 +165,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		}
 
 		if cameraSettings.RTSP != rtspUrl || cameraSettings.SubRTSP != subRtspUrl || cameraSettings.Width != width || cameraSettings.Height != height || cameraSettings.Num != num || cameraSettings.Denum != denum || cameraSettings.Codec != videoStream.(av.VideoCodecData).Type() {
-			if cameraSettings.Initialized {
+
+			if cameraSettings.RTSP != "" && cameraSettings.SubRTSP != "" && cameraSettings.Initialized {
 				decoder.Close()
 				if subStreamEnabled {
 					subDecoder.Close()
