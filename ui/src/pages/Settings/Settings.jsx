@@ -729,7 +729,7 @@ class Settings extends React.Component {
           />
         )}
         {verifyOnvifError && (
-          <InfoBar type="alert" message={`${verifyOnvifErrorMessage}`} />
+          <InfoBar type="alert" message={verifyOnvifErrorMessage} />
         )}
 
         {loadingHub && (
