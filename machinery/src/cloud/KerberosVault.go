@@ -44,7 +44,7 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 	if err != nil {
 		err := "UploadKerberosVault: Upload Failed, file doesn't exists anymore."
 		log.Log.Info(err)
-		return false, true, errors.New(err)
+		return false, false, errors.New(err)
 	}
 
 	publicKey := config.KStorage.CloudKey

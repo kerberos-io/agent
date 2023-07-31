@@ -19,7 +19,7 @@ import (
 
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
 	autoClean := configuration.Config.AutoClean
-	if autoClean != "false" {
+	if autoClean == "true" {
 		maxSize := configuration.Config.MaxDirectorySize
 		if maxSize == 0 {
 			maxSize = 300

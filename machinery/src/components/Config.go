@@ -90,11 +90,18 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 
 		if res.Err() != nil {
 			log.Log.Error("Could not find global configuration, using default configuration.")
+			panic("Could not find global configuration, using default configuration.")
 		}
 		err := res.Decode(&globalConfig)
 		if err != nil {
 			log.Log.Error("Could not find global configuration, using default configuration.")
+			panic("Could not find global configuration, using default configuration.")
 		}
+		if globalConfig.Type != "global" {
+			log.Log.Error("Could not find global configuration, might missed the mongodb connection.")
+			panic("Could not find global configuration, might missed the mongodb connection.")
+		}
+
 		configuration.GlobalConfig = globalConfig
 
 		var customConfig models.Config
@@ -109,6 +116,11 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 		err = res.Decode(&customConfig)
 		if err != nil {
 			log.Log.Error("Could not find configuration for " + deploymentName + ", using global configuration.")
+		}
+
+		if customConfig.Type != "config" {
+			log.Log.Error("Could not find custom configuration, might missed the mongodb connection.")
+			panic("Could not find custom configuration, might missed the mongodb connection.")
 		}
 		configuration.CustomConfig = customConfig
 

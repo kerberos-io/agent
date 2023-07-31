@@ -44,7 +44,7 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 	if err != nil {
 		err := "UploadKerberosHub: Upload Failed, file doesn't exists anymore."
 		log.Log.Info(err)
-		return false, true, errors.New(err)
+		return false, false, errors.New(err)
 	}
 
 	// Check if we are allowed to upload to the hub with these credentials.
