@@ -45,14 +45,25 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 
 				if err == nil {
 
-					if onvifAction.Action == "ptz" {
+					if onvifAction.Action == "absolute-move" {
+
+						// We will move the camera to zero position.
+						x := ptzAction.X
+						y := ptzAction.Y
+						z := ptzAction.Z
+						err := AbsolutePanTiltMove(device, configurations, token, x, y, z)
+						if err != nil {
+							log.Log.Error("HandleONVIFActions (AbsolutePanTitleMove): " + err.Error())
+						}
+
+					} else if onvifAction.Action == "ptz" {
 
 						if err == nil {
 
 							if ptzAction.Center == 1 {
 
 								// We will move the camera to zero position.
-								err := AbsolutePanTiltMove(device, configurations, token, 0, 0)
+								err := AbsolutePanTiltMove(device, configurations, token, 0, 0, 0)
 								if err != nil {
 									log.Log.Error("HandleONVIFActions (AbsolutePanTitleMove): " + err.Error())
 								}
@@ -179,18 +190,73 @@ func GetPTZConfigurationsFromDevice(device *onvif.Device) (ptz.GetConfigurations
 	return configurations, err
 }
 
-func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float32, tilt float32) error {
+func GetPositionFromDevice(configuration models.Configuration) (xsd.PTZVector, error) {
 
-	absoluteVector := xsd.Vector2D{
-		X:     float64(pan),
-		Y:     float64(tilt),
+	// We'll try to receive the PTZ configurations from the server
+	var status ptz.GetStatusResponse
+	var position xsd.PTZVector
+
+	// Connect to Onvif device
+	cameraConfiguration := configuration.Config.Capture.IPCamera
+	device, err := ConnectToOnvifDevice(&cameraConfiguration)
+	if err == nil {
+
+		// Get token from the first profile
+		token, err := GetTokenFromProfile(device, 0)
+		if err == nil {
+
+			// Get the PTZ configurations from the device
+			resp, err := device.CallMethod(ptz.GetStatus{
+				ProfileToken: token,
+			})
+
+			if err == nil {
+				defer resp.Body.Close()
+				b, err := io.ReadAll(resp.Body)
+				if err == nil {
+					stringBody := string(b)
+					decodedXML, et, err := getXMLNode(stringBody, "GetStatusResponse")
+					if err != nil {
+						log.Log.Error("GetPositionFromDevice: " + err.Error())
+						return position, err
+					} else {
+						if err := decodedXML.DecodeElement(&status, et); err != nil {
+							log.Log.Error("GetPositionFromDevice: " + err.Error())
+							return position, err
+						}
+					}
+				}
+			}
+			position = status.PTZStatus.Position
+			return position, err
+		} else {
+			log.Log.Error("GetPositionFromDevice: " + err.Error())
+			return position, err
+		}
+	} else {
+		log.Log.Error("GetPositionFromDevice: " + err.Error())
+		return position, err
+	}
+}
+
+func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float64, tilt float64, zoom float64) error {
+
+	absolutePantiltVector := xsd.Vector2D{
+		X:     pan,
+		Y:     tilt,
 		Space: configuration.PTZConfiguration.DefaultAbsolutePantTiltPositionSpace,
+	}
+
+	absoluteZoomVector := xsd.Vector1D{
+		X:     zoom,
+		Space: configuration.PTZConfiguration.DefaultAbsoluteZoomPositionSpace,
 	}
 
 	res, err := device.CallMethod(ptz.AbsoluteMove{
 		ProfileToken: token,
 		Position: xsd.PTZVector{
-			PanTilt: absoluteVector,
+			PanTilt: absolutePantiltVector,
+			Zoom:    absoluteZoomVector,
 		},
 	})
 

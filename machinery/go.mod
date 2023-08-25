@@ -25,7 +25,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/kellydunn/golang-geo v0.7.0
 	github.com/kerberos-io/joy4 v1.0.58
-	github.com/kerberos-io/onvif v0.0.5
+	github.com/kerberos-io/onvif v0.0.6
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/nsmith5/mjpeg v0.0.0-20200913181537-54b8ada0e53e
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7

@@ -91,14 +91,14 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 	config := configuration.Config
 
-	name := config.Key
+	deviceKey := config.Key
 	stunServers := []string{config.STUNURI}
 	turnServers := []string{config.TURNURI}
 	turnServersUsername := config.TURNUsername
 	turnServersCredential := config.TURNPassword
 
 	// Create WebRTC object
-	w := CreateWebRTC(name, stunServers, turnServers, turnServersUsername, turnServersCredential)
+	w := CreateWebRTC(deviceKey, stunServers, turnServers, turnServersUsername, turnServersCredential)
 	sd, err := w.DecodeSessionDescription(handshake.Sdp)
 
 	if err == nil {
@@ -187,7 +187,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				candidatesMux.Lock()
 				defer candidatesMux.Unlock()
 
-				topic := fmt.Sprintf("%s/%s/candidate/edge", name, handshake.Cuuid)
+				topic := fmt.Sprintf("%s/%s/candidate/edge", deviceKey, handshake.Cuuid)
 				log.Log.Info("InitializeWebRTCConnection: Send candidate to " + topic)
 				candiInit := candidate.ToJSON()
 				sdpmid := "0"
@@ -203,7 +203,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			peerConnections[handshake.Cuuid] = peerConnection
 
 			if err == nil {
-				topic := fmt.Sprintf("%s/%s/answer", name, handshake.Cuuid)
+				topic := fmt.Sprintf("%s/%s/answer", deviceKey, handshake.Cuuid)
 				log.Log.Info("InitializeWebRTCConnection: Send SDP answer to " + topic)
 				mqttClient.Publish(topic, 2, false, []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP))))
 			}
