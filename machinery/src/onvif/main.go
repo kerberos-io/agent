@@ -59,7 +59,7 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 						log.Log.Info("HandleONVIFActions: functions: " + strings.Join(functions, ", "))
 
 						// Check if we need to use absolute or continuous move
-						canAbsoluteMove := false
+						/*canAbsoluteMove := false
 						canContinuousMove := false
 
 						if len(functions) > 0 {
@@ -70,9 +70,17 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 									canContinuousMove = true
 								}
 							}
+						}*/
+
+						// Ideally we should be able to use the AbsolutePanTiltMove function, but it looks like
+						// the current detection through GetPTZFuntionsFromDevice is not working properly. Therefore we will fallback
+						// on the ContinuousPanTiltMove function which is more compatible with more cameras.
+						err = AbsolutePanTiltMoveFake(device, configurations, token, x, y, z)
+						if err != nil {
+							log.Log.Error("HandleONVIFActions (AbsolutePanTitleMoveFake): " + err.Error())
 						}
 
-						if canAbsoluteMove {
+						/*if canAbsoluteMove {
 							err = AbsolutePanTiltMove(device, configurations, token, x, y, z)
 							if err != nil {
 								log.Log.Error("HandleONVIFActions (AbsolutePanTitleMove): " + err.Error())
@@ -82,7 +90,7 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 							if err != nil {
 								log.Log.Error("HandleONVIFActions (AbsolutePanTitleMoveFake): " + err.Error())
 							}
-						}
+						}*/
 
 					} else if onvifAction.Action == "ptz" {
 
