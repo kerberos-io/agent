@@ -55,6 +55,9 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 						// Check which PTZ Space we need to use
 						functions, _, _ := GetPTZFunctionsFromDevice(configurations)
 
+						// Log functions
+						log.Log.Debug("HandleONVIFActions: functions: " + strings.Join(functions, ", "))
+
 						// Check if we need to use absolute or continuous move
 						canAbsoluteMove := false
 						canContinuousMove := false
