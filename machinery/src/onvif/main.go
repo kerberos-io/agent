@@ -78,6 +78,8 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 						err = AbsolutePanTiltMoveFake(device, configurations, token, x, y, z)
 						if err != nil {
 							log.Log.Error("HandleONVIFActions (AbsolutePanTitleMoveFake): " + err.Error())
+						} else {
+							log.Log.Info("HandleONVIFActions (AbsolutePanTitleMoveFake): successfully moved camera")
 						}
 
 						/*if canAbsoluteMove {
@@ -91,6 +93,17 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 								log.Log.Error("HandleONVIFActions (AbsolutePanTitleMoveFake): " + err.Error())
 							}
 						}*/
+
+					} else if onvifAction.Action == "preset" {
+
+						// Execute the preset
+						preset := ptzAction.Preset
+						err := GoToPresetFromDevice(device, preset)
+						if err != nil {
+							log.Log.Error("HandleONVIFActions (GotoPreset): " + err.Error())
+						} else {
+							log.Log.Info("HandleONVIFActions (GotoPreset): successfully moved camera")
+						}
 
 					} else if onvifAction.Action == "ptz" {
 
@@ -311,7 +324,7 @@ func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfiguratio
 	}
 
 	bs, _ := ioutil.ReadAll(res.Body)
-	log.Log.Debug("AbsoluteMove: " + string(bs))
+	log.Log.Info("AbsoluteMove: " + string(bs))
 
 	return err
 }
@@ -330,18 +343,17 @@ func AbsolutePanTiltMoveFake(device *onvif.Device, configuration ptz.GetConfigur
 		speed := 0.6
 		wait := 100 * time.Millisecond
 
-		err := ZoomOutCompletely(device, configuration, token)
-
 		// We'll move quickly to the position (might be inaccurate)
-		err = PanUntilPosition(device, configuration, token, pan, speed, wait)
-		err = TiltUntilPosition(device, configuration, token, tilt, speed, wait)
+		err = ZoomOutCompletely(device, configuration, token)
+		err = PanUntilPosition(device, configuration, token, pan, zoom, speed, wait)
+		err = TiltUntilPosition(device, configuration, token, tilt, zoom, speed, wait)
 
 		// Now we'll move a bit slower to make sure we are ok (will be more accurate)
-		speed = 0.2
+		speed = 0.1
 		wait = 200 * time.Millisecond
 
-		err = PanUntilPosition(device, configuration, token, pan, speed, wait)
-		err = TiltUntilPosition(device, configuration, token, tilt, speed, wait)
+		err = PanUntilPosition(device, configuration, token, pan, zoom, speed, wait)
+		err = TiltUntilPosition(device, configuration, token, tilt, zoom, speed, wait)
 		err = ZoomUntilPosition(device, configuration, token, zoom, speed, wait)
 
 		return err
@@ -376,10 +388,10 @@ func ZoomOutCompletely(device *onvif.Device, configuration ptz.GetConfigurations
 	return err
 }
 
-func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float64, speed float64, wait time.Duration) error {
+func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float64, zoom float64, speed float64, wait time.Duration) error {
 	position, err := GetPosition(device, token)
 
-	if position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01 {
+	if position.PanTilt.X >= pan-0.005 && position.PanTilt.X <= pan+0.005 {
 
 	} else {
 
@@ -422,6 +434,7 @@ func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsR
 		_, errStop := device.CallMethod(ptz.Stop{
 			ProfileToken: token,
 			PanTilt:      true,
+			Zoom:         true,
 		})
 
 		if errStop != nil {
@@ -431,10 +444,10 @@ func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsR
 	return err
 }
 
-func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, tilt float64, speed float64, wait time.Duration) error {
+func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, tilt float64, zoom float64, speed float64, wait time.Duration) error {
 	position, err := GetPosition(device, token)
 
-	if position.PanTilt.Y >= tilt-0.01 && position.PanTilt.Y <= tilt+0.01 {
+	if position.PanTilt.Y >= tilt-0.005 && position.PanTilt.Y <= tilt+0.005 {
 
 	} else {
 
@@ -477,6 +490,7 @@ func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 		_, errStop := device.CallMethod(ptz.Stop{
 			ProfileToken: token,
 			PanTilt:      true,
+			Zoom:         true,
 		})
 
 		if errStop != nil {
@@ -489,7 +503,7 @@ func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, zoom float64, speed float64, wait time.Duration) error {
 	position, err := GetPosition(device, token)
 
-	if position.Zoom.X >= zoom-0.01 && position.Zoom.X <= zoom+0.01 {
+	if position.Zoom.X >= zoom-0.005 && position.Zoom.X <= zoom+0.005 {
 
 	} else {
 
@@ -530,6 +544,7 @@ func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 
 		_, errStop := device.CallMethod(ptz.Stop{
 			ProfileToken: token,
+			PanTilt:      true,
 			Zoom:         true,
 		})
 
@@ -633,6 +648,89 @@ func GetCapabilitiesFromDevice(device *onvif.Device) []string {
 		}
 	}
 	return capabilities
+}
+
+func GetPresetsFromDevice(device *onvif.Device) ([]models.OnvifActionPreset, error) {
+	var presets []models.OnvifActionPreset
+	var presetsResponse ptz.GetPresetsResponse
+
+	// Get token from the first profile
+	token, err := GetTokenFromProfile(device, 0)
+	if err == nil {
+		resp, err := device.CallMethod(ptz.GetPresets{
+			ProfileToken: token,
+		})
+
+		defer resp.Body.Close()
+		b, err := io.ReadAll(resp.Body)
+		if err == nil {
+			stringBody := string(b)
+			decodedXML, et, err := getXMLNode(stringBody, "GetPresetsResponse")
+			if err != nil {
+				log.Log.Error("GetPresetsFromDevice: " + err.Error())
+				return presets, err
+			} else {
+				if err := decodedXML.DecodeElement(&presetsResponse, et); err != nil {
+					log.Log.Error("GetPresetsFromDevice: " + err.Error())
+					return presets, err
+				}
+
+				for _, preset := range presetsResponse.Preset {
+					p := models.OnvifActionPreset{
+						Name:  string(preset.Name),
+						Token: string(preset.Token),
+					}
+
+					presets = append(presets, p)
+				}
+
+				return presets, err
+			}
+		} else {
+			log.Log.Error("GetPresetsFromDevice: " + err.Error())
+		}
+	} else {
+		log.Log.Error("GetPresetsFromDevice: " + err.Error())
+	}
+
+	return presets, err
+}
+
+func GoToPresetFromDevice(device *onvif.Device, presetName string) error {
+	var goToPresetResponse ptz.GotoPresetResponse
+
+	// Get token from the first profile
+	token, err := GetTokenFromProfile(device, 0)
+	if err == nil {
+
+		resp, err := device.CallMethod(ptz.GotoPreset{
+			ProfileToken: token,
+			PresetToken:  xsd.ReferenceToken(presetName),
+		})
+
+		defer resp.Body.Close()
+		b, err := io.ReadAll(resp.Body)
+		if err == nil {
+			stringBody := string(b)
+			decodedXML, et, err := getXMLNode(stringBody, "GotoPresetResponses")
+			if err != nil {
+				log.Log.Error("GoToPresetFromDevice: " + err.Error())
+				return err
+			} else {
+				if err := decodedXML.DecodeElement(&goToPresetResponse, et); err != nil {
+					log.Log.Error("GoToPresetFromDevice: " + err.Error())
+					return err
+				}
+				return err
+			}
+		} else {
+			log.Log.Error("GoToPresetFromDevice: " + err.Error())
+		}
+	} else {
+		log.Log.Error("GoToPresetFromDevice: " + err.Error())
+	}
+
+	return err
 }
 
 func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, error) {

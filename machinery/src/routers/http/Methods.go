@@ -250,3 +250,105 @@ func DoOnvifZoom(c *gin.Context) {
 		})
 	}
 }
+
+// GetOnvifPresets godoc
+// @Router /api/camera/onvif/presets [post]
+// @ID camera-onvif-presets
+// @Tags camera
+// @Param config body models.OnvifCredentials true "OnvifCredentials"
+// @Summary Will return the ONVIF presets for the specific camera.
+// @Description Will return the ONVIF presets for the specific camera.
+// @Success 200 {object} models.APIResponse
+func GetOnvifPresets(c *gin.Context) {
+	var onvifCredentials models.OnvifCredentials
+	err := c.BindJSON(&onvifCredentials)
+
+	if err == nil && onvifCredentials.ONVIFXAddr != "" {
+
+		configuration := &models.Configuration{
+			Config: models.Config{
+				Capture: models.Capture{
+					IPCamera: models.IPCamera{
+						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
+						ONVIFUsername: onvifCredentials.ONVIFUsername,
+						ONVIFPassword: onvifCredentials.ONVIFPassword,
+					},
+				},
+			},
+		}
+
+		cameraConfiguration := configuration.Config.Capture.IPCamera
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		if err == nil {
+			presets, err := onvif.GetPresetsFromDevice(device)
+			if err == nil {
+				c.JSON(200, gin.H{
+					"presets": presets,
+				})
+			} else {
+				c.JSON(400, gin.H{
+					"data": "Something went wrong: " + err.Error(),
+				})
+			}
+		} else {
+			c.JSON(400, gin.H{
+				"data": "Something went wrong: " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
+		})
+	}
+}
+
+// GoToOnvifPReset godoc
+// @Router /api/camera/onvif/gotopreset [post]
+// @ID camera-onvif-gotopreset
+// @Tags camera
+// @Param config body models.OnvifPreset true "OnvifPreset"
+// @Summary Will activate the desired ONVIF preset.
+// @Description Will activate the desired ONVIF preset.
+// @Success 200 {object} models.APIResponse
+func GoToOnvifPreset(c *gin.Context) {
+	var onvifPreset models.OnvifPreset
+	err := c.BindJSON(&onvifPreset)
+
+	if err == nil && onvifPreset.OnvifCredentials.ONVIFXAddr != "" {
+
+		configuration := &models.Configuration{
+			Config: models.Config{
+				Capture: models.Capture{
+					IPCamera: models.IPCamera{
+						ONVIFXAddr:    onvifPreset.OnvifCredentials.ONVIFXAddr,
+						ONVIFUsername: onvifPreset.OnvifCredentials.ONVIFUsername,
+						ONVIFPassword: onvifPreset.OnvifCredentials.ONVIFPassword,
+					},
+				},
+			},
+		}
+
+		cameraConfiguration := configuration.Config.Capture.IPCamera
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		if err == nil {
+			err := onvif.GoToPresetFromDevice(device, onvifPreset.Preset)
+			if err == nil {
+				c.JSON(200, gin.H{
+					"data": "Camera preset activated: " + onvifPreset.Preset,
+				})
+			} else {
+				c.JSON(400, gin.H{
+					"data": "Something went wrong: " + err.Error(),
+				})
+			}
+		} else {
+			c.JSON(400, gin.H{
+				"data": "Something went wrong: " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
+		})
+	}
+}

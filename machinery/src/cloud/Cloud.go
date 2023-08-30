@@ -279,6 +279,8 @@ loop:
 				onvifEnabled := "false"
 				onvifZoom := "false"
 				onvifPanTilt := "false"
+				onvifPresets := "false"
+				var onvifPresetsList []byte
 				if config.Capture.IPCamera.ONVIFXAddr != "" {
 					cameraConfiguration := configuration.Config.Capture.IPCamera
 					device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
@@ -292,6 +294,15 @@ loop:
 							}
 							if canPanTilt {
 								onvifPanTilt = "true"
+							}
+							// Try to read out presets
+							presets, err := onvif.GetPresetsFromDevice(device)
+							if err == nil && len(presets) > 0 {
+								onvifPresets = "true"
+								onvifPresetsList, err = json.Marshal(presets)
+								if err != nil {
+									log.Log.Error("HandleHeartBeat: error while marshalling presets: " + err.Error())
+								}
 							}
 						}
 					}
@@ -339,6 +350,8 @@ loop:
 						"onvif" : "%s",
 						"onvif_zoom" : "%s",
 						"onvif_pantilt" : "%s",
+						"onvif_presets": "%s",
+						"onvif_presets_list": %s,
 						"cameraConnected": "%s",
 						"numberoffiles" : "33",
 						"timestamp" : 1564747908,
@@ -346,7 +359,7 @@ loop:
 						"docker" : true,
 						"kios" : false,
 						"raspberrypi" : false
-					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, cameraConnected)
+					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, cameraConnected)
 
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)

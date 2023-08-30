@@ -227,6 +227,8 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 		// the camera.
 		api.POST("/camera/onvif/login", LoginToOnvif)
 		api.POST("/camera/onvif/capabilities", GetOnvifCapabilities)
+		api.POST("/camera/onvif/presets", GetOnvifPresets)
+		api.POST("/camera/onvif/gotopreset", GoToOnvifPreset)
 		api.POST("/camera/onvif/pantilt", DoOnvifPanTilt)
 		api.POST("/camera/onvif/zoom", DoOnvifZoom)
 		api.POST("/camera/verify/:streamType", capture.VerifyCamera)

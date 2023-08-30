@@ -54,6 +54,35 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/camera/onvif/gotopreset": {
+            "post": {
+                "description": "Will activate the desired ONVIF preset.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Will activate the desired ONVIF preset.",
+                "operationId": "camera-onvif-gotopreset",
+                "parameters": [
+                    {
+                        "description": "OnvifPreset",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OnvifPreset"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/camera/onvif/login": {
             "post": {
                 "description": "Try to login into ONVIF supported camera.",
@@ -99,6 +128,35 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/models.OnvifPanTilt"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/camera/onvif/presets": {
+            "post": {
+                "description": "Will return the ONVIF presets for the specific camera.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Will return the ONVIF presets for the specific camera.",
+                "operationId": "camera-onvif-presets",
+                "parameters": [
+                    {
+                        "description": "OnvifCredentials",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OnvifCredentials"
                         }
                     }
                 ],
@@ -317,8 +375,15 @@ const docTemplate = `{
         "models.APIResponse": {
             "type": "object",
             "properties": {
+                "can_pan_tilt": {
+                    "type": "boolean"
+                },
+                "can_zoom": {
+                    "type": "boolean"
+                },
                 "data": {},
-                "message": {}
+                "message": {},
+                "ptz_functions": {}
             }
         },
         "models.Authentication": {
@@ -618,6 +683,17 @@ const docTemplate = `{
                 },
                 "tilt": {
                     "type": "number"
+                }
+            }
+        },
+        "models.OnvifPreset": {
+            "type": "object",
+            "properties": {
+                "onvif_credentials": {
+                    "$ref": "#/definitions/models.OnvifCredentials"
+                },
+                "preset": {
+                    "type": "string"
                 }
             }
         },
