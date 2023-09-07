@@ -303,9 +303,25 @@ loop:
 								if err != nil {
 									log.Log.Error("HandleHeartBeat: error while marshalling presets: " + err.Error())
 								}
+							} else {
+								if err != nil {
+									log.Log.Error("HandleHeartBeat: error while getting presets: " + err.Error())
+								} else {
+									log.Log.Debug("HandleHeartBeat: no presets found.")
+								}
+								onvifPresetsList = []byte("[]")
 							}
+						} else {
+							log.Log.Error("HandleHeartBeat: error while getting PTZ configurations: " + err.Error())
+							onvifPresetsList = []byte("[]")
 						}
+					} else {
+						log.Log.Error("HandleHeartBeat: error while connecting to ONVIF device: " + err.Error())
+						onvifPresetsList = []byte("[]")
 					}
+				} else {
+					log.Log.Debug("HandleHeartBeat: ONVIF is not enabled.")
+					onvifPresetsList = []byte("[]")
 				}
 
 				// Check if the agent is running inside a cluster (Kerberos Factory) or as
