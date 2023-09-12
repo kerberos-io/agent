@@ -1,20 +1,25 @@
-
 {
 	"type": "",
-	"key": "",
-	"name": "agent",
+	"key": "okkey",
+	"name": "rtsp2",
 	"time": "false",
 	"offline": "false",
-	"auto_clean": "true",
+	"auto_clean": "100",
 	"remove_after_upload": "true",
-	"max_directory_size": 100,
-	"timezone": "Africa/Ceuta",
+	"max_directory_size": 20,
+	"timezone": "Europe/Brussels",
 	"capture": {
 		"name": "",
 		"ipcamera": {
-			"rtsp": "",
-			"sub_rtsp": "",
-			"fps": ""
+			"width": 640,
+			"height": 480,
+			"fps": "",
+			"rtsp": "rtsp://fake.kerberos.io/stream",
+			"sub_rtsp": "rtsp://kellyvd:cedricve123@192.168.1.68:554/Streaming/Channels/102?transportmode=multicast\u0026profile=Profile_1",
+			"onvif": "true",
+			"onvif_xaddr": "192.168.1.68",
+			"onvif_username": "kellyvd",
+			"onvif_password": "cedricve123"
 		},
 		"usbcamera": {
 			"device": ""
@@ -22,27 +27,27 @@
 		"raspicamera": {
 			"device": ""
 		},
-		"continuous": "false",
 		"recording": "true",
 		"snapshots": "true",
-		"liveview": "true",
 		"motion": "true",
-		"postrecording": 20,
-		"prerecording": 10,
-		"maxlengthrecording": 30,
+		"liveview": "true",
+		"continuous": "false",
+		"postrecording": 5,
+		"prerecording": 5,
+		"maxlengthrecording": 10,
 		"transcodingwebrtc": "",
 		"transcodingresolution": 0,
 		"forwardwebrtc": "",
 		"fragmented": "false",
-		"fragmentedduration": 8,
+		"fragmentedduration": 10,
 		"pixelChangeThreshold": 150
 	},
 	"timetable": [
 		{
 			"start1": 0,
-			"end1": 43199,
-			"start2": 43200,
-			"end2": 86400
+			"end1": 0,
+			"start2": 0,
+			"end2": 0
 		},
 		{
 			"start1": 0,
@@ -89,15 +94,106 @@
 			"x2": 800,
 			"y2": 640
 		},
-		"polygon": []
+		"polygon": [
+			{
+				"id": "1694456798869",
+				"coordinates": [
+					{
+						"x": 458.8176559163439,
+						"y": 420.6597577161105
+					},
+					{
+						"x": 541.8959724597637,
+						"y": 422.62130444776193
+					},
+					{
+						"x": 540.2578560606811,
+						"y": 446.03551153214977
+					},
+					{
+						"x": 459.51092569845395,
+						"y": 445.07041692205803
+					}
+				]
+			},
+			{
+				"id": "1694455955284",
+				"coordinates": [
+					{
+						"x": 82.63849814838939,
+						"y": 122.83665165528404
+					},
+					{
+						"x": 259.18591194149286,
+						"y": 122.83665165528404
+					},
+					{
+						"x": 259.18591194149286,
+						"y": 232.42716889666335
+					},
+					{
+						"x": 82.63849814838939,
+						"y": 232.42716889666335
+					}
+				]
+			},
+			{
+				"id": "1694455953115",
+				"coordinates": [
+					{
+						"x": 200.7130606007035,
+						"y": 171.25495957161723
+					},
+					{
+						"x": 445.73676749725524,
+						"y": 171.25495957161723
+					},
+					{
+						"x": 445.73676749725524,
+						"y": 297.5911664681689
+					},
+					{
+						"x": 200.7130606007035,
+						"y": 297.5911664681689
+					}
+				]
+			},
+			{
+				"id": "0",
+				"coordinates": [
+					{
+						"x": 351.8431271737717,
+						"y": 65.62379883848743
+					},
+					{
+						"x": 609.6534108617149,
+						"y": 65.62379883848743
+					},
+					{
+						"x": 609.6534108617149,
+						"y": 246.50145841295546
+					},
+					{
+						"x": 351.8431271737717,
+						"y": 246.50145841295546
+					}
+				]
+			}
+		]
 	},
 	"cloud": "s3",
 	"s3": {
 		"proxyuri": "http://proxy.kerberos.io",
 		"bucket": "kerberosaccept",
-		"region": "eu-west-1"
+		"region": "eu-west1",
+		"username": "cedricve"
 	},
-	"kstorage": {},
+	"kstorage": {
+		"uri": "https://api.vault.kerberos.io",
+		"access_key": "pDCQve0XL1DXwy2x",
+		"secret_access_key": "GTpus90EKrKYuplqL3g!2oiQ@s",
+		"directory": "cedricve"
+	},
 	"dropbox": {},
 	"mqtturi": "tcp://mqtt.kerberos.io:1883",
 	"mqtt_username": "",
@@ -107,9 +203,9 @@
 	"turn_username": "username1",
 	"turn_password": "password1",
 	"heartbeaturi": "",
-	"hub_uri": "https://api.cloud.kerberos.io",
-	"hub_key": "",
-	"hub_private_key": "",
+	"hub_uri": "http://localhost:8081",
+	"hub_key": "AKIA5V6EGLUWXDU4JBEI",
+	"hub_private_key": "DIOXToTpAlYpa4atf7aWtxHd9xEw/Fk4XioL0tek",
 	"hub_site": "",
 	"condition_uri": ""
 }

@@ -256,6 +256,8 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 					// Not relevant for this device, so we'll ignore it.
 				} else {
 					// We'll find out which message we received, and act accordingly.
+					log.Log.Info("MQTTListenerHandler: received message with action: " + payload.Action)
+
 					switch payload.Action {
 					case "record":
 						HandleRecording(mqttClient, hubKey, payload, configuration, communication)
