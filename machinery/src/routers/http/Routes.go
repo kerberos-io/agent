@@ -12,6 +12,7 @@ import (
 
 	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/components"
+	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
@@ -40,7 +41,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 		var config models.Config
 		err := c.BindJSON(&config)
 		if err == nil {
-			err := components.SaveConfig(configDirectory, config, configuration, communication)
+			err := configService.SaveConfig(configDirectory, config, configuration, communication)
 			if err == nil {
 				c.JSON(200, gin.H{
 					"data": "☄ Reconfiguring",
@@ -165,7 +166,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 			var config models.Config
 			err := c.BindJSON(&config)
 			if err == nil {
-				err := components.SaveConfig(configDirectory, config, configuration, communication)
+				err := configService.SaveConfig(configDirectory, config, configuration, communication)
 				if err == nil {
 					c.JSON(200, gin.H{
 						"data": "☄ Reconfiguring",
@@ -215,7 +216,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 				// We will only send an image once per second.
 				time.Sleep(time.Second * 1)
 				log.Log.Info("AddRoutes (/stream): reading from MJPEG stream")
-				img, err := components.GetImageFromFilePath(configDirectory)
+				img, err := configService.GetImageFromFilePath(configDirectory)
 				return img, err
 			}
 			h := components.StartMotionJPEG(imageFunction, 80)

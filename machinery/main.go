@@ -9,6 +9,8 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+
+	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/routers"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
@@ -92,10 +94,10 @@ func main() {
 			configuration.Port = port
 
 			// Open this configuration either from Kerberos Agent or Kerberos Factory.
-			components.OpenConfig(configDirectory, &configuration)
+			configService.OpenConfig(configDirectory, &configuration)
 
 			// We will override the configuration with the environment variables
-			components.OverrideWithEnvironmentVariables(&configuration)
+			configService.OverrideWithEnvironmentVariables(&configuration)
 
 			// Printing final configuration
 			utils.PrintConfiguration(&configuration)
@@ -113,7 +115,7 @@ func main() {
 			if configuration.Config.Key == "" {
 				key := utils.RandStringBytesMaskImpr(30)
 				configuration.Config.Key = key
-				err := components.StoreConfig(configDirectory, configuration.Config)
+				err := configService.StoreConfig(configDirectory, configuration.Config)
 				if err == nil {
 					log.Log.Info("Main: updated unique key for agent to: " + key)
 				} else {

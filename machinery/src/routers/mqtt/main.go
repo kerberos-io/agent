@@ -8,6 +8,8 @@ import (
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/gofrs/uuid"
+	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
@@ -55,12 +57,22 @@ func HasMQTTClientModified(configuration *models.Configuration) bool {
 }
 
 func PackageMQTTMessage(msg Message) ([]byte, error) {
-	// We'll generate an unique id, and encrypt it using the private key.
-	msg.Mid = "0123456789+1"
+	// Create a Version 4 UUID.
+	u2, err := uuid.NewV4()
+	if err != nil {
+		log.Log.Error("failed to generate UUID: " + err.Error())
+	}
+
+	// We'll generate an unique id, and encrypt / decrypt it using the private key if available.
+	msg.Mid = u2.String()
 	msg.Timestamp = time.Now().Unix()
+
+	// At the moment we don't do the encryption part, but we'll implement it
+	// once the legacy methods (subscriptions are moved).
 	msg.Encrypted = false
 	msg.PublicKey = ""
 	msg.Fingerprint = ""
+
 	payload, err := json.Marshal(msg)
 	return payload, err
 }
@@ -98,7 +110,7 @@ func PackageMQTTMessage(msg Message) ([]byte, error) {
 // - {devicekey}/{sessionid}/answer: once a WebRTC request is received through (kerberos/register), we'll draft an answer and send it back to the remote WebRTC client.
 // - kerberos/{hubkey}/device/{devicekey}/motion: a motion signal
 
-func ConfigureMQTT(configuration *models.Configuration, communication *models.Communication) mqtt.Client {
+func ConfigureMQTT(configDirectory string, configuration *models.Configuration, communication *models.Communication) mqtt.Client {
 
 	config := configuration.Config
 
@@ -174,8 +186,9 @@ func ConfigureMQTT(configuration *models.Configuration, communication *models.Co
 				log.Log.Info("ConfigureMQTT: " + mqttClientID + " connected to " + mqttURL)
 
 				// Create a susbcription for listen and reply
-				MQTTListenerHandler(c, hubKey, configuration, communication)
+				MQTTListenerHandler(c, hubKey, configDirectory, configuration, communication)
 
+				// Legacy methods below -> should be converted to the above method.
 				// Create a subscription to know if send out a livestream or not.
 				MQTTListenerHandleLiveSD(c, hubKey, configuration, communication)
 
@@ -207,7 +220,7 @@ func ConfigureMQTT(configuration *models.Configuration, communication *models.Co
 	return nil
 }
 
-func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, communication *models.Communication) {
+func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 	if hubKey == "" {
 		log.Log.Info("MQTTListenerHandler: no hub key provided, not subscribing to kerberos/hub/{hubkey}")
 	} else {
@@ -225,6 +238,7 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configuration *m
 
 			var message Message
 			json.Unmarshal(msg.Payload(), &message)
+
 			if message.Mid != "" && message.Timestamp != 0 {
 				// Messages might be encrypted, if so we'll
 				// need to decrypt them.
@@ -249,6 +263,10 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configuration *m
 						HandleGetPTZPosition(mqttClient, hubKey, payload, configuration, communication)
 					case "update-ptz-position":
 						HandleUpdatePTZPosition(mqttClient, hubKey, payload, configuration, communication)
+					case "request-config":
+						HandleRequestConfig(mqttClient, hubKey, payload, configuration, communication)
+					case "update-config":
+						HandleUpdateConfig(mqttClient, hubKey, payload, configDirectory, configuration, communication)
 					}
 				}
 			}
@@ -336,10 +354,95 @@ func HandleUpdatePTZPosition(mqttClient mqtt.Client, hubKey string, payload Payl
 	}
 }
 
+// We received a request config request, we'll fetch the current config and send it back.
+type RequestConfigPayload struct {
+	Timestamp int64 `json:"timestamp"` // timestamp of the preset request.
+}
+
+func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload Payload, configuration *models.Configuration, communication *models.Communication) {
+	value := payload.Value
+
+	// Convert map[string]interface{} to RequestConfigPayload
+	jsonData, _ := json.Marshal(value)
+	var configPayload RequestConfigPayload
+	json.Unmarshal(jsonData, &configPayload)
+
+	if configPayload.Timestamp != 0 {
+		// Get Config from the device
+
+		key := configuration.Config.Key
+		name := configuration.Config.Name
+
+		if key != "" && name != "" {
+
+			var configMap map[string]interface{}
+			inrec, _ := json.Marshal(configuration.Config)
+			json.Unmarshal(inrec, &configMap)
+
+			message := Message{
+				Payload: Payload{
+					Action:   "receive-config",
+					DeviceId: configuration.Config.Key,
+					Value:    configMap,
+				},
+			}
+			payload, err := PackageMQTTMessage(message)
+			if err == nil {
+				mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+			} else {
+				log.Log.Info("HandleRequestConfig: something went wrong while sending config to hub: " + string(payload))
+			}
+
+		} else {
+			log.Log.Info("HandleRequestConfig: no config available")
+		}
+
+		log.Log.Info("HandleRequestConfig: Received a request for the config")
+	}
+}
+
+// We received a update config request, we'll update the current config and send a confirmation back.
+type UpdateConfigPayload struct {
+	Timestamp int64         `json:"timestamp"` // timestamp of the preset request.
+	Config    models.Config `json:"config"`
+}
+
+func HandleUpdateConfig(mqttClient mqtt.Client, hubKey string, payload Payload, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+	value := payload.Value
+
+	// Convert map[string]interface{} to UpdateConfigPayload
+	jsonData, _ := json.Marshal(value)
+	var configPayload UpdateConfigPayload
+	json.Unmarshal(jsonData, &configPayload)
+
+	if configPayload.Timestamp != 0 {
+
+		config := configPayload.Config
+		err := configService.SaveConfig(configDirectory, config, configuration, communication)
+		if err == nil {
+			log.Log.Info("HandleUpdateConfig: Config updated")
+
+			message := Message{
+				Payload: Payload{
+					Action:   "acknowledge-update-config",
+					DeviceId: configuration.Config.Key,
+				},
+			}
+			payload, err := PackageMQTTMessage(message)
+			if err == nil {
+				mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+			} else {
+				log.Log.Info("HandleRequestConfig: something went wrong while sending acknowledge config to hub: " + string(payload))
+			}
+		} else {
+			log.Log.Info("HandleUpdateConfig: Config update failed")
+		}
+	}
+}
+
 func DisconnectMQTT(mqttClient mqtt.Client, config *models.Config) {
 	if mqttClient != nil {
 		// Cleanup all subscriptions
-
 		// New methods
 		mqttClient.Unsubscribe("kerberos/agent/" + PREV_HubKey)
 

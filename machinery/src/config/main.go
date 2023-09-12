@@ -1,4 +1,4 @@
-package components
+package config
 
 import (
 	"context"
@@ -210,7 +210,7 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				configuration.Config.Key = value
 				break
 			case "AGENT_NAME":
-				configuration.Config.Name = value
+				configuration.Config.FriendlyName = value
 				break
 			case "AGENT_TIMEZONE":
 				configuration.Config.Timezone = value

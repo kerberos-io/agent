@@ -14,6 +14,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/computervision"
+	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
@@ -72,7 +73,7 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 
 	// We'll create a MQTT handler, which will be used to communicate with Kerberos Hub.
 	// Configure a MQTT client which helps for a bi-directional communication
-	mqttClient := routers.ConfigureMQTT(configuration, communication)
+	mqttClient := routers.ConfigureMQTT(configDirectory, configuration, communication)
 
 	// Run the agent and fire up all the other
 	// goroutines which do image capture, motion detection, onvif, etc.
@@ -87,15 +88,15 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 
 		if status == "not started" {
 			// We will re open the configuration, might have changed :O!
-			OpenConfig(configDirectory, configuration)
+			configService.OpenConfig(configDirectory, configuration)
 			// We will override the configuration with the environment variables
-			OverrideWithEnvironmentVariables(configuration)
+			configService.OverrideWithEnvironmentVariables(configuration)
 		}
 
 		// Reset the MQTT client, might have provided new information, so we need to reconnect.
 		if routers.HasMQTTClientModified(configuration) {
 			routers.DisconnectMQTT(mqttClient, &configuration.Config)
-			mqttClient = routers.ConfigureMQTT(configuration, communication)
+			mqttClient = routers.ConfigureMQTT(configDirectory, configuration, communication)
 		}
 
 		// We will create a new cancelable context, which will be used to cancel and restart.
@@ -134,6 +135,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	width := videoStream.(av.VideoCodecData).Width()
 	height := videoStream.(av.VideoCodecData).Height()
 
+	// Set config values as well
+	configuration.Config.Capture.IPCamera.Width = width
+	configuration.Config.Capture.IPCamera.Height = height
+
 	var queue *pubsub.Queue
 	var subQueue *pubsub.Queue
 
@@ -162,6 +167,13 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 				time.Sleep(time.Second * 3)
 				return status
 			}
+
+			width := videoStream.(av.VideoCodecData).Width()
+			height := videoStream.(av.VideoCodecData).Height()
+
+			// Set config values as well
+			configuration.Config.Capture.IPCamera.Width = width
+			configuration.Config.Capture.IPCamera.Height = height
 		}
 
 		if cameraSettings.RTSP != rtspUrl || cameraSettings.SubRTSP != subRtspUrl || cameraSettings.Width != width || cameraSettings.Height != height || cameraSettings.Num != num || cameraSettings.Denum != denum || cameraSettings.Codec != videoStream.(av.VideoCodecData).Type() {
@@ -190,6 +202,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 			cameraSettings.Denum = denum
 			cameraSettings.Codec = videoStream.(av.VideoCodecData).Type()
 			cameraSettings.Initialized = true
+
 		} else {
 			log.Log.Info("RunAgent: camera settings did not change, keeping decoder")
 		}
@@ -285,10 +298,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		(*communication.CancelContext)()
 
 		// We will re open the configuration, might have changed :O!
-		OpenConfig(configDirectory, configuration)
+		configService.OpenConfig(configDirectory, configuration)
 
 		// We will override the configuration with the environment variables
-		OverrideWithEnvironmentVariables(configuration)
+		configService.OverrideWithEnvironmentVariables(configuration)
 
 		// Here we are cleaning up everything!
 		if configuration.Config.Offline != "true" {

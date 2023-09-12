@@ -302,6 +302,7 @@ loop:
 								onvifPresetsList, err = json.Marshal(presets)
 								if err != nil {
 									log.Log.Error("HandleHeartBeat: error while marshalling presets: " + err.Error())
+									onvifPresetsList = []byte("[]")
 								}
 							} else {
 								if err != nil {
