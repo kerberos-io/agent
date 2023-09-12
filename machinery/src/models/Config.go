@@ -15,7 +15,7 @@ type Config struct {
 	Type              string       `json:"type"`
 	Key               string       `json:"key"`
 	Name              string       `json:"name"`
-	FriendlyName      string       `json:"friendly_name"`
+	FriendlyName      string       `json:"friendly_name,omitempty" bson:"friendly_name,omitempty"`
 	Time              string       `json:"time" bson:"time"`
 	Offline           string       `json:"offline"`
 	AutoClean         string       `json:"auto_clean"`
