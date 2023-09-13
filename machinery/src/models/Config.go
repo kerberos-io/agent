@@ -21,7 +21,7 @@ type Config struct {
 	AutoClean         string       `json:"auto_clean"`
 	RemoveAfterUpload string       `json:"remove_after_upload"`
 	MaxDirectorySize  int64        `json:"max_directory_size"`
-	Timezone          string       `json:"timezone,omitempty" bson:"timezone,omitempty"`
+	Timezone          string       `json:"timezone"`
 	Capture           Capture      `json:"capture"`
 	Timetable         []*Timetable `json:"timetable"`
 	Region            *Region      `json:"region"`
@@ -76,9 +76,9 @@ type IPCamera struct {
 	RTSP          string `json:"rtsp"`
 	SubRTSP       string `json:"sub_rtsp"`
 	ONVIF         string `json:"onvif,omitempty" bson:"onvif"`
-	ONVIFXAddr    string `json:"onvif_xaddr,omitempty" bson:"onvif_xaddr"`
-	ONVIFUsername string `json:"onvif_username,omitempty" bson:"onvif_username"`
-	ONVIFPassword string `json:"onvif_password,omitempty" bson:"onvif_password"`
+	ONVIFXAddr    string `json:"onvif_xaddr" bson:"onvif_xaddr"`
+	ONVIFUsername string `json:"onvif_username" bson:"onvif_username"`
+	ONVIFPassword string `json:"onvif_password" bson:"onvif_password"`
 }
 
 // USBCamera configuration, such as the device path (/dev/video*)
