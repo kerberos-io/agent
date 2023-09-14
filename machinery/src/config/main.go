@@ -141,8 +141,13 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 			},
 		)
 
-		// Merge Config toplevel
+		// Reset main configuration Config.
+		configuration.Config = models.Config{}
+
+		// Merge the global settings in the main config
 		conjungo.Merge(&configuration.Config, configuration.GlobalConfig, opts)
+
+		// Now we might override some settings with the custom config
 		conjungo.Merge(&configuration.Config, configuration.CustomConfig, opts)
 
 		// Merge Kerberos Vault settings
