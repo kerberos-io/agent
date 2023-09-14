@@ -157,6 +157,9 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 		conjungo.Merge(&s3, configuration.CustomConfig.S3, opts)
 		configuration.Config.S3 = &s3
 
+		// Merge timetable manually because it's an array
+		configuration.Config.Timetable = configuration.CustomConfig.Timetable
+
 		// Cleanup
 		opts = nil
 
