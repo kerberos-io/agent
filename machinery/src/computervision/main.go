@@ -169,9 +169,23 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 						if config.Offline != "true" {
 							if mqttClient != nil {
 								if hubKey != "" {
-									mqttClient.Publish("kerberos/"+hubKey+"/device/"+deviceKey+"/motion", 2, false, "motion")
+									message := models.Message{
+										Payload: models.Payload{
+											Action:   "motion",
+											DeviceId: configuration.Config.Key,
+											Value: map[string]interface{}{
+												"timestamp": time.Now().Unix(),
+											},
+										},
+									}
+									payload, err := models.PackageMQTTMessage(configuration, message)
+									if err == nil {
+										mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+									} else {
+										log.Log.Info("ProcessMotion: failed to package MQTT message: " + err.Error())
+									}
 								} else {
-									mqttClient.Publish("kerberos/device/"+deviceKey+"/motion", 2, false, "motion")
+									mqttClient.Publish("kerberos/agent/"+deviceKey, 2, false, "motion")
 								}
 							}
 						}

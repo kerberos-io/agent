@@ -1,39 +1,25 @@
 package mqtt
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/gofrs/uuid"
 	configService "github.com/kerberos-io/agent/machinery/src/config"
+	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
 )
-
-// The message structure which is used to send over
-// and receive messages from the MQTT broker
-type Message struct {
-	Mid         string  `json:"mid"`
-	Timestamp   int64   `json:"timestamp"`
-	Encrypted   bool    `json:"encrypted"`
-	PublicKey   string  `json:"public_key"`
-	Fingerprint string  `json:"fingerprint"`
-	Payload     Payload `json:"payload"`
-}
-
-// The payload structure which is used to send over
-// and receive messages from the MQTT broker
-type Payload struct {
-	Action   string                 `json:"action"`
-	DeviceId string                 `json:"device_id"`
-	Value    map[string]interface{} `json:"value"`
-}
 
 // We'll cache the MQTT settings to know if we need to reinitialize the MQTT client connection.
 // If we update the configuration but no new MQTT settings are provided, we don't need to restart it.
@@ -56,58 +42,15 @@ func HasMQTTClientModified(configuration *models.Configuration) bool {
 	return false
 }
 
-func PackageMQTTMessage(msg Message) ([]byte, error) {
-	// Create a Version 4 UUID.
-	u2, err := uuid.NewV4()
-	if err != nil {
-		log.Log.Error("failed to generate UUID: " + err.Error())
-	}
-
-	// We'll generate an unique id, and encrypt / decrypt it using the private key if available.
-	msg.Mid = u2.String()
-	msg.Timestamp = time.Now().Unix()
-
-	// At the moment we don't do the encryption part, but we'll implement it
-	// once the legacy methods (subscriptions are moved).
-	msg.Encrypted = false
-	msg.PublicKey = ""
-	msg.Fingerprint = ""
-
-	payload, err := json.Marshal(msg)
-	return payload, err
-}
-
 // Configuring MQTT to subscribe for various bi-directional messaging
 // Listen and reply (a generic method to share and retrieve information)
-//
-// !!! NEW METHOD TO COMMUNICATE: only create a single subscription for all communication.
-// and an additional publish messages back
 //
 // - [SUBSCRIPTION] kerberos/agent/{hubkey} 		(hub -> agent)
 // - [PUBLISH] kerberos/hub/{hubkey}  		(agent -> hub)
 //
 // !!! LEGACY METHODS BELOW, WE SHOULD LEVERAGE THE ABOVE METHOD!
-//
-// [SUBSCRIPTIONS]
-//
-// SD Streaming (Base64 JPEGs)
-// - kerberos/{hubkey}/device/{devicekey}/request-live: use for polling of SD live streaming (as long the user requests stream, we'll send JPEGs over).
-//
-// HD Streaming (WebRTC)
-// - kerberos/register: use for receiving HD live streaming requests.
-// - candidate/cloud: remote ICE candidates are shared over this line.
-// - kerberos/webrtc/keepalivehub/{devicekey}: use for polling of HD streaming (as long the user requests stream, we'll send it over).
-// - kerberos/webrtc/peers/{devicekey}: we'll keep track of the number of peers (we can have more than 1 concurrent listeners).
-//
-// ONVIF capabilities
-// - kerberos/onvif/{devicekey}: endpoint to execute ONVIF commands such as (PTZ, Zoom, IO, etc)
-//
 // [PUBlISH]
 // Next to subscribing to various topics, we'll also publish messages to various topics, find a list of available Publish methods.
-//
-// - kerberos/webrtc/packets/{devicekey}: use for forwarding WebRTC (RTP Packets) over MQTT -> Complex firewall.
-// - kerberos/webrtc/keepalive/{devicekey}: use for keeping alive forwarded WebRTC stream
-// - {devicekey}/{sessionid}/answer: once a WebRTC request is received through (kerberos/register), we'll draft an answer and send it back to the remote WebRTC client.
 // - kerberos/{hubkey}/device/{devicekey}/motion: a motion signal
 
 func ConfigureMQTT(configDirectory string, configuration *models.Configuration, communication *models.Communication) mqtt.Client {
@@ -187,25 +130,6 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 
 				// Create a susbcription for listen and reply
 				MQTTListenerHandler(c, hubKey, configDirectory, configuration, communication)
-
-				// Legacy methods below -> should be converted to the above method.
-				// Create a subscription to know if send out a livestream or not.
-				MQTTListenerHandleLiveSD(c, hubKey, configuration, communication)
-
-				// Create a subscription for the WEBRTC livestream.
-				MQTTListenerHandleLiveHDHandshake(c, hubKey, configuration, communication)
-
-				// Create a subscription for keeping alive the WEBRTC livestream.
-				MQTTListenerHandleLiveHDKeepalive(c, hubKey, configuration, communication)
-
-				// Create a subscription to listen to the number of WEBRTC peers.
-				MQTTListenerHandleLiveHDPeers(c, hubKey, configuration, communication)
-
-				// Create a subscription to listen for WEBRTC candidates.
-				MQTTListenerHandleLiveHDCandidates(c, hubKey, configuration, communication)
-
-				// Create a susbcription to listen for ONVIF actions: e.g. PTZ, Zoom, etc.
-				MQTTListenerHandleONVIF(c, hubKey, configuration, communication)
 			}
 		}
 		mqc := mqtt.NewClient(opts)
@@ -236,57 +160,99 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 			//	 payload: Payload, "a json object which might be encrypted"
 			// }
 
-			var message Message
+			var message models.Message
 			json.Unmarshal(msg.Payload(), &message)
 
-			if message.Mid != "" && message.Timestamp != 0 {
+			// We will receive all messages from our hub, so we'll need to filter to the relevant device.
+			if message.Mid != "" && message.Timestamp != 0 && message.DeviceId == configuration.Config.Key {
 				// Messages might be encrypted, if so we'll
 				// need to decrypt them.
-				var payload Payload
+				var payload models.Payload
 				if message.Encrypted {
-					// We'll find out the key we use to decrypt the message.
-					// TODO -> still needs to be implemented.
-					// Use to fingerprint to act accordingly.
+					encryptedValue := message.Payload.EncryptedValue
+					if len(encryptedValue) > 0 {
+						symmetricKey := configuration.Config.Encryption.SymmetricKey
+						privateKey := configuration.Config.Encryption.PrivateKey
+						r := strings.NewReader(privateKey)
+						pemBytes, _ := ioutil.ReadAll(r)
+						block, _ := pem.Decode(pemBytes)
+						if block == nil {
+							log.Log.Error("MQTTListenerHandler: error decoding PEM block containing private key")
+							return
+						} else {
+							// Parse private key
+							b := block.Bytes
+							key, err := x509.ParsePKCS8PrivateKey(b)
+							if err != nil {
+								log.Log.Error("MQTTListenerHandler: error parsing private key: " + err.Error())
+								return
+							} else {
+								// Conver key to *rsa.PrivateKey
+								rsaKey, _ := key.(*rsa.PrivateKey)
+
+								// Get encrypted key from message, delimited by :::
+								encryptedKey := strings.Split(encryptedValue, ":::")[0]   // encrypted with RSA
+								encryptedValue := strings.Split(encryptedValue, ":::")[1] // encrypted with AES
+								// Convert encrypted value to []byte
+								decryptedKey, err := encryption.DecryptWithPrivateKey(encryptedKey, rsaKey)
+								if decryptedKey != nil {
+									if string(decryptedKey) == symmetricKey {
+										// Decrypt value with decryptedKey
+										decryptedValue, err := encryption.AesDecrypt(encryptedValue, string(decryptedKey))
+										if err != nil {
+											log.Log.Error("MQTTListenerHandler: error decrypting message: " + err.Error())
+											return
+										}
+										json.Unmarshal([]byte(decryptedValue), &payload)
+									} else {
+										log.Log.Error("MQTTListenerHandler: error decrypting message, assymetric keys do not match.")
+										return
+									}
+								} else if err != nil {
+									log.Log.Error("MQTTListenerHandler: error decrypting message: " + err.Error())
+									return
+								}
+							}
+						}
+					}
 				} else {
 					payload = message.Payload
 				}
 
-				// We will receive all messages from our hub, so we'll need to filter to the relevant device.
-				if payload.DeviceId != configuration.Config.Key {
-					// Not relevant for this device, so we'll ignore it.
-				} else {
-					// We'll find out which message we received, and act accordingly.
-					log.Log.Info("MQTTListenerHandler: received message with action: " + payload.Action)
-
-					switch payload.Action {
-					case "record":
-						HandleRecording(mqttClient, hubKey, payload, configuration, communication)
-					case "get-ptz-position":
-						HandleGetPTZPosition(mqttClient, hubKey, payload, configuration, communication)
-					case "update-ptz-position":
-						HandleUpdatePTZPosition(mqttClient, hubKey, payload, configuration, communication)
-					case "request-config":
-						HandleRequestConfig(mqttClient, hubKey, payload, configuration, communication)
-					case "update-config":
-						HandleUpdateConfig(mqttClient, hubKey, payload, configDirectory, configuration, communication)
-					}
+				// We'll find out which message we received, and act accordingly.
+				log.Log.Info("MQTTListenerHandler: received message with action: " + payload.Action)
+				switch payload.Action {
+				case "record":
+					go HandleRecording(mqttClient, hubKey, payload, configuration, communication)
+				case "get-ptz-position":
+					go HandleGetPTZPosition(mqttClient, hubKey, payload, configuration, communication)
+				case "update-ptz-position":
+					go HandleUpdatePTZPosition(mqttClient, hubKey, payload, configuration, communication)
+				case "navigate-ptz":
+					go HandleNavigatePTZ(mqttClient, hubKey, payload, configuration, communication)
+				case "request-config":
+					go HandleRequestConfig(mqttClient, hubKey, payload, configuration, communication)
+				case "update-config":
+					go HandleUpdateConfig(mqttClient, hubKey, payload, configDirectory, configuration, communication)
+				case "request-sd-stream":
+					go HandleRequestSDStream(mqttClient, hubKey, payload, configuration, communication)
+				case "request-hd-stream":
+					go HandleRequestHDStream(mqttClient, hubKey, payload, configuration, communication)
+				case "receive-hd-candidates":
+					go HandleReceiveHDCandidates(mqttClient, hubKey, payload, configuration, communication)
 				}
+
 			}
 		})
 	}
 }
 
-// We received a recording request, we'll send it to the motion handler.
-type RecordPayload struct {
-	Timestamp int64 `json:"timestamp"` // timestamp of the recording request.
-}
-
-func HandleRecording(mqttClient mqtt.Client, hubKey string, payload Payload, configuration *models.Configuration, communication *models.Communication) {
+func HandleRecording(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
 	value := payload.Value
 
 	// Convert map[string]interface{} to RecordPayload
 	jsonData, _ := json.Marshal(value)
-	var recordPayload RecordPayload
+	var recordPayload models.RecordPayload
 	json.Unmarshal(jsonData, &recordPayload)
 
 	if recordPayload.Timestamp != 0 {
@@ -297,17 +263,12 @@ func HandleRecording(mqttClient mqtt.Client, hubKey string, payload Payload, con
 	}
 }
 
-// We received a preset position request, we'll request it through onvif and send it back.
-type PTZPositionPayload struct {
-	Timestamp int64 `json:"timestamp"` // timestamp of the preset request.
-}
-
-func HandleGetPTZPosition(mqttClient mqtt.Client, hubKey string, payload Payload, configuration *models.Configuration, communication *models.Communication) {
+func HandleGetPTZPosition(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
 	value := payload.Value
 
 	// Convert map[string]interface{} to PTZPositionPayload
 	jsonData, _ := json.Marshal(value)
-	var positionPayload PTZPositionPayload
+	var positionPayload models.PTZPositionPayload
 	json.Unmarshal(jsonData, &positionPayload)
 
 	if positionPayload.Timestamp != 0 {
@@ -318,8 +279,8 @@ func HandleGetPTZPosition(mqttClient mqtt.Client, hubKey string, payload Payload
 		} else {
 			// Needs to wrapped!
 			posString := fmt.Sprintf("%f,%f,%f", pos.PanTilt.X, pos.PanTilt.Y, pos.Zoom.X)
-			message := Message{
-				Payload: Payload{
+			message := models.Message{
+				Payload: models.Payload{
 					Action:   "ptz-position",
 					DeviceId: configuration.Config.Key,
 					Value: map[string]interface{}{
@@ -328,7 +289,7 @@ func HandleGetPTZPosition(mqttClient mqtt.Client, hubKey string, payload Payload
 					},
 				},
 			}
-			payload, err := PackageMQTTMessage(message)
+			payload, err := models.PackageMQTTMessage(configuration, message)
 			if err == nil {
 				mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
 			} else {
@@ -338,7 +299,7 @@ func HandleGetPTZPosition(mqttClient mqtt.Client, hubKey string, payload Payload
 	}
 }
 
-func HandleUpdatePTZPosition(mqttClient mqtt.Client, hubKey string, payload Payload, configuration *models.Configuration, communication *models.Communication) {
+func HandleUpdatePTZPosition(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
 	value := payload.Value
 
 	// Convert map[string]interface{} to PTZPositionPayload
@@ -356,17 +317,12 @@ func HandleUpdatePTZPosition(mqttClient mqtt.Client, hubKey string, payload Payl
 	}
 }
 
-// We received a request config request, we'll fetch the current config and send it back.
-type RequestConfigPayload struct {
-	Timestamp int64 `json:"timestamp"` // timestamp of the preset request.
-}
-
-func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload Payload, configuration *models.Configuration, communication *models.Communication) {
+func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
 	value := payload.Value
 
 	// Convert map[string]interface{} to RequestConfigPayload
 	jsonData, _ := json.Marshal(value)
-	var configPayload RequestConfigPayload
+	var configPayload models.RequestConfigPayload
 	json.Unmarshal(jsonData, &configPayload)
 
 	if configPayload.Timestamp != 0 {
@@ -381,14 +337,14 @@ func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload Payload,
 			inrec, _ := json.Marshal(configuration.Config)
 			json.Unmarshal(inrec, &configMap)
 
-			message := Message{
-				Payload: Payload{
+			message := models.Message{
+				Payload: models.Payload{
 					Action:   "receive-config",
 					DeviceId: configuration.Config.Key,
 					Value:    configMap,
 				},
 			}
-			payload, err := PackageMQTTMessage(message)
+			payload, err := models.PackageMQTTMessage(configuration, message)
 			if err == nil {
 				mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
 			} else {
@@ -403,18 +359,12 @@ func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload Payload,
 	}
 }
 
-// We received a update config request, we'll update the current config and send a confirmation back.
-type UpdateConfigPayload struct {
-	Timestamp int64         `json:"timestamp"` // timestamp of the preset request.
-	Config    models.Config `json:"config"`
-}
-
-func HandleUpdateConfig(mqttClient mqtt.Client, hubKey string, payload Payload, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+func HandleUpdateConfig(mqttClient mqtt.Client, hubKey string, payload models.Payload, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 	value := payload.Value
 
 	// Convert map[string]interface{} to UpdateConfigPayload
 	jsonData, _ := json.Marshal(value)
-	var configPayload UpdateConfigPayload
+	var configPayload models.UpdateConfigPayload
 	json.Unmarshal(jsonData, &configPayload)
 
 	if configPayload.Timestamp != 0 {
@@ -423,14 +373,13 @@ func HandleUpdateConfig(mqttClient mqtt.Client, hubKey string, payload Payload, 
 		err := configService.SaveConfig(configDirectory, config, configuration, communication)
 		if err == nil {
 			log.Log.Info("HandleUpdateConfig: Config updated")
-
-			message := Message{
-				Payload: Payload{
+			message := models.Message{
+				Payload: models.Payload{
 					Action:   "acknowledge-update-config",
 					DeviceId: configuration.Config.Key,
 				},
 			}
-			payload, err := PackageMQTTMessage(message)
+			payload, err := models.PackageMQTTMessage(configuration, message)
 			if err == nil {
 				mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
 			} else {
@@ -442,129 +391,93 @@ func HandleUpdateConfig(mqttClient mqtt.Client, hubKey string, payload Payload, 
 	}
 }
 
-func DisconnectMQTT(mqttClient mqtt.Client, config *models.Config) {
-	if mqttClient != nil {
-		// Cleanup all subscriptions
-		// New methods
-		mqttClient.Unsubscribe("kerberos/agent/" + PREV_HubKey)
+func HandleRequestSDStream(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
+	value := payload.Value
+	// Convert map[string]interface{} to RequestSDStreamPayload
+	jsonData, _ := json.Marshal(value)
+	var requestSDStreamPayload models.RequestSDStreamPayload
+	json.Unmarshal(jsonData, &requestSDStreamPayload)
 
-		// Legacy methods
-		mqttClient.Unsubscribe("kerberos/" + PREV_HubKey + "/device/" + PREV_AgentKey + "/request-live")
-		mqttClient.Unsubscribe(PREV_AgentKey + "/register")
-		mqttClient.Unsubscribe("kerberos/webrtc/keepalivehub/" + PREV_AgentKey)
-		mqttClient.Unsubscribe("kerberos/webrtc/peers/" + PREV_AgentKey)
-		mqttClient.Unsubscribe("candidate/cloud")
-		mqttClient.Unsubscribe("kerberos/onvif/" + PREV_AgentKey)
-
-		mqttClient.Disconnect(1000)
-		mqttClient = nil
-		log.Log.Info("DisconnectMQTT: MQTT client disconnected.")
-	}
-}
-
-// #################################################################################################
-// Below you'll find legacy methods, as of now we'll have a single subscription, which scales better
-
-func MQTTListenerHandleLiveSD(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, communication *models.Communication) {
-	config := configuration.Config
-	topicRequest := "kerberos/" + hubKey + "/device/" + config.Key + "/request-live"
-	mqttClient.Subscribe(topicRequest, 0, func(c mqtt.Client, msg mqtt.Message) {
+	if requestSDStreamPayload.Timestamp != 0 {
 		if communication.CameraConnected {
 			select {
 			case communication.HandleLiveSD <- time.Now().Unix():
 			default:
 			}
-			log.Log.Info("MQTTListenerHandleLiveSD: received request to livestream.")
+			log.Log.Info("HandleRequestSDStream: received request to livestream.")
 		} else {
-			log.Log.Info("MQTTListenerHandleLiveSD: received request to livestream, but camera is not connected.")
+			log.Log.Info("HandleRequestSDStream: received request to livestream, but camera is not connected.")
 		}
-		msg.Ack()
-	})
+	}
 }
 
-func MQTTListenerHandleLiveHDHandshake(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, communication *models.Communication) {
-	config := configuration.Config
-	topicRequestWebRtc := config.Key + "/register"
-	mqttClient.Subscribe(topicRequestWebRtc, 0, func(c mqtt.Client, msg mqtt.Message) {
+func HandleRequestHDStream(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
+	value := payload.Value
+	// Convert map[string]interface{} to RequestHDStreamPayload
+	jsonData, _ := json.Marshal(value)
+	var requestHDStreamPayload models.RequestHDStreamPayload
+	json.Unmarshal(jsonData, &requestHDStreamPayload)
+
+	if requestHDStreamPayload.Timestamp != 0 {
 		if communication.CameraConnected {
-			var sdp models.SDPPayload
-			json.Unmarshal(msg.Payload(), &sdp)
+			// Set the Hub key, so we can send back the answer.
+			requestHDStreamPayload.HubKey = hubKey
 			select {
-			case communication.HandleLiveHDHandshake <- sdp:
+			case communication.HandleLiveHDHandshake <- requestHDStreamPayload:
 			default:
 			}
-			log.Log.Info("MQTTListenerHandleLiveHDHandshake: received request to setup webrtc.")
+			log.Log.Info("HandleRequestHDStream: received request to setup webrtc.")
 		} else {
-			log.Log.Info("MQTTListenerHandleLiveHDHandshake: received request to setup webrtc, but camera is not connected.")
+			log.Log.Info("HandleRequestHDStream: received request to setup webrtc, but camera is not connected.")
 		}
-		msg.Ack()
-	})
+	}
 }
 
-func MQTTListenerHandleLiveHDKeepalive(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, communication *models.Communication) {
-	config := configuration.Config
-	topicKeepAlive := fmt.Sprintf("kerberos/webrtc/keepalivehub/%s", config.Key)
-	mqttClient.Subscribe(topicKeepAlive, 0, func(c mqtt.Client, msg mqtt.Message) {
+func HandleReceiveHDCandidates(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
+	value := payload.Value
+	// Convert map[string]interface{} to ReceiveHDCandidatesPayload
+	jsonData, _ := json.Marshal(value)
+	var receiveHDCandidatesPayload models.ReceiveHDCandidatesPayload
+	json.Unmarshal(jsonData, &receiveHDCandidatesPayload)
+
+	if receiveHDCandidatesPayload.Timestamp != 0 {
 		if communication.CameraConnected {
-			alive := string(msg.Payload())
-			communication.HandleLiveHDKeepalive <- alive
-			log.Log.Info("MQTTListenerHandleLiveHDKeepalive: Received keepalive: " + alive)
+			channel := webrtc.CandidateArrays[receiveHDCandidatesPayload.SessionID]
+			log.Log.Info("HandleReceiveHDCandidates: " + receiveHDCandidatesPayload.Candidate)
+			channel <- receiveHDCandidatesPayload.Candidate
 		} else {
-			log.Log.Info("MQTTListenerHandleLiveHDKeepalive: received keepalive, but camera is not connected.")
+			log.Log.Info("HandleReceiveHDCandidates: received candidate, but camera is not connected.")
 		}
-	})
+	}
 }
 
-func MQTTListenerHandleLiveHDPeers(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, communication *models.Communication) {
-	config := configuration.Config
-	topicPeers := fmt.Sprintf("kerberos/webrtc/peers/%s", config.Key)
-	mqttClient.Subscribe(topicPeers, 0, func(c mqtt.Client, msg mqtt.Message) {
-		if communication.CameraConnected {
-			peerCount := string(msg.Payload())
-			communication.HandleLiveHDPeers <- peerCount
-			log.Log.Info("MQTTListenerHandleLiveHDPeers: Number of peers listening: " + peerCount)
-		} else {
-			log.Log.Info("MQTTListenerHandleLiveHDPeers: received peer count, but camera is not connected.")
-		}
-	})
-}
+func HandleNavigatePTZ(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
+	value := payload.Value
+	jsonData, _ := json.Marshal(value)
+	var navigatePTZPayload models.NavigatePTZPayload
+	json.Unmarshal(jsonData, &navigatePTZPayload)
 
-func MQTTListenerHandleLiveHDCandidates(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, communication *models.Communication) {
-	config := configuration.Config
-	topicCandidates := "candidate/cloud"
-	mqttClient.Subscribe(topicCandidates, 0, func(c mqtt.Client, msg mqtt.Message) {
+	if navigatePTZPayload.Timestamp != 0 {
 		if communication.CameraConnected {
-			var candidate models.Candidate
-			json.Unmarshal(msg.Payload(), &candidate)
-			if candidate.CloudKey == config.Key {
-				key := candidate.CloudKey + "/" + candidate.Cuuid
-				candidatesExists := false
-				var channel chan string
-				for !candidatesExists {
-					webrtc.CandidatesMutex.Lock()
-					channel, candidatesExists = webrtc.CandidateArrays[key]
-					webrtc.CandidatesMutex.Unlock()
-				}
-				log.Log.Info("MQTTListenerHandleLiveHDCandidates: " + string(msg.Payload()))
-				channel <- string(msg.Payload())
-			}
-		} else {
-			log.Log.Info("MQTTListenerHandleLiveHDCandidates: received candidate, but camera is not connected.")
-		}
-	})
-}
-
-func MQTTListenerHandleONVIF(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, communication *models.Communication) {
-	config := configuration.Config
-	topicOnvif := fmt.Sprintf("kerberos/onvif/%s", config.Key)
-	mqttClient.Subscribe(topicOnvif, 0, func(c mqtt.Client, msg mqtt.Message) {
-		if communication.CameraConnected {
+			action := navigatePTZPayload.Action
 			var onvifAction models.OnvifAction
-			json.Unmarshal(msg.Payload(), &onvifAction)
+			json.Unmarshal([]byte(action), &onvifAction)
 			communication.HandleONVIF <- onvifAction
-			log.Log.Info("MQTTListenerHandleONVIF: Received an action - " + onvifAction.Action)
+			log.Log.Info("HandleNavigatePTZ: Received an action - " + onvifAction.Action)
+
 		} else {
-			log.Log.Info("MQTTListenerHandleONVIF: received action, but camera is not connected.")
+			log.Log.Info("HandleNavigatePTZ: received action, but camera is not connected.")
 		}
-	})
+	}
+}
+
+func DisconnectMQTT(mqttClient mqtt.Client, config *models.Config) {
+	if mqttClient != nil {
+		// Cleanup all subscriptions
+		// New methods
+		mqttClient.Unsubscribe("kerberos/agent/" + PREV_HubKey)
+		mqttClient.Disconnect(1000)
+		mqttClient = nil
+		log.Log.Info("DisconnectMQTT: MQTT client disconnected.")
+	}
 }

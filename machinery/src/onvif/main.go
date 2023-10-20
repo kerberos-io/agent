@@ -391,7 +391,7 @@ func ZoomOutCompletely(device *onvif.Device, configuration ptz.GetConfigurations
 func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float64, zoom float64, speed float64, wait time.Duration) error {
 	position, err := GetPosition(device, token)
 
-	if position.PanTilt.X >= pan-0.005 && position.PanTilt.X <= pan+0.005 {
+	if position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01 {
 
 	} else {
 
@@ -423,9 +423,15 @@ func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsR
 
 		// While moving we'll check if we reached the desired position.
 		// or if we overshot the desired position.
+
+		// Break after 3seconds
+		now := time.Now()
 		for {
 			position, _ := GetPosition(device, token)
-			if position.PanTilt.X == -1 || position.PanTilt.X == 1 || (directionX > 0 && position.PanTilt.X >= pan) || (directionX < 0 && position.PanTilt.X <= pan) || (position.PanTilt.X >= pan-0.005 && position.PanTilt.X <= pan+0.005) {
+			if position.PanTilt.X == -1 || position.PanTilt.X == 1 || (directionX > 0 && position.PanTilt.X >= pan) || (directionX < 0 && position.PanTilt.X <= pan) || (position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01) {
+				break
+			}
+			if time.Since(now) > 3*time.Second {
 				break
 			}
 			time.Sleep(wait)
@@ -479,9 +485,15 @@ func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 
 		// While moving we'll check if we reached the desired position.
 		// or if we overshot the desired position.
+
+		// Break after 3seconds
+		now := time.Now()
 		for {
 			position, _ := GetPosition(device, token)
 			if position.PanTilt.Y == -1 || position.PanTilt.Y == 1 || (directionY > 0 && position.PanTilt.Y >= tilt) || (directionY < 0 && position.PanTilt.Y <= tilt) || (position.PanTilt.Y >= tilt-0.005 && position.PanTilt.Y <= tilt+0.005) {
+				break
+			}
+			if time.Since(now) > 3*time.Second {
 				break
 			}
 			time.Sleep(wait)
@@ -534,9 +546,15 @@ func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 
 		// While moving we'll check if we reached the desired position.
 		// or if we overshot the desired position.
+
+		// Break after 3seconds
+		now := time.Now()
 		for {
 			position, _ := GetPosition(device, token)
 			if position.Zoom.X == -1 || position.Zoom.X == 1 || (directionZ > 0 && position.Zoom.X >= zoom) || (directionZ < 0 && position.Zoom.X <= zoom) || (position.Zoom.X >= zoom-0.005 && position.Zoom.X <= zoom+0.005) {
+				break
+			}
+			if time.Since(now) > 3*time.Second {
 				break
 			}
 			time.Sleep(wait)

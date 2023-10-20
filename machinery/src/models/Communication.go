@@ -26,7 +26,7 @@ type Communication struct {
 	HandleHeartBeat       chan string
 	HandleLiveSD          chan int64
 	HandleLiveHDKeepalive chan string
-	HandleLiveHDHandshake chan SDPPayload
+	HandleLiveHDHandshake chan RequestHDStreamPayload
 	HandleLiveHDPeers     chan string
 	HandleONVIF           chan OnvifAction
 	IsConfiguring         *abool.AtomicBool

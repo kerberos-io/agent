@@ -227,6 +227,10 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_KERBEROSVAULT_DIRECTORY`         | The directory, in the provider, where the recordings will be stored in.                         | ""                             |
 | `AGENT_DROPBOX_ACCESS_TOKEN`            | The Access Token from your Dropbox app, that is used to leverage the Dropbox SDK.               | ""                             |
 | `AGENT_DROPBOX_DIRECTORY`               | The directory, in the provider, where the recordings will be stored in.                         | ""                             |
+| `AGENT_ENCRYPTION`                      | Enable 'true' or disable 'false' end-to-end encryption through MQTT (recordings will follow).   | "false"                        |
+| `AGENT_ENCRYPTION_FINGERPRINT`          | The fingerprint of the keypair (public/private keys), so you know which one to use.             | ""                             |
+| `AGENT_ENCRYPTION_PRIVATE_KEY`          | The private key (assymetric/RSA) to decryptand sign requests send over MQTT.                    | ""                             |
+| `AGENT_ENCRYPTION_SYMMETRIC_KEY`        | The symmetric key (AES) to encrypt and decrypt request send over MQTT.                          | ""                             |
 
 ## Contribute with Codespaces
 

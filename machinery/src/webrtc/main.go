@@ -87,19 +87,22 @@ func (w WebRTC) CreateOffer(sd []byte) pionWebRTC.SessionDescription {
 	return offer
 }
 
-func InitializeWebRTCConnection(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, handshake models.SDPPayload, candidates chan string) {
+func InitializeWebRTCConnection(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, handshake models.RequestHDStreamPayload, candidates chan string) {
 
 	config := configuration.Config
-
 	deviceKey := config.Key
 	stunServers := []string{config.STUNURI}
 	turnServers := []string{config.TURNURI}
 	turnServersUsername := config.TURNUsername
 	turnServersCredential := config.TURNPassword
 
+	// Set variables
+	hubKey := handshake.HubKey
+	sessionDescription := handshake.SessionDescription
+
 	// Create WebRTC object
 	w := CreateWebRTC(deviceKey, stunServers, turnServers, turnServersUsername, turnServersCredential)
-	sd, err := w.DecodeSessionDescription(handshake.Sdp)
+	sd, err := w.DecodeSessionDescription(sessionDescription)
 
 	if err == nil {
 
@@ -122,7 +125,6 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 						Credential: w.TurnServersCredential,
 					},
 				},
-				//ICETransportPolicy: pionWebRTC.ICETransportPolicyRelay,
 			},
 		)
 
@@ -143,7 +145,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			peerConnection.OnICEConnectionStateChange(func(connectionState pionWebRTC.ICEConnectionState) {
 				if connectionState == pionWebRTC.ICEConnectionStateDisconnected {
 					atomic.AddInt64(&peerConnectionCount, -1)
-					peerConnections[handshake.Cuuid] = nil
+					peerConnections[handshake.SessionID] = nil
 					close(candidates)
 					close(w.PacketsCount)
 					if err := peerConnection.Close(); err != nil {
@@ -152,9 +154,12 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				} else if connectionState == pionWebRTC.ICEConnectionStateConnected {
 					atomic.AddInt64(&peerConnectionCount, 1)
 				} else if connectionState == pionWebRTC.ICEConnectionStateChecking {
+					// Iterate over the candidates and send them to the remote client
+					// Non blocking channel
 					for candidate := range candidates {
 						log.Log.Info("InitializeWebRTCConnection: Received candidate.")
 						if candidateErr := peerConnection.AddICECandidate(pionWebRTC.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
+							log.Log.Error("InitializeWebRTCConnection: something went wrong while adding candidate: " + candidateErr.Error())
 						}
 					}
 				}
@@ -167,7 +172,6 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				panic(err)
 			}
 
-			//gatherCompletePromise := pionWebRTC.GatheringCompletePromise(peerConnection)
 			answer, err := peerConnection.CreateAnswer(nil)
 			if err != nil {
 				panic(err)
@@ -175,37 +179,64 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				panic(err)
 			}
 
-			// When an ICE candidate is available send to the other Pion instance
-			// the other Pion instance will add this candidate by calling AddICECandidate
-			var candidatesMux sync.Mutex
+			// When an ICE candidate is available send to the other peer using the signaling server (MQTT).
+			// The other peer will add this candidate by calling AddICECandidate
 			peerConnection.OnICECandidate(func(candidate *pionWebRTC.ICECandidate) {
-
 				if candidate == nil {
 					return
 				}
 
-				candidatesMux.Lock()
-				defer candidatesMux.Unlock()
-
-				topic := fmt.Sprintf("%s/%s/candidate/edge", deviceKey, handshake.Cuuid)
-				log.Log.Info("InitializeWebRTCConnection: Send candidate to " + topic)
-				candiInit := candidate.ToJSON()
+				//  Create a config map
+				valueMap := make(map[string]interface{})
+				candateJSON := candidate.ToJSON()
 				sdpmid := "0"
-				candiInit.SDPMid = &sdpmid
-				candi, err := json.Marshal(candiInit)
+				candateJSON.SDPMid = &sdpmid
+				candateBinary, err := json.Marshal(candateJSON)
 				if err == nil {
-					log.Log.Info("InitializeWebRTCConnection:" + string(candi))
-					token := mqttClient.Publish(topic, 2, false, candi)
-					token.Wait()
+					valueMap["candidate"] = string(candateBinary)
+				} else {
+					log.Log.Info("HandleRequestConfig: something went wrong while marshalling candidate: " + err.Error())
+				}
+
+				// We'll send the candidate to the hub
+				message := models.Message{
+					Payload: models.Payload{
+						Action:   "receive-hd-candidates",
+						DeviceId: configuration.Config.Key,
+						Value:    valueMap,
+					},
+				}
+				payload, err := models.PackageMQTTMessage(configuration, message)
+				if err == nil {
+					mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+				} else {
+					log.Log.Info("HandleRequestConfig: something went wrong while sending acknowledge config to hub: " + string(payload))
 				}
 			})
 
-			peerConnections[handshake.Cuuid] = peerConnection
+			// Create a channel which will be used to send candidates to the other peer
+			peerConnections[handshake.SessionID] = peerConnection
 
 			if err == nil {
-				topic := fmt.Sprintf("%s/%s/answer", deviceKey, handshake.Cuuid)
-				log.Log.Info("InitializeWebRTCConnection: Send SDP answer to " + topic)
-				mqttClient.Publish(topic, 2, false, []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP))))
+				//  Create a config map
+				valueMap := make(map[string]interface{})
+				valueMap["sdp"] = []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP)))
+				log.Log.Info("InitializeWebRTCConnection: Send SDP answer")
+
+				// We'll send the candidate to the hub
+				message := models.Message{
+					Payload: models.Payload{
+						Action:   "receive-hd-answer",
+						DeviceId: configuration.Config.Key,
+						Value:    valueMap,
+					},
+				}
+				payload, err := models.PackageMQTTMessage(configuration, message)
+				if err == nil {
+					mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+				} else {
+					log.Log.Info("HandleRequestConfig: something went wrong while sending acknowledge config to hub: " + string(payload))
+				}
 			}
 		}
 	} else {
@@ -358,16 +389,9 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 					pkt.Data = append(codecData.(h264parser.CodecData).SPS(), pkt.Data...)
 					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
 					log.Log.Info("WriteToTrack: Sending keyframe")
-
-					if config.Capture.ForwardWebRTC == "true" {
-						log.Log.Info("WriteToTrack: Sending keep a live to remote broker.")
-						topic := fmt.Sprintf("kerberos/webrtc/keepalive/%s", config.Key)
-						mqttClient.Publish(topic, 2, false, "1")
-					}
 				}
 
 				if start {
-
 					sample := pionMedia.Sample{Data: pkt.Data, Duration: bufferDuration}
 					if config.Capture.ForwardWebRTC == "true" {
 						samplePacket, err := json.Marshal(sample)

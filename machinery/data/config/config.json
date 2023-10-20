@@ -111,5 +111,6 @@
 	"hub_key": "",
 	"hub_private_key": "",
 	"hub_site": "",
-	"condition_uri": ""
+	"condition_uri": "",
+	"encryption": {}
 }

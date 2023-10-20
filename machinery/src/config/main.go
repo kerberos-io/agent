@@ -461,6 +461,24 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 			case "AGENT_DROPBOX_DIRECTORY":
 				configuration.Config.Dropbox.Directory = value
 				break
+
+			/* When encryption is enabled */
+			case "AGENT_ENCRYPTION":
+				if value == "true" {
+					configuration.Config.Encryption.Enabled = true
+				} else {
+					configuration.Config.Encryption.Enabled = false
+				}
+				break
+			case "AGENT_ENCRYPTION_FINGERPRINT":
+				configuration.Config.Encryption.Fingerprint = value
+				break
+			case "AGENT_ENCRYPTION_PRIVATE_KEY":
+				configuration.Config.Encryption.PrivateKey = value
+				break
+			case "AGENT_ENCRYPTION_SYMMETRIC_KEY":
+				configuration.Config.Encryption.SymmetricKey = value
+				break
 			}
 		}
 	}

@@ -458,18 +458,16 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 			// Allocate frame
 			frame := ffmpeg.AllocVideoFrame()
 
-			key := ""
+			hubKey := ""
 			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
-				key = config.S3.Publickey
+				hubKey = config.S3.Publickey
 			} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
-				key = config.KStorage.CloudKey
+				hubKey = config.KStorage.CloudKey
 			}
 			// This is the new way ;)
 			if config.HubKey != "" {
-				key = config.HubKey
+				hubKey = config.HubKey
 			}
-
-			topic := "kerberos/" + key + "/device/" + config.Key + "/live"
 
 			lastLivestreamRequest := int64(0)
 
@@ -491,7 +489,27 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 					continue
 				}
 				log.Log.Info("HandleLiveStreamSD: Sending base64 encoded images to MQTT.")
-				sendImage(frame, topic, mqttClient, pkt, decoder, decoderMutex)
+				_, err := computervision.GetRawImage(frame, pkt, decoder, decoderMutex)
+				if err == nil {
+					bytes, _ := computervision.ImageToBytes(&frame.Image)
+					encoded := base64.StdEncoding.EncodeToString(bytes)
+
+					valueMap := make(map[string]interface{})
+					valueMap["image"] = encoded
+					message := models.Message{
+						Payload: models.Payload{
+							Action:   "receive-sd-stream",
+							DeviceId: configuration.Config.Key,
+							Value:    valueMap,
+						},
+					}
+					payload, err := models.PackageMQTTMessage(configuration, message)
+					if err == nil {
+						mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+					} else {
+						log.Log.Info("HandleRequestConfig: something went wrong while sending acknowledge config to hub: " + string(payload))
+					}
+				}
 			}
 
 			// Cleanup the frame.
@@ -503,15 +521,6 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 	}
 
 	log.Log.Debug("HandleLiveStreamSD: finished")
-}
-
-func sendImage(frame *ffmpeg.VideoFrame, topic string, mqttClient mqtt.Client, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
-	_, err := computervision.GetRawImage(frame, pkt, decoder, decoderMutex)
-	if err == nil {
-		bytes, _ := computervision.ImageToBytes(&frame.Image)
-		encoded := base64.StdEncoding.EncodeToString(bytes)
-		mqttClient.Publish(topic, 0, false, encoded)
-	}
 }
 
 func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, codecs []av.CodecData, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
@@ -532,25 +541,23 @@ func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 
 			if config.Capture.ForwardWebRTC == "true" {
 				// We get a request with an offer, but we'll forward it.
-				for m := range communication.HandleLiveHDHandshake {
+				/*for m := range communication.HandleLiveHDHandshake {
 					// Forward SDP
 					m.CloudKey = config.Key
 					request, err := json.Marshal(m)
 					if err == nil {
 						mqttClient.Publish("kerberos/webrtc/request", 2, false, request)
 					}
-				}
+				}*/
 			} else {
 				log.Log.Info("HandleLiveStreamHD: Waiting for peer connections.")
 				for handshake := range communication.HandleLiveHDHandshake {
 					log.Log.Info("HandleLiveStreamHD: setting up a peer connection.")
-					key := config.Key + "/" + handshake.Cuuid
-					webrtc.CandidatesMutex.Lock()
+					key := config.Key + "/" + handshake.SessionID
 					_, ok := webrtc.CandidateArrays[key]
 					if !ok {
-						webrtc.CandidateArrays[key] = make(chan string, 30)
+						webrtc.CandidateArrays[key] = make(chan string)
 					}
-					webrtc.CandidatesMutex.Unlock()
 					webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, videoTrack, audioTrack, handshake, webrtc.CandidateArrays[key])
 
 				}
