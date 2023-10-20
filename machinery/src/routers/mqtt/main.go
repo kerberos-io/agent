@@ -168,7 +168,7 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 				// Messages might be encrypted, if so we'll
 				// need to decrypt them.
 				var payload models.Payload
-				if message.Encrypted {
+				if message.Encrypted && configuration.Config.Encryption != nil && configuration.Config.Encryption.Enabled {
 					encryptedValue := message.Payload.EncryptedValue
 					if len(encryptedValue) > 0 {
 						symmetricKey := configuration.Config.Encryption.SymmetricKey

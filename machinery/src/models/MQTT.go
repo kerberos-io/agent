@@ -30,7 +30,7 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 	// At the moment we don't do the encryption part, but we'll implement it
 	// once the legacy methods (subscriptions are moved).
 	msg.Encrypted = false
-	if configuration.Config.Encryption.Enabled {
+	if configuration.Config.Encryption != nil && configuration.Config.Encryption.Enabled {
 		msg.Encrypted = true
 	}
 	msg.PublicKey = ""
