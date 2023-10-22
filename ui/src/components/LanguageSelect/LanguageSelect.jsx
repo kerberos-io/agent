@@ -20,6 +20,7 @@ const LanguageSelect = () => {
     fr: { label: 'Francais', dir: 'ltr', active: false },
     pl: { label: 'Polski', dir: 'ltr', active: false },
     de: { label: 'Deutsch', dir: 'ltr', active: false },
+    it: { label: 'Italiano', dir: 'ltr', active: false },
     pt: { label: 'Português', dir: 'ltr', active: false },
     es: { label: 'Español', dir: 'ltr', active: false },
     ja: { label: '日本', dir: 'rlt', active: false },
