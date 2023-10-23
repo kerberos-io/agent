@@ -1,7 +1,9 @@
 package http
 
 import (
+	"io"
 	"os"
+	"strconv"
 
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-contrib/pprof"
@@ -12,6 +14,7 @@ import (
 	"log"
 
 	_ "github.com/kerberos-io/agent/machinery/docs"
+	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -77,7 +80,7 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	r.Use(static.Serve("/settings", static.LocalFile(configDirectory+"/www", true)))
 	r.Use(static.Serve("/login", static.LocalFile(configDirectory+"/www", true)))
 	r.Handle("GET", "/file/*filepath", func(c *gin.Context) {
-		Files(c, configDirectory)
+		Files(c, configDirectory, configuration)
 	})
 
 	// Run the api on port
@@ -87,8 +90,50 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	}
 }
 
-func Files(c *gin.Context, configDirectory string) {
-	c.Header("Access-Control-Allow-Origin", "*")
-	c.Header("Content-Type", "video/mp4")
-	c.File(configDirectory + "/data/recordings" + c.Param("filepath"))
+func Files(c *gin.Context, configDirectory string, configuration *models.Configuration) {
+
+	// Get File
+	filePath := configDirectory + "/data/recordings" + c.Param("filepath")
+	_, err := os.Open(filePath)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "File not found"})
+		return
+	}
+
+	contents, err := os.ReadFile(filePath)
+	if err == nil {
+
+		// Get symmetric key
+		symmetricKey := configuration.Config.Encryption.SymmetricKey
+		// Decrypt file
+		if symmetricKey != "" {
+
+			// Read file
+			if err != nil {
+				c.JSON(404, gin.H{"error": "File not found"})
+				return
+			}
+
+			// Decrypt file
+			contents, err = encryption.AesDecrypt(contents, symmetricKey)
+			if err != nil {
+				c.JSON(404, gin.H{"error": "File not found"})
+				return
+			}
+		}
+
+		// Get fileSize from contents
+		fileSize := len(contents)
+
+		// Send file to gin
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Content-Disposition", "attachment; filename="+filePath)
+		c.Header("Content-Type", "video/mp4")
+		c.Header("Content-Length", strconv.Itoa(fileSize))
+		// Send contents to gin
+		io.WriteString(c.Writer, string(contents))
+	} else {
+		c.JSON(404, gin.H{"error": "File not found"})
+		return
+	}
 }
