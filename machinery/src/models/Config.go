@@ -42,7 +42,7 @@ type Config struct {
 	HubPrivateKey     string       `json:"hub_private_key" bson:"hub_private_key"`
 	HubSite           string       `json:"hub_site" bson:"hub_site"`
 	ConditionURI      string       `json:"condition_uri" bson:"condition_uri"`
-	Encryption        *Encryption  `json:"encryption" bson:"encryption"`
+	Encryption        *Encryption  `json:"encryption,omitempty" bson:"encryption",omitempty`
 }
 
 // Capture defines which camera type (Id) you are using (IP, USB or Raspberry Pi camera),
@@ -161,7 +161,8 @@ type Dropbox struct {
 
 // Encryption
 type Encryption struct {
-	Enabled      bool   `json:"enabled" bson:"enabled"`
+	Enabled      string `json:"enabled" bson:"enabled"`
+	Recordings   string `json:"recordings" bson:"recordings"`
 	Fingerprint  string `json:"fingerprint" bson:"fingerprint"`
 	PrivateKey   string `json:"private_key" bson:"private_key"`
 	SymmetricKey string `json:"symmetric_key" bson:"symmetric_key"`

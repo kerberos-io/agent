@@ -78,6 +78,21 @@ func main() {
 	case "discover":
 		log.Log.Info(timeout)
 
+	case "decrypt":
+		log.Log.Info("Decrypting: " + flag.Arg(0) + " with key: " + flag.Arg(1))
+		symmetricKey := []byte(flag.Arg(1))
+
+		if symmetricKey == nil || len(symmetricKey) == 0 {
+			log.Log.Fatal("Main: symmetric key should not be empty")
+			return
+		}
+		if len(symmetricKey) != 32 {
+			log.Log.Fatal("Main: symmetric key should be 32 bytes")
+			return
+		}
+
+		utils.Decrypt(flag.Arg(0), symmetricKey)
+
 	case "run":
 		{
 			// Print Kerberos.io ASCII art

@@ -85,7 +85,16 @@
       "advanced_configuration": "एडवांस कॉन्फ़िगरेशन",
       "description_advanced_configuration": "Kerberos एजेंट के विशिष्ट भागों को सक्षम या अक्षम करने के लिए विस्तृत कॉन्फ़िगरेशन विकल्प",
       "offline_mode": "ऑफ़लाइन मोड",
-      "description_offline_mode": "सभी आउटगोइंग ट्रैफ़िक अक्षम करें"
+      "description_offline_mode": "सभी आउटगोइंग ट्रैफ़िक अक्षम करें",
+      "encryption": "Encryption",
+      "description_encryption": "Enable encryption for all outgoing traffic. MQTT messages and/or recordings will be encrypted using AES-256. A private key is used for signing.",
+      "encryption_enabled": "Enable MQTT encryption",
+      "description_encryption_enabled": "Enable encryption for all MQTT messages.",
+      "encryption_recordings_enabled": "Enable recording encryption",
+      "description_encryption_recordings_enabled": "Enable encryption for all recordings.",
+      "encryption_fingerprint": "Fingerprint",
+      "encryption_privatekey": "Private key",
+      "encryption_symmetrickey": "Symmetric key"
     },
     "camera": {
       "camera": "कैमरा",

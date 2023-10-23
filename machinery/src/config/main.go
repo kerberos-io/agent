@@ -464,11 +464,10 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 
 			/* When encryption is enabled */
 			case "AGENT_ENCRYPTION":
-				if value == "true" {
-					configuration.Config.Encryption.Enabled = true
-				} else {
-					configuration.Config.Encryption.Enabled = false
-				}
+				configuration.Config.Encryption.Enabled = value
+				break
+			case "AGENT_ENCRYPTION_RECORDINGS":
+				configuration.Config.Encryption.Recordings = value
 				break
 			case "AGENT_ENCRYPTION_FINGERPRINT":
 				configuration.Config.Encryption.Fingerprint = value
@@ -510,6 +509,13 @@ func SaveConfig(configDirectory string, config models.Config, configuration *mod
 }
 
 func StoreConfig(configDirectory string, config models.Config) error {
+
+	// Encryption key can be set wrong.
+	encryptionPrivateKey := config.Encryption.PrivateKey
+	// Replace \\n by \n
+	encryptionPrivateKey = strings.ReplaceAll(encryptionPrivateKey, "\\n", "\n")
+	config.Encryption.PrivateKey = encryptionPrivateKey
+
 	// Save into database
 	if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
 		// Write to mongodb

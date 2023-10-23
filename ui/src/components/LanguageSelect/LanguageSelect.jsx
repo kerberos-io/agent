@@ -24,6 +24,7 @@ const LanguageSelect = () => {
     pt: { label: 'Português', dir: 'ltr', active: false },
     es: { label: 'Español', dir: 'ltr', active: false },
     ja: { label: '日本', dir: 'rlt', active: false },
+    hi: { label: 'हिंदी', dir: 'ltr', active: false },
   };
 
   if (!languageMap[selected]) {

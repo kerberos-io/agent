@@ -30,7 +30,7 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 	// At the moment we don't do the encryption part, but we'll implement it
 	// once the legacy methods (subscriptions are moved).
 	msg.Encrypted = false
-	if configuration.Config.Encryption != nil && configuration.Config.Encryption.Enabled {
+	if configuration.Config.Encryption != nil && configuration.Config.Encryption.Enabled == "true" {
 		msg.Encrypted = true
 	}
 	msg.PublicKey = ""
@@ -65,15 +65,19 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 
 			// Create a 16bit key random
 			k := configuration.Config.Encryption.SymmetricKey
-			encryptedValue, err := encryption.AesEncrypt(string(data), k)
+			encryptedValue, err := encryption.AesEncrypt(data, k)
+			if err == nil {
 
-			// Sign the encrypted value
-			signature, err := encryption.SignWithPrivateKey([]byte(encryptedValue), rsaKey)
-			base64Signature := base64.StdEncoding.EncodeToString(signature)
-
-			msg.Payload.EncryptedValue = encryptedValue
-			msg.Payload.Signature = base64Signature
-			msg.Payload.Value = make(map[string]interface{})
+				data := base64.StdEncoding.EncodeToString(encryptedValue)
+				// Sign the encrypted value
+				signature, err := encryption.SignWithPrivateKey([]byte(data), rsaKey)
+				if err == nil {
+					base64Signature := base64.StdEncoding.EncodeToString(signature)
+					msg.Payload.EncryptedValue = data
+					msg.Payload.Signature = base64Signature
+					msg.Payload.Value = make(map[string]interface{})
+				}
+			}
 		}
 	}
 

@@ -3,6 +3,7 @@ package mqtt
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
@@ -168,7 +169,7 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 				// Messages might be encrypted, if so we'll
 				// need to decrypt them.
 				var payload models.Payload
-				if message.Encrypted && configuration.Config.Encryption != nil && configuration.Config.Encryption.Enabled {
+				if message.Encrypted && configuration.Config.Encryption != nil && configuration.Config.Encryption.Enabled == "true" {
 					encryptedValue := message.Payload.EncryptedValue
 					if len(encryptedValue) > 0 {
 						symmetricKey := configuration.Config.Encryption.SymmetricKey
@@ -198,12 +199,16 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 								if decryptedKey != nil {
 									if string(decryptedKey) == symmetricKey {
 										// Decrypt value with decryptedKey
-										decryptedValue, err := encryption.AesDecrypt(encryptedValue, string(decryptedKey))
+										data, err := base64.StdEncoding.DecodeString(encryptedValue)
+										if err != nil {
+											return
+										}
+										decryptedValue, err := encryption.AesDecrypt(data, string(decryptedKey))
 										if err != nil {
 											log.Log.Error("MQTTListenerHandler: error decrypting message: " + err.Error())
 											return
 										}
-										json.Unmarshal([]byte(decryptedValue), &payload)
+										json.Unmarshal(decryptedValue, &payload)
 									} else {
 										log.Log.Error("MQTTListenerHandler: error decrypting message, assymetric keys do not match.")
 										return
@@ -333,9 +338,15 @@ func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload models.P
 
 		if key != "" && name != "" {
 
+			// Copy the config, as we don't want to share the encryption part.
+			deepCopy := configuration.Config
+
 			var configMap map[string]interface{}
-			inrec, _ := json.Marshal(configuration.Config)
+			inrec, _ := json.Marshal(deepCopy)
 			json.Unmarshal(inrec, &configMap)
+
+			// Unset encryption part.
+			delete(configMap, "encryption")
 
 			message := models.Message{
 				Payload: models.Payload{
@@ -370,6 +381,10 @@ func HandleUpdateConfig(mqttClient mqtt.Client, hubKey string, payload models.Pa
 	if configPayload.Timestamp != 0 {
 
 		config := configPayload.Config
+
+		// Make sure to remove Encryption part, as we don't want to save it.
+		config.Encryption = configuration.Config.Encryption
+
 		err := configService.SaveConfig(configDirectory, config, configuration, communication)
 		if err == nil {
 			log.Log.Info("HandleUpdateConfig: Config updated")

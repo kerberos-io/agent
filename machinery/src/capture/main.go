@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
@@ -403,6 +404,27 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 				// Check if need to convert to fragmented using bento
 				if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
 					utils.CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
+				}
+
+				// Check if we need to encrypt the recording.
+				if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
+					// reopen file into memory 'fullName'
+					contents, err := os.ReadFile(fullName)
+					if err == nil {
+						// encrypt
+						encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
+						if err == nil {
+							// write back to file
+							err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
+							if err != nil {
+								log.Log.Error("HandleRecordStream: error writing file: " + err.Error())
+							}
+						} else {
+							log.Log.Error("HandleRecordStream: error encrypting file: " + err.Error())
+						}
+					} else {
+						log.Log.Error("HandleRecordStream: error reading file: " + err.Error())
+					}
 				}
 
 				// Create a symbol linc.

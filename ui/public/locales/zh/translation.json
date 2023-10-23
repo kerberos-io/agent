@@ -85,7 +85,16 @@
       "advanced_configuration": "高级配置",
       "description_advanced_configuration": "启用或禁用 Kerberos Agent 特定部分详细配置选项",
       "offline_mode": "离线模式",
-      "description_offline_mode": "禁用所有传出流量"
+      "description_offline_mode": "禁用所有传出流量",
+      "encryption": "Encryption",
+      "description_encryption": "Enable encryption for all outgoing traffic. MQTT messages and/or recordings will be encrypted using AES-256. A private key is used for signing.",
+      "encryption_enabled": "Enable MQTT encryption",
+      "description_encryption_enabled": "Enable encryption for all MQTT messages.",
+      "encryption_recordings_enabled": "Enable recording encryption",
+      "description_encryption_recordings_enabled": "Enable encryption for all recordings.",
+      "encryption_fingerprint": "Fingerprint",
+      "encryption_privatekey": "Private key",
+      "encryption_symmetrickey": "Symmetric key"
     },
     "camera": {
       "camera": "相机",

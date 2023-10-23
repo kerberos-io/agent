@@ -147,6 +147,20 @@ The default username and password for the Kerberos Agent is:
 
 **_Please note that you change the username and password for a final installation, see [Configure with environment variables](#configure-with-environment-variables) below._**
 
+## Encryption
+
+You can encrypt your recordings and outgoing MQTT messages with your own AES and RSA keys by enabling the encryption settings. Once enabled all your recordings will be encrypted using AES-256-CBC and your symmetric key. You can either use the default `openssl` toolchain to decrypt the recordings with your AES key, as following:
+
+    openssl aes-256-cbc -d -md md5 -in encrypted.mp4 -out decrypted.mp4 -k your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
+
+, and additionally you can decrypt a folder of recordings, using the Kerberos Agent binary as following:
+
+    go run main.go -action decrypt ./data/recordings your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
+
+or for a single file:
+
+    go run main.go -action decrypt ./data/recordings/video.mp4 your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
+
 ## Configure and persist with volume mounts
 
 An example of how to mount a host directory is shown below using `docker`, but is applicable for [all the deployment models and tools described above](#running-and-automating-a-kerberos-agent).
@@ -227,7 +241,8 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_KERBEROSVAULT_DIRECTORY`         | The directory, in the provider, where the recordings will be stored in.                         | ""                             |
 | `AGENT_DROPBOX_ACCESS_TOKEN`            | The Access Token from your Dropbox app, that is used to leverage the Dropbox SDK.               | ""                             |
 | `AGENT_DROPBOX_DIRECTORY`               | The directory, in the provider, where the recordings will be stored in.                         | ""                             |
-| `AGENT_ENCRYPTION`                      | Enable 'true' or disable 'false' end-to-end encryption through MQTT (recordings will follow).   | "false"                        |
+| `AGENT_ENCRYPTION`                      | Enable 'true' or disable 'false' end-to-end encryption for MQTT messages.                       | "false"                        |
+| `AGENT_ENCRYPTION_RECORDINGS`           | Enable 'true' or disable 'false' end-to-end encryption for recordings.                          | "false"                        |
 | `AGENT_ENCRYPTION_FINGERPRINT`          | The fingerprint of the keypair (public/private keys), so you know which one to use.             | ""                             |
 | `AGENT_ENCRYPTION_PRIVATE_KEY`          | The private key (assymetric/RSA) to decryptand sign requests send over MQTT.                    | ""                             |
 | `AGENT_ENCRYPTION_SYMMETRIC_KEY`        | The symmetric key (AES) to encrypt and decrypt request send over MQTT.                          | ""                             |
