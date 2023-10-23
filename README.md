@@ -109,8 +109,10 @@ This repository contains everything you'll need to know about our core product, 
 - Single camera per instance (e.g. one container per camera).
 - Primary and secondary stream setup (record full-res, stream low-res).
 - Low resolution streaming through MQTT and full resolution streaming through WebRTC.
+- End-to-end encryption through MQTT using RSA and AES.
 - Ability to specifiy conditions: offline mode, motion region, time table, continuous recording, etc.
 - Post- and pre-recording on motion detection.
+- Encryption at rest using AES-256-CBC.
 - Ability to create fragmented recordings, and streaming though HLS fMP4.
 - [Deploy where you want](#how-to-run-and-deploy-a-kerberos-agent) with the tools you use: `docker`, `docker compose`, `ansible`, `terraform`, `kubernetes`, etc.
 - Cloud storage/persistance: Kerberos Hub, Kerberos Vault and Dropbox. [(WIP: Minio, Storj, Google Drive, FTP etc.)](https://github.com/kerberos-io/agent/issues/95)
