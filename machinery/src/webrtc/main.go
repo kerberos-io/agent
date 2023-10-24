@@ -125,7 +125,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 						Credential: w.TurnServersCredential,
 					},
 				},
-				ICETransportPolicy: pionWebRTC.ICETransportPolicyRelay,
+				//ICETransportPolicy: pionWebRTC.ICETransportPolicyRelay,
 			},
 		)
 
