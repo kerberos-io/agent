@@ -511,10 +511,12 @@ func SaveConfig(configDirectory string, config models.Config, configuration *mod
 func StoreConfig(configDirectory string, config models.Config) error {
 
 	// Encryption key can be set wrong.
-	encryptionPrivateKey := config.Encryption.PrivateKey
-	// Replace \\n by \n
-	encryptionPrivateKey = strings.ReplaceAll(encryptionPrivateKey, "\\n", "\n")
-	config.Encryption.PrivateKey = encryptionPrivateKey
+	if config.Encryption != nil {
+		encryptionPrivateKey := config.Encryption.PrivateKey
+		// Replace \\n by \n
+		encryptionPrivateKey = strings.ReplaceAll(encryptionPrivateKey, "\\n", "\n")
+		config.Encryption.PrivateKey = encryptionPrivateKey
+	}
 
 	// Save into database
 	if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
