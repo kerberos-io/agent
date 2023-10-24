@@ -179,12 +179,18 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				panic(err)
 			}
 
+			// When an ICE candidate is available send to the other Pion instance
+			// the other Pion instance will add this candidate by calling AddICECandidate
+			var candidatesMux sync.Mutex
 			// When an ICE candidate is available send to the other peer using the signaling server (MQTT).
 			// The other peer will add this candidate by calling AddICECandidate
 			peerConnection.OnICECandidate(func(candidate *pionWebRTC.ICECandidate) {
 				if candidate == nil {
 					return
 				}
+
+				candidatesMux.Lock()
+				defer candidatesMux.Unlock()
 
 				//  Create a config map
 				valueMap := make(map[string]interface{})
