@@ -208,7 +208,9 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				}
 				payload, err := models.PackageMQTTMessage(configuration, message)
 				if err == nil {
-					mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+					log.Log.Info("InitializeWebRTCConnection:" + string(candateBinary))
+					token := mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+					token.Wait()
 				} else {
 					log.Log.Info("HandleRequestConfig: something went wrong while sending acknowledge config to hub: " + string(payload))
 				}
@@ -233,7 +235,8 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				}
 				payload, err := models.PackageMQTTMessage(configuration, message)
 				if err == nil {
-					mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+					token := mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+					token.Wait()
 				} else {
 					log.Log.Info("HandleRequestConfig: something went wrong while sending acknowledge config to hub: " + string(payload))
 				}
