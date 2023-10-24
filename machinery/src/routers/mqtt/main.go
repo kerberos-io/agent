@@ -457,7 +457,12 @@ func HandleReceiveHDCandidates(mqttClient mqtt.Client, hubKey string, payload mo
 
 	if receiveHDCandidatesPayload.Timestamp != 0 {
 		if communication.CameraConnected {
-			channel := webrtc.CandidateArrays[receiveHDCandidatesPayload.SessionID]
+			key := configuration.Config.Key + "/" + receiveHDCandidatesPayload.SessionID
+			channel := webrtc.CandidateArrays[key]
+			if channel == nil {
+				channel = make(chan string)
+				webrtc.CandidateArrays[key] = channel
+			}
 			log.Log.Info("HandleReceiveHDCandidates: " + receiveHDCandidatesPayload.Candidate)
 			channel <- receiveHDCandidatesPayload.Candidate
 		} else {
