@@ -162,6 +162,12 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 		conjungo.Merge(&s3, configuration.CustomConfig.S3, opts)
 		configuration.Config.S3 = &s3
 
+		// Merge Encryption settings
+		var encryption models.Encryption
+		conjungo.Merge(&encryption, configuration.GlobalConfig.Encryption, opts)
+		conjungo.Merge(&encryption, configuration.CustomConfig.Encryption, opts)
+		configuration.Config.Encryption = &encryption
+
 		// Merge timetable manually because it's an array
 		configuration.Config.Timetable = configuration.CustomConfig.Timetable
 
