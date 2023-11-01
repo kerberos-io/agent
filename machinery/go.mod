@@ -2,7 +2,8 @@ module github.com/kerberos-io/agent/machinery
 
 go 1.19
 
-// replace github.com/kerberos-io/joy4 v1.0.57 => ../../../../github.com/kerberos-io/joy4
+//replace github.com/kerberos-io/joy4 v1.0.58 => ../../../../github.com/kerberos-io/joy4
+
 // replace github.com/kerberos-io/onvif v0.0.6 => ../../../../github.com/kerberos-io/onvif
 
 require (
@@ -20,11 +21,12 @@ require (
 	github.com/gin-contrib/pprof v1.4.0
 	github.com/gin-gonic/contrib v0.0.0-20221130124618-7e01895a63f2
 	github.com/gin-gonic/gin v1.8.2
+	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/golang-module/carbon/v2 v2.2.3
 	github.com/gorilla/websocket v1.5.0
 	github.com/kellydunn/golang-geo v0.7.0
-	github.com/kerberos-io/joy4 v1.0.58
+	github.com/kerberos-io/joy4 v1.0.59
 	github.com/kerberos-io/onvif v0.0.7
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/nsmith5/mjpeg v0.0.0-20200913181537-54b8ada0e53e
@@ -72,7 +74,6 @@ require (
 	github.com/go-playground/validator/v10 v10.11.1 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/goccy/go-json v0.10.0 // indirect
-	github.com/gofrs/uuid v3.2.0+incompatible // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
