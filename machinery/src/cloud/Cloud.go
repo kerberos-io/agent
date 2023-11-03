@@ -780,7 +780,7 @@ func VerifyPersistence(c *gin.Context, configDirectory string) {
 								"_6-967003_" + config.Name + "_200-200-400-400_24_769.mp4"
 
 							// Open test-480p.mp4
-							file, err := os.Open(configDirectory + "/test-480p.mp4")
+							file, err := os.Open(configDirectory + "/data/test-480p.mp4")
 							if err != nil {
 								msg := "VerifyPersistence: error reading test-480p.mp4: " + err.Error()
 								log.Log.Error(msg)
