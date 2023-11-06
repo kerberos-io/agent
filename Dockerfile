@@ -10,7 +10,7 @@ ENV GOSUMDB=off
 ##########################################
 # Installing some additional dependencies.
 
-RUN apt-get upgrade -y && apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get upgrade -y && apt-get update && apt-get install -y --fix-missing --no-install-recommends \
 	git build-essential cmake pkg-config unzip libgtk2.0-dev \
 	curl ca-certificates libcurl4-openssl-dev libssl-dev libjpeg62-turbo-dev && \
 	rm -rf /var/lib/apt/lists/*
