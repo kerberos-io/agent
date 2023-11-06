@@ -231,7 +231,7 @@ loop:
 			log.Log.Debug("HandleHeartBeat: stopping as Offline is enabled.")
 		} else {
 
-			url := config.HeartbeatURI
+			hubURI := config.HeartbeatURI
 			key := ""
 			username := ""
 			vaultURI := ""
@@ -247,98 +247,110 @@ loop:
 
 			// This is the new way ;)
 			if config.HubURI != "" {
-				url = config.HubURI + "/devices/heartbeat"
+				hubURI = config.HubURI + "/devices/heartbeat"
 			}
 			if config.HubKey != "" {
 				key = config.HubKey
 			}
 
-			if key != "" {
-				// Check if we have a friendly name or not.
-				name := config.Name
-				if config.FriendlyName != "" {
-					name = config.FriendlyName
-				}
+			// Check if we have a friendly name or not.
+			name := config.Name
+			if config.FriendlyName != "" {
+				name = config.FriendlyName
+			}
 
-				// Get some system information
-				// like the uptime, hostname, memory usage, etc.
-				system, _ := GetSystemInfo()
+			// Get some system information
+			// like the uptime, hostname, memory usage, etc.
+			system, _ := GetSystemInfo()
 
-				// We will formated the uptime to a human readable format
-				// this will be used on Kerberos Hub: Uptime -> 1 day and 2 hours.
-				uptimeFormatted := uptimeStart.Format("2006-01-02 15:04:05")
-				uptimeString := carbon.Parse(uptimeFormatted).DiffForHumans()
-				uptimeString = strings.ReplaceAll(uptimeString, "ago", "")
+			// Check if the agent is running inside a cluster (Kerberos Factory) or as
+			// an open source agent
+			isEnterprise := false
+			if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
+				isEnterprise = true
+			}
 
-				// Do the same for boottime
-				bootTimeFormatted := time.Unix(int64(system.BootTime), 0).Format("2006-01-02 15:04:05")
-				boottimeString := carbon.Parse(bootTimeFormatted).DiffForHumans()
-				boottimeString = strings.ReplaceAll(boottimeString, "ago", "")
+			// Congert to string
+			macs, _ := json.Marshal(system.MACs)
+			ips, _ := json.Marshal(system.IPs)
+			cameraConnected := "true"
+			if !communication.CameraConnected {
+				cameraConnected = "false"
+			}
 
-				// We'll check which mode is enabled for the camera.
-				onvifEnabled := "false"
-				onvifZoom := "false"
-				onvifPanTilt := "false"
-				onvifPresets := "false"
-				var onvifPresetsList []byte
-				if config.Capture.IPCamera.ONVIFXAddr != "" {
-					cameraConfiguration := configuration.Config.Capture.IPCamera
-					device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+			// We will formated the uptime to a human readable format
+			// this will be used on Kerberos Hub: Uptime -> 1 day and 2 hours.
+			uptimeFormatted := uptimeStart.Format("2006-01-02 15:04:05")
+			uptimeString := carbon.Parse(uptimeFormatted).DiffForHumans()
+			uptimeString = strings.ReplaceAll(uptimeString, "ago", "")
+
+			// Do the same for boottime
+			bootTimeFormatted := time.Unix(int64(system.BootTime), 0).Format("2006-01-02 15:04:05")
+			boottimeString := carbon.Parse(bootTimeFormatted).DiffForHumans()
+			boottimeString = strings.ReplaceAll(boottimeString, "ago", "")
+
+			// We'll check which mode is enabled for the camera.
+			onvifEnabled := "false"
+			onvifZoom := "false"
+			onvifPanTilt := "false"
+			onvifPresets := "false"
+			var onvifPresetsList []byte
+			if config.Capture.IPCamera.ONVIFXAddr != "" {
+				cameraConfiguration := configuration.Config.Capture.IPCamera
+				device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+				if err == nil {
+					configurations, err := onvif.GetPTZConfigurationsFromDevice(device)
 					if err == nil {
-						configurations, err := onvif.GetPTZConfigurationsFromDevice(device)
-						if err == nil {
-							onvifEnabled = "true"
-							_, canZoom, canPanTilt := onvif.GetPTZFunctionsFromDevice(configurations)
-							if canZoom {
-								onvifZoom = "true"
-							}
-							if canPanTilt {
-								onvifPanTilt = "true"
-							}
-							// Try to read out presets
-							presets, err := onvif.GetPresetsFromDevice(device)
-							if err == nil && len(presets) > 0 {
-								onvifPresets = "true"
-								onvifPresetsList, err = json.Marshal(presets)
-								if err != nil {
-									log.Log.Error("HandleHeartBeat: error while marshalling presets: " + err.Error())
-									onvifPresetsList = []byte("[]")
-								}
-							} else {
-								if err != nil {
-									log.Log.Error("HandleHeartBeat: error while getting presets: " + err.Error())
-								} else {
-									log.Log.Debug("HandleHeartBeat: no presets found.")
-								}
+						onvifEnabled = "true"
+						_, canZoom, canPanTilt := onvif.GetPTZFunctionsFromDevice(configurations)
+						if canZoom {
+							onvifZoom = "true"
+						}
+						if canPanTilt {
+							onvifPanTilt = "true"
+						}
+						// Try to read out presets
+						presets, err := onvif.GetPresetsFromDevice(device)
+						if err == nil && len(presets) > 0 {
+							onvifPresets = "true"
+							onvifPresetsList, err = json.Marshal(presets)
+							if err != nil {
+								log.Log.Error("HandleHeartBeat: error while marshalling presets: " + err.Error())
 								onvifPresetsList = []byte("[]")
 							}
 						} else {
-							log.Log.Error("HandleHeartBeat: error while getting PTZ configurations: " + err.Error())
+							if err != nil {
+								log.Log.Error("HandleHeartBeat: error while getting presets: " + err.Error())
+							} else {
+								log.Log.Debug("HandleHeartBeat: no presets found.")
+							}
 							onvifPresetsList = []byte("[]")
 						}
 					} else {
-						log.Log.Error("HandleHeartBeat: error while connecting to ONVIF device: " + err.Error())
+						log.Log.Error("HandleHeartBeat: error while getting PTZ configurations: " + err.Error())
 						onvifPresetsList = []byte("[]")
 					}
 				} else {
-					log.Log.Debug("HandleHeartBeat: ONVIF is not enabled.")
+					log.Log.Error("HandleHeartBeat: error while connecting to ONVIF device: " + err.Error())
 					onvifPresetsList = []byte("[]")
 				}
+			} else {
+				log.Log.Debug("HandleHeartBeat: ONVIF is not enabled.")
+				onvifPresetsList = []byte("[]")
+			}
 
-				// Check if the agent is running inside a cluster (Kerberos Factory) or as
-				// an open source agent
-				isEnterprise := false
-				if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
-					isEnterprise = true
+			var client *http.Client
+			if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+				tr := &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 				}
+				client = &http.Client{Transport: tr}
+			} else {
+				client = &http.Client{}
+			}
 
-				// Congert to string
-				macs, _ := json.Marshal(system.MACs)
-				ips, _ := json.Marshal(system.IPs)
-				cameraConnected := "true"
-				if communication.CameraConnected == false {
-					cameraConnected = "false"
-				}
+			// We need a hub URI and hub public key before we will send a heartbeat
+			if hubURI != "" && key != "" {
 
 				var object = fmt.Sprintf(`{
 						"key" : "%s",
@@ -380,19 +392,8 @@ loop:
 
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)
-				req, _ := http.NewRequest("POST", url, buffy)
+				req, _ := http.NewRequest("POST", hubURI, buffy)
 				req.Header.Set("Content-Type", "application/json")
-
-				var client *http.Client
-				if os.Getenv("AGENT_TLS_INSECURE") == "true" {
-					tr := &http.Transport{
-						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-					}
-					client = &http.Client{Transport: tr}
-				} else {
-					client = &http.Client{}
-				}
-
 				resp, err := client.Do(req)
 				if resp != nil {
 					resp.Body.Close()
@@ -406,26 +407,67 @@ loop:
 					}
 					log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Hub.")
 				}
-
-				// If we have a Kerberos Vault connected, we will also send some analytics
-				// to that service.
-				vaultURI = config.KStorage.URI
-				if vaultURI != "" {
-					buffy = bytes.NewBuffer(jsonStr)
-					req, _ = http.NewRequest("POST", vaultURI+"/devices/heartbeat", buffy)
-					req.Header.Set("Content-Type", "application/json")
-					resp, err = client.Do(req)
-					if resp != nil {
-						resp.Body.Close()
-					}
-					if err == nil && resp.StatusCode == 200 {
-						log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Vault.")
-					} else {
-						log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Vault.")
-					}
-				}
 			} else {
 				log.Log.Error("HandleHeartBeat: Disabled as we do not have a public key defined.")
+			}
+
+			// If we have a Kerberos Vault connected, we will also send some analytics
+			// to that service.
+			vaultURI = config.KStorage.URI
+			if vaultURI != "" {
+
+				var object = fmt.Sprintf(`{
+					"key" : "%s",
+					"version" : "3.0.0",
+					"release" : "%s",
+					"cpuid" : "%s",
+					"clouduser" : "%s",
+					"cloudpublickey" : "%s",
+					"cameraname" : "%s",
+					"enterprise" : %t,
+					"hostname" : "%s",
+					"architecture" : "%s",
+					"totalMemory" : "%d",
+					"usedMemory" : "%d",
+					"freeMemory" : "%d",
+					"processMemory" : "%d",
+					"mac_list" : %s,
+					"ip_list" : %s,
+					"board" : "",
+					"disk1size" : "%s",
+					"disk3size" : "%s",
+					"diskvdasize" :  "%s",
+					"uptime" : "%s",
+					"boot_time" : "%s",
+					"siteID" : "%s",
+					"onvif" : "%s",
+					"onvif_zoom" : "%s",
+					"onvif_pantilt" : "%s",
+					"onvif_presets": "%s",
+					"onvif_presets_list": %s,
+					"cameraConnected": "%s",
+					"numberoffiles" : "33",
+					"timestamp" : 1564747908,
+					"cameratype" : "IPCamera",
+					"docker" : true,
+					"kios" : false,
+					"raspberrypi" : false
+				}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, cameraConnected)
+
+				var jsonStr = []byte(object)
+				buffy := bytes.NewBuffer(jsonStr)
+				req, _ := http.NewRequest("POST", vaultURI+"/devices/heartbeat", buffy)
+				req.Header.Set("Content-Type", "application/json")
+
+				resp, err := client.Do(req)
+				if resp != nil {
+					resp.Body.Close()
+				}
+				if err == nil && resp.StatusCode == 200 {
+					log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Vault.")
+				} else {
+					log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Vault.")
+				}
 			}
 		}
 
