@@ -23,7 +23,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "heading": "Overview of your video surveilance",
+    "heading": "Overview of your video surveillance",
     "number_of_days": "Number of days",
     "total_recordings": "Total recordings",
     "connected": "Connected",
@@ -151,7 +151,7 @@
       "stun_turn_description_webrtc": "Forward h264 stream through MQTT",
       "stun_turn_transcode": "Transcode stream",
       "stun_turn_description_transcode": "Convert stream to a lower resolution",
-      "stun_turn_downscale": "Downscale resolution (in % or original resolution)",
+      "stun_turn_downscale": "Downscale resolution (in % of original resolution)",
       "mqtt": "MQTT",
       "description_mqtt": "A MQTT broker is used to communicate from",
       "description2_mqtt": "to the Kerberos Agent, to achieve for example livestreaming or ONVIF (PTZ) capabilities.",
