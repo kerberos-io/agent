@@ -107,6 +107,12 @@ type Payload struct {
 	Value          map[string]interface{} `json:"value"`
 }
 
+// We received a audio input
+type AudioPayload struct {
+	Timestamp int64   `json:"timestamp"` // timestamp of the recording request.
+	Data      []int16 `json:"data"`
+}
+
 // We received a recording request, we'll send it to the motion handler.
 type RecordPayload struct {
 	Timestamp int64 `json:"timestamp"` // timestamp of the recording request.

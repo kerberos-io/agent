@@ -11,6 +11,8 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 
+	//"github.com/youpy/go-wav"
+
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/computervision"
@@ -244,6 +246,9 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 			go capture.HandleSubStream(subInfile, subQueue, communication)
 		}
 
+		// Handle processing of audio
+		communication.HandleAudio = make(chan models.AudioDataPartial)
+
 		// Handle processing of motion
 		communication.HandleMotion = make(chan models.MotionDataPartial, 1)
 		if subStreamEnabled {
@@ -284,6 +289,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 		// If we reach this point, we have a working RTSP connection.
 		communication.CameraConnected = true
+
+		// We might have a camera with audio backchannel enabled.
+		// Check if we have a stream with a backchannel and is PCMU encoded.
+		go WriteAudioToBackchannel(infile, streams, communication)
 
 		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 		// This will go into a blocking state, once this channel is triggered
@@ -328,6 +337,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		}
 		close(communication.HandleMotion)
 		communication.HandleMotion = nil
+		close(communication.HandleAudio)
+		communication.HandleAudio = nil
 
 		// Waiting for some seconds to make sure everything is properly closed.
 		log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")

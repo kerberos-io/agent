@@ -229,6 +229,8 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 				switch payload.Action {
 				case "record":
 					go HandleRecording(mqttClient, hubKey, payload, configuration, communication)
+				case "get-audio-backchannel":
+					go HandleAudio(mqttClient, hubKey, payload, configuration, communication)
 				case "get-ptz-position":
 					go HandleGetPTZPosition(mqttClient, hubKey, payload, configuration, communication)
 				case "update-ptz-position":
@@ -265,6 +267,23 @@ func HandleRecording(mqttClient mqtt.Client, hubKey string, payload models.Paylo
 			Timestamp: recordPayload.Timestamp,
 		}
 		communication.HandleMotion <- motionDataPartial
+	}
+}
+
+func HandleAudio(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
+	value := payload.Value
+
+	// Convert map[string]interface{} to AudioPayload
+	jsonData, _ := json.Marshal(value)
+	var audioPayload models.AudioPayload
+	json.Unmarshal(jsonData, &audioPayload)
+
+	if audioPayload.Timestamp != 0 {
+		audioDataPartial := models.AudioDataPartial{
+			Timestamp: audioPayload.Timestamp,
+			Data:      audioPayload.Data,
+		}
+		communication.HandleAudio <- audioDataPartial
 	}
 }
 

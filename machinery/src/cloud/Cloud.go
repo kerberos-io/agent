@@ -278,6 +278,11 @@ loop:
 				cameraConnected = "false"
 			}
 
+			hasBackChannel := "false"
+			if communication.HasBackChannel {
+				hasBackChannel = "true"
+			}
+
 			// We will formated the uptime to a human readable format
 			// this will be used on Kerberos Hub: Uptime -> 1 day and 2 hours.
 			uptimeFormatted := uptimeStart.Format("2006-01-02 15:04:05")
@@ -382,13 +387,14 @@ loop:
 						"onvif_presets": "%s",
 						"onvif_presets_list": %s,
 						"cameraConnected": "%s",
+						"hasBackChannel": "%s",
 						"numberoffiles" : "33",
 						"timestamp" : 1564747908,
 						"cameratype" : "IPCamera",
 						"docker" : true,
 						"kios" : false,
 						"raspberrypi" : false
-					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, cameraConnected)
+					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, cameraConnected, hasBackChannel)
 
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)
