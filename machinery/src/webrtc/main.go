@@ -87,6 +87,21 @@ func (w WebRTC) CreateOffer(sd []byte) pionWebRTC.SessionDescription {
 	return offer
 }
 
+func RegisterCandidates(key string, candidate models.ReceiveHDCandidatesPayload) {
+
+	// Set lock
+	CandidatesMutex.Lock()
+	defer CandidatesMutex.Unlock()
+
+	channel := CandidateArrays[key]
+	if channel == nil {
+		channel = make(chan string)
+		CandidateArrays[key] = channel
+	}
+	log.Log.Info("HandleReceiveHDCandidates: " + candidate.Candidate)
+	channel <- candidate.Candidate
+}
+
 func InitializeWebRTCConnection(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, handshake models.RequestHDStreamPayload, candidates chan string) {
 
 	config := configuration.Config
@@ -145,6 +160,9 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 			peerConnection.OnICEConnectionStateChange(func(connectionState pionWebRTC.ICEConnectionState) {
 				if connectionState == pionWebRTC.ICEConnectionStateDisconnected {
+					CandidatesMutex.Lock()
+					defer CandidatesMutex.Unlock()
+
 					atomic.AddInt64(&peerConnectionCount, -1)
 					peerConnections[handshake.SessionID] = nil
 					close(candidates)
