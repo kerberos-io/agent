@@ -751,24 +751,6 @@ func GoToPresetFromDevice(device *onvif.Device, presetName string) error {
 	return err
 }
 
-func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, error) {
-	xmlBytes := bytes.NewBufferString(xmlBody)
-	decodedXML := xml.NewDecoder(xmlBytes)
-	for {
-		token, err := decodedXML.Token()
-		if err != nil {
-			break
-		}
-		switch et := token.(type) {
-		case xml.StartElement:
-			if et.Name.Local == nodeName {
-				return decodedXML, &et, nil
-			}
-		}
-	}
-	return nil, nil, errors.New("error in NodeName - username and password might be wrong")
-}
-
 func GetPTZFunctionsFromDevice(configurations ptz.GetConfigurationsResponse) ([]string, bool, bool) {
 	var functions []string
 	canZoom := false
@@ -853,4 +835,22 @@ func VerifyOnvifConnection(c *gin.Context) {
 			Message: "Something went wrong while receiving the config " + err.Error(),
 		})
 	}
+}
+
+func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, error) {
+	xmlBytes := bytes.NewBufferString(xmlBody)
+	decodedXML := xml.NewDecoder(xmlBytes)
+	for {
+		token, err := decodedXML.Token()
+		if err != nil {
+			break
+		}
+		switch et := token.(type) {
+		case xml.StartElement:
+			if et.Name.Local == nodeName {
+				return decodedXML, &et, nil
+			}
+		}
+	}
+	return nil, nil, errors.New("error in NodeName - username and password might be wrong")
 }

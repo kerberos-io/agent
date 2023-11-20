@@ -469,7 +469,7 @@ func VerifyCamera(c *gin.Context) {
 		if streamType == "secondary" {
 			rtspUrl = cameraStreams.SubRTSP
 		}
-		_, codecs, err := OpenRTSP(ctx, rtspUrl)
+		_, codecs, err := OpenRTSP(ctx, rtspUrl, true)
 		if err == nil {
 
 			videoIdx := -1

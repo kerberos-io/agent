@@ -16,12 +16,27 @@ import (
 	"github.com/kerberos-io/joy4/format"
 )
 
-func OpenRTSP(ctx context.Context, url string) (av.DemuxCloser, []av.CodecData, error) {
+func OpenRTSP(ctx context.Context, url string, withBackChannel bool) (av.DemuxCloser, []av.CodecData, error) {
 	format.RegisterAll()
-	infile, err := avutil.Open(ctx, url)
+
+	// Try with backchannel first (if variable is set to true)
+	// If set to true, it will try to open the stream with a backchannel
+	// If fails we will try again (see below).
+	infile, err := avutil.Open(ctx, url, withBackChannel)
 	if err == nil {
 		streams, errstreams := infile.Streams()
-		return infile, streams, errstreams
+		if len(streams) > 0 {
+			return infile, streams, errstreams
+		} else {
+			// Try again without backchannel
+			log.Log.Info("OpenRTSP: trying without backchannel")
+			withBackChannel = false
+			infile, err := avutil.Open(ctx, url, withBackChannel)
+			if err == nil {
+				streams, errstreams := infile.Streams()
+				return infile, streams, errstreams
+			}
+		}
 	}
 	return nil, []av.CodecData{}, err
 }
