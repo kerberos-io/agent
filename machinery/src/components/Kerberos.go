@@ -121,10 +121,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Establishing the camera connection without backchannel if no substream
 	rtspUrl := config.Capture.IPCamera.RTSP
 	withBackChannel := true
-	subRtspUrl := config.Capture.IPCamera.SubRTSP
-	if subRtspUrl != "" && subRtspUrl != rtspUrl {
-		withBackChannel = false
-	}
 	infile, streams, err := capture.OpenRTSP(context.Background(), rtspUrl, withBackChannel)
 
 	// We will initialise the camera settings object
@@ -162,7 +158,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		subStreamEnabled := false
 		subRtspUrl := config.Capture.IPCamera.SubRTSP
 		if subRtspUrl != "" && subRtspUrl != rtspUrl {
-			subInfile, subStreams, err = capture.OpenRTSP(context.Background(), subRtspUrl, true) // We'll try to enable backchannel for the substream.
+			withBackChannel := false
+			subInfile, subStreams, err = capture.OpenRTSP(context.Background(), subRtspUrl, withBackChannel) // We'll try to enable backchannel for the substream.
 			if err == nil {
 				log.Log.Info("RunAgent: opened RTSP sub stream " + subRtspUrl)
 				subStreamEnabled = true
