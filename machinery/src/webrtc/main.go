@@ -90,13 +90,16 @@ func (w WebRTC) CreateOffer(sd []byte) pionWebRTC.SessionDescription {
 func RegisterCandidates(key string, candidate models.ReceiveHDCandidatesPayload) {
 	// Set lock
 	CandidatesMutex.Lock()
-	channel := CandidateArrays[key]
-	if channel == nil {
-		channel = make(chan string)
-		CandidateArrays[key] = channel
+	_, ok := CandidateArrays[key]
+	if !ok {
+		CandidateArrays[key] = make(chan string)
 	}
 	log.Log.Info("HandleReceiveHDCandidates: " + candidate.Candidate)
-	channel <- candidate.Candidate
+	select {
+	case CandidateArrays[key] <- candidate.Candidate:
+	default:
+		log.Log.Info("HandleReceiveHDCandidates: channel is full.")
+	}
 	CandidatesMutex.Unlock()
 }
 
@@ -193,6 +196,8 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 							log.Log.Error("InitializeWebRTCConnection: something went wrong while adding candidate: " + candidateErr.Error())
 						}
 					}
+				} else if connectionState == pionWebRTC.ICEConnectionStateFailed {
+
 				}
 				log.Log.Info("InitializeWebRTCConnection: connection state changed to: " + connectionState.String())
 				log.Log.Info("InitializeWebRTCConnection: Number of peers connected (" + strconv.FormatInt(peerConnectionCount, 10) + ")")
