@@ -478,7 +478,7 @@ func HandleReceiveHDCandidates(mqttClient mqtt.Client, hubKey string, payload mo
 		if communication.CameraConnected {
 			// Register candidate channel
 			key := configuration.Config.Key + "/" + receiveHDCandidatesPayload.SessionID
-			webrtc.RegisterCandidates(key, receiveHDCandidatesPayload)
+			go webrtc.RegisterCandidates(key, receiveHDCandidatesPayload)
 		} else {
 			log.Log.Info("HandleReceiveHDCandidates: received candidate, but camera is not connected.")
 		}

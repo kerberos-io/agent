@@ -88,11 +88,8 @@ func (w WebRTC) CreateOffer(sd []byte) pionWebRTC.SessionDescription {
 }
 
 func RegisterCandidates(key string, candidate models.ReceiveHDCandidatesPayload) {
-
 	// Set lock
 	CandidatesMutex.Lock()
-	defer CandidatesMutex.Unlock()
-
 	channel := CandidateArrays[key]
 	if channel == nil {
 		channel = make(chan string)
@@ -100,9 +97,10 @@ func RegisterCandidates(key string, candidate models.ReceiveHDCandidatesPayload)
 	}
 	log.Log.Info("HandleReceiveHDCandidates: " + candidate.Candidate)
 	channel <- candidate.Candidate
+	CandidatesMutex.Unlock()
 }
 
-func InitializeWebRTCConnection(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, handshake models.RequestHDStreamPayload, candidates chan string) {
+func InitializeWebRTCConnection(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, handshake models.RequestHDStreamPayload) {
 
 	config := configuration.Config
 	deviceKey := config.Key
@@ -110,6 +108,15 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 	turnServers := []string{config.TURNURI}
 	turnServersUsername := config.TURNUsername
 	turnServersCredential := config.TURNPassword
+
+	// We create a channel which will hold the candidates for this session.
+	sessionKey := config.Key + "/" + handshake.SessionID
+	CandidatesMutex.Lock()
+	_, ok := CandidateArrays[sessionKey]
+	if !ok {
+		CandidateArrays[sessionKey] = make(chan string)
+	}
+	CandidatesMutex.Unlock()
 
 	// Set variables
 	hubKey := handshake.HubKey
@@ -147,35 +154,40 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 		if err == nil && peerConnection != nil {
 
 			if _, err = peerConnection.AddTrack(videoTrack); err != nil {
-				panic(err)
+				//panic(err)
 			}
 
 			if _, err = peerConnection.AddTrack(audioTrack); err != nil {
-				panic(err)
+				//panic(err)
 			}
 
 			if err != nil {
-				panic(err)
+				//panic(err)
 			}
 
 			peerConnection.OnICEConnectionStateChange(func(connectionState pionWebRTC.ICEConnectionState) {
 				if connectionState == pionWebRTC.ICEConnectionStateDisconnected {
-					CandidatesMutex.Lock()
-					defer CandidatesMutex.Unlock()
-
 					atomic.AddInt64(&peerConnectionCount, -1)
+
+					// Set lock
+					CandidatesMutex.Lock()
 					peerConnections[handshake.SessionID] = nil
-					close(candidates)
+					_, ok := CandidateArrays[sessionKey]
+					if ok {
+						close(CandidateArrays[sessionKey])
+					}
+					CandidatesMutex.Unlock()
+
 					close(w.PacketsCount)
 					if err := peerConnection.Close(); err != nil {
-						panic(err)
+						//panic(err)
 					}
 				} else if connectionState == pionWebRTC.ICEConnectionStateConnected {
 					atomic.AddInt64(&peerConnectionCount, 1)
 				} else if connectionState == pionWebRTC.ICEConnectionStateChecking {
 					// Iterate over the candidates and send them to the remote client
 					// Non blocking channel
-					for candidate := range candidates {
+					for candidate := range CandidateArrays[sessionKey] {
 						log.Log.Info("InitializeWebRTCConnection: Received candidate.")
 						if candidateErr := peerConnection.AddICECandidate(pionWebRTC.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
 							log.Log.Error("InitializeWebRTCConnection: something went wrong while adding candidate: " + candidateErr.Error())
@@ -188,29 +200,22 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 			offer := w.CreateOffer(sd)
 			if err = peerConnection.SetRemoteDescription(offer); err != nil {
-				panic(err)
+				//panic(err)
 			}
 
 			answer, err := peerConnection.CreateAnswer(nil)
 			if err != nil {
-				panic(err)
+				//panic(err)
 			} else if err = peerConnection.SetLocalDescription(answer); err != nil {
-				panic(err)
+				//panic(err)
 			}
 
-			// When an ICE candidate is available send to the other Pion instance
-			// the other Pion instance will add this candidate by calling AddICECandidate
-			var candidatesMux sync.Mutex
 			// When an ICE candidate is available send to the other peer using the signaling server (MQTT).
 			// The other peer will add this candidate by calling AddICECandidate
 			peerConnection.OnICECandidate(func(candidate *pionWebRTC.ICECandidate) {
 				if candidate == nil {
 					return
 				}
-
-				candidatesMux.Lock()
-				defer candidatesMux.Unlock()
-
 				//  Create a config map
 				valueMap := make(map[string]interface{})
 				candateJSON := candidate.ToJSON()
