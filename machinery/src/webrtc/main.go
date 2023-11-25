@@ -10,14 +10,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"github.com/kerberos-io/joy4/av/pubsub"
+	"github.com/kerberos-io/agent/machinery/src/packets"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	av "github.com/kerberos-io/joy4/av"
-	"github.com/kerberos-io/joy4/cgo/ffmpeg"
-	h264parser "github.com/kerberos-io/joy4/codec/h264parser"
 	pionWebRTC "github.com/pion/webrtc/v3"
 	pionMedia "github.com/pion/webrtc/v3/pkg/media"
 )
@@ -282,21 +280,21 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 	}
 }
 
-func NewVideoTrack(codecs []av.CodecData) *pionWebRTC.TrackLocalStaticSample {
+func NewVideoTrack(streams []packets.Stream) *pionWebRTC.TrackLocalStaticSample {
 	var mimeType string
 	mimeType = pionWebRTC.MimeTypeH264
 	outboundVideoTrack, _ := pionWebRTC.NewTrackLocalStaticSample(pionWebRTC.RTPCodecCapability{MimeType: mimeType}, "video", "pion124")
 	return outboundVideoTrack
 }
 
-func NewAudioTrack(codecs []av.CodecData) *pionWebRTC.TrackLocalStaticSample {
+func NewAudioTrack(streams []packets.Stream) *pionWebRTC.TrackLocalStaticSample {
 	var mimeType string
-	for _, codec := range codecs {
-		if codec.Type().String() == "OPUS" {
+	for _, stream := range streams {
+		if stream.Name == "OPUS" {
 			mimeType = pionWebRTC.MimeTypeOpus
-		} else if codec.Type().String() == "PCM_MULAW" {
+		} else if stream.Name == "PCM_MULAW" {
 			mimeType = pionWebRTC.MimeTypePCMU
-		} else if codec.Type().String() == "PCM_ALAW" {
+		} else if stream.Name == "PCM_ALAW" {
 			mimeType = pionWebRTC.MimeTypePCMA
 		}
 	}
@@ -304,7 +302,7 @@ func NewAudioTrack(codecs []av.CodecData) *pionWebRTC.TrackLocalStaticSample {
 	return outboundAudioTrack
 }
 
-func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, codecs []av.CodecData, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, rtspClient capture.RTSPClient) {
 
 	config := configuration.Config
 
@@ -315,10 +313,11 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 	// Later when we read a packet we need to figure out which track to send it to.
 	videoIdx := -1
 	audioIdx := -1
-	for i, codec := range codecs {
-		if codec.Type().String() == "H264" && videoIdx < 0 {
+	streams, _ := rtspClient.GetStreams()
+	for i, stream := range streams {
+		if stream.Name == "H264" && videoIdx < 0 {
 			videoIdx = i
-		} else if (codec.Type().String() == "OPUS" || codec.Type().String() == "PCM_MULAW" || codec.Type().String() == "PCM_ALAW") && audioIdx < 0 {
+		} else if (stream.Name == "OPUS" || stream.Name == "PCM_MULAW" || stream.Name == "PCM_ALAW") && audioIdx < 0 {
 			audioIdx = i
 		}
 	}
@@ -338,12 +337,12 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 		}
 
 		var cursorError error
-		var pkt av.Packet
+		var pkt packets.Packet
 		var previousTime time.Duration
 
 		start := false
 		receivedKeyFrame := false
-		codecData := codecs[videoIdx]
+		stream := streams[videoIdx]
 		lastKeepAlive := "0"
 		peerCount := "0"
 
@@ -422,9 +421,9 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 				if pkt.IsKeyFrame {
 					start = true
 					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
-					pkt.Data = append(codecData.(h264parser.CodecData).PPS(), pkt.Data...)
+					pkt.Data = append(stream.PPS, pkt.Data...)
 					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
-					pkt.Data = append(codecData.(h264parser.CodecData).SPS(), pkt.Data...)
+					pkt.Data = append(stream.SPS, pkt.Data...)
 					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
 					log.Log.Info("WriteToTrack: Sending keyframe")
 				}

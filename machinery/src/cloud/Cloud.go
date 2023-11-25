@@ -9,25 +9,23 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/elastic/go-sysinfo"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-module/carbon/v2"
-	"github.com/kerberos-io/joy4/av/pubsub"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	av "github.com/kerberos-io/joy4/av"
-	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
+	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
 )
@@ -489,22 +487,19 @@ loop:
 	log.Log.Debug("HandleHeartBeat: finished")
 }
 
-func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
 
-	log.Log.Debug("HandleLiveStreamSD: started")
+	log.Log.Debug("cloud.HandleLiveStreamSD(): started")
 
 	config := configuration.Config
 
 	// If offline made is enabled, we will stop the thread.
 	if config.Offline == "true" {
-		log.Log.Debug("HandleLiveStreamSD: stopping as Offline is enabled.")
+		log.Log.Debug("cloud.HandleLiveStreamSD(): stopping as Offline is enabled.")
 	} else {
 
 		// Check if we need to enable the live stream
 		if config.Capture.Liveview != "false" {
-
-			// Allocate frame
-			frame := ffmpeg.AllocVideoFrame()
 
 			hubKey := ""
 			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
@@ -520,7 +515,7 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 			lastLivestreamRequest := int64(0)
 
 			var cursorError error
-			var pkt av.Packet
+			var pkt packets.Packet
 
 			for cursorError == nil {
 				pkt, cursorError = livestreamCursor.ReadPacket()
@@ -536,10 +531,10 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 				if now-lastLivestreamRequest > 3 {
 					continue
 				}
-				log.Log.Info("HandleLiveStreamSD: Sending base64 encoded images to MQTT.")
-				_, err := computervision.GetRawImage(frame, pkt, decoder, decoderMutex)
+				log.Log.Info("cloud.HandleLiveStreamSD(): Sending base64 encoded images to MQTT.")
+				img, err := rtspClient.DecodePacket(pkt)
 				if err == nil {
-					bytes, _ := computervision.ImageToBytes(&frame.Image)
+					bytes, _ := computervision.ImageToBytes(&img)
 					encoded := base64.StdEncoding.EncodeToString(bytes)
 
 					valueMap := make(map[string]interface{})
@@ -555,23 +550,20 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 					if err == nil {
 						mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
 					} else {
-						log.Log.Info("HandleRequestConfig: something went wrong while sending acknowledge config to hub: " + string(payload))
+						log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
 					}
 				}
 			}
 
-			// Cleanup the frame.
-			frame.Free()
-
 		} else {
-			log.Log.Debug("HandleLiveStreamSD: stopping as Liveview is disabled.")
+			log.Log.Debug("cloud.HandleLiveStreamSD(): stopping as Liveview is disabled.")
 		}
 	}
 
-	log.Log.Debug("HandleLiveStreamSD: finished")
+	log.Log.Debug("cloud.HandleLiveStreamSD(): finished")
 }
 
-func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, codecs []av.CodecData, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func HandleLiveStreamHD(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
 
 	config := configuration.Config
 
@@ -583,9 +575,10 @@ func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 		if config.Capture.Liveview != "false" {
 
 			// Should create a track here.
-			videoTrack := webrtc.NewVideoTrack(codecs)
-			audioTrack := webrtc.NewAudioTrack(codecs)
-			go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, videoTrack, audioTrack, codecs, decoder, decoderMutex)
+			streams, _ := rtspClient.GetStreams()
+			videoTrack := webrtc.NewVideoTrack(streams)
+			audioTrack := webrtc.NewAudioTrack(streams)
+			go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, videoTrack, audioTrack, rtspClient)
 
 			if config.Capture.ForwardWebRTC == "true" {
 				// We get a request with an offer, but we'll forward it.
