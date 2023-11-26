@@ -1,11 +1,20 @@
 package capture
 
+// #cgo pkg-config: libavcodec libavutil libswscale
+// #include <libavcodec/avcodec.h>
+// #include <libavutil/imgutils.h>
+// #include <libswscale/swscale.h>
+import "C"
+
 import (
 	"context"
+	"fmt"
 	"image"
+	"reflect"
 	"strconv"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/bluenviron/gortsplib/v4"
 	"github.com/bluenviron/gortsplib/v4/pkg/base"
@@ -32,7 +41,7 @@ type Golibrtsp struct {
 
 	DecoderMutex *sync.Mutex
 	Decoder      *rtph264.Decoder
-	//FrameDecoder *h264Decoder
+	FrameDecoder *h264Decoder
 }
 
 // Connect to the RTSP server.
@@ -83,7 +92,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.Decoder = rtpDec
 
 	// setup H264 -> raw frames decoder
-	/*frameDec, err := newH264Decoder()
+	frameDec, err := newH264Decoder()
 	if err != nil {
 		panic(err)
 	}
@@ -95,7 +104,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	}
 	if forma.PPS != nil {
 		frameDec.decode(forma.PPS)
-	}*/
+	}
 
 	// setup a single media
 	_, err = g.Client.Setup(desc.BaseURL, medi, 0, 0)
@@ -137,35 +146,14 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 
 			// Conver to packet.
 			pkt := packets.Packet{
-				IsKeyFrame:      isKeyFrame,
-				Idx:             0,
-				CompositionTime: time.Duration(rtppkt.Timestamp),
-				Time:            time.Duration(rtppkt.Timestamp),
-				Data:            rtppkt.Payload,
-				Header: packets.Header{
-					Version:        rtppkt.Version,
-					Padding:        rtppkt.Padding,
-					Extension:      rtppkt.Extension,
-					Marker:         rtppkt.Marker,
-					PayloadType:    rtppkt.PayloadType,
-					SequenceNumber: rtppkt.SequenceNumber,
-					Timestamp:      rtppkt.Timestamp,
-					SSRC:           rtppkt.SSRC,
-					CSRC:           rtppkt.CSRC,
-				},
-				PaddingSize: rtppkt.PaddingSize,
+				IsKeyFrame:  isKeyFrame,
+				Packet:      rtppkt,
+				AccessUnits: au,
+				Data:        rtppkt.Payload,
+				Time:        time.Duration(rtppkt.Timestamp),
 			}
 
 			queue.WritePacket(pkt)
-
-			/*for _, nalu := range au {
-				// convert NALUs into RGBA frames
-				img, err := g.FrameDecoder.decode(nalu)
-				if err != nil {
-					panic(err)
-				}
-				fmt.Println(img)
-			}*/
 
 			// This will check if we need to stop the thread,
 			// because of a reconfiguration.
@@ -197,6 +185,23 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 
 // Decode a packet to an image.
 func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
+	accessUnits := pkt.AccessUnits
+	// decode access units
+	for _, nalu := range accessUnits {
+		img, err := g.FrameDecoder.decode(nalu)
+
+		if err != nil {
+			return image.YCbCr{}, err
+		}
+
+		// wait for a frame
+		if img.Bounds().Empty() {
+			log.Log.Debug("RTSPClient(Golibrtsp).Start(): " + "empty frame")
+			continue
+		}
+
+		return img, nil
+	}
 	return image.YCbCr{}, nil
 }
 
@@ -236,4 +241,113 @@ func (g *Golibrtsp) Close() error {
 	// Close the demuxer.
 	g.Client.Close()
 	return nil
+}
+
+func frameData(frame *C.AVFrame) **C.uint8_t {
+	return (**C.uint8_t)(unsafe.Pointer(&frame.data[0]))
+}
+
+func frameLineSize(frame *C.AVFrame) *C.int {
+	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
+}
+
+// h264Decoder is a wrapper around FFmpeg's H264 decoder.
+type h264Decoder struct {
+	codecCtx    *C.AVCodecContext
+	srcFrame    *C.AVFrame
+	swsCtx      *C.struct_SwsContext
+	dstFrame    *C.AVFrame
+	dstFramePtr []uint8
+}
+
+// newH264Decoder allocates a new h264Decoder.
+func newH264Decoder() (*h264Decoder, error) {
+	codec := C.avcodec_find_decoder(C.AV_CODEC_ID_H264)
+	if codec == nil {
+		return nil, fmt.Errorf("avcodec_find_decoder() failed")
+	}
+
+	codecCtx := C.avcodec_alloc_context3(codec)
+	if codecCtx == nil {
+		return nil, fmt.Errorf("avcodec_alloc_context3() failed")
+	}
+
+	res := C.avcodec_open2(codecCtx, codec, nil)
+	if res < 0 {
+		C.avcodec_close(codecCtx)
+		return nil, fmt.Errorf("avcodec_open2() failed")
+	}
+
+	srcFrame := C.av_frame_alloc()
+	if srcFrame == nil {
+		C.avcodec_close(codecCtx)
+		return nil, fmt.Errorf("av_frame_alloc() failed")
+	}
+
+	return &h264Decoder{
+		codecCtx: codecCtx,
+		srcFrame: srcFrame,
+	}, nil
+}
+
+// close closes the decoder.
+func (d *h264Decoder) close() {
+	if d.dstFrame != nil {
+		C.av_frame_free(&d.dstFrame)
+	}
+
+	if d.swsCtx != nil {
+		C.sws_freeContext(d.swsCtx)
+	}
+
+	C.av_frame_free(&d.srcFrame)
+	C.avcodec_close(d.codecCtx)
+}
+
+func (d *h264Decoder) decode(nalu []byte) (image.YCbCr, error) {
+	nalu = append([]uint8{0x00, 0x00, 0x00, 0x01}, []uint8(nalu)...)
+
+	// send NALU to decoder
+	var avPacket C.AVPacket
+	avPacket.data = (*C.uint8_t)(C.CBytes(nalu))
+	defer C.free(unsafe.Pointer(avPacket.data))
+	avPacket.size = C.int(len(nalu))
+	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
+	if res < 0 {
+		return image.YCbCr{}, nil
+	}
+
+	// receive frame if available
+	res = C.avcodec_receive_frame(d.codecCtx, d.srcFrame)
+	if res < 0 {
+		return image.YCbCr{}, nil
+	}
+
+	if res == 0 {
+		fr := d.srcFrame
+		w := int(fr.width)
+		h := int(fr.height)
+		ys := int(fr.linesize[0])
+		cs := int(fr.linesize[1])
+
+		return image.YCbCr{
+			Y:              fromCPtr(unsafe.Pointer(fr.data[0]), ys*h),
+			Cb:             fromCPtr(unsafe.Pointer(fr.data[1]), cs*h/2),
+			Cr:             fromCPtr(unsafe.Pointer(fr.data[2]), cs*h/2),
+			YStride:        ys,
+			CStride:        cs,
+			SubsampleRatio: image.YCbCrSubsampleRatio420,
+			Rect:           image.Rect(0, 0, w, h),
+		}, nil
+	}
+
+	return image.YCbCr{}, nil
+}
+
+func fromCPtr(buf unsafe.Pointer, size int) (ret []uint8) {
+	hdr := (*reflect.SliceHeader)((unsafe.Pointer(&ret)))
+	hdr.Cap = size
+	hdr.Len = size
+	hdr.Data = uintptr(buf)
+	return
 }
