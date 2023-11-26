@@ -3,7 +3,6 @@ package webrtc
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"strconv"
 	"sync"
@@ -392,27 +391,10 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 				}
 			}
 
-			if config.Capture.TranscodingWebRTC == "true" {
-
-				/*decoderMutex.Lock()
-				decoder.SetFramerate(30, 1)
-				frame, err := decoder.Decode(pkt.Data)
-				decoderMutex.Unlock()
-				if err == nil && frame != nil && frame.Width() > 0 && frame.Height() > 0 {
-					var _outpkts []av.Packet
-					transcodingResolution := config.Capture.TranscodingResolution
-					newWidth := frame.Width() * int(transcodingResolution) / 100
-					newHeight := frame.Height() * int(transcodingResolution) / 100
-					encoder.SetResolution(newWidth, newHeight)
-					if _outpkts, err = encoder.Encode(frame); err != nil {
-					}
-					if len(_outpkts) > 0 {
-						pkt = _outpkts[0]
-						codecData, _ = encoder.CodecData()
-					}
-				}*/
-
-			}
+			//if config.Capture.TranscodingWebRTC == "true" {
+			// We will transcode the video
+			// TODO..
+			//}
 
 			switch int(pkt.Idx) {
 			case videoIdx:
@@ -431,14 +413,8 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 				if start {
 					sample := pionMedia.Sample{Data: pkt.Data, Duration: bufferDuration}
 					if config.Capture.ForwardWebRTC == "true" {
-						samplePacket, err := json.Marshal(sample)
-						if err == nil {
-							// Write packets
-							topic := fmt.Sprintf("kerberos/webrtc/packets/%s", config.Key)
-							mqttClient.Publish(topic, 0, false, samplePacket)
-						} else {
-							log.Log.Info("WriteToTrack: Error marshalling frame, " + err.Error())
-						}
+						// We will send the video to a remote peer
+						// TODO..
 					} else {
 						if err := videoTrack.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
 							log.Log.Error("WriteToTrack: something went wrong while writing sample: " + err.Error())
