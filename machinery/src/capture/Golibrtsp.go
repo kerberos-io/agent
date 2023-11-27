@@ -119,6 +119,8 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communication *models.Communication) (err error) {
 	log.Log.Debug("RTSPClient(Golibrtsp).Start(): started")
 
+	//dtsExtractor := h264.NewDTSExtractor()
+
 	// called when a RTP packet arrives
 	g.Client.OnPacketRTP(g.Media, g.Forma, func(rtppkt *rtp.Packet) {
 
@@ -133,24 +135,69 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 		//og.Log.Info("RTSPClient(Golibrtsp).Start(): " + "read packet from stream: " + strconv.Itoa(len(pkt.Payload)) + " bytes")
 		if len(rtppkt.Payload) > 0 {
 
+			// decode timestamp
+			pts, ok := g.Client.PacketPTS(g.Media, rtppkt)
+			if !ok {
+				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + "unable to get PTS")
+				return
+			}
+
 			// extract access units from RTP packets
-			au, err := g.Decoder.Decode(rtppkt)
-			if err != nil {
-				if err != rtph264.ErrNonStartingPacketAndNoPrevious && err != rtph264.ErrMorePacketsNeeded {
-					log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+			au, errDecode := g.Decoder.Decode(rtppkt)
+			if errDecode != nil {
+				if errDecode != rtph264.ErrNonStartingPacketAndNoPrevious && errDecode != rtph264.ErrMorePacketsNeeded {
+					log.Log.Error("RTSPClient(Golibrtsp).Start(): " + errDecode.Error())
 				}
 				return
 			}
 
-			isKeyFrame := h264.IDRPresent(au)
+			// We'll need to read out a few things.
+			// prepend an AUD. This is required by some players
+			filteredAU := [][]byte{
+				{byte(h264.NALUTypeAccessUnitDelimiter), 240},
+			}
+
+			nonIDRPresent := false
+			idrPresent := false
+			for _, nalu := range au {
+				typ := h264.NALUType(nalu[0] & 0x1F)
+				switch typ {
+				case h264.NALUTypeAccessUnitDelimiter:
+					continue
+				case h264.NALUTypeIDR:
+					idrPresent = true
+
+				case h264.NALUTypeNonIDR:
+					nonIDRPresent = true
+				}
+				filteredAU = append(filteredAU, nalu)
+			}
+
+			au = filteredAU
+
+			if len(au) <= 1 || (!nonIDRPresent && !idrPresent) {
+				return
+			}
+
+			/*dts, errDts := dtsExtractor.Extract(au, pts)
+			if errDts != nil {
+				return
+			}
+			fmt.Println("DTS: ", dts)*/
 
 			// Conver to packet.
+			enc, err := h264.AnnexBMarshal(au)
+			if err != nil {
+				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+				return
+			}
+
 			pkt := packets.Packet{
-				IsKeyFrame:  isKeyFrame,
+				IsKeyFrame:  idrPresent,
 				Packet:      rtppkt,
 				AccessUnits: au,
-				Data:        rtppkt.Payload,
-				Time:        time.Duration(rtppkt.Timestamp),
+				Data:        enc,
+				Time:        pts,
 			}
 
 			queue.WritePacket(pkt)
@@ -163,7 +210,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 			default:
 			}
 
-			if isKeyFrame {
+			if idrPresent {
 				// Increment packets, so we know the device
 				// is not blocking.
 				r := communication.PackageCounter.Load().(int64)
@@ -185,24 +232,14 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 
 // Decode a packet to an image.
 func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
-	accessUnits := pkt.AccessUnits
-	// decode access units
-	for _, nalu := range accessUnits {
-		img, err := g.FrameDecoder.decode(nalu)
-
-		if err != nil {
-			return image.YCbCr{}, err
-		}
-
-		// wait for a frame
-		if img.Bounds().Empty() {
-			log.Log.Debug("RTSPClient(Golibrtsp).Start(): " + "empty frame")
-			continue
-		}
-
-		return img, nil
+	img, err := g.FrameDecoder.decode(pkt.Data)
+	if err != nil {
+		return image.YCbCr{}, err
 	}
-	return image.YCbCr{}, nil
+	if img.Bounds().Empty() {
+		log.Log.Debug("RTSPClient(Golibrtsp).Start(): " + "empty frame")
+	}
+	return img, nil
 }
 
 // Get a list of streams from the RTSP server.
