@@ -81,7 +81,7 @@ func (self *Muxer) newStream(codec packets.Stream, index int, withoutAudio bool)
 	}
 
 	switch codec.Name {
-	case "H264":
+	case "H264", "H265":
 		stream.sample.SyncSample = &mp4io.SyncSample{}
 	}
 
@@ -173,7 +173,7 @@ func (self *Muxer) WriteHeader(streams []packets.Stream) (err error) {
 func (self *Muxer) WritePacket(pkt packets.Packet) (err error) {
 	stream := self.streams[pkt.Idx]
 	switch stream.CodecData.Name {
-	case "H264", "av.AAC":
+	case "H264", "AAC":
 		if stream.lastpkt != nil {
 			if err = stream.writePacket(*stream.lastpkt, pkt.Time-stream.lastpkt.Time); err != nil {
 				return
@@ -234,7 +234,7 @@ func (self *Muxer) WriteTrailer() (err error) {
 
 	for _, stream := range self.streams {
 		switch stream.CodecData.Name {
-		case "H264", "av.AAC":
+		case "H264", "AAC":
 			if stream.lastpkt != nil {
 				if err = stream.writePacket(*stream.lastpkt, 0); err != nil {
 					//return
@@ -258,7 +258,7 @@ func (self *Muxer) WriteTrailer() (err error) {
 	timeScale := int64(1000)
 	for _, stream := range self.streams {
 		switch stream.CodecData.Name {
-		case "H264", "av.AAC":
+		case "H264", "AAC":
 			if err = stream.fillTrackAtom(); err != nil {
 				return
 			}
@@ -303,7 +303,7 @@ func (self *Muxer) WriteTrailerWithPacket(pkt packets.Packet) (err error) {
 
 	for _, stream := range self.streams {
 		switch stream.CodecData.Name {
-		case "H264", "av.AAC":
+		case "H264", "AAC":
 			if stream.lastpkt != nil {
 				if err = stream.writePacket(*stream.lastpkt, pkt.Time-stream.lastpkt.Time); err != nil {
 					//return
@@ -327,7 +327,7 @@ func (self *Muxer) WriteTrailerWithPacket(pkt packets.Packet) (err error) {
 	timeScale := int64(1000)
 	for _, stream := range self.streams {
 		switch stream.CodecData.Name {
-		case "H264", "av.AAC":
+		case "H264", "AAC":
 			if err = stream.fillTrackAtom(); err != nil {
 				return
 			}

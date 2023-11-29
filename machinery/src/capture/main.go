@@ -471,15 +471,27 @@ func VerifyCamera(c *gin.Context) {
 		if streamType == "secondary" {
 			rtspUrl = cameraStreams.SubRTSP
 		}
-		_, codecs, err := OpenRTSP(ctx, rtspUrl, true)
+
+		// Currently only support H264 encoded cameras, this will change.
+		// Establishing the camera connection without backchannel if no substream
+		withBackChannel := true
+		rtspClient := &Golibrtsp{
+			Url:             rtspUrl,
+			WithBackChannel: withBackChannel,
+		}
+
+		err := rtspClient.Connect(ctx)
 		if err == nil {
+
+			// Get the streams from the rtsp client.
+			streams, _ := rtspClient.GetStreams()
 
 			videoIdx := -1
 			audioIdx := -1
-			for i, codec := range codecs {
-				if codec.Type().String() == "H264" && videoIdx < 0 {
+			for i, stream := range streams {
+				if stream.Name == "H264" && videoIdx < 0 {
 					videoIdx = i
-				} else if codec.Type().String() == "PCM_MULAW" && audioIdx < 0 {
+				} else if stream.Name == "PCM_MULAW" && audioIdx < 0 {
 					audioIdx = i
 				}
 			}
@@ -487,7 +499,7 @@ func VerifyCamera(c *gin.Context) {
 			if videoIdx > -1 {
 				c.JSON(200, models.APIResponse{
 					Message: "All good, detected a H264 codec.",
-					Data:    codecs,
+					Data:    streams,
 				})
 			} else {
 				c.JSON(400, models.APIResponse{

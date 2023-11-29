@@ -66,19 +66,21 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	// parse URL
 	u, err := base.ParseURL(g.Url)
 	if err != nil {
-		panic(err)
+		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+		return
 	}
 
 	// connect to the server
 	err = g.Client.Start(u.Scheme, u.Host)
 	if err != nil {
-		panic(err)
+		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
 	}
 
 	// find published medias
 	desc, _, err := g.Client.Describe(u)
 	if err != nil {
-		panic(err)
+		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+		return
 	}
 
 	// find the H264 media and format
@@ -95,6 +97,8 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			IsAudio: false,
 			SPS:     forma.SPS,
 			PPS:     forma.PPS,
+			Width:   640,
+			Height:  480,
 		})
 
 		// Set the index for the video
@@ -245,7 +249,6 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 						continue
 					case h264.NALUTypeIDR:
 						idrPresent = true
-
 					case h264.NALUTypeNonIDR:
 						nonIDRPresent = true
 					}

@@ -129,7 +129,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	// Get the video streams from the RTSP server.
 	videoStreams, err := rtspClient.GetVideoStreams()
-	if err != nil && len(videoStreams) == 0 {
+	if err != nil || len(videoStreams) == 0 {
 		log.Log.Error("RunAgent: no video stream found, might be the wrong codec (we only support H264 for the moment)")
 		time.Sleep(time.Second * 3)
 		return status

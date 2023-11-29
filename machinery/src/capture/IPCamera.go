@@ -1,7 +1,6 @@
 package capture
 
 import (
-	"context"
 	"strconv"
 	"sync"
 	"time"
@@ -11,63 +10,8 @@ import (
 	"github.com/kerberos-io/joy4/av/pubsub"
 
 	"github.com/kerberos-io/joy4/av"
-	"github.com/kerberos-io/joy4/av/avutil"
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
-	"github.com/kerberos-io/joy4/format"
 )
-
-func OpenRTSP(ctx context.Context, url string, withBackChannel bool) (av.DemuxCloser, []av.CodecData, error) {
-	format.RegisterAll()
-
-	// Try with backchannel first (if variable is set to true)
-	// If set to true, it will try to open the stream with a backchannel
-	// If fails we will try again (see below).
-	infile, err := avutil.Open(ctx, url, withBackChannel)
-	if err == nil {
-		streams, errstreams := infile.Streams()
-		if len(streams) > 0 {
-			return infile, streams, errstreams
-		} else {
-			// Try again without backchannel
-			log.Log.Info("OpenRTSP: trying without backchannel")
-			withBackChannel = false
-			infile, err := avutil.Open(ctx, url, withBackChannel)
-			if err == nil {
-				streams, errstreams := infile.Streams()
-				return infile, streams, errstreams
-			}
-		}
-	}
-	return nil, []av.CodecData{}, err
-}
-
-func GetVideoStream(streams []av.CodecData) (av.CodecData, error) {
-	var videoStream av.CodecData
-	for _, stream := range streams {
-		if stream.Type().IsAudio() {
-			//astream := stream.(av.AudioCodecData)
-		} else if stream.Type().IsVideo() {
-			videoStream = stream
-		}
-	}
-	return videoStream, nil
-}
-
-func GetVideoDecoder(decoder *ffmpeg.VideoDecoder, streams []av.CodecData) {
-	// Load video codec
-	var vstream av.VideoCodecData
-	for _, stream := range streams {
-		if stream.Type().IsAudio() {
-			//astream := stream.(av.AudioCodecData)
-		} else if stream.Type().IsVideo() {
-			vstream = stream.(av.VideoCodecData)
-		}
-	}
-	err := ffmpeg.NewVideoDecoder(decoder, vstream)
-	if err != nil {
-		log.Log.Error("GetVideoDecoder: " + err.Error())
-	}
-}
 
 func DecodeImage(frame *ffmpeg.VideoFrame, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
 	decoderMutex.Lock()
