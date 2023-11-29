@@ -14,12 +14,11 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"github.com/kerberos-io/joy4/av"
-	"github.com/kerberos-io/joy4/av/pubsub"
+	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 )
 
-func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) { //, wg *sync.WaitGroup) {
+func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) { //, wg *sync.WaitGroup) {
 
 	log.Log.Debug("ProcessMotion: started")
 	config := configuration.Config
@@ -53,7 +52,7 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 		j := 0
 
 		var cursorError error
-		var pkt av.Packet
+		var pkt packets.Packet
 
 		for cursorError == nil {
 			pkt, cursorError = motionCursor.ReadPacket()
@@ -225,7 +224,7 @@ func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChange
 	return changes > pixelChangeThreshold, changes
 }
 
-func GetGrayImage(frame *ffmpeg.VideoFrame, pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*image.Gray, error) {
+func GetGrayImage(frame *ffmpeg.VideoFrame, pkt packets.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*image.Gray, error) {
 	_, err := capture.DecodeImage(frame, pkt, dec, decoderMutex)
 
 	// Do a deep copy of the image
@@ -236,7 +235,7 @@ func GetGrayImage(frame *ffmpeg.VideoFrame, pkt av.Packet, dec *ffmpeg.VideoDeco
 	return imgDeepCopy, err
 }
 
-func GetRawImage(frame *ffmpeg.VideoFrame, pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
+func GetRawImage(frame *ffmpeg.VideoFrame, pkt packets.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
 	_, err := capture.DecodeImage(frame, pkt, dec, decoderMutex)
 	return frame, err
 }
@@ -261,7 +260,7 @@ func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.
 	return changes
 }
 
-func StoreSnapshot(communication *models.Communication, frame *ffmpeg.VideoFrame, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func StoreSnapshot(communication *models.Communication, frame *ffmpeg.VideoFrame, pkt packets.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
 	rgbImage, err := GetRawImage(frame, pkt, decoder, decoderMutex)
 	if err == nil {
 		buffer := new(bytes.Buffer)

@@ -223,11 +223,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					log.Log.Info("HandleRecordStream: composing recording")
 					log.Log.Info("HandleRecordStream: write header")
 
-					// Creating the file, might block sometimes.
-					/*if err := myMuxer.WriteHeader(streams); err != nil {
-						log.Log.Error(err.Error())
-					}*/
-
 					time := durationGoToMPEGTS(pkt.Time)
 					if err := myMuxer.Write(videoTrack, pkt.Data, time, time); err != nil {
 						log.Log.Error(err.Error())
@@ -240,16 +235,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						time := durationGoToMPEGTS(pkt.Time)
 						if err := myMuxer.Write(videoTrack, pkt.Data, time, time); err != nil {
 							log.Log.Error(err.Error())
-						}
-					}
-
-					// We will sync to file every keyframe.
-					if pkt.IsKeyFrame {
-						err := file.Sync()
-						if err != nil {
-							log.Log.Error(err.Error())
-						} else {
-							log.Log.Info("HandleRecordStream: Synced file: " + name)
 						}
 					}
 				}
@@ -270,8 +255,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					log.Log.Info("HandleRecordStream: Recording finished: file save: " + name)
 					// Cleanup muxer
 					start = false
-					//myMuxer.Close()
-					//myMuxer = nil
 					file.Close()
 					file = nil
 

@@ -2,16 +2,13 @@ package websocket
 
 import (
 	"context"
-	"encoding/base64"
 	"net/http"
 	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 )
 
 type Message struct {
@@ -128,26 +125,27 @@ func ForwardSDStream(ctx context.Context, clientID string, connection *Connectio
 
 	queue := communication.Queue
 	cursor := queue.Latest()
-	decoder := communication.Decoder
-	decoderMutex := communication.DecoderMutex
+	//decoder := communication.Decoder
+	//decoderMutex := communication.DecoderMutex
 
 	// Allocate ffmpeg.VideoFrame
-	frame := ffmpeg.AllocVideoFrame()
+	//frame := ffmpeg.AllocVideoFrame()
 
 logreader:
 	for {
 		var encodedImage string
-		if queue != nil && cursor != nil && decoder != nil {
+		if queue != nil && cursor != nil { //&& decoder != nil {
 			pkt, err := cursor.ReadPacket()
 			if err == nil {
 				if !pkt.IsKeyFrame {
 					continue
 				}
-				img, err := computervision.GetRawImage(frame, pkt, decoder, decoderMutex)
+				/*img, err := computervision.GetRawImage(frame, pkt, decoder, decoderMutex)
 				if err == nil {
 					bytes, _ := computervision.ImageToBytes(&img.Image)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
-				}
+				}*/
+
 			} else {
 				log.Log.Error("ForwardSDStream:" + err.Error())
 				break logreader
@@ -173,7 +171,7 @@ logreader:
 		}
 	}
 
-	frame.Free()
+	//frame.Free()
 
 	// Close socket for streaming
 	_, exists := connection.Cancels["stream-sd"]

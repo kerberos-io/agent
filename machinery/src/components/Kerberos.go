@@ -115,7 +115,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Establishing the camera connection without backchannel if no substream
 	rtspUrl := config.Capture.IPCamera.RTSP
 	withBackChannel := true
-	rtspClient := &capture.Joy4{
+	rtspClient := &capture.Golibrtsp{
 		Url:             rtspUrl,
 		WithBackChannel: withBackChannel,
 	}
@@ -149,11 +149,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	configuration.Config.Capture.IPCamera.Height = height
 
 	var queue *packets.Queue
-	//var subQueue *packets.Queue
-
-	//var decoderMutex sync.Mutex
-	//var subDecoderMutex sync.Mutex
-	subStreamEnabled := false
+	var subQueue *packets.Queue
 
 	log.Log.Info("RunAgent: opened RTSP stream: " + rtspUrl)
 
@@ -164,12 +160,91 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		log.Log.Warning("RunAgent: Prerecording value not found in config or invalid value! Found: " + strconv.FormatInt(config.Capture.PreRecording, 10))
 	}
 
-	// TODO add the substream + another check if the resolution changed.
+	// We might have a secondary rtsp url, so we might need to use that for livestreaming let us check first!
+	subStreamEnabled := false
+	subRtspUrl := config.Capture.IPCamera.SubRTSP
+	var rtspSubClient capture.RTSPClient
+	var videoSubStreams []packets.Stream
+
+	if subRtspUrl != "" && subRtspUrl != rtspUrl {
+		// For the sub stream we will not enable backchannel.
+		withBackChannel := false
+		rtspSubClient := &capture.Golibrtsp{
+			Url:             subRtspUrl,
+			WithBackChannel: withBackChannel,
+		}
+
+		err := rtspSubClient.Connect(context.Background())
+		if err != nil {
+			log.Log.Error("RunAgent: error connecting to RTSP sub stream: " + err.Error())
+			time.Sleep(time.Second * 3)
+			return status
+		}
+
+		// Get the video streams from the RTSP server.
+		videoSubStreams, err = rtspClient.GetVideoStreams()
+		if err != nil || len(videoStreams) == 0 {
+			log.Log.Error("RunAgent: no video sub stream found, might be the wrong codec (we only support H264 for the moment)")
+			time.Sleep(time.Second * 3)
+			return status
+		}
+
+		// Get the video stream from the RTSP server.
+		videoSubStream := videoSubStreams[0]
+
+		width := videoSubStream.Width
+		height := videoSubStream.Height
+
+		// Set config values as well
+		configuration.Config.Capture.IPCamera.Width = width
+		configuration.Config.Capture.IPCamera.Height = height
+	}
+
+	if cameraSettings.RTSP != rtspUrl ||
+		cameraSettings.SubRTSP != subRtspUrl ||
+		cameraSettings.Width != width ||
+		cameraSettings.Height != height {
+		//cameraSettings.Num != num ||
+		//cameraSettings.Denum != denum ||
+		//cameraSettings.Codec != videoStream.(av.VideoCodecData).Type() {
+
+		// TODO: this condition is used to reset the decoder when the camera settings change.
+		// The main idea is that you only set the decoder once, and then reuse it on each restart (no new memory allocation).
+		// However the stream settings of the camera might have been changed, and so the decoder might need to be reloaded.
+		// ....
+
+		if cameraSettings.RTSP != "" && cameraSettings.SubRTSP != "" && cameraSettings.Initialized {
+			//decoder.Close()
+			//if subStreamEnabled {
+			//	subDecoder.Close()
+			//}
+		}
+
+		// At some routines we will need to decode the image.
+		// Make sure its properly locked as we only have a single decoder.
+		log.Log.Info("RunAgent: camera settings changed, reloading decoder")
+		//capture.GetVideoDecoder(decoder, streams)
+		//if subStreamEnabled {
+		//	capture.GetVideoDecoder(subDecoder, subStreams)
+		//}
+
+		cameraSettings.RTSP = rtspUrl
+		cameraSettings.SubRTSP = subRtspUrl
+		cameraSettings.Width = width
+		cameraSettings.Height = height
+		//cameraSettings.Framerate = float64(num) / float64(denum)
+		//cameraSettings.Num = num
+		//cameraSettings.Denum = denum
+		//cameraSettings.Codec = videoStream.(av.VideoCodecData).Type()
+		cameraSettings.Initialized = true
+	} else {
+		log.Log.Info("RunAgent: camera settings did not change, keeping decoder")
+	}
 
 	// We are creating a queue to store the RTSP frames in, these frames will be
 	// processed by the different consumers: motion detection, recording, etc.
 	queue = packets.NewQueue()
-	//communication.Queue = queue
+	communication.Queue = queue
 
 	queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
 	log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
@@ -181,8 +256,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	// Handle livestream SD (low resolution over MQTT)
 	if subStreamEnabled {
-		//livestreamCursor := subQueue.Latest()
-		//go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspSubClient)
+		livestreamCursor := subQueue.Latest()
+		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspSubClient)
 	} else {
 		livestreamCursor := queue.Latest()
 		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspClient)
@@ -191,8 +266,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Handle livestream HD (high resolution over WEBRTC)
 	communication.HandleLiveHDHandshake = make(chan models.RequestHDStreamPayload, 1)
 	if subStreamEnabled {
-		//livestreamHDCursor := subQueue.Latest()
-		//go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, subStreams, subDecoder, &decoderMutex)
+		livestreamHDCursor := subQueue.Latest()
+		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspSubClient)
 	} else {
 		livestreamHDCursor := queue.Latest()
 		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspClient)
@@ -239,16 +314,28 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	time.Sleep(time.Second * 3)
 
+	err = rtspClient.Close()
+	if err != nil {
+		log.Log.Error("RunAgent: error closing RTSP stream: " + err.Error())
+		time.Sleep(time.Second * 3)
+		return status
+	}
+
 	queue.Close()
 	queue = nil
 	communication.Queue = nil
 	if subStreamEnabled {
-		//subInfile.Close()
-		//subInfile = nil
-		//subQueue.Close()
-		//subQueue = nil
+		err = rtspSubClient.Close()
+		if err != nil {
+			log.Log.Error("RunAgent: error closing RTSP sub stream: " + err.Error())
+			time.Sleep(time.Second * 3)
+			return status
+		}
+		subQueue.Close()
+		subQueue = nil
 		communication.SubQueue = nil
 	}
+
 	//close(communication.HandleMotion)
 	//communication.HandleMotion = nil
 	//close(communication.HandleAudio)
@@ -257,221 +344,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Waiting for some seconds to make sure everything is properly closed.
 	log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")
 	time.Sleep(time.Second * 3)
-	/*
-
-		if err == nil
-
-			// We might have a secondary rtsp url, so we might need to use that.
-			var subInfile av.DemuxCloser
-			var subStreams []av.CodecData
-			subStreamEnabled := false
-			subRtspUrl := config.Capture.IPCamera.SubRTSP
-			if subRtspUrl != "" && subRtspUrl != rtspUrl {
-				withBackChannel := false
-				subInfile, subStreams, err = capture.OpenRTSP(context.Background(), subRtspUrl, withBackChannel) // We'll try to enable backchannel for the substream.
-				if err == nil {
-					log.Log.Info("RunAgent: opened RTSP sub stream " + subRtspUrl)
-					subStreamEnabled = true
-				}
-
-				videoStream, _ := capture.GetVideoStream(subStreams)
-				if videoStream == nil {
-					log.Log.Error("RunAgent: no video substream found, might be the wrong codec (we only support H264 for the moment)")
-					time.Sleep(time.Second * 3)
-					return status
-				}
-
-				width := videoStream.(av.VideoCodecData).Width()
-				height := videoStream.(av.VideoCodecData).Height()
-
-				// Set config values as well
-				configuration.Config.Capture.IPCamera.Width = width
-				configuration.Config.Capture.IPCamera.Height = height
-			}
-
-			if cameraSettings.RTSP != rtspUrl || cameraSettings.SubRTSP != subRtspUrl || cameraSettings.Width != width || cameraSettings.Height != height || cameraSettings.Num != num || cameraSettings.Denum != denum || cameraSettings.Codec != videoStream.(av.VideoCodecData).Type() {
-
-				if cameraSettings.RTSP != "" && cameraSettings.SubRTSP != "" && cameraSettings.Initialized {
-					decoder.Close()
-					if subStreamEnabled {
-						subDecoder.Close()
-					}
-				}
-
-				// At some routines we will need to decode the image.
-				// Make sure its properly locked as we only have a single decoder.
-				log.Log.Info("RunAgent: camera settings changed, reloading decoder")
-				capture.GetVideoDecoder(decoder, streams)
-				if subStreamEnabled {
-					capture.GetVideoDecoder(subDecoder, subStreams)
-				}
-
-				cameraSettings.RTSP = rtspUrl
-				cameraSettings.SubRTSP = subRtspUrl
-				cameraSettings.Width = width
-				cameraSettings.Height = height
-				cameraSettings.Framerate = float64(num) / float64(denum)
-				cameraSettings.Num = num
-				cameraSettings.Denum = denum
-				cameraSettings.Codec = videoStream.(av.VideoCodecData).Type()
-				cameraSettings.Initialized = true
-
-			} else {
-				log.Log.Info("RunAgent: camera settings did not change, keeping decoder")
-			}
-
-			communication.Decoder = decoder
-			communication.SubDecoder = subDecoder
-			communication.DecoderMutex = &decoderMutex
-			communication.SubDecoderMutex = &subDecoderMutex
-
-			// Create a packet queue, which is filled by the HandleStream routing
-			// and consumed by all other routines: motion, livestream, etc.
-			if config.Capture.PreRecording <= 0 {
-				config.Capture.PreRecording = 1
-				log.Log.Warning("RunAgent: Prerecording value not found in config or invalid value! Found: " + strconv.FormatInt(config.Capture.PreRecording, 10))
-			}
-
-			// We are creating a queue to store the RTSP frames in, these frames will be
-			// processed by the different consumers: motion detection, recording, etc.
-			queue = pubsub.NewQueue()
-			communication.Queue = queue
-			queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
-			log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
-			queue.WriteHeader(streams)
-
-			// We might have a substream, if so we'll create a seperate queue.
-			if subStreamEnabled {
-				log.Log.Info("RunAgent: Creating sub stream queue with SetMaxGopCount set to " + strconv.Itoa(int(1)))
-				subQueue = pubsub.NewQueue()
-				communication.SubQueue = subQueue
-				subQueue.SetMaxGopCount(1)
-				subQueue.WriteHeader(subStreams)
-			}
-
-			// Handle the camera stream
-			go capture.HandleStream(infile, queue, communication)
-
-			// Handle the substream if enabled
-			if subStreamEnabled {
-				go capture.HandleSubStream(subInfile, subQueue, communication)
-			}
-
-			// Handle processing of audio
-			communication.HandleAudio = make(chan models.AudioDataPartial)
-
-			// Handle processing of motion
-			communication.HandleMotion = make(chan models.MotionDataPartial, 1)
-			if subStreamEnabled {
-				motionCursor := subQueue.Latest()
-				go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, subDecoder, &subDecoderMutex)
-			} else {
-				motionCursor := queue.Latest()
-				go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
-			}
-
-			// Handle livestream SD (low resolution over MQTT)
-			if subStreamEnabled {
-				livestreamCursor := subQueue.Latest()
-				go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, subDecoder, &subDecoderMutex)
-			} else {
-				livestreamCursor := queue.Latest()
-				go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
-			}
-
-			// Handle livestream HD (high resolution over WEBRTC)
-			communication.HandleLiveHDHandshake = make(chan models.RequestHDStreamPayload, 1)
-			if subStreamEnabled {
-				livestreamHDCursor := subQueue.Latest()
-				go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, subStreams, subDecoder, &decoderMutex)
-			} else {
-				livestreamHDCursor := queue.Latest()
-				go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, streams, decoder, &decoderMutex)
-			}
-
-			// Handle recording, will write an mp4 to disk.
-			go capture.HandleRecordStream(queue, configDirectory, configuration, communication, streams)
-
-			// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)
-			go cloud.HandleUpload(configDirectory, configuration, communication)
-
-			// Handle ONVIF actions
-			go onvif.HandleONVIFActions(configuration, communication)
-
-			// If we reach this point, we have a working RTSP connection.
-			communication.CameraConnected = true
-
-			// We might have a camera with audio backchannel enabled.
-			// Check if we have a stream with a backchannel and is PCMU encoded.
-			go WriteAudioToBackchannel(infile, streams, communication)
-
-			// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-			// This will go into a blocking state, once this channel is triggered
-			// the agent will cleanup and restart.
-
-			status = <-communication.HandleBootstrap
-
-			// If we reach this point, we are stopping the stream.
-			communication.CameraConnected = false
-
-			// Cancel the main context, this will stop all the other goroutines.
-			(*communication.CancelContext)()
-
-			// We will re open the configuration, might have changed :O!
-			configService.OpenConfig(configDirectory, configuration)
-
-			// We will override the configuration with the environment variables
-			configService.OverrideWithEnvironmentVariables(configuration)
-
-			// Here we are cleaning up everything!
-			if configuration.Config.Offline != "true" {
-				communication.HandleUpload <- "stop"
-			}
-			communication.HandleStream <- "stop"
-			if subStreamEnabled {
-				communication.HandleSubStream <- "stop"
-			}
-
-			time.Sleep(time.Second * 3)
-
-			infile.Close()
-			infile = nil
-			queue.Close()
-			queue = nil
-			communication.Queue = nil
-			if subStreamEnabled {
-				subInfile.Close()
-				subInfile = nil
-				subQueue.Close()
-				subQueue = nil
-				communication.SubQueue = nil
-			}
-			close(communication.HandleMotion)
-			communication.HandleMotion = nil
-			close(communication.HandleAudio)
-			communication.HandleAudio = nil
-
-			// Waiting for some seconds to make sure everything is properly closed.
-			log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")
-			time.Sleep(time.Second * 3)
-
-		} else {
-			log.Log.Error("Something went wrong while opening RTSP: " + err.Error())
-			time.Sleep(time.Second * 3)
-		}
-
-		log.Log.Debug("RunAgent: finished")
-
-		// Clean up, force garbage collection
-		runtime.GC()*/
-
-	// Close the connection to the RTSP server.
-	err = rtspClient.Close()
-	if err != nil {
-		log.Log.Error("RunAgent: error closing RTSP stream: " + err.Error())
-		time.Sleep(time.Second * 3)
-		return status
-	}
 
 	return status
 }
