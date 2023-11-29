@@ -21,6 +21,8 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/description"
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
+	"github.com/bluenviron/gortsplib/v4/pkg/format/rtplpcm"
+	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpsimpleaudio"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -34,14 +36,26 @@ type Golibrtsp struct {
 	Url             string
 	WithBackChannel bool
 
-	Client  gortsplib.Client
-	Media   *description.Media
-	Forma   *format.H264
-	Streams []packets.Stream
+	Client gortsplib.Client
 
-	DecoderMutex *sync.Mutex
-	Decoder      *rtph264.Decoder
-	FrameDecoder *h264Decoder
+	VideoH264Index        int8
+	VideoH264Media        *description.Media
+	VideoH264Forma        *format.H264
+	VideoH264Decoder      *rtph264.Decoder
+	VideoH264FrameDecoder *h264Decoder
+	VideoH264DecoderMutex *sync.Mutex
+
+	AudioLPCMIndex   int8
+	AudioLPCMMedia   *description.Media
+	AudioLPCMForma   *format.LPCM
+	AudioLPCMDecoder *rtplpcm.Decoder
+
+	AudioG711Index   int8
+	AudioG711Media   *description.Media
+	AudioG711Forma   *format.G711
+	AudioG711Decoder *rtpsimpleaudio.Decoder
+
+	Streams []packets.Stream
 }
 
 // Connect to the RTSP server.
@@ -70,46 +84,81 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	// find the H264 media and format
 	var forma *format.H264
 	medi := desc.FindFormat(&forma)
+	g.VideoH264Media = medi
+	g.VideoH264Forma = forma
 	if medi == nil {
-		panic("media not found")
-	}
-	g.Media = medi
-	g.Forma = forma
+		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "video media not found")
+	} else {
+		g.Streams = append(g.Streams, packets.Stream{
+			Name:    forma.Codec(),
+			IsVideo: true,
+			IsAudio: false,
+			SPS:     forma.SPS,
+			PPS:     forma.PPS,
+		})
 
-	g.Streams = append(g.Streams, packets.Stream{
-		Name:    forma.Codec(),
-		IsVideo: true,
-		IsAudio: false,
-		SPS:     forma.SPS,
-		PPS:     forma.PPS,
-	})
+		// Set the index for the video
+		g.VideoH264Index = int8(len(g.Streams)) - 1
 
-	// setup RTP/H264 -> H264 decoder
-	rtpDec, err := forma.CreateDecoder()
-	if err != nil {
-		panic(err)
-	}
-	g.Decoder = rtpDec
+		// setup RTP/H264 -> H264 decoder
+		rtpDec, err := forma.CreateDecoder()
+		if err != nil {
+			// Something went wrong .. Do something
+		}
+		g.VideoH264Decoder = rtpDec
 
-	// setup H264 -> raw frames decoder
-	frameDec, err := newH264Decoder()
-	if err != nil {
-		panic(err)
-	}
-	g.FrameDecoder = frameDec
+		// setup H264 -> raw frames decoder
+		frameDec, err := newH264Decoder()
+		if err != nil {
+			// Something went wrong .. Do something
+		}
+		g.VideoH264FrameDecoder = frameDec
 
-	// if SPS and PPS are present into the SDP, send them to the decoder
-	if forma.SPS != nil {
-		frameDec.decode(forma.SPS)
-	}
-	if forma.PPS != nil {
-		frameDec.decode(forma.PPS)
+		// if SPS and PPS are present into the SDP, send them to the decoder
+		if forma.SPS != nil {
+			frameDec.decode(forma.SPS)
+		}
+		if forma.PPS != nil {
+			frameDec.decode(forma.PPS)
+		}
+
+		// setup a video media
+		_, err = g.Client.Setup(desc.BaseURL, medi, 0, 0)
+		if err != nil {
+			// Something went wrong .. Do something
+		}
 	}
 
-	// setup a single media
-	_, err = g.Client.Setup(desc.BaseURL, medi, 0, 0)
-	if err != nil {
-		panic(err)
+	// Look for audio stream.
+	// find the G711 media and format
+	var audioForma *format.G711
+	audioMedi := desc.FindFormat(&audioForma)
+	g.AudioG711Media = audioMedi
+	g.AudioG711Forma = audioForma
+	if audioMedi == nil {
+		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "audio media not found")
+	} else {
+		g.Streams = append(g.Streams, packets.Stream{
+			Name:    "PCM_MULAW",
+			IsVideo: false,
+			IsAudio: true,
+		})
+
+		// Set the index for the audio
+		g.AudioG711Index = int8(len(g.Streams)) - 1
+
+		// create decoder
+		audiortpDec, err := audioForma.CreateDecoder()
+		if err != nil {
+			// Something went wrong .. Do something
+		}
+		g.AudioG711Decoder = audiortpDec
+
+		// setup a audio media
+		_, err = g.Client.Setup(desc.BaseURL, audioMedi, 0, 0)
+		if err != nil {
+			// Something went wrong .. Do something
+		}
 	}
 
 	return
@@ -119,88 +168,37 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communication *models.Communication) (err error) {
 	log.Log.Debug("RTSPClient(Golibrtsp).Start(): started")
 
-	//dtsExtractor := h264.NewDTSExtractor()
-
-	// called when a RTP packet arrives
-	g.Client.OnPacketRTP(g.Media, g.Forma, func(rtppkt *rtp.Packet) {
-
-		// This will check if we need to stop the thread,
-		// because of a reconfiguration.
-		select {
-		case <-communication.HandleStream:
-			return
-		default:
-		}
-
-		//og.Log.Info("RTSPClient(Golibrtsp).Start(): " + "read packet from stream: " + strconv.Itoa(len(pkt.Payload)) + " bytes")
-		if len(rtppkt.Payload) > 0 {
-
+	// called when a audio RTP packet arrives
+	if g.AudioG711Media != nil {
+		g.Client.OnPacketRTP(g.AudioG711Media, g.AudioG711Forma, func(rtppkt *rtp.Packet) {
 			// decode timestamp
-			pts, ok := g.Client.PacketPTS(g.Media, rtppkt)
+			pts, ok := g.Client.PacketPTS(g.AudioG711Media, rtppkt)
 			if !ok {
 				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + "unable to get PTS")
 				return
 			}
 
-			// extract access units from RTP packets
-			au, errDecode := g.Decoder.Decode(rtppkt)
-			if errDecode != nil {
-				if errDecode != rtph264.ErrNonStartingPacketAndNoPrevious && errDecode != rtph264.ErrMorePacketsNeeded {
-					log.Log.Error("RTSPClient(Golibrtsp).Start(): " + errDecode.Error())
-				}
-				return
-			}
-
-			// We'll need to read out a few things.
-			// prepend an AUD. This is required by some players
-			filteredAU := [][]byte{
-				{byte(h264.NALUTypeAccessUnitDelimiter), 240},
-			}
-
-			nonIDRPresent := false
-			idrPresent := false
-			for _, nalu := range au {
-				typ := h264.NALUType(nalu[0] & 0x1F)
-				switch typ {
-				case h264.NALUTypeAccessUnitDelimiter:
-					continue
-				case h264.NALUTypeIDR:
-					idrPresent = true
-
-				case h264.NALUTypeNonIDR:
-					nonIDRPresent = true
-				}
-				filteredAU = append(filteredAU, nalu)
-			}
-
-			au = filteredAU
-
-			if len(au) <= 1 || (!nonIDRPresent && !idrPresent) {
-				return
-			}
-
-			/*dts, errDts := dtsExtractor.Extract(au, pts)
-			if errDts != nil {
-				return
-			}
-			fmt.Println("DTS: ", dts)*/
-
-			// Conver to packet.
-			enc, err := h264.AnnexBMarshal(au)
+			// extract LPCM samples from RTP packets
+			op, err := g.AudioG711Decoder.Decode(rtppkt)
 			if err != nil {
 				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
 				return
 			}
 
 			pkt := packets.Packet{
-				IsKeyFrame:  idrPresent,
-				Packet:      rtppkt,
-				AccessUnits: au,
-				Data:        enc,
-				Time:        pts,
+				IsKeyFrame: false,
+				Packet:     rtppkt,
+				Data:       op,
+				Time:       pts,
+				Idx:        g.AudioG711Index,
 			}
-
 			queue.WritePacket(pkt)
+		})
+	}
+
+	// called when a video RTP packet arrives
+	if g.VideoH264Media != nil {
+		g.Client.OnPacketRTP(g.VideoH264Media, g.VideoH264Forma, func(rtppkt *rtp.Packet) {
 
 			// This will check if we need to stop the thread,
 			// because of a reconfiguration.
@@ -210,16 +208,90 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 			default:
 			}
 
-			if idrPresent {
-				// Increment packets, so we know the device
-				// is not blocking.
-				r := communication.PackageCounter.Load().(int64)
-				log.Log.Info("RTSPClient(Golibrtsp).Start(): packet size " + strconv.Itoa(len(pkt.Data)))
-				communication.PackageCounter.Store((r + 1) % 1000)
-				communication.LastPacketTimer.Store(time.Now().Unix())
+			if len(rtppkt.Payload) > 0 {
+
+				// decode timestamp
+				pts, ok := g.Client.PacketPTS(g.VideoH264Media, rtppkt)
+				if !ok {
+					log.Log.Warning("RTSPClient(Golibrtsp).Start(): " + "unable to get PTS")
+					return
+				}
+
+				// Extract access units from RTP packets
+				// We need to do this, because the decoder expects a full
+				// access unit. Once we have a full access unit, we can
+				// decode it, and know if it's a keyframe or not.
+				au, errDecode := g.VideoH264Decoder.Decode(rtppkt)
+				if errDecode != nil {
+					if errDecode != rtph264.ErrNonStartingPacketAndNoPrevious && errDecode != rtph264.ErrMorePacketsNeeded {
+						log.Log.Warning("RTSPClient(Golibrtsp).Start(): " + errDecode.Error())
+					}
+					return
+				}
+
+				// We'll need to read out a few things.
+				// prepend an AUD. This is required by some players
+				filteredAU := [][]byte{
+					{byte(h264.NALUTypeAccessUnitDelimiter), 240},
+				}
+
+				// Check if we have a keyframe.
+				nonIDRPresent := false
+				idrPresent := false
+				for _, nalu := range au {
+					typ := h264.NALUType(nalu[0] & 0x1F)
+					switch typ {
+					case h264.NALUTypeAccessUnitDelimiter:
+						continue
+					case h264.NALUTypeIDR:
+						idrPresent = true
+
+					case h264.NALUTypeNonIDR:
+						nonIDRPresent = true
+					}
+					filteredAU = append(filteredAU, nalu)
+				}
+
+				if len(filteredAU) <= 1 || (!nonIDRPresent && !idrPresent) {
+					return
+				}
+
+				// Conver to packet.
+				enc, err := h264.AnnexBMarshal(filteredAU)
+				if err != nil {
+					log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+					return
+				}
+
+				pkt := packets.Packet{
+					IsKeyFrame: idrPresent,
+					Packet:     rtppkt,
+					Data:       enc,
+					Time:       pts,
+					Idx:        g.VideoH264Index,
+				}
+				queue.WritePacket(pkt)
+
+				// This will check if we need to stop the thread,
+				// because of a reconfiguration.
+				select {
+				case <-communication.HandleStream:
+					return
+				default:
+				}
+
+				if idrPresent {
+					// Increment packets, so we know the device
+					// is not blocking.
+					r := communication.PackageCounter.Load().(int64)
+					log.Log.Info("RTSPClient(Golibrtsp).Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					communication.PackageCounter.Store((r + 1) % 1000)
+					communication.LastPacketTimer.Store(time.Now().Unix())
+				}
 			}
-		}
-	})
+
+		})
+	}
 
 	// Play the stream.
 	_, err = g.Client.Play(nil)
@@ -232,7 +304,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 
 // Decode a packet to an image.
 func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
-	img, err := g.FrameDecoder.decode(pkt.Data)
+	img, err := g.VideoH264FrameDecoder.decode(pkt.Data)
 	if err != nil {
 		return image.YCbCr{}, err
 	}

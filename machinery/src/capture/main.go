@@ -11,11 +11,9 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/mp4"
+	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
-	"github.com/kerberos-io/joy4/av/pubsub"
-	"github.com/kerberos-io/joy4/format/mp4"
-
-	"github.com/kerberos-io/joy4/av"
 )
 
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
@@ -52,9 +50,12 @@ func CleanupRecordingDirectory(configDirectory string, configuration *models.Con
 	}
 }
 
-func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, streams []av.CodecData) {
+func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient) {
 
 	config := configuration.Config
+
+	// Get the streams from the rtsp client.
+	streams, _ := rtspClient.GetStreams()
 
 	if config.Capture.Recording == "false" {
 		log.Log.Info("HandleRecordStream: disabled, we will not record anything.")
@@ -92,8 +93,8 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 			// Get as much packets we need.
 			//for pkt := range packets {
 			var cursorError error
-			var pkt av.Packet
-			var nextPkt av.Packet
+			var pkt packets.Packet
+			var nextPkt packets.Packet
 			recordingStatus := "idle"
 			recordingCursor := queue.Oldest()
 
@@ -330,14 +331,15 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 				log.Log.Info("HandleRecordStream: composing recording")
 				log.Log.Info("HandleRecordStream: write header")
 				// Creating the file, might block sometimes.
-				if err := myMuxer.WriteHeader(streams); err != nil {
-					log.Log.Error(err.Error())
-				}
+				// TODO CHANGE!!!
+				//if err := myMuxer.WriteHeader(streams); err != nil {
+				//	log.Log.Error(err.Error())
+				//}
 
 				// Get as much packets we need.
 				var cursorError error
-				var pkt av.Packet
-				var nextPkt av.Packet
+				var pkt packets.Packet
+				var nextPkt packets.Packet
 				recordingCursor := queue.DelayedGopCount(int(config.Capture.PreRecording))
 
 				if cursorError == nil {

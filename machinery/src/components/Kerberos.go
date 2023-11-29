@@ -198,6 +198,9 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspClient)
 	}
 
+	// Handle recording, will write an mp4 to disk.
+	go capture.HandleRecordStream(queue, configDirectory, configuration, communication, rtspClient)
+
 	// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)
 	go cloud.HandleUpload(configDirectory, configuration, communication)
 
@@ -256,9 +259,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	time.Sleep(time.Second * 3)
 	/*
 
-		if err == nil {
-
-
+		if err == nil
 
 			// We might have a secondary rtsp url, so we might need to use that.
 			var subInfile av.DemuxCloser
