@@ -372,6 +372,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						start = true
 					}
 					if start {
+
 						if err := myMuxer.WritePacket(pkt); err != nil {
 							log.Log.Error(err.Error())
 						}

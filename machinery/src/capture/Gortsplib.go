@@ -202,6 +202,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 
 	// called when a video RTP packet arrives
 	if g.VideoH264Media != nil {
+
 		g.Client.OnPacketRTP(g.VideoH264Media, g.VideoH264Forma, func(rtppkt *rtp.Packet) {
 
 			// This will check if we need to stop the thread,

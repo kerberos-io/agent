@@ -91,7 +91,6 @@ func (self *Muxer) newStream(codec packets.Stream, index int, withoutAudio bool)
 
 	return
 }
-
 func (self *Stream) fillTrackAtom() (err error) {
 	self.trackAtom.Media.Header.TimeScale = int32(self.timeScale)
 	self.trackAtom.Media.Header.Duration = int32(self.duration)
@@ -100,6 +99,24 @@ func (self *Stream) fillTrackAtom() (err error) {
 
 		codec := self.CodecData
 		width, height := codec.Width, codec.Height
+		decoderData := []byte{}
+
+		recordinfo := AVCDecoderConfRecord{}
+		if len(self.CodecData.SPS) > 0 {
+			recordinfo.AVCProfileIndication = self.CodecData.SPS[1]
+			recordinfo.ProfileCompatibility = self.CodecData.SPS[2]
+			recordinfo.AVCLevelIndication = self.CodecData.SPS[3]
+			recordinfo.SPS = [][]byte{self.CodecData.SPS}
+
+		}
+		if len(self.CodecData.PPS) > 0 {
+			recordinfo.PPS = [][]byte{self.CodecData.PPS}
+		}
+		recordinfo.LengthSizeMinusOne = 3 // check...
+
+		buf := make([]byte, recordinfo.Len())
+		recordinfo.Marshal(buf)
+
 		self.sample.SampleDesc.AVC1Desc = &mp4io.AVC1Desc{
 			DataRefIdx:           1,
 			HorizontalResolution: 72,
@@ -109,7 +126,7 @@ func (self *Stream) fillTrackAtom() (err error) {
 			FrameCount:           1,
 			Depth:                24,
 			ColorTableId:         -1,
-			//Conf:                 &mp4io.AVC1Conf{Data: codec.AVCDecoderConfRecordBytes()},
+			Conf:                 &mp4io.AVC1Conf{Data: decoderData},
 		}
 		self.trackAtom.Media.Handler = &mp4io.HandlerRefer{
 			SubType: [4]byte{'v', 'i', 'd', 'e'},
@@ -377,5 +394,54 @@ func (self *Muxer) Close() (err error) {
 		stream = nil
 	}
 	self.streams = nil
+	return
+}
+
+type AVCDecoderConfRecord struct {
+	AVCProfileIndication uint8
+	ProfileCompatibility uint8
+	AVCLevelIndication   uint8
+	LengthSizeMinusOne   uint8
+	SPS                  [][]byte
+	PPS                  [][]byte
+}
+
+func (self AVCDecoderConfRecord) Len() (n int) {
+	n = 7
+	for _, sps := range self.SPS {
+		n += 2 + len(sps)
+	}
+	for _, pps := range self.PPS {
+		n += 2 + len(pps)
+	}
+	return
+}
+
+func (self AVCDecoderConfRecord) Marshal(b []byte) (n int) {
+	b[0] = 1
+	b[1] = self.AVCProfileIndication
+	b[2] = self.ProfileCompatibility
+	b[3] = self.AVCLevelIndication
+	b[4] = self.LengthSizeMinusOne | 0xfc
+	b[5] = uint8(len(self.SPS)) | 0xe0
+	n += 6
+
+	for _, sps := range self.SPS {
+		pio.PutU16BE(b[n:], uint16(len(sps)))
+		n += 2
+		copy(b[n:], sps)
+		n += len(sps)
+	}
+
+	b[n] = uint8(len(self.PPS))
+	n++
+
+	for _, pps := range self.PPS {
+		pio.PutU16BE(b[n:], uint16(len(pps)))
+		n += 2
+		copy(b[n:], pps)
+		n += len(pps)
+	}
+
 	return
 }
