@@ -37,6 +37,7 @@ require (
 	github.com/swaggo/gin-swagger v1.5.3
 	github.com/swaggo/swag v1.8.9
 	github.com/tevino/abool v1.2.0
+	github.com/yapingcat/gomedia v0.0.0-20231111085550-145f641a02d1
 	github.com/zaf/g711 v0.0.0-20220109202201-cf0017bf0359
 	go.mongodb.org/mongo-driver v1.7.5
 	gopkg.in/DataDog/dd-trace-go.v1 v1.46.0

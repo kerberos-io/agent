@@ -3,6 +3,9 @@ package capture
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"time"
@@ -11,9 +14,9 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"github.com/kerberos-io/agent/machinery/src/mp4"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
+	"github.com/yapingcat/gomedia/go-mp4"
 )
 
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
@@ -55,7 +58,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 	config := configuration.Config
 
 	// Get the streams from the rtsp client.
-	streams, _ := rtspClient.GetStreams()
+	//streams, _ := rtspClient.GetStreams()
 
 	if config.Capture.Recording == "false" {
 		log.Log.Info("HandleRecordStream: disabled, we will not record anything.")
@@ -73,6 +76,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 		// Check if continuous recording.
 		if config.Capture.Continuous == "true" {
 
+			var cws *cacheWriterSeeker
+			var myMuxer *mp4.Movmuxer
+			var videoTrack uint32
+
 			// Do not do anything!
 			log.Log.Info("HandleRecordStream: Start continuous recording ")
 
@@ -81,7 +88,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			timestamp = now
 			start := false
 			var name string
-			var myMuxer *mp4.Muxer
 			var file *os.File
 			var err error
 
@@ -112,12 +118,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
 					// Write the last packet
-					if err := myMuxer.WritePacket(pkt); err != nil {
+					if err := myMuxer.Write(videoTrack, pkt.Data, uint64(pkt.Time), uint64(pkt.CompositionTime)); err != nil {
 						log.Log.Error(err.Error())
 					}
 
 					// This will write the trailer a well.
-					if err := myMuxer.WriteTrailerWithPacket(nextPkt); err != nil {
+					if err := myMuxer.WriteTrailer(); err != nil {
 						log.Log.Error(err.Error())
 					}
 
@@ -125,8 +131,15 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					// Cleanup muxer
 					start = false
-					myMuxer.Close()
-					myMuxer = nil
+					//myMuxer.Close()
+					//myMuxer = nil
+					_, err = file.Write(cws.buf)
+					if err != nil {
+						panic(err)
+					}
+
+					fmt.Println(cws.offset, len(cws.buf))
+
 					file.Close()
 					file = nil
 
@@ -201,25 +214,28 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					file, err = os.Create(fullName)
 					if err == nil {
-						myMuxer = mp4.NewMuxer(file)
+						//myMuxer = mp4.NewMuxer(file)
+						cws = newCacheWriterSeeker(4096)
+						myMuxer, _ = mp4.CreateMp4Muxer(cws)
+						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264)
 					}
 
 					log.Log.Info("HandleRecordStream: composing recording")
 					log.Log.Info("HandleRecordStream: write header")
 
 					// Creating the file, might block sometimes.
-					if err := myMuxer.WriteHeader(streams); err != nil {
+					/*if err := myMuxer.WriteHeader(streams); err != nil {
 						log.Log.Error(err.Error())
-					}
+					}*/
 
-					if err := myMuxer.WritePacket(pkt); err != nil {
+					if err := myMuxer.Write(videoTrack, pkt.Data, uint64(pkt.Time), uint64(pkt.CompositionTime)); err != nil {
 						log.Log.Error(err.Error())
 					}
 
 					recordingStatus = "started"
 
 				} else if start {
-					if err := myMuxer.WritePacket(pkt); err != nil {
+					if err := myMuxer.Write(videoTrack, pkt.Data, uint64(pkt.Time), uint64(pkt.CompositionTime)); err != nil {
 						log.Log.Error(err.Error())
 					}
 
@@ -250,8 +266,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					log.Log.Info("HandleRecordStream: Recording finished: file save: " + name)
 					// Cleanup muxer
 					start = false
-					myMuxer.Close()
-					myMuxer = nil
+					//myMuxer.Close()
+					//myMuxer = nil
 					file.Close()
 					file = nil
 
@@ -271,12 +287,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 			log.Log.Info("HandleRecordStream: Start motion based recording ")
 
-			var myMuxer *mp4.Muxer
 			var file *os.File
-			var err error
-
 			var lastDuration time.Duration
 			var lastRecordingTime int64
+
+			var cws *cacheWriterSeeker
+			var myMuxer *mp4.Movmuxer
+			var videoTrack uint32
 
 			for motion := range communication.HandleMotion {
 
@@ -321,10 +338,11 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				// Running...
 				log.Log.Info("HandleRecordStream: Recording started")
-				file, err = os.Create(fullName)
-				if err == nil {
-					myMuxer = mp4.NewMuxer(file)
-				}
+				file, _ = os.Create(fullName)
+
+				cws = newCacheWriterSeeker(4096)
+				myMuxer, _ = mp4.CreateMp4Muxer(cws)
+				videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264)
 
 				start := false
 
@@ -373,7 +391,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 					if start {
 
-						if err := myMuxer.WritePacket(pkt); err != nil {
+						if err := myMuxer.Write(videoTrack, pkt.Data, uint64(pkt.Time), uint64(pkt.CompositionTime)); err != nil {
 							log.Log.Error(err.Error())
 						}
 
@@ -392,15 +410,23 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				}
 
 				// This will write the trailer as well.
-				myMuxer.WriteTrailerWithPacket(nextPkt)
+				if err := myMuxer.Write(videoTrack, nextPkt.Data, uint64(nextPkt.Time), uint64(nextPkt.CompositionTime)); err != nil {
+					log.Log.Error(err.Error())
+				}
+				myMuxer.WriteTrailer()
+
 				log.Log.Info("HandleRecordStream:  file save: " + name)
 
 				lastDuration = pkt.Time
 				lastRecordingTime = time.Now().Unix()
 
 				// Cleanup muxer
-				myMuxer.Close()
-				myMuxer = nil
+				//myMuxer.Close()
+				//myMuxer = nil
+				_, err := file.Write(cws.buf)
+				if err != nil {
+					panic(err)
+				}
 				file.Close()
 				file = nil
 
@@ -517,5 +543,55 @@ func VerifyCamera(c *gin.Context) {
 		c.JSON(400, models.APIResponse{
 			Message: "Something went wrong while receiving the config " + err.Error(),
 		})
+	}
+}
+
+type cacheWriterSeeker struct {
+	buf    []byte
+	offset int
+}
+
+func newCacheWriterSeeker(capacity int) *cacheWriterSeeker {
+	return &cacheWriterSeeker{
+		buf:    make([]byte, 0, capacity),
+		offset: 0,
+	}
+}
+
+func (ws *cacheWriterSeeker) Write(p []byte) (n int, err error) {
+	if cap(ws.buf)-ws.offset >= len(p) {
+		if len(ws.buf) < ws.offset+len(p) {
+			ws.buf = ws.buf[:ws.offset+len(p)]
+		}
+		copy(ws.buf[ws.offset:], p)
+		ws.offset += len(p)
+		return len(p), nil
+	}
+	tmp := make([]byte, len(ws.buf), cap(ws.buf)+len(p)*2)
+	copy(tmp, ws.buf)
+	if len(ws.buf) < ws.offset+len(p) {
+		tmp = tmp[:ws.offset+len(p)]
+	}
+	copy(tmp[ws.offset:], p)
+	ws.buf = tmp
+	ws.offset += len(p)
+	return len(p), nil
+}
+
+func (ws *cacheWriterSeeker) Seek(offset int64, whence int) (int64, error) {
+	if whence == io.SeekCurrent {
+		if ws.offset+int(offset) > len(ws.buf) {
+			return -1, errors.New(fmt.Sprint("SeekCurrent out of range", len(ws.buf), offset, ws.offset))
+		}
+		ws.offset += int(offset)
+		return int64(ws.offset), nil
+	} else if whence == io.SeekStart {
+		if offset > int64(len(ws.buf)) {
+			return -1, errors.New(fmt.Sprint("SeekStart out of range", len(ws.buf), offset, ws.offset))
+		}
+		ws.offset = int(offset)
+		return offset, nil
+	} else {
+		return 0, errors.New("unsupport SeekEnd")
 	}
 }
