@@ -118,7 +118,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
 					// Write the last packet
-					if err := myMuxer.Write(videoTrack, pkt.Data, uint64(pkt.Time), uint64(pkt.CompositionTime)); err != nil {
+					if err := myMuxer.Write(videoTrack, pkt.Data, durationGoToMPEGTS(pkt.Time), durationGoToMPEGTS(pkt.CompositionTime)); err != nil {
 						log.Log.Error(err.Error())
 					}
 
@@ -228,15 +228,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Error(err.Error())
 					}*/
 
-					if err := myMuxer.Write(videoTrack, pkt.Data, uint64(pkt.Time), uint64(pkt.CompositionTime)); err != nil {
+					time := durationGoToMPEGTS(pkt.Time)
+					if err := myMuxer.Write(videoTrack, pkt.Data, time, time); err != nil {
 						log.Log.Error(err.Error())
 					}
 
 					recordingStatus = "started"
 
 				} else if start {
-					if err := myMuxer.Write(videoTrack, pkt.Data, uint64(pkt.Time), uint64(pkt.CompositionTime)); err != nil {
-						log.Log.Error(err.Error())
+					if pkt.Idx == 0 {
+						time := durationGoToMPEGTS(pkt.Time)
+						if err := myMuxer.Write(videoTrack, pkt.Data, time, time); err != nil {
+							log.Log.Error(err.Error())
+						}
 					}
 
 					// We will sync to file every keyframe.
@@ -594,4 +598,8 @@ func (ws *cacheWriterSeeker) Seek(offset int64, whence int) (int64, error) {
 	} else {
 		return 0, errors.New("unsupport SeekEnd")
 	}
+}
+
+func durationGoToMPEGTS(v time.Duration) uint64 {
+	return uint64(v.Milliseconds())
 }

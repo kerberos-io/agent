@@ -115,7 +115,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Establishing the camera connection without backchannel if no substream
 	rtspUrl := config.Capture.IPCamera.RTSP
 	withBackChannel := true
-	rtspClient := &capture.Golibrtsp{
+	rtspClient := &capture.Joy4{
 		Url:             rtspUrl,
 		WithBackChannel: withBackChannel,
 	}

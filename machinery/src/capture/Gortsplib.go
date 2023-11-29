@@ -8,6 +8,7 @@ import "C"
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"reflect"
@@ -329,17 +330,14 @@ func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
 	}
 	if img.Bounds().Empty() {
 		log.Log.Debug("RTSPClient(Golibrtsp).Start(): " + "empty frame")
+		return image.YCbCr{}, errors.New("Empty frame")
 	}
 	return img, nil
 }
 
 // Get a list of streams from the RTSP server.
 func (j *Golibrtsp) GetStreams() ([]packets.Stream, error) {
-	var streams []packets.Stream
-	for _, stream := range j.Streams {
-		streams = append(streams, stream)
-	}
-	return streams, nil
+	return j.Streams, nil
 }
 
 // Get a list of video streams from the RTSP server.
