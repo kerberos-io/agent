@@ -19,7 +19,7 @@ import (
 	"github.com/tevino/abool"
 )
 
-func Bootstrap(configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+func Bootstrap(configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
 	log.Log.Debug("Bootstrap: started")
 
 	// We will keep track of the Kerberos Agent up time
@@ -54,14 +54,11 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 	communication.HandleONVIF = make(chan models.OnvifAction, 1)
 	communication.IsConfiguring = abool.New()
 
+	cameraSettings := &models.Camera{}
+
 	// Before starting the agent, we have a control goroutine, that might
 	// do several checks to see if the agent is still operational.
 	go ControlAgent(communication)
-
-	// Create some global variables
-	//decoder := &ffmpeg.VideoDecoder{}
-	//subDecoder := &ffmpeg.VideoDecoder{}
-	cameraSettings := &models.Camera{}
 
 	// Handle heartbeats
 	go cloud.HandleHeartBeat(configuration, communication, uptimeStart)
@@ -76,7 +73,7 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 
 		// This will blocking until receiving a signal to be restarted, reconfigured, stopped, etc.
 		//status := RunAgent(configDirectory, configuration, communication, mqttClient, uptimeStart, cameraSettings, decoder, subDecoder)
-		status := RunAgent(configDirectory, configuration, communication, mqttClient, uptimeStart, cameraSettings)
+		status := RunAgent(configDirectory, configuration, communication, mqttClient, uptimeStart, cameraSettings, captureDevice)
 
 		if status == "stop" {
 			break
@@ -104,7 +101,7 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 	log.Log.Debug("Bootstrap: finished")
 }
 
-func RunAgent(configDirectory string, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, uptimeStart time.Time, cameraSettings *models.Camera) string {
+func RunAgent(configDirectory string, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, uptimeStart time.Time, cameraSettings *models.Camera, captureDevice *capture.Capture) string {
 
 	log.Log.Debug("RunAgent: bootstrapping agent")
 	config := configuration.Config
@@ -115,10 +112,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Establishing the camera connection without backchannel if no substream
 	rtspUrl := config.Capture.IPCamera.RTSP
 	withBackChannel := true
-	rtspClient := &capture.Golibrtsp{
-		Url:             rtspUrl,
-		WithBackChannel: withBackChannel,
-	}
+	rtspClient := captureDevice.SetMainClient(rtspUrl, withBackChannel)
 
 	err := rtspClient.Connect(context.Background())
 	if err != nil {
@@ -169,10 +163,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	if subRtspUrl != "" && subRtspUrl != rtspUrl {
 		// For the sub stream we will not enable backchannel.
 		withBackChannel := false
-		rtspSubClient := &capture.Golibrtsp{
-			Url:             subRtspUrl,
-			WithBackChannel: withBackChannel,
-		}
+		rtspSubClient := captureDevice.SetMainClient(subRtspUrl, withBackChannel)
+		captureDevice.RTSPSubClient = rtspSubClient
 
 		err := rtspSubClient.Connect(context.Background())
 		if err != nil {

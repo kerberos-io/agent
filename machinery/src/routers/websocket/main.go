@@ -2,11 +2,15 @@ package websocket
 
 import (
 	"context"
+	"encoding/base64"
+	"image"
 	"net/http"
 	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/kerberos-io/agent/machinery/src/capture"
+	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
@@ -44,7 +48,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func WebsocketHandler(c *gin.Context, communication *models.Communication) {
+func WebsocketHandler(c *gin.Context, communication *models.Communication, captureDevice *capture.Capture) {
 	w := c.Writer
 	r := c.Request
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -102,7 +106,7 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication) {
 
 						ctx, cancel := context.WithCancel(context.Background())
 						sockets[clientID].Cancels["stream-sd"] = cancel
-						go ForwardSDStream(ctx, clientID, sockets[clientID], communication)
+						go ForwardSDStream(ctx, clientID, sockets[clientID], communication, captureDevice)
 					}
 				}
 			}
@@ -121,30 +125,34 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication) {
 	}
 }
 
-func ForwardSDStream(ctx context.Context, clientID string, connection *Connection, communication *models.Communication) {
+func ForwardSDStream(ctx context.Context, clientID string, connection *Connection, communication *models.Communication, captureDevice *capture.Capture) {
 
 	queue := communication.Queue
 	cursor := queue.Latest()
-	//decoder := communication.Decoder
-	//decoderMutex := communication.DecoderMutex
-
-	// Allocate ffmpeg.VideoFrame
-	//frame := ffmpeg.AllocVideoFrame()
 
 logreader:
 	for {
 		var encodedImage string
-		if queue != nil && cursor != nil { //&& decoder != nil {
+		rtspClient := captureDevice.RTSPClient
+		if queue != nil && cursor != nil && rtspClient != nil {
 			pkt, err := cursor.ReadPacket()
 			if err == nil {
 				if !pkt.IsKeyFrame {
 					continue
 				}
-				/*img, err := computervision.GetRawImage(frame, pkt, decoder, decoderMutex)
+
+				var img image.YCbCr
+				rtspSubClient := captureDevice.RTSPSubClient
+				if rtspSubClient != nil {
+					img, err = (*rtspSubClient).DecodePacket(pkt)
+				} else {
+					img, err = (*rtspSubClient).DecodePacket(pkt)
+				}
+
 				if err == nil {
-					bytes, _ := computervision.ImageToBytes(&img.Image)
+					bytes, _ := computervision.ImageToBytes(&img)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
-				}*/
+				}
 
 			} else {
 				log.Log.Error("ForwardSDStream:" + err.Error())

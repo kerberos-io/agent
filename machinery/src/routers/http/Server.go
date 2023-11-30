@@ -14,6 +14,7 @@ import (
 	"log"
 
 	_ "github.com/kerberos-io/agent/machinery/docs"
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	swaggerFiles "github.com/swaggo/files"
@@ -38,7 +39,7 @@ import (
 // @in header
 // @name Authorization
 
-func StartServer(configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+func StartServer(configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
 
 	// Initialize REST API
 	r := gin.Default()
@@ -60,7 +61,7 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	}
 
 	// Add all routes
-	AddRoutes(r, authMiddleware, configDirectory, configuration, communication)
+	AddRoutes(r, authMiddleware, configDirectory, configuration, communication, captureDevice)
 
 	// Update environment variables
 	environmentVariables := configDirectory + "/www/env.js"

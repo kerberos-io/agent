@@ -153,19 +153,6 @@ loop:
 		// Could be that a decode is throwing errors.
 		if len(avpkt.Data) > 0 {
 
-			avpkt.Data = avpkt.Data[4:]
-			if avpkt.IsKeyFrame {
-				start = true
-				// Add SPS and PPS to the packet.
-				stream := j.Streams[avpkt.Idx]
-				annexbNALUStartCode := func() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
-				avpkt.Data = append(annexbNALUStartCode(), avpkt.Data...)
-				avpkt.Data = append(stream.PPS, avpkt.Data...)
-				avpkt.Data = append(annexbNALUStartCode(), avpkt.Data...)
-				avpkt.Data = append(stream.SPS, avpkt.Data...)
-				avpkt.Data = append(annexbNALUStartCode(), avpkt.Data...)
-			}
-
 			if start {
 				// Conver to packet.
 				pkt := packets.Packet{

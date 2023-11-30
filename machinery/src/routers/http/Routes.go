@@ -18,10 +18,10 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/utils"
 )
 
-func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirectory string, configuration *models.Configuration, communication *models.Communication) *gin.RouterGroup {
+func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) *gin.RouterGroup {
 
 	r.GET("/ws", func(c *gin.Context) {
-		websocket.WebsocketHandler(c, communication)
+		websocket.WebsocketHandler(c, communication, captureDevice)
 	})
 
 	// This is legacy should be removed in future! Now everything

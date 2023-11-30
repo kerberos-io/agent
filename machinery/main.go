@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -142,16 +143,23 @@ func main() {
 			// This is used to restart the agent when the configuration is updated.
 			ctx, cancel := context.WithCancel(context.Background())
 
+			// We create a capture object.
+			capture := capture.Capture{
+				RTSPClient:    nil,
+				RTSPSubClient: nil,
+			}
+
 			// Bootstrapping the agent
 			communication := models.Communication{
 				Context:         &ctx,
 				CancelContext:   &cancel,
 				HandleBootstrap: make(chan string, 1),
 			}
-			go components.Bootstrap(configDirectory, &configuration, &communication)
+
+			go components.Bootstrap(configDirectory, &configuration, &communication, &capture)
 
 			// Start the REST API.
-			routers.StartWebserver(configDirectory, &configuration, &communication)
+			routers.StartWebserver(configDirectory, &configuration, &communication, &capture)
 		}
 	default:
 		log.Log.Error("Main: Sorry I don't understand :(")
