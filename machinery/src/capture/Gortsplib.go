@@ -374,6 +374,7 @@ func (j *Golibrtsp) GetAudioStreams() ([]packets.Stream, error) {
 func (g *Golibrtsp) Close() error {
 	// Close the demuxer.
 	g.Client.Close()
+	g.VideoH264FrameDecoder.Close()
 	return nil
 }
 
@@ -387,11 +388,8 @@ func frameLineSize(frame *C.AVFrame) *C.int {
 
 // h264Decoder is a wrapper around FFmpeg's H264 decoder.
 type h264Decoder struct {
-	codecCtx    *C.AVCodecContext
-	srcFrame    *C.AVFrame
-	swsCtx      *C.struct_SwsContext
-	dstFrame    *C.AVFrame
-	dstFramePtr []uint8
+	codecCtx *C.AVCodecContext
+	srcFrame *C.AVFrame
 }
 
 // newH264Decoder allocates a new h264Decoder.
@@ -425,15 +423,10 @@ func newH264Decoder() (*h264Decoder, error) {
 }
 
 // close closes the decoder.
-func (d *h264Decoder) close() {
-	if d.dstFrame != nil {
-		C.av_frame_free(&d.dstFrame)
+func (d *h264Decoder) Close() {
+	if d.srcFrame != nil {
+		C.av_frame_free(&d.srcFrame)
 	}
-
-	if d.swsCtx != nil {
-		C.sws_freeContext(d.swsCtx)
-	}
-
 	C.av_frame_free(&d.srcFrame)
 	C.avcodec_close(d.codecCtx)
 }

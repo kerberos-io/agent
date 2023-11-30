@@ -72,7 +72,6 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 	for {
 
 		// This will blocking until receiving a signal to be restarted, reconfigured, stopped, etc.
-		//status := RunAgent(configDirectory, configuration, communication, mqttClient, uptimeStart, cameraSettings, decoder, subDecoder)
 		status := RunAgent(configDirectory, configuration, communication, mqttClient, uptimeStart, cameraSettings, captureDevice)
 
 		if status == "stop" {
@@ -157,13 +156,13 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// We might have a secondary rtsp url, so we might need to use that for livestreaming let us check first!
 	subStreamEnabled := false
 	subRtspUrl := config.Capture.IPCamera.SubRTSP
-	var rtspSubClient capture.RTSPClient
 	var videoSubStreams []packets.Stream
 
 	if subRtspUrl != "" && subRtspUrl != rtspUrl {
 		// For the sub stream we will not enable backchannel.
+		subStreamEnabled = true
 		withBackChannel := false
-		rtspSubClient := captureDevice.SetMainClient(subRtspUrl, withBackChannel)
+		rtspSubClient := captureDevice.SetSubClient(subRtspUrl, withBackChannel)
 		captureDevice.RTSPSubClient = rtspSubClient
 
 		err := rtspSubClient.Connect(context.Background())
@@ -238,13 +237,20 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	queue = packets.NewQueue()
 	communication.Queue = queue
 
-	queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
+	// Set the maximum GOP count, this is used to determine the pre-recording time.
 	log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
+	queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
 	queue.WriteHeader(videoStreams)
-
-	// Handle the camera stream
-	//go capture.HandleStream(infile, queue, communication)
 	go rtspClient.Start(context.Background(), queue, communication)
+
+	rtspSubClient := captureDevice.RTSPSubClient
+	if subStreamEnabled && rtspSubClient != nil {
+		subQueue = packets.NewQueue()
+		communication.SubQueue = subQueue
+		subQueue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
+		subQueue.WriteHeader(videoSubStreams)
+		go rtspSubClient.Start(context.Background(), subQueue, communication)
+	}
 
 	// Handle livestream SD (low resolution over MQTT)
 	if subStreamEnabled {
