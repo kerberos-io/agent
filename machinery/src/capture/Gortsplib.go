@@ -202,7 +202,6 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 
 	// called when a video RTP packet arrives
 	if g.VideoH264Media != nil {
-		var dtsExtractor *h264.DTSExtractor
 		g.Client.OnPacketRTP(g.VideoH264Media, g.VideoH264Forma, func(rtppkt *rtp.Packet) {
 
 			// This will check if we need to stop the thread,
@@ -260,23 +259,10 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 					return
 				}
 
-				if dtsExtractor == nil {
-					// skip samples silently until we find one with a IDR
-					if !idrPresent {
-						return
-					}
-					dtsExtractor = h264.NewDTSExtractor()
-				}
-
 				// Convert to packet.
 				enc, err := h264.AnnexBMarshal(filteredAU)
 				if err != nil {
 					log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
-					return
-				}
-
-				dts, err := dtsExtractor.Extract(au, pts)
-				if err != nil {
 					return
 				}
 
@@ -285,7 +271,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 					Packet:          rtppkt,
 					Data:            enc,
 					Time:            pts,
-					CompositionTime: dts,
+					CompositionTime: pts,
 					Idx:             g.VideoH264Index,
 				}
 				queue.WritePacket(pkt)
