@@ -324,8 +324,6 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 	if videoIdx == -1 {
 		log.Log.Error("WriteToTrack: no video codec found.")
 	} else {
-		annexbNALUStartCode := func() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
-
 		if config.Capture.TranscodingWebRTC == "true" {
 			if videoIdx > -1 {
 				log.Log.Info("WriteToTrack: successfully using a transcoder.")
@@ -341,7 +339,6 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 
 		start := false
 		receivedKeyFrame := false
-		stream := streams[videoIdx]
 		lastKeepAlive := "0"
 		peerCount := "0"
 
@@ -398,18 +395,10 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 
 			switch int(pkt.Idx) {
 			case videoIdx:
-				// For every key-frame pre-pend the SPS and PPS
-				pkt.Data = pkt.Data[4:]
+				// Start at the first keyframe
 				if pkt.IsKeyFrame {
 					start = true
-					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
-					pkt.Data = append(stream.PPS, pkt.Data...)
-					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
-					pkt.Data = append(stream.SPS, pkt.Data...)
-					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
-					log.Log.Info("WriteToTrack: Sending keyframe")
 				}
-
 				if start {
 					sample := pionMedia.Sample{Data: pkt.Data, Duration: bufferDuration}
 					if config.Capture.ForwardWebRTC == "true" {

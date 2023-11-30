@@ -274,6 +274,17 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 					CompositionTime: pts,
 					Idx:             g.VideoH264Index,
 				}
+
+				pkt.Data = pkt.Data[4:]
+				if pkt.IsKeyFrame {
+					annexbNALUStartCode := func() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
+					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
+					pkt.Data = append(g.VideoH264Forma.PPS, pkt.Data...)
+					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
+					pkt.Data = append(g.VideoH264Forma.SPS, pkt.Data...)
+					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
+				}
+
 				queue.WritePacket(pkt)
 
 				// This will check if we need to stop the thread,
