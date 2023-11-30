@@ -20,20 +20,20 @@ import (
 )
 
 type Capture struct {
-	RTSPClient    *Joy4
-	RTSPSubClient *Joy4
+	RTSPClient    *Golibrtsp
+	RTSPSubClient *Golibrtsp
 }
 
-func (c *Capture) SetMainClient(rtspUrl string, withBackChannel bool) *Joy4 {
-	c.RTSPClient = &Joy4{
+func (c *Capture) SetMainClient(rtspUrl string, withBackChannel bool) *Golibrtsp {
+	c.RTSPClient = &Golibrtsp{
 		Url:             rtspUrl,
 		WithBackChannel: withBackChannel,
 	}
 	return c.RTSPClient
 }
 
-func (c *Capture) SetSubClient(rtspUrl string, withBackChannel bool) *Joy4 {
-	c.RTSPSubClient = &Joy4{
+func (c *Capture) SetSubClient(rtspUrl string, withBackChannel bool) *Golibrtsp {
+	c.RTSPSubClient = &Golibrtsp{
 		Url:             rtspUrl,
 		WithBackChannel: withBackChannel,
 	}

@@ -268,7 +268,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 					dtsExtractor = h264.NewDTSExtractor()
 				}
 
-				// Conver to packet.
+				// Convert to packet.
 				enc, err := h264.AnnexBMarshal(filteredAU)
 				if err != nil {
 					log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
