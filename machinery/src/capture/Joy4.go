@@ -133,7 +133,7 @@ func (j *Joy4) Connect(ctx context.Context) (err error) {
 // Start the RTSP client, and start reading packets.
 func (j *Joy4) Start(ctx context.Context, queue *packets.Queue, communication *models.Communication) (err error) {
 	log.Log.Debug("RTSPClient(JOY4).Start(): started")
-	start := false
+
 loop:
 	for {
 		// This will check if we need to stop the thread,
@@ -153,39 +153,34 @@ loop:
 		// Could be that a decode is throwing errors.
 		if len(avpkt.Data) > 0 {
 
-			avpkt.Data = avpkt.Data[4:]
-			if avpkt.IsKeyFrame {
-				start = true
-				// Add SPS and PPS to the packet.
-				stream := j.Streams[avpkt.Idx]
-				annexbNALUStartCode := func() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
-				avpkt.Data = append(annexbNALUStartCode(), avpkt.Data...)
-				avpkt.Data = append(stream.PPS, avpkt.Data...)
-				avpkt.Data = append(annexbNALUStartCode(), avpkt.Data...)
-				avpkt.Data = append(stream.SPS, avpkt.Data...)
-				avpkt.Data = append(annexbNALUStartCode(), avpkt.Data...)
+			pkt := packets.Packet{
+				IsKeyFrame:      avpkt.IsKeyFrame,
+				Idx:             int8(avpkt.Idx),
+				CompositionTime: avpkt.CompositionTime,
+				Time:            avpkt.Time,
+				Data:            avpkt.Data,
 			}
 
-			if start {
-				// Conver to packet.
-				pkt := packets.Packet{
-					IsKeyFrame:      avpkt.IsKeyFrame,
-					Idx:             int8(avpkt.Idx),
-					CompositionTime: avpkt.CompositionTime,
-					Time:            avpkt.Time,
-					Data:            avpkt.Data,
-				}
+			pkt.Data = pkt.Data[4:]
+			if pkt.IsKeyFrame {
+				stream := j.Streams[avpkt.Idx]
+				annexbNALUStartCode := func() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
+				pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
+				pkt.Data = append(stream.PPS, pkt.Data...)
+				pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
+				pkt.Data = append(stream.SPS, pkt.Data...)
+				pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
+			}
 
-				queue.WritePacket(pkt)
+			queue.WritePacket(pkt)
 
-				if pkt.IsKeyFrame {
-					// Increment packets, so we know the device
-					// is not blocking.
-					r := communication.PackageCounter.Load().(int64)
-					log.Log.Info("RTSPClient(JOY4).Start(): packet size " + strconv.Itoa(len(pkt.Data)))
-					communication.PackageCounter.Store((r + 1) % 1000)
-					communication.LastPacketTimer.Store(time.Now().Unix())
-				}
+			if pkt.IsKeyFrame {
+				// Increment packets, so we know the device
+				// is not blocking.
+				r := communication.PackageCounter.Load().(int64)
+				log.Log.Info("RTSPClient(JOY4).Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+				communication.PackageCounter.Store((r + 1) % 1000)
+				communication.LastPacketTimer.Store(time.Now().Unix())
 			}
 
 			// This will check if we need to stop the thread,
