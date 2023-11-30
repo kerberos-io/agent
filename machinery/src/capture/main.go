@@ -19,27 +19,6 @@ import (
 	"github.com/yapingcat/gomedia/go-mp4"
 )
 
-type Capture struct {
-	RTSPClient    *Joy4
-	RTSPSubClient *Joy4
-}
-
-func (c *Capture) SetMainClient(rtspUrl string, withBackChannel bool) *Joy4 {
-	c.RTSPClient = &Joy4{
-		Url:             rtspUrl,
-		WithBackChannel: withBackChannel,
-	}
-	return c.RTSPClient
-}
-
-func (c *Capture) SetSubClient(rtspUrl string, withBackChannel bool) *Joy4 {
-	c.RTSPSubClient = &Joy4{
-		Url:             rtspUrl,
-		WithBackChannel: withBackChannel,
-	}
-	return c.RTSPSubClient
-}
-
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
 	autoClean := configuration.Config.AutoClean
 	if autoClean == "true" {

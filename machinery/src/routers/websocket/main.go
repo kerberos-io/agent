@@ -146,7 +146,7 @@ logreader:
 				if rtspSubClient != nil {
 					img, err = (*rtspSubClient).DecodePacket(pkt)
 				} else {
-					img, err = (*rtspSubClient).DecodePacket(pkt)
+					img, err = (*rtspClient).DecodePacket(pkt)
 				}
 
 				if err == nil {

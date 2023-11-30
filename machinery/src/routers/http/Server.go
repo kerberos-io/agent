@@ -106,8 +106,9 @@ func Files(c *gin.Context, configDirectory string, configuration *models.Configu
 
 		// Get symmetric key
 		symmetricKey := configuration.Config.Encryption.SymmetricKey
+		encryptedRecordings := configuration.Config.Encryption.Recordings
 		// Decrypt file
-		if symmetricKey != "" {
+		if encryptedRecordings == "true" && symmetricKey != "" {
 
 			// Read file
 			if err != nil {

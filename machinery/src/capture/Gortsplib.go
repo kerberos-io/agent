@@ -330,6 +330,19 @@ func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
 	return img, nil
 }
 
+// Decode a packet to a Gray image.
+func (g *Golibrtsp) DecodePacketRaw(pkt packets.Packet) (image.Gray, error) {
+	img, err := g.VideoH264FrameDecoder.decodeRaw(pkt.Data)
+	if err != nil {
+		return image.Gray{}, err
+	}
+	if img.Bounds().Empty() {
+		log.Log.Debug("RTSPClient(Golibrtsp).Start(): " + "empty frame")
+		return image.Gray{}, errors.New("Empty frame")
+	}
+	return img, nil
+}
+
 // Get a list of streams from the RTSP server.
 func (j *Golibrtsp) GetStreams() ([]packets.Stream, error) {
 	return j.Streams, nil
@@ -463,6 +476,41 @@ func (d *h264Decoder) decode(nalu []byte) (image.YCbCr, error) {
 	}
 
 	return image.YCbCr{}, nil
+}
+
+func (d *h264Decoder) decodeRaw(nalu []byte) (image.Gray, error) {
+	nalu = append([]uint8{0x00, 0x00, 0x00, 0x01}, []uint8(nalu)...)
+
+	// send NALU to decoder
+	var avPacket C.AVPacket
+	avPacket.data = (*C.uint8_t)(C.CBytes(nalu))
+	defer C.free(unsafe.Pointer(avPacket.data))
+	avPacket.size = C.int(len(nalu))
+	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
+	if res < 0 {
+		return image.Gray{}, nil
+	}
+
+	// receive frame if available
+	res = C.avcodec_receive_frame(d.codecCtx, d.srcFrame)
+	if res < 0 {
+		return image.Gray{}, nil
+	}
+
+	if res == 0 {
+		fr := d.srcFrame
+		w := int(fr.width)
+		h := int(fr.height)
+		ys := int(fr.linesize[0])
+
+		return image.Gray{
+			Pix:    fromCPtr(unsafe.Pointer(fr.data[0]), w*h),
+			Stride: ys,
+			Rect:   image.Rect(0, 0, w, h),
+		}, nil
+	}
+
+	return image.Gray{}, nil
 }
 
 func fromCPtr(buf unsafe.Pointer, size int) (ret []uint8) {

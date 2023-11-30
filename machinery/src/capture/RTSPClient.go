@@ -8,6 +8,27 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/packets"
 )
 
+type Capture struct {
+	RTSPClient    *Golibrtsp
+	RTSPSubClient *Golibrtsp
+}
+
+func (c *Capture) SetMainClient(rtspUrl string, withBackChannel bool) *Golibrtsp {
+	c.RTSPClient = &Golibrtsp{
+		Url:             rtspUrl,
+		WithBackChannel: withBackChannel,
+	}
+	return c.RTSPClient
+}
+
+func (c *Capture) SetSubClient(rtspUrl string, withBackChannel bool) *Golibrtsp {
+	c.RTSPSubClient = &Golibrtsp{
+		Url:             rtspUrl,
+		WithBackChannel: withBackChannel,
+	}
+	return c.RTSPSubClient
+}
+
 // RTSPClient is a interface that abstracts the RTSP client implementation.
 type RTSPClient interface {
 	// Connect to the RTSP server.
@@ -18,6 +39,9 @@ type RTSPClient interface {
 
 	// Decode a packet into a image.
 	DecodePacket(pkt packets.Packet) (image.YCbCr, error)
+
+	// Decode a packet into a image.
+	DecodePacketRaw(pkt packets.Packet) (image.Gray, error)
 
 	// Close the connection to the RTSP server.
 	Close() error

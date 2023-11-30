@@ -156,7 +156,7 @@ loop:
 			pkt := packets.Packet{
 				IsKeyFrame:      avpkt.IsKeyFrame,
 				Idx:             int8(avpkt.Idx),
-				CompositionTime: avpkt.CompositionTime,
+				CompositionTime: avpkt.Time,
 				Time:            avpkt.Time,
 				Data:            avpkt.Data,
 			}
