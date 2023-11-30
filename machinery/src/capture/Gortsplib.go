@@ -98,8 +98,6 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			IsAudio: false,
 			SPS:     forma.SPS,
 			PPS:     forma.PPS,
-			Width:   640,
-			Height:  480,
 		})
 
 		// Set the index for the video
