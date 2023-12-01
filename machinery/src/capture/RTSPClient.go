@@ -43,6 +43,9 @@ type RTSPClient interface {
 	// Decode a packet into a image.
 	DecodePacketRaw(pkt packets.Packet) (image.Gray, error)
 
+	// Write a packet to the RTSP server.
+	WritePacket(pkt packets.Packet) error
+
 	// Close the connection to the RTSP server.
 	Close() error
 

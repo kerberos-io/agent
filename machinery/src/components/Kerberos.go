@@ -121,6 +121,9 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		return status
 	}
 
+	// Check if has backchannel, then we set it in the communication struct
+	communication.HasBackChannel = rtspClient.HasBackChannel
+
 	// Get the video streams from the RTSP server.
 	videoStreams, err := rtspClient.GetVideoStreams()
 	if err != nil || len(videoStreams) == 0 {
@@ -291,9 +294,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Handle ONVIF actions
 	go onvif.HandleONVIFActions(configuration, communication)
 
-	// TODO: handle audio
-	//communication.HandleAudio = make(chan models.AudioDataPartial, 1)
-	//go capture.HandleAudio(queue, configDirectory, configuration, communication, rtspClient)
+	communication.HandleAudio = make(chan models.AudioDataPartial, 1)
+	if rtspClient.HasBackChannel {
+		go WriteAudioToBackchannel(communication, rtspClient)
+	}
 
 	// If we reach this point, we have a working RTSP connection.
 	communication.CameraConnected = true

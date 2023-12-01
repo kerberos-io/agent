@@ -56,6 +56,7 @@ type Golibrtsp struct {
 	AudioG711Forma   *format.G711
 	AudioG711Decoder *rtpsimpleaudio.Decoder
 
+	HasBackChannel            bool
 	AudioG711IndexBackChannel int8
 	AudioG711MediaBackChannel *description.Media
 	AudioG711FormaBackChannel *format.G711
@@ -180,6 +181,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	}
 
 	// Look for audio back channel.
+	g.HasBackChannel = false
 	if g.WithBackChannel {
 		// find the LPCM media and format
 		audioFormaBackChannel, audioMediBackChannel := FindPCMU(desc, true)
@@ -203,6 +205,8 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			_, err = g.Client.Setup(desc.BaseURL, audioMediBackChannel, 0, 0)
 			if err != nil {
 				// Something went wrong .. Do something
+			} else {
+				g.HasBackChannel = true
 			}
 		}
 	}
@@ -358,6 +362,17 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 	}
 
 	return
+}
+
+func (g *Golibrtsp) WritePacket(pkt packets.Packet) error {
+	if g.HasBackChannel {
+		err := g.Client.WritePacketRTP(g.AudioG711MediaBackChannel, pkt.Packet)
+		if err != nil {
+			log.Log.Debug("RTSPClient(Golibrtsp).WritePacketBackChannel(): " + err.Error())
+			return err
+		}
+	}
+	return errors.New("Backchannel not enabled")
 }
 
 // Decode a packet to an image.
