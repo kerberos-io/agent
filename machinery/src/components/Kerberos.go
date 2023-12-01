@@ -292,7 +292,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	go onvif.HandleONVIFActions(configuration, communication)
 
 	// TODO: handle audio
-	communication.HandleAudio = make(chan models.AudioDataPartial, 1)
+	//communication.HandleAudio = make(chan models.AudioDataPartial, 1)
 	//go capture.HandleAudio(queue, configDirectory, configuration, communication, rtspClient)
 
 	// If we reach this point, we have a working RTSP connection.
@@ -321,9 +321,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		communication.HandleUpload <- "stop"
 	}
 	communication.HandleStream <- "stop"
-	if subStreamEnabled {
-		communication.HandleSubStream <- "stop"
-	}
+	// We use the steam channel to stop both main and sub stream.
+	//if subStreamEnabled {
+	//	communication.HandleSubStream <- "stop"
+	//}
 
 	time.Sleep(time.Second * 3)
 
@@ -351,8 +352,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	close(communication.HandleMotion)
 	communication.HandleMotion = nil
-	close(communication.HandleAudio)
-	communication.HandleAudio = nil
+	//close(communication.HandleAudio)
+	//communication.HandleAudio = nil
 
 	// Waiting for some seconds to make sure everything is properly closed.
 	log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")
