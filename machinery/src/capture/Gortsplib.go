@@ -23,8 +23,10 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtplpcm"
+	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpmpeg4audio"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpsimpleaudio"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
+	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4audio"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
@@ -60,6 +62,11 @@ type Golibrtsp struct {
 	AudioG711IndexBackChannel int8
 	AudioG711MediaBackChannel *description.Media
 	AudioG711FormaBackChannel *format.G711
+
+	AudioMPEG4Index   int8
+	AudioMPEG4Media   *description.Media
+	AudioMPEG4Forma   *format.MPEG4Audio
+	AudioMPEG4Decoder *rtpmpeg4audio.Decoder
 
 	Streams []packets.Stream
 }
@@ -211,6 +218,38 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 		}
 	}
 
+	// Look for audio stream.
+	// find the G711 media and format
+	audioFormaMPEG4, audioMediMPEG4 := FindMPEG4Audio(desc, false)
+	g.AudioMPEG4Media = audioMediMPEG4
+	g.AudioMPEG4Forma = audioFormaMPEG4
+	if audioMediMPEG4 == nil {
+		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "audio media not found")
+	} else {
+		g.Streams = append(g.Streams, packets.Stream{
+			Name:          "AAC",
+			IsVideo:       false,
+			IsAudio:       true,
+			IsBackChannel: false,
+		})
+
+		// Set the index for the audio
+		g.AudioMPEG4Index = int8(len(g.Streams)) - 1
+
+		// create decoder
+		audiortpDec, err := audioFormaMPEG4.CreateDecoder()
+		if err != nil {
+			// Something went wrong .. Do something
+		}
+		g.AudioMPEG4Decoder = audiortpDec
+
+		// setup a audio media
+		_, err = g.Client.Setup(desc.BaseURL, audioMediMPEG4, 0, 0)
+		if err != nil {
+			// Something went wrong .. Do something
+		}
+	}
+
 	return
 }
 
@@ -218,7 +257,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communication *models.Communication) (err error) {
 	log.Log.Debug("RTSPClient(Golibrtsp).Start(): started")
 
-	// called when a audio RTP packet arrives
+	// called when a MULAW audio RTP packet arrives
 	if g.AudioG711Media != nil {
 		g.Client.OnPacketRTP(g.AudioG711Media, g.AudioG711Forma, func(rtppkt *rtp.Packet) {
 			// decode timestamp
@@ -242,6 +281,48 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 				Time:            pts,
 				CompositionTime: pts,
 				Idx:             g.AudioG711Index,
+				IsVideo:         false,
+				IsAudio:         true,
+				Codec:           "PCM_MULAW",
+			}
+			queue.WritePacket(pkt)
+		})
+	}
+
+	// called when a AAC audio RTP packet arrives
+	if g.AudioMPEG4Media != nil {
+		g.Client.OnPacketRTP(g.AudioMPEG4Media, g.AudioMPEG4Forma, func(rtppkt *rtp.Packet) {
+			// decode timestamp
+			pts, ok := g.Client.PacketPTS(g.AudioMPEG4Media, rtppkt)
+			if !ok {
+				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + "unable to get PTS")
+				return
+			}
+
+			// Encode the AAC samples from RTP packets
+			// extract access units from RTP packets
+			aus, err := g.AudioMPEG4Decoder.Decode(rtppkt)
+			if err != nil {
+				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+				return
+			}
+
+			enc, err := WriteMPEG4Audio(g.AudioMPEG4Forma, aus)
+			if err != nil {
+				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+				return
+			}
+
+			pkt := packets.Packet{
+				IsKeyFrame:      false,
+				Packet:          rtppkt,
+				Data:            enc,
+				Time:            pts,
+				CompositionTime: pts,
+				Idx:             g.AudioG711Index,
+				IsVideo:         false,
+				IsAudio:         true,
+				Codec:           "AAC",
 			}
 			queue.WritePacket(pkt)
 		})
@@ -320,6 +401,9 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 					Time:            pts,
 					CompositionTime: pts,
 					Idx:             g.VideoH264Index,
+					IsVideo:         true,
+					IsAudio:         false,
+					Codec:           "H264",
 				}
 
 				pkt.Data = pkt.Data[4:]
@@ -595,4 +679,35 @@ func FindPCMU(desc *description.Session, isBackChannel bool) (*format.G711, *des
 		}
 	}
 	return nil, nil
+}
+
+func FindMPEG4Audio(desc *description.Session, isBackChannel bool) (*format.MPEG4Audio, *description.Media) {
+	for _, media := range desc.Medias {
+		if media.IsBackChannel == isBackChannel {
+			for _, forma := range media.Formats {
+				if mpeg4, ok := forma.(*format.MPEG4Audio); ok {
+					return mpeg4, media
+				}
+			}
+		}
+	}
+	return nil, nil
+}
+
+// WriteMPEG4Audio writes MPEG-4 Audio access units.
+func WriteMPEG4Audio(forma *format.MPEG4Audio, aus [][]byte) ([]byte, error) {
+	pkts := make(mpeg4audio.ADTSPackets, len(aus))
+	for i, au := range aus {
+		pkts[i] = &mpeg4audio.ADTSPacket{
+			Type:         forma.Config.Type,
+			SampleRate:   forma.Config.SampleRate,
+			ChannelCount: forma.Config.ChannelCount,
+			AU:           au,
+		}
+	}
+	enc, err := pkts.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	return enc, nil
 }

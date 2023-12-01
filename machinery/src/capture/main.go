@@ -79,6 +79,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var cws *cacheWriterSeeker
 			var myMuxer *mp4.Movmuxer
 			var videoTrack uint32
+			var audioTrack uint32
 
 			// Do not do anything!
 			log.Log.Info("HandleRecordStream: Start continuous recording ")
@@ -118,8 +119,20 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
 					// Write the last packet
-					if err := myMuxer.Write(videoTrack, pkt.Data, durationGoToMPEGTS(pkt.Time), durationGoToMPEGTS(pkt.CompositionTime)); err != nil {
-						log.Log.Error(err.Error())
+					ttime := convertPTS(pkt.Time)
+					if pkt.IsVideo {
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+							log.Log.Error(err.Error())
+						}
+					} else if pkt.IsAudio {
+						if pkt.Codec == "AAC" {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+								log.Log.Error(err.Error())
+							}
+						} else {
+							// TODO: transcode to AAC, some work to do..
+							log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
+						}
 					}
 
 					// This will write the trailer a well.
@@ -217,24 +230,51 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						//myMuxer = mp4.NewMuxer(file)
 						cws = newCacheWriterSeeker(4096)
 						myMuxer, _ = mp4.CreateMp4Muxer(cws)
-						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264)
+						// We choose between H264 and H265
+						if pkt.Codec == "H264" {
+							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264)
+						} else if pkt.Codec == "H265" {
+							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265)
+						}
+						// For an MP4 container, AAC is the only audio codec supported.
+						audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
 					}
 
 					log.Log.Info("HandleRecordStream: composing recording")
 					log.Log.Info("HandleRecordStream: write header")
 
-					time := durationGoToMPEGTS(pkt.Time)
-					if err := myMuxer.Write(videoTrack, pkt.Data, time, time); err != nil {
-						log.Log.Error(err.Error())
+					ttime := convertPTS(pkt.Time)
+					if pkt.IsVideo {
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+							log.Log.Error(err.Error())
+						}
+					} else if pkt.IsAudio {
+						if pkt.Codec == "AAC" {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+								log.Log.Error(err.Error())
+							}
+						} else {
+							// TODO: transcode to AAC, some work to do..
+							log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
+						}
 					}
 
 					recordingStatus = "started"
 
 				} else if start {
-					if pkt.Idx == 0 {
-						time := durationGoToMPEGTS(pkt.Time)
-						if err := myMuxer.Write(videoTrack, pkt.Data, time, time); err != nil {
+					ttime := convertPTS(pkt.Time)
+					if pkt.IsVideo {
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 							log.Log.Error(err.Error())
+						}
+					} else if pkt.IsAudio {
+						if pkt.Codec == "AAC" {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+								log.Log.Error(err.Error())
+							}
+						} else {
+							// TODO: transcode to AAC, some work to do..
+							log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
 						}
 					}
 				}
@@ -281,6 +321,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var cws *cacheWriterSeeker
 			var myMuxer *mp4.Movmuxer
 			var videoTrack uint32
+			var audioTrack uint32
 
 			for motion := range communication.HandleMotion {
 
@@ -329,17 +370,22 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				cws = newCacheWriterSeeker(4096)
 				myMuxer, _ = mp4.CreateMp4Muxer(cws)
-				videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264)
+
+				// Check which video codec we need to use.
+				videoSteams, _ := rtspClient.GetVideoStreams()
+				for _, stream := range videoSteams {
+					if stream.Name == "H264" {
+						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264)
+					} else if stream.Name == "H265" {
+						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265)
+					}
+				}
+				// For an MP4 container, AAC is the only audio codec supported.
+				audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
 
 				start := false
-
 				log.Log.Info("HandleRecordStream: composing recording")
 				log.Log.Info("HandleRecordStream: write header")
-				// Creating the file, might block sometimes.
-				// TODO CHANGE!!!
-				//if err := myMuxer.WriteHeader(streams); err != nil {
-				//	log.Log.Error(err.Error())
-				//}
 
 				// Get as much packets we need.
 				var cursorError error
@@ -378,9 +424,20 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 					if start {
 
-						ttime := durationGoToMPEGTS(pkt.Time)
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
-							log.Log.Error(err.Error())
+						ttime := convertPTS(pkt.Time)
+						if pkt.IsVideo {
+							if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+								log.Log.Error(err.Error())
+							}
+						} else if pkt.IsAudio {
+							if pkt.Codec == "AAC" {
+								if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+									log.Log.Error(err.Error())
+								}
+							} else {
+								// TODO: transcode to AAC, some work to do..
+								log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
+							}
 						}
 
 						// We will sync to file every keyframe.
@@ -581,6 +638,6 @@ func (ws *cacheWriterSeeker) Seek(offset int64, whence int) (int64, error) {
 	}
 }
 
-func durationGoToMPEGTS(v time.Duration) uint64 {
+func convertPTS(v time.Duration) uint64 {
 	return uint64(v.Milliseconds())
 }
