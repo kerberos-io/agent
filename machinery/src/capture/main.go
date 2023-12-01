@@ -345,7 +345,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				var cursorError error
 				var pkt packets.Packet
 				var nextPkt packets.Packet
-				recordingCursor := queue.DelayedGopCount(int(config.Capture.PreRecording))
+				recordingCursor := queue.DelayedGopCount(int(config.Capture.PreRecording + 1))
 
 				if cursorError == nil {
 					pkt, cursorError = recordingCursor.ReadPacket()
@@ -397,11 +397,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					pkt = nextPkt
 				}
 
-				// This will write the trailer as well.
-				ttime := durationGoToMPEGTS(nextPkt.Time)
-				if err := myMuxer.Write(videoTrack, nextPkt.Data, ttime, ttime); err != nil {
-					log.Log.Error(err.Error())
-				}
+				// This will write the trailer a well.
 				myMuxer.WriteTrailer()
 
 				log.Log.Info("HandleRecordStream:  file save: " + name)
