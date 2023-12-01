@@ -33,4 +33,7 @@ type Stream struct {
 
 	// For H264, this is the pps.
 	PPS []byte
+
+	// IsBackChannel is true if this stream is a back channel.
+	IsBackChannel bool
 }
