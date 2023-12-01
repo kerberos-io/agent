@@ -3,7 +3,6 @@ package computervision
 import (
 	"bufio"
 	"bytes"
-	"encoding/base64"
 	"image"
 	"image/jpeg"
 	"sync"
@@ -18,7 +17,7 @@ import (
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 )
 
-func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) { //, wg *sync.WaitGroup) {
+func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
 
 	log.Log.Debug("ProcessMotion: started")
 	config := configuration.Config
@@ -43,9 +42,6 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 		hubKey := config.HubKey
 		deviceKey := config.Key
 
-		// Allocate a VideoFrame
-		frame := ffmpeg.AllocVideoFrame()
-
 		// Initialise first 2 elements
 		var imageArray [3]*image.Gray
 
@@ -58,9 +54,9 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 			pkt, cursorError = motionCursor.ReadPacket()
 			// Check If valid package.
 			if len(pkt.Data) > 0 && pkt.IsKeyFrame {
-				grayImage, err := GetGrayImage(frame, pkt, decoder, decoderMutex)
+				grayImage, err := rtspClient.DecodePacketRaw(pkt)
 				if err == nil {
-					imageArray[j] = grayImage
+					imageArray[j] = &grayImage
 					j++
 				}
 			}
@@ -120,14 +116,14 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 					continue
 				}
 
-				grayImage, err := GetGrayImage(frame, pkt, decoder, decoderMutex)
+				grayImage, err := rtspClient.DecodePacketRaw(pkt)
 				if err == nil {
-					imageArray[2] = grayImage
+					imageArray[2] = &grayImage
 				}
 
 				// Store snapshots (jpg) for hull.
 				if config.Capture.Snapshots != "false" {
-					StoreSnapshot(communication, frame, pkt, decoder, decoderMutex)
+					//StoreSnapshot(communication, frame, pkt, decoder, decoderMutex)
 				}
 
 				// Check if within time interval
@@ -208,8 +204,6 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 				img = nil
 			}
 		}
-
-		frame.Free()
 	}
 
 	log.Log.Debug("ProcessMotion: finished")
@@ -222,22 +216,6 @@ func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChange
 	threshold := 60
 	changes := AbsDiffBitwiseAndThreshold(image1, image2, image3, threshold, coordinatesToCheck)
 	return changes > pixelChangeThreshold, changes
-}
-
-func GetGrayImage(frame *ffmpeg.VideoFrame, pkt packets.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*image.Gray, error) {
-	_, err := capture.DecodeImage(frame, pkt, dec, decoderMutex)
-
-	// Do a deep copy of the image
-	imgDeepCopy := image.NewGray(frame.ImageGray.Bounds())
-	imgDeepCopy.Stride = frame.ImageGray.Stride
-	copy(imgDeepCopy.Pix, frame.ImageGray.Pix)
-
-	return imgDeepCopy, err
-}
-
-func GetRawImage(frame *ffmpeg.VideoFrame, pkt packets.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
-	_, err := capture.DecodeImage(frame, pkt, dec, decoderMutex)
-	return frame, err
 }
 
 func ImageToBytes(img image.Image) ([]byte, error) {
@@ -261,7 +239,7 @@ func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.
 }
 
 func StoreSnapshot(communication *models.Communication, frame *ffmpeg.VideoFrame, pkt packets.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
-	rgbImage, err := GetRawImage(frame, pkt, decoder, decoderMutex)
+	/*rgbImage, err := GetRawImage(frame, pkt, decoder, decoderMutex)
 	if err == nil {
 		buffer := new(bytes.Buffer)
 		w := bufio.NewWriter(buffer)
@@ -270,5 +248,5 @@ func StoreSnapshot(communication *models.Communication, frame *ffmpeg.VideoFrame
 			snapshot := base64.StdEncoding.EncodeToString(buffer.Bytes())
 			communication.Image = snapshot
 		}
-	}
+	}*/
 }

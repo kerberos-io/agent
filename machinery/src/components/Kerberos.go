@@ -10,6 +10,7 @@ import (
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
+	"github.com/kerberos-io/agent/machinery/src/computervision"
 	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -274,11 +275,25 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Handle recording, will write an mp4 to disk.
 	go capture.HandleRecordStream(queue, configDirectory, configuration, communication, rtspClient)
 
+	// Handle processing of motion
+	communication.HandleMotion = make(chan models.MotionDataPartial, 1)
+	if subStreamEnabled {
+		motionCursor := subQueue.Latest()
+		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspSubClient)
+	} else {
+		motionCursor := queue.Latest()
+		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspClient)
+	}
+
 	// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)
 	go cloud.HandleUpload(configDirectory, configuration, communication)
 
 	// Handle ONVIF actions
 	go onvif.HandleONVIFActions(configuration, communication)
+
+	// TODO: handle audio
+	communication.HandleAudio = make(chan models.AudioDataPartial, 1)
+	//go capture.HandleAudio(queue, configDirectory, configuration, communication, rtspClient)
 
 	// If we reach this point, we have a working RTSP connection.
 	communication.CameraConnected = true
@@ -334,10 +349,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		communication.SubQueue = nil
 	}
 
-	//close(communication.HandleMotion)
-	//communication.HandleMotion = nil
-	//close(communication.HandleAudio)
-	//communication.HandleAudio = nil
+	close(communication.HandleMotion)
+	communication.HandleMotion = nil
+	close(communication.HandleAudio)
+	communication.HandleAudio = nil
 
 	// Waiting for some seconds to make sure everything is properly closed.
 	log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")

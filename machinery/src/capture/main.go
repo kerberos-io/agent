@@ -378,7 +378,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 					if start {
 
-						if err := myMuxer.Write(videoTrack, pkt.Data, uint64(pkt.Time), uint64(pkt.CompositionTime)); err != nil {
+						ttime := durationGoToMPEGTS(pkt.Time)
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 							log.Log.Error(err.Error())
 						}
 
@@ -397,7 +398,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				}
 
 				// This will write the trailer as well.
-				if err := myMuxer.Write(videoTrack, nextPkt.Data, uint64(nextPkt.Time), uint64(nextPkt.CompositionTime)); err != nil {
+				ttime := durationGoToMPEGTS(nextPkt.Time)
+				if err := myMuxer.Write(videoTrack, nextPkt.Data, ttime, ttime); err != nil {
 					log.Log.Error(err.Error())
 				}
 				myMuxer.WriteTrailer()

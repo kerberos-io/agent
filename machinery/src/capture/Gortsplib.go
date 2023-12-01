@@ -84,6 +84,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 		return
 	}
 
+	// Iniatlise the mutex.
+	g.VideoH264DecoderMutex = &sync.Mutex{}
+
 	// find the H264 media and format
 	var forma *format.H264
 	medi := desc.FindFormat(&forma)
@@ -319,7 +322,9 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 
 // Decode a packet to an image.
 func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
+	g.VideoH264DecoderMutex.Lock()
 	img, err := g.VideoH264FrameDecoder.decode(pkt.Data)
+	g.VideoH264DecoderMutex.Unlock()
 	if err != nil {
 		return image.YCbCr{}, err
 	}
@@ -332,7 +337,9 @@ func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
 
 // Decode a packet to a Gray image.
 func (g *Golibrtsp) DecodePacketRaw(pkt packets.Packet) (image.Gray, error) {
+	g.VideoH264DecoderMutex.Lock()
 	img, err := g.VideoH264FrameDecoder.decodeRaw(pkt.Data)
+	g.VideoH264DecoderMutex.Unlock()
 	if err != nil {
 		return image.Gray{}, err
 	}
@@ -340,7 +347,13 @@ func (g *Golibrtsp) DecodePacketRaw(pkt packets.Packet) (image.Gray, error) {
 		log.Log.Debug("RTSPClient(Golibrtsp).Start(): " + "empty frame")
 		return image.Gray{}, errors.New("Empty frame")
 	}
-	return img, nil
+
+	// Do a deep copy of the image
+	imgDeepCopy := image.NewGray(img.Bounds())
+	imgDeepCopy.Stride = img.Stride
+	copy(imgDeepCopy.Pix, img.Pix)
+
+	return *imgDeepCopy, err
 }
 
 // Get a list of streams from the RTSP server.
