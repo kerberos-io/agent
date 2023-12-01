@@ -25,6 +25,9 @@ type Stream struct {
 	// Denum is the denominator of the framerate.
 	Denum int
 
+	// FPS is the framerate of the stream.
+	FPS float64
+
 	// For H264, this is the sps.
 	SPS []byte
 

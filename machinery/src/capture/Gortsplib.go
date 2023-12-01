@@ -95,12 +95,24 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	if medi == nil {
 		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "video media not found")
 	} else {
+		// Get SPS from the SDP
+		// Calculate the width and height of the video
+		var sps h264.SPS
+		err = sps.Unmarshal(forma.SPS)
+		if err != nil {
+			log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+			return
+		}
+
 		g.Streams = append(g.Streams, packets.Stream{
 			Name:    forma.Codec(),
 			IsVideo: true,
 			IsAudio: false,
 			SPS:     forma.SPS,
 			PPS:     forma.PPS,
+			Width:   sps.Width(),
+			Height:  sps.Height(),
+			FPS:     sps.FPS(),
 		})
 
 		// Set the index for the video
@@ -119,14 +131,6 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			// Something went wrong .. Do something
 		}
 		g.VideoH264FrameDecoder = frameDec
-
-		// if SPS and PPS are present into the SDP, send them to the decoder
-		if forma.SPS != nil {
-			frameDec.decode(forma.SPS)
-		}
-		if forma.PPS != nil {
-			frameDec.decode(forma.PPS)
-		}
 
 		// setup a video media
 		_, err = g.Client.Setup(desc.BaseURL, medi, 0, 0)
@@ -362,9 +366,9 @@ func (j *Golibrtsp) GetStreams() ([]packets.Stream, error) {
 }
 
 // Get a list of video streams from the RTSP server.
-func (j *Golibrtsp) GetVideoStreams() ([]packets.Stream, error) {
+func (g *Golibrtsp) GetVideoStreams() ([]packets.Stream, error) {
 	var videoStreams []packets.Stream
-	for _, stream := range j.Streams {
+	for _, stream := range g.Streams {
 		if stream.IsVideo {
 			videoStreams = append(videoStreams, stream)
 		}
@@ -373,9 +377,9 @@ func (j *Golibrtsp) GetVideoStreams() ([]packets.Stream, error) {
 }
 
 // Get a list of audio streams from the RTSP server.
-func (j *Golibrtsp) GetAudioStreams() ([]packets.Stream, error) {
+func (g *Golibrtsp) GetAudioStreams() ([]packets.Stream, error) {
 	var audioStreams []packets.Stream
-	for _, stream := range j.Streams {
+	for _, stream := range g.Streams {
 		if stream.IsAudio {
 			audioStreams = append(audioStreams, stream)
 		}
