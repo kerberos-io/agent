@@ -3,9 +3,9 @@ package computervision
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"image"
 	"image/jpeg"
-	"sync"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -14,7 +14,6 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
-	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 )
 
 func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
@@ -122,8 +121,19 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 				}
 
 				// Store snapshots (jpg) for hull.
+				// We'll store the last snapshot, so we can use it for hull on the frontend.
+				// But we'll also store the last 10 snapshots, so we can use it for the timelapse.
 				if config.Capture.Snapshots != "false" {
-					//StoreSnapshot(communication, frame, pkt, decoder, decoderMutex)
+					image, err := rtspClient.DecodePacket(pkt)
+					if err == nil {
+						buffer := new(bytes.Buffer)
+						w := bufio.NewWriter(buffer)
+						err := jpeg.Encode(w, &image, &jpeg.Options{Quality: 15})
+						if err == nil {
+							snapshot := base64.StdEncoding.EncodeToString(buffer.Bytes())
+							communication.Image = snapshot
+						}
+					}
 				}
 
 				// Check if within time interval
@@ -236,17 +246,4 @@ func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.
 		}
 	}
 	return changes
-}
-
-func StoreSnapshot(communication *models.Communication, frame *ffmpeg.VideoFrame, pkt packets.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
-	/*rgbImage, err := GetRawImage(frame, pkt, decoder, decoderMutex)
-	if err == nil {
-		buffer := new(bytes.Buffer)
-		w := bufio.NewWriter(buffer)
-		err := jpeg.Encode(w, &rgbImage.Image, &jpeg.Options{Quality: 15})
-		if err == nil {
-			snapshot := base64.StdEncoding.EncodeToString(buffer.Bytes())
-			communication.Image = snapshot
-		}
-	}*/
 }

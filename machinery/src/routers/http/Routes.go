@@ -1,9 +1,6 @@
 package http
 
 import (
-	"image"
-	"time"
-
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/capture"
@@ -11,9 +8,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/routers/websocket"
 
 	"github.com/kerberos-io/agent/machinery/src/cloud"
-	"github.com/kerberos-io/agent/machinery/src/components"
 	configService "github.com/kerberos-io/agent/machinery/src/config"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 )
@@ -207,20 +202,6 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 
 		api.POST("/persistence/verify", func(c *gin.Context) {
 			cloud.VerifyPersistence(c, configDirectory)
-		})
-
-		// Streaming handler
-		api.GET("/stream", func(c *gin.Context) {
-			// TODO add a token validation!
-			imageFunction := func() (image.Image, error) {
-				// We will only send an image once per second.
-				time.Sleep(time.Second * 1)
-				log.Log.Info("AddRoutes (/stream): reading from MJPEG stream")
-				img, err := configService.GetImageFromFilePath(configDirectory)
-				return img, err
-			}
-			h := components.StartMotionJPEG(imageFunction, 80)
-			h.ServeHTTP(c.Writer, c.Request)
 		})
 
 		// Camera specific methods. Doesn't require any authorization.
