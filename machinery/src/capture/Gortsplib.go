@@ -372,7 +372,7 @@ func (g *Golibrtsp) WritePacket(pkt packets.Packet) error {
 			return err
 		}
 	}
-	return errors.New("Backchannel not enabled")
+	return nil
 }
 
 // Decode a packet to an image.
