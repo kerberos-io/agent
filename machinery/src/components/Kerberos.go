@@ -117,6 +117,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	err := rtspClient.Connect(context.Background())
 	if err != nil {
 		log.Log.Error("RunAgent: error connecting to RTSP stream: " + err.Error())
+		rtspClient.Close()
 		time.Sleep(time.Second * 3)
 		return status
 	}
