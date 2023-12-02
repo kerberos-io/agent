@@ -357,10 +357,13 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		communication.SubQueue = nil
 	}
 
+	time.Sleep(time.Second * 3)
+
 	close(communication.HandleMotion)
 	communication.HandleMotion = nil
-	//close(communication.HandleAudio)
-	//communication.HandleAudio = nil
+
+	close(communication.HandleAudio)
+	communication.HandleAudio = nil
 
 	// Waiting for some seconds to make sure everything is properly closed.
 	log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")
