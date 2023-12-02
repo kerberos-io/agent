@@ -13,6 +13,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/packets"
 )
 
 type Message struct {
@@ -127,33 +128,35 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication, captu
 
 func ForwardSDStream(ctx context.Context, clientID string, connection *Connection, communication *models.Communication, captureDevice *capture.Capture) {
 
-	queue := communication.Queue
-	cursor := queue.Latest()
+	var queue *packets.Queue
+	var cursor *packets.QueueCursor
+
+	// We'll pick the right client and decoder.
+	rtspClient := captureDevice.RTSPSubClient
+	if rtspClient != nil {
+		queue = communication.SubQueue
+		cursor = queue.Latest()
+	} else {
+		rtspClient = captureDevice.RTSPClient
+		queue = communication.Queue
+		cursor = queue.Latest()
+	}
 
 logreader:
 	for {
 		var encodedImage string
-		rtspClient := captureDevice.RTSPClient
 		if queue != nil && cursor != nil && rtspClient != nil {
 			pkt, err := cursor.ReadPacket()
 			if err == nil {
 				if !pkt.IsKeyFrame {
 					continue
 				}
-
 				var img image.YCbCr
-				rtspSubClient := captureDevice.RTSPSubClient
-				if rtspSubClient != nil {
-					img, err = (*rtspSubClient).DecodePacket(pkt)
-				} else {
-					img, err = (*rtspClient).DecodePacket(pkt)
-				}
-
+				img, err = (*rtspClient).DecodePacket(pkt)
 				if err == nil {
 					bytes, _ := computervision.ImageToBytes(&img)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				}
-
 			} else {
 				log.Log.Error("ForwardSDStream:" + err.Error())
 				break logreader

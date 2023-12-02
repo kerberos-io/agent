@@ -121,6 +121,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		time.Sleep(time.Second * 3)
 		return status
 	}
+	log.Log.Info("RunAgent: opened RTSP stream: " + rtspUrl)
 
 	// Check if has backchannel, then we set it in the communication struct
 	communication.HasBackChannel = rtspClient.HasBackChannel
@@ -150,8 +151,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	var queue *packets.Queue
 	var subQueue *packets.Queue
 
-	log.Log.Info("RunAgent: opened RTSP stream: " + rtspUrl)
-
 	// Create a packet queue, which is filled by the HandleStream routing
 	// and consumed by all other routines: motion, livestream, etc.
 	if config.Capture.PreRecording <= 0 {
@@ -177,6 +176,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 			time.Sleep(time.Second * 3)
 			return status
 		}
+		log.Log.Info("RunAgent: opened RTSP sub stream: " + rtspUrl)
 
 		// Get the video streams from the RTSP server.
 		videoSubStreams, err = rtspSubClient.GetVideoStreams()

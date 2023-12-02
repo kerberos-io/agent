@@ -458,7 +458,8 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				configuration.Config.Encryption.Fingerprint = value
 				break
 			case "AGENT_ENCRYPTION_PRIVATE_KEY":
-				configuration.Config.Encryption.PrivateKey = value
+				encryptionPrivateKey := strings.ReplaceAll(value, "\\n", "\n")
+				configuration.Config.Encryption.PrivateKey = encryptionPrivateKey
 				break
 			case "AGENT_ENCRYPTION_SYMMETRIC_KEY":
 				configuration.Config.Encryption.SymmetricKey = value
