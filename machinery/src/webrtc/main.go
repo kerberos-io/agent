@@ -310,25 +310,22 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 
 	// Set the indexes for the video & audio streams
 	// Later when we read a packet we need to figure out which track to send it to.
-	videoIdx := -1
-	audioIdx := -1
+	hasH264 := false
+	hasPCM_MULAW := false
 	streams, _ := rtspClient.GetStreams()
-	for i, stream := range streams {
-		if stream.Name == "H264" && videoIdx < 0 {
-			videoIdx = i
-		} else if (stream.Name == "OPUS" || stream.Name == "PCM_MULAW" || stream.Name == "PCM_ALAW") && audioIdx < 0 {
-			audioIdx = i
+	for _, stream := range streams {
+		if stream.Name == "H264" {
+			hasH264 = true
+		} else if stream.Name == "PCM_MULAW" {
+			hasPCM_MULAW = true
 		}
 	}
 
-	if videoIdx == -1 {
-		log.Log.Error("WriteToTrack: no video codec found.")
+	if !hasH264 && !hasPCM_MULAW {
+		log.Log.Error("WriteToTrack: no valid video codec and audio codec found.")
 	} else {
 		if config.Capture.TranscodingWebRTC == "true" {
-			if videoIdx > -1 {
-				log.Log.Info("WriteToTrack: successfully using a transcoder.")
-			} else {
-			}
+			// Todo..
 		} else {
 			log.Log.Info("WriteToTrack: not using a transcoder.")
 		}
@@ -393,8 +390,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 			// TODO..
 			//}
 
-			switch int(pkt.Idx) {
-			case videoIdx:
+			if pkt.IsVideo {
 				// Start at the first keyframe
 				if pkt.IsKeyFrame {
 					start = true
@@ -410,7 +406,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 						}
 					}
 				}
-			case audioIdx:
+			} else if pkt.IsAudio {
 				// We will send the audio
 				sample := pionMedia.Sample{Data: pkt.Data, Duration: pkt.Time}
 				if err := audioTrack.WriteSample(sample); err != nil && err != io.ErrClosedPipe {

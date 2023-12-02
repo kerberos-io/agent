@@ -22,10 +22,12 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/description"
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
+	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtplpcm"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpmpeg4audio"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpsimpleaudio"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
+	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
 	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4audio"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -45,8 +47,15 @@ type Golibrtsp struct {
 	VideoH264Media        *description.Media
 	VideoH264Forma        *format.H264
 	VideoH264Decoder      *rtph264.Decoder
-	VideoH264FrameDecoder *h264Decoder
+	VideoH264FrameDecoder *Decoder
 	VideoH264DecoderMutex *sync.Mutex
+
+	VideoH265Index        int8
+	VideoH265Media        *description.Media
+	VideoH265Forma        *format.H265
+	VideoH265Decoder      *rtph265.Decoder
+	VideoH265FrameDecoder *Decoder
+	VideoH265DecoderMutex *sync.Mutex
 
 	AudioLPCMIndex   int8
 	AudioLPCMMedia   *description.Media
@@ -102,28 +111,28 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.VideoH264DecoderMutex = &sync.Mutex{}
 
 	// find the H264 media and format
-	var forma *format.H264
-	medi := desc.FindFormat(&forma)
-	g.VideoH264Media = medi
-	g.VideoH264Forma = forma
-	if medi == nil {
+	var formaH264 *format.H264
+	mediH264 := desc.FindFormat(&formaH264)
+	g.VideoH264Media = mediH264
+	g.VideoH264Forma = formaH264
+	if mediH264 == nil {
 		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "video media not found")
 	} else {
 		// Get SPS from the SDP
 		// Calculate the width and height of the video
 		var sps h264.SPS
-		err = sps.Unmarshal(forma.SPS)
+		err = sps.Unmarshal(formaH264.SPS)
 		if err != nil {
 			log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
 			return
 		}
 
 		g.Streams = append(g.Streams, packets.Stream{
-			Name:          forma.Codec(),
+			Name:          formaH264.Codec(),
 			IsVideo:       true,
 			IsAudio:       false,
-			SPS:           forma.SPS,
-			PPS:           forma.PPS,
+			SPS:           formaH264.SPS,
+			PPS:           formaH264.PPS,
 			Width:         sps.Width(),
 			Height:        sps.Height(),
 			FPS:           sps.FPS(),
@@ -134,21 +143,78 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 		g.VideoH264Index = int8(len(g.Streams)) - 1
 
 		// setup RTP/H264 -> H264 decoder
-		rtpDec, err := forma.CreateDecoder()
+		rtpDec, err := formaH264.CreateDecoder()
 		if err != nil {
 			// Something went wrong .. Do something
 		}
 		g.VideoH264Decoder = rtpDec
 
 		// setup H264 -> raw frames decoder
-		frameDec, err := newH264Decoder()
+		frameDec, err := newDecoder("H264")
 		if err != nil {
 			// Something went wrong .. Do something
 		}
 		g.VideoH264FrameDecoder = frameDec
 
 		// setup a video media
-		_, err = g.Client.Setup(desc.BaseURL, medi, 0, 0)
+		_, err = g.Client.Setup(desc.BaseURL, mediH264, 0, 0)
+		if err != nil {
+			// Something went wrong .. Do something
+		}
+	}
+
+	// Iniatlise the mutex.
+	g.VideoH265DecoderMutex = &sync.Mutex{}
+
+	// find the H265 media and format
+	var formaH265 *format.H265
+	mediH265 := desc.FindFormat(&formaH265)
+	g.VideoH265Media = mediH265
+	g.VideoH265Forma = formaH265
+	if mediH265 == nil {
+		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "video media not found")
+	} else {
+		// Get SPS from the SDP
+		// Calculate the width and height of the video
+		var sps h265.SPS
+		err = sps.Unmarshal(formaH265.SPS)
+		if err != nil {
+			log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+			return
+		}
+
+		g.Streams = append(g.Streams, packets.Stream{
+			Name:          formaH265.Codec(),
+			IsVideo:       true,
+			IsAudio:       false,
+			SPS:           formaH265.SPS,
+			PPS:           formaH265.PPS,
+			VPS:           formaH265.VPS,
+			Width:         sps.Width(),
+			Height:        sps.Height(),
+			FPS:           sps.FPS(),
+			IsBackChannel: false,
+		})
+
+		// Set the index for the video
+		g.VideoH265Index = int8(len(g.Streams)) - 1
+
+		// setup RTP/H265 -> H265 decoder
+		rtpDec, err := formaH265.CreateDecoder()
+		if err != nil {
+			// Something went wrong .. Do something
+		}
+		g.VideoH265Decoder = rtpDec
+
+		// setup H265 -> raw frames decoder
+		frameDec, err := newDecoder("H265")
+		if err != nil {
+			// Something went wrong .. Do something
+		}
+		g.VideoH265FrameDecoder = frameDec
+
+		// setup a video media
+		_, err = g.Client.Setup(desc.BaseURL, mediH265, 0, 0)
 		if err != nil {
 			// Something went wrong .. Do something
 		}
@@ -194,7 +260,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 		audioFormaBackChannel, audioMediBackChannel := FindPCMU(desc, true)
 		g.AudioG711MediaBackChannel = audioMediBackChannel
 		g.AudioG711FormaBackChannel = audioFormaBackChannel
-		if audioMedi == nil {
+		if audioMediBackChannel == nil {
 			log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "audio backchannel not found")
 		} else {
 
@@ -328,7 +394,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 		})
 	}
 
-	// called when a video RTP packet arrives
+	// called when a video RTP packet arrives for H264
 	if g.VideoH264Media != nil {
 		g.Client.OnPacketRTP(g.VideoH264Media, g.VideoH264Forma, func(rtppkt *rtp.Packet) {
 
@@ -439,6 +505,113 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 		})
 	}
 
+	// called when a video RTP packet arrives for H265
+	if g.VideoH265Media != nil {
+		g.Client.OnPacketRTP(g.VideoH265Media, g.VideoH265Forma, func(rtppkt *rtp.Packet) {
+
+			// This will check if we need to stop the thread,
+			// because of a reconfiguration.
+			select {
+			case <-communication.HandleStream:
+				return
+			default:
+			}
+
+			if len(rtppkt.Payload) > 0 {
+
+				// decode timestamp
+				pts, ok := g.Client.PacketPTS(g.VideoH265Media, rtppkt)
+				if !ok {
+					log.Log.Warning("RTSPClient(Golibrtsp).Start(): " + "unable to get PTS")
+					return
+				}
+
+				// Extract access units from RTP packets
+				// We need to do this, because the decoder expects a full
+				// access unit. Once we have a full access unit, we can
+				// decode it, and know if it's a keyframe or not.
+				au, errDecode := g.VideoH265Decoder.Decode(rtppkt)
+				if errDecode != nil {
+					if errDecode != rtph265.ErrNonStartingPacketAndNoPrevious && errDecode != rtph265.ErrMorePacketsNeeded {
+						log.Log.Warning("RTSPClient(Golibrtsp).Start(): " + errDecode.Error())
+					}
+					return
+				}
+
+				filteredAU := [][]byte{
+					{byte(h265.NALUType_AUD_NUT) << 1, 1, 0x50},
+				}
+
+				isRandomAccess := false
+				for _, nalu := range au {
+					typ := h265.NALUType((nalu[0] >> 1) & 0b111111)
+					switch typ {
+					case h265.NALUType_VPS_NUT:
+						continue
+					case h265.NALUType_SPS_NUT:
+						continue
+					case h265.NALUType_PPS_NUT:
+						continue
+					case h265.NALUType_AUD_NUT:
+						continue
+					case h265.NALUType_IDR_W_RADL, h265.NALUType_IDR_N_LP, h265.NALUType_CRA_NUT:
+						isRandomAccess = true
+					}
+					filteredAU = append(filteredAU, nalu)
+				}
+
+				au = filteredAU
+
+				if len(au) <= 1 {
+					return
+				}
+
+				// add VPS, SPS and PPS before random access access unit
+				if isRandomAccess {
+					au = append([][]byte{g.VideoH265Forma.VPS, g.VideoH265Forma.SPS, g.VideoH265Forma.PPS}, au...)
+				}
+
+				enc, err := h264.AnnexBMarshal(au)
+				if err != nil {
+					log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+					return
+				}
+
+				pkt := packets.Packet{
+					IsKeyFrame:      isRandomAccess,
+					Packet:          rtppkt,
+					Data:            enc,
+					Time:            pts,
+					CompositionTime: pts,
+					Idx:             g.VideoH265Index,
+					IsVideo:         true,
+					IsAudio:         false,
+					Codec:           "H265",
+				}
+
+				queue.WritePacket(pkt)
+
+				// This will check if we need to stop the thread,
+				// because of a reconfiguration.
+				select {
+				case <-communication.HandleStream:
+					return
+				default:
+				}
+
+				if isRandomAccess {
+					// Increment packets, so we know the device
+					// is not blocking.
+					r := communication.PackageCounter.Load().(int64)
+					log.Log.Info("RTSPClient(Golibrtsp).Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					communication.PackageCounter.Store((r + 1) % 1000)
+					communication.LastPacketTimer.Store(time.Now().Unix())
+				}
+			}
+
+		})
+	}
+
 	// Play the stream.
 	_, err = g.Client.Play(nil)
 	if err != nil {
@@ -526,7 +699,9 @@ func (g *Golibrtsp) GetAudioStreams() ([]packets.Stream, error) {
 func (g *Golibrtsp) Close() error {
 	// Close the demuxer.
 	g.Client.Close()
-	g.VideoH264FrameDecoder.Close()
+	if g.VideoH264Decoder != nil {
+		g.VideoH264FrameDecoder.Close()
+	}
 	return nil
 }
 
@@ -539,14 +714,17 @@ func frameLineSize(frame *C.AVFrame) *C.int {
 }
 
 // h264Decoder is a wrapper around FFmpeg's H264 decoder.
-type h264Decoder struct {
+type Decoder struct {
 	codecCtx *C.AVCodecContext
 	srcFrame *C.AVFrame
 }
 
 // newH264Decoder allocates a new h264Decoder.
-func newH264Decoder() (*h264Decoder, error) {
+func newDecoder(codecName string) (*Decoder, error) {
 	codec := C.avcodec_find_decoder(C.AV_CODEC_ID_H264)
+	if codecName == "H265" {
+		codec = C.avcodec_find_decoder(C.AV_CODEC_ID_H265)
+	}
 	if codec == nil {
 		return nil, fmt.Errorf("avcodec_find_decoder() failed")
 	}
@@ -568,14 +746,14 @@ func newH264Decoder() (*h264Decoder, error) {
 		return nil, fmt.Errorf("av_frame_alloc() failed")
 	}
 
-	return &h264Decoder{
+	return &Decoder{
 		codecCtx: codecCtx,
 		srcFrame: srcFrame,
 	}, nil
 }
 
 // close closes the decoder.
-func (d *h264Decoder) Close() {
+func (d *Decoder) Close() {
 	if d.srcFrame != nil {
 		C.av_frame_free(&d.srcFrame)
 	}
@@ -583,7 +761,7 @@ func (d *h264Decoder) Close() {
 	C.avcodec_close(d.codecCtx)
 }
 
-func (d *h264Decoder) decode(nalu []byte) (image.YCbCr, error) {
+func (d *Decoder) decode(nalu []byte) (image.YCbCr, error) {
 	nalu = append([]uint8{0x00, 0x00, 0x00, 0x01}, []uint8(nalu)...)
 
 	// send NALU to decoder
@@ -623,7 +801,7 @@ func (d *h264Decoder) decode(nalu []byte) (image.YCbCr, error) {
 	return image.YCbCr{}, nil
 }
 
-func (d *h264Decoder) decodeRaw(nalu []byte) (image.Gray, error) {
+func (d *Decoder) decodeRaw(nalu []byte) (image.Gray, error) {
 	nalu = append([]uint8{0x00, 0x00, 0x00, 0x01}, []uint8(nalu)...)
 
 	// send NALU to decoder
