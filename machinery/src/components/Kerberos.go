@@ -341,10 +341,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		time.Sleep(time.Second * 3)
 		return status
 	}
-
 	queue.Close()
 	queue = nil
 	communication.Queue = nil
+
 	if subStreamEnabled {
 		err = rtspSubClient.Close()
 		if err != nil {
