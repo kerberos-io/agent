@@ -111,8 +111,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Currently only support H264 encoded cameras, this will change.
 	// Establishing the camera connection without backchannel if no substream
 	rtspUrl := config.Capture.IPCamera.RTSP
-	withBackChannel := true
-	rtspClient := captureDevice.SetMainClient(rtspUrl, withBackChannel)
+	rtspClient := captureDevice.SetMainClient(rtspUrl)
 
 	err := rtspClient.Connect(context.Background())
 	if err != nil {
@@ -122,9 +121,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		return status
 	}
 	log.Log.Info("RunAgent: opened RTSP stream: " + rtspUrl)
-
-	// Check if has backchannel, then we set it in the communication struct
-	communication.HasBackChannel = rtspClient.HasBackChannel
 
 	// Get the video streams from the RTSP server.
 	videoStreams, err := rtspClient.GetVideoStreams()
@@ -139,8 +135,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	videoStream := videoStreams[0]
 
 	// Get some information from the video stream.
-	//	num := videoStream.Num
-	//denum := videoStream.Denum
 	width := videoStream.Width
 	height := videoStream.Height
 
@@ -166,8 +160,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	if subRtspUrl != "" && subRtspUrl != rtspUrl {
 		// For the sub stream we will not enable backchannel.
 		subStreamEnabled = true
-		withBackChannel := false
-		rtspSubClient := captureDevice.SetSubClient(subRtspUrl, withBackChannel)
+		rtspSubClient := captureDevice.SetSubClient(subRtspUrl)
 		captureDevice.RTSPSubClient = rtspSubClient
 
 		err := rtspSubClient.Connect(context.Background())
@@ -250,6 +243,16 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	queue.WriteHeader(videoStreams)
 	go rtspClient.Start(context.Background(), queue, communication)
 
+	// Try to create backchannel
+	rtspBackChannelClient := captureDevice.SetBackChannelClient(rtspUrl)
+	err = rtspBackChannelClient.ConnectBackChannel(context.Background())
+	if err != nil {
+		log.Log.Error("RunAgent: error connecting to RTSP backchannel stream: " + err.Error())
+	} else {
+		log.Log.Info("RunAgent: opened RTSP backchannel stream: " + rtspUrl)
+		go rtspBackChannelClient.StartBackChannel(context.Background())
+	}
+
 	rtspSubClient := captureDevice.RTSPSubClient
 	if subStreamEnabled && rtspSubClient != nil {
 		subQueue = packets.NewQueue()
@@ -298,8 +301,9 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	go onvif.HandleONVIFActions(configuration, communication)
 
 	communication.HandleAudio = make(chan models.AudioDataPartial, 1)
-	if rtspClient.HasBackChannel {
-		go WriteAudioToBackchannel(communication, rtspClient)
+	if rtspBackChannelClient.HasBackChannel {
+		communication.HasBackChannel = true
+		go WriteAudioToBackchannel(communication, rtspBackChannelClient)
 	}
 
 	// If we reach this point, we have a working RTSP connection.
@@ -341,6 +345,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		time.Sleep(time.Second * 3)
 		return status
 	}
+
 	queue.Close()
 	queue = nil
 	communication.Queue = nil
@@ -356,6 +361,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		subQueue = nil
 		communication.SubQueue = nil
 	}
+
+	err = rtspBackChannelClient.Close()
 
 	time.Sleep(time.Second * 3)
 

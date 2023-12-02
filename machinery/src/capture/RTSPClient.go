@@ -9,24 +9,30 @@ import (
 )
 
 type Capture struct {
-	RTSPClient    *Golibrtsp
-	RTSPSubClient *Golibrtsp
+	RTSPClient            *Golibrtsp
+	RTSPSubClient         *Golibrtsp
+	RTSPBackChannelClient *Golibrtsp
 }
 
-func (c *Capture) SetMainClient(rtspUrl string, withBackChannel bool) *Golibrtsp {
+func (c *Capture) SetMainClient(rtspUrl string) *Golibrtsp {
 	c.RTSPClient = &Golibrtsp{
-		Url:             rtspUrl,
-		WithBackChannel: withBackChannel,
+		Url: rtspUrl,
 	}
 	return c.RTSPClient
 }
 
-func (c *Capture) SetSubClient(rtspUrl string, withBackChannel bool) *Golibrtsp {
+func (c *Capture) SetSubClient(rtspUrl string) *Golibrtsp {
 	c.RTSPSubClient = &Golibrtsp{
-		Url:             rtspUrl,
-		WithBackChannel: withBackChannel,
+		Url: rtspUrl,
 	}
 	return c.RTSPSubClient
+}
+
+func (c *Capture) SetBackChannelClient(rtspUrl string) *Golibrtsp {
+	c.RTSPBackChannelClient = &Golibrtsp{
+		Url: rtspUrl,
+	}
+	return c.RTSPBackChannelClient
 }
 
 // RTSPClient is a interface that abstracts the RTSP client implementation.
@@ -34,8 +40,14 @@ type RTSPClient interface {
 	// Connect to the RTSP server.
 	Connect(ctx context.Context) error
 
+	// Connect to a backchannel RTSP server.
+	ConnectBackChannel(ctx context.Context) error
+
 	// Start the RTSP client, and start reading packets.
 	Start(ctx context.Context, queue *packets.Queue, communication *models.Communication) error
+
+	// Start the RTSP client, and start reading packets.
+	StartBackChannel(ctx context.Context) (err error)
 
 	// Decode a packet into a image.
 	DecodePacket(pkt packets.Packet) (image.YCbCr, error)

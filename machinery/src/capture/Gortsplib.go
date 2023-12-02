@@ -38,8 +38,7 @@ import (
 // Implements the RTSPClient interface.
 type Golibrtsp struct {
 	RTSPClient
-	Url             string
-	WithBackChannel bool
+	Url string
 
 	Client gortsplib.Client
 
@@ -84,7 +83,7 @@ type Golibrtsp struct {
 func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 
 	g.Client = gortsplib.Client{
-		RequestBackChannels: g.WithBackChannel,
+		RequestBackChannels: false,
 	}
 
 	// parse URL
@@ -253,37 +252,6 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 		}
 	}
 
-	// Look for audio back channel.
-	g.HasBackChannel = false
-	if g.WithBackChannel {
-		// find the LPCM media and format
-		audioFormaBackChannel, audioMediBackChannel := FindPCMU(desc, true)
-		g.AudioG711MediaBackChannel = audioMediBackChannel
-		g.AudioG711FormaBackChannel = audioFormaBackChannel
-		if audioMediBackChannel == nil {
-			log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "audio backchannel not found")
-		} else {
-
-			g.Streams = append(g.Streams, packets.Stream{
-				Name:          "PCM_MULAW",
-				IsVideo:       false,
-				IsAudio:       true,
-				IsBackChannel: true,
-			})
-
-			// Set the index for the audio
-			g.AudioG711IndexBackChannel = int8(len(g.Streams)) - 1
-
-			// setup a audio media
-			_, err = g.Client.Setup(desc.BaseURL, audioMediBackChannel, 0, 0)
-			if err != nil {
-				// Something went wrong .. Do something
-			} else {
-				g.HasBackChannel = true
-			}
-		}
-	}
-
 	// Look for audio stream.
 	// find the G711 media and format
 	audioFormaMPEG4, audioMediMPEG4 := FindMPEG4Audio(desc, false)
@@ -316,6 +284,63 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 		}
 	}
 
+	return
+}
+
+func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
+
+	g.Client = gortsplib.Client{
+		RequestBackChannels: true,
+	}
+
+	// parse URL
+	u, err := base.ParseURL(g.Url)
+	if err != nil {
+		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+		return
+	}
+
+	// connect to the server
+	err = g.Client.Start(u.Scheme, u.Host)
+	if err != nil {
+		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+	}
+
+	// find published medias
+	desc, _, err := g.Client.Describe(u)
+	if err != nil {
+		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+		return
+	}
+
+	// Look for audio back channel.
+	g.HasBackChannel = false
+	// find the LPCM media and format
+	audioFormaBackChannel, audioMediBackChannel := FindPCMU(desc, true)
+	g.AudioG711MediaBackChannel = audioMediBackChannel
+	g.AudioG711FormaBackChannel = audioFormaBackChannel
+	if audioMediBackChannel == nil {
+		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "audio backchannel not found")
+	} else {
+
+		g.Streams = append(g.Streams, packets.Stream{
+			Name:          "PCM_MULAW",
+			IsVideo:       false,
+			IsAudio:       true,
+			IsBackChannel: true,
+		})
+
+		// Set the index for the audio
+		g.AudioG711IndexBackChannel = int8(len(g.Streams)) - 1
+
+		// setup a audio media
+		_, err = g.Client.Setup(desc.BaseURL, audioMediBackChannel, 0, 0)
+		if err != nil {
+			// Something went wrong .. Do something
+		} else {
+			g.HasBackChannel = true
+		}
+	}
 	return
 }
 
@@ -618,6 +643,17 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 		panic(err)
 	}
 
+	return
+}
+
+// Start the RTSP client, and start reading packets.
+func (g *Golibrtsp) StartBackChannel(ctx context.Context) (err error) {
+	log.Log.Debug("RTSPClient(Golibrtsp).Start(): started")
+	// Play the stream.
+	_, err = g.Client.Play(nil)
+	if err != nil {
+		panic(err)
+	}
 	return
 }
 
