@@ -637,6 +637,8 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 		})
 	}
 
+	// Wait for a second, so we can be sure the stream is playing.
+	time.Sleep(1 * time.Second)
 	// Play the stream.
 	_, err = g.Client.Play(nil)
 	if err != nil {
@@ -648,11 +650,13 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 
 // Start the RTSP client, and start reading packets.
 func (g *Golibrtsp) StartBackChannel(ctx context.Context) (err error) {
-	log.Log.Debug("RTSPClient(Golibrtsp).Start(): started")
+	log.Log.Info("RTSPClient(Golibrtsp).Start(): started")
+	// Wait for a second, so we can be sure the stream is playing.
+	time.Sleep(1 * time.Second)
 	// Play the stream.
 	_, err = g.Client.Play(nil)
 	if err != nil {
-		panic(err)
+		log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
 	}
 	return
 }
