@@ -61,9 +61,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 	//streams, _ := rtspClient.GetStreams()
 
 	if config.Capture.Recording == "false" {
-		log.Log.Info("HandleRecordStream: disabled, we will not record anything.")
+		log.Log.Info("capture.HandleRecordStream(): disabled, we will not record anything.")
 	} else {
-		log.Log.Debug("HandleRecordStream: started")
+		log.Log.Debug("capture.HandleRecordStream(): started")
 
 		recordingPeriod := config.Capture.PostRecording         // number of seconds to record.
 		maxRecordingPeriod := config.Capture.MaxLengthRecording // maximum number of seconds to record.
@@ -82,7 +82,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var audioTrack uint32
 
 			// Do not do anything!
-			log.Log.Info("HandleRecordStream: Start continuous recording ")
+			log.Log.Info("capture.HandleRecordStream() - continuous: Start continuous recording ")
 
 			loc, _ := time.LoadLocation(config.Timezone)
 			now = time.Now().Unix()
@@ -131,7 +131,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
 							// TODO: transcode to AAC, some work to do..
-							log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
+							log.Log.Debug("capture.HandleRecordStream() - continuous: no AAC audio codec detected, skipping audio track.")
 						}
 					}
 
@@ -140,19 +140,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Error(err.Error())
 					}
 
-					log.Log.Info("HandleRecordStream: Recording finished: file save: " + name)
+					log.Log.Info("capture.HandleRecordStream() - continuous: Recording finished: file save: " + name)
 
 					// Cleanup muxer
 					start = false
-					//myMuxer.Close()
-					//myMuxer = nil
 					_, err = file.Write(cws.buf)
 					if err != nil {
-						panic(err)
+						log.Log.Info("capture.HandleRecordStream() - continuous: " + err.Error())
 					}
-
-					fmt.Println(cws.offset, len(cws.buf))
-
 					file.Close()
 					file = nil
 
@@ -193,7 +188,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							(currentTimeInSeconds >= start2 && currentTimeInSeconds <= end2) {
 
 						} else {
-							log.Log.Debug("HandleRecordStream: Disabled: no continuous recording at this moment. Not within specified time interval.")
+							log.Log.Debug("capture.HandleRecordStream() - continuous: Disabled: no continuous recording at this moment. Not within specified time interval.")
 							time.Sleep(5 * time.Second)
 							continue
 						}
@@ -223,7 +218,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					fullName = configDirectory + "/data/recordings/" + name
 
 					// Running...
-					log.Log.Info("Recording started")
+					log.Log.Info("capture.HandleRecordStream() - continuous: Recording started")
 
 					file, err = os.Create(fullName)
 					if err == nil {
@@ -240,8 +235,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
 					}
 
-					log.Log.Info("HandleRecordStream: composing recording")
-					log.Log.Info("HandleRecordStream: write header")
+					log.Log.Info("capture.HandleRecordStream() - continuous: composing recording")
+					log.Log.Info("capture.HandleRecordStream() - continuous: write header")
 
 					ttime := convertPTS(pkt.Time)
 					if pkt.IsVideo {
@@ -255,7 +250,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
 							// TODO: transcode to AAC, some work to do..
-							log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
+							log.Log.Debug("capture.HandleRecordStream() - continuous: no AAC audio codec detected, skipping audio track.")
 						}
 					}
 
@@ -274,7 +269,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
 							// TODO: transcode to AAC, some work to do..
-							log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
+							log.Log.Debug("capture.HandleRecordStream() - continuous: no AAC audio codec detected, skipping audio track.")
 						}
 					}
 				}
@@ -286,15 +281,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			// If this happens we need to check to properly close the recording.
 			if cursorError != nil {
 				if recordingStatus == "started" {
-
 					// This will write the trailer a well.
 					if err := myMuxer.WriteTrailer(); err != nil {
 						log.Log.Error(err.Error())
 					}
 
-					log.Log.Info("HandleRecordStream: Recording finished: file save: " + name)
+					log.Log.Info("capture.HandleRecordStream() - continuous: Recording finished: file save: " + name)
+
 					// Cleanup muxer
 					start = false
+					_, err = file.Write(cws.buf)
+					if err != nil {
+						log.Log.Info("capture.HandleRecordStream() - continuous: " + err.Error())
+					}
 					file.Close()
 					file = nil
 
@@ -308,11 +307,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					fc.Close()
 
 					recordingStatus = "idle"
+
+					// Clean up the recording directory if necessary.
+					CleanupRecordingDirectory(configDirectory, configuration)
 				}
 			}
 		} else {
 
-			log.Log.Info("HandleRecordStream: Start motion based recording ")
+			log.Log.Info("capture.HandleRecordStream() - motiondetection: Start motion based recording ")
 
 			var file *os.File
 			var lastDuration time.Duration
@@ -384,8 +386,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
 
 				start := false
-				log.Log.Info("HandleRecordStream: composing recording")
-				log.Log.Info("HandleRecordStream: write header")
+				log.Log.Info("capture.HandleRecordStream() - motiondetection: composing recording")
 
 				// Get as much packets we need.
 				var cursorError error
@@ -401,25 +402,25 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					nextPkt, cursorError = recordingCursor.ReadPacket()
 					if cursorError != nil {
-						log.Log.Error("HandleRecordStream: " + cursorError.Error())
+						log.Log.Error("capture.HandleRecordStream() - motiondetection: " + cursorError.Error())
 					}
 
 					now := time.Now().Unix()
 					select {
 					case motion := <-communication.HandleMotion:
 						timestamp = now
-						log.Log.Info("HandleRecordStream: motion detected while recording. Expanding recording.")
+						log.Log.Info("capture.HandleRecordStream() - motiondetection: motion detected while recording. Expanding recording.")
 						numberOfChanges = motion.NumberOfChanges
-						log.Log.Info("Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
+						log.Log.Info("capture.HandleRecordStream() - motiondetection: Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
 					default:
 					}
 
 					if (timestamp+recordingPeriod-now < 0 || now-startRecording > maxRecordingPeriod) && nextPkt.IsKeyFrame {
-						log.Log.Info("HandleRecordStream: closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", recordingPeriod: " + strconv.FormatInt(recordingPeriod, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
+						log.Log.Info("capture.HandleRecordStream() - motiondetection: closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", recordingPeriod: " + strconv.FormatInt(recordingPeriod, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 						break
 					}
 					if pkt.IsKeyFrame && !start && pkt.Time >= lastDuration {
-						log.Log.Info("HandleRecordStream: write frames")
+						log.Log.Info("capture.HandleRecordStream() - motiondetection: write frames")
 						start = true
 					}
 					if start {
@@ -436,7 +437,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 								}
 							} else if pkt.Codec == "PCM_MULAW" {
 								// TODO: transcode to AAC, some work to do..
-								log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
+								log.Log.Debug("capture.HandleRecordStream() - motiondetection: no AAC audio codec detected, skipping audio track.")
 							}
 						}
 
@@ -446,7 +447,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							if err != nil {
 								log.Log.Error(err.Error())
 							} else {
-								log.Log.Info("HandleRecordStream: Synced file: " + name)
+								log.Log.Info("capture.HandleRecordStream() - motiondetection: Synced file: " + name)
 							}
 						}
 					}
@@ -457,7 +458,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// This will write the trailer a well.
 				myMuxer.WriteTrailer()
 
-				log.Log.Info("HandleRecordStream:  file save: " + name)
+				log.Log.Info("capture.HandleRecordStream() - motiondetection:  file save: " + name)
 
 				lastDuration = pkt.Time
 				lastRecordingTime = time.Now().Unix()
@@ -488,13 +489,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							// write back to file
 							err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
 							if err != nil {
-								log.Log.Error("HandleRecordStream: error writing file: " + err.Error())
+								log.Log.Error("capture.HandleRecordStream() - motiondetection: error writing file: " + err.Error())
 							}
 						} else {
-							log.Log.Error("HandleRecordStream: error encrypting file: " + err.Error())
+							log.Log.Error("capture.HandleRecordStream() - motiondetection: error encrypting file: " + err.Error())
 						}
 					} else {
-						log.Log.Error("HandleRecordStream: error reading file: " + err.Error())
+						log.Log.Error("capture.HandleRecordStream() - motiondetection: error reading file: " + err.Error())
 					}
 				}
 
@@ -507,7 +508,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			}
 		}
 
-		log.Log.Debug("HandleRecordStream: finished")
+		log.Log.Debug("capture.HandleRecordStream(): finished")
 	}
 }
 
