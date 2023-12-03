@@ -156,6 +156,27 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						utils.CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
 					}
 
+					// Check if we need to encrypt the recording.
+					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
+						// reopen file into memory 'fullName'
+						contents, err := os.ReadFile(fullName)
+						if err == nil {
+							// encrypt
+							encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
+							if err == nil {
+								// write back to file
+								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
+								if err != nil {
+									log.Log.Error("capture.HandleRecordStream() - motiondetection: error writing file: " + err.Error())
+								}
+							} else {
+								log.Log.Error("capture.HandleRecordStream() - motiondetection: error encrypting file: " + err.Error())
+							}
+						} else {
+							log.Log.Error("capture.HandleRecordStream() - motiondetection: error reading file: " + err.Error())
+						}
+					}
+
 					// Create a symbol link.
 					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
 					fc.Close()
@@ -300,6 +321,27 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// Check if need to convert to fragmented using bento
 					if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
 						utils.CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
+					}
+
+					// Check if we need to encrypt the recording.
+					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
+						// reopen file into memory 'fullName'
+						contents, err := os.ReadFile(fullName)
+						if err == nil {
+							// encrypt
+							encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
+							if err == nil {
+								// write back to file
+								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
+								if err != nil {
+									log.Log.Error("capture.HandleRecordStream() - motiondetection: error writing file: " + err.Error())
+								}
+							} else {
+								log.Log.Error("capture.HandleRecordStream() - motiondetection: error encrypting file: " + err.Error())
+							}
+						} else {
+							log.Log.Error("capture.HandleRecordStream() - motiondetection: error reading file: " + err.Error())
+						}
 					}
 
 					// Create a symbol link.
@@ -464,8 +506,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				lastRecordingTime = time.Now().Unix()
 
 				// Cleanup muxer
-				//myMuxer.Close()
-				//myMuxer = nil
 				_, err := file.Write(cws.buf)
 				if err != nil {
 					panic(err)
