@@ -129,7 +129,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
 								log.Log.Error(err.Error())
 							}
-						} else {
+						} else if pkt.Codec == "PCM_MULAW" {
 							// TODO: transcode to AAC, some work to do..
 							log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
 						}
@@ -253,7 +253,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
 								log.Log.Error(err.Error())
 							}
-						} else {
+						} else if pkt.Codec == "PCM_MULAW" {
 							// TODO: transcode to AAC, some work to do..
 							log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
 						}
@@ -272,7 +272,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
 								log.Log.Error(err.Error())
 							}
-						} else {
+						} else if pkt.Codec == "PCM_MULAW" {
 							// TODO: transcode to AAC, some work to do..
 							log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
 						}
@@ -434,7 +434,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 								if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
 									log.Log.Error(err.Error())
 								}
-							} else {
+							} else if pkt.Codec == "PCM_MULAW" {
 								// TODO: transcode to AAC, some work to do..
 								log.Log.Debug("HandleRecordStream: no AAC audio codec detected, skipping audio track.")
 							}
