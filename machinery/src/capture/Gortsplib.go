@@ -571,8 +571,8 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 				for _, nalu := range au {
 					typ := h265.NALUType((nalu[0] >> 1) & 0b111111)
 					switch typ {
-					case h265.NALUType_VPS_NUT:
-						continue
+					/*case h265.NALUType_VPS_NUT:
+					continue*/
 					case h265.NALUType_SPS_NUT:
 						continue
 					case h265.NALUType_PPS_NUT:
@@ -593,7 +593,10 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 
 				// add VPS, SPS and PPS before random access access unit
 				if isRandomAccess {
-					au = append([][]byte{g.VideoH265Forma.VPS, g.VideoH265Forma.SPS, g.VideoH265Forma.PPS}, au...)
+					au = append([][]byte{
+						g.VideoH265Forma.VPS,
+						g.VideoH265Forma.SPS,
+						g.VideoH265Forma.PPS}, au...)
 				}
 
 				enc, err := h264.AnnexBMarshal(au)
