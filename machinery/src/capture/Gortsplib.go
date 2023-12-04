@@ -40,21 +40,20 @@ type Golibrtsp struct {
 	RTSPClient
 	Url string
 
-	Client gortsplib.Client
+	Client            gortsplib.Client
+	VideoDecoderMutex *sync.Mutex
 
 	VideoH264Index        int8
 	VideoH264Media        *description.Media
 	VideoH264Forma        *format.H264
 	VideoH264Decoder      *rtph264.Decoder
 	VideoH264FrameDecoder *Decoder
-	VideoH264DecoderMutex *sync.Mutex
 
 	VideoH265Index        int8
 	VideoH265Media        *description.Media
 	VideoH265Forma        *format.H265
 	VideoH265Decoder      *rtph265.Decoder
 	VideoH265FrameDecoder *Decoder
-	VideoH265DecoderMutex *sync.Mutex
 
 	AudioLPCMIndex   int8
 	AudioLPCMMedia   *description.Media
@@ -107,7 +106,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	}
 
 	// Iniatlise the mutex.
-	g.VideoH264DecoderMutex = &sync.Mutex{}
+	g.VideoDecoderMutex = &sync.Mutex{}
 
 	// find the H264 media and format
 	var formaH264 *format.H264
@@ -161,9 +160,6 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			// Something went wrong .. Do something
 		}
 	}
-
-	// Iniatlise the mutex.
-	g.VideoH265DecoderMutex = &sync.Mutex{}
 
 	// find the H265 media and format
 	var formaH265 *format.H265
@@ -679,15 +675,17 @@ func (g *Golibrtsp) WritePacket(pkt packets.Packet) error {
 func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
 	var img image.YCbCr
 	var err error
-	g.VideoH264DecoderMutex.Lock()
+	g.VideoDecoderMutex.Lock()
 	if len(pkt.Data) == 0 {
 		err = errors.New("Empty frame")
 	} else if g.VideoH264Decoder != nil {
 		img, err = g.VideoH264FrameDecoder.decode(pkt.Data)
+	} else if g.VideoH265Decoder != nil {
+		img, err = g.VideoH265FrameDecoder.decode(pkt.Data)
 	} else {
 		err = errors.New("No decoder found, might already be closed")
 	}
-	g.VideoH264DecoderMutex.Unlock()
+	g.VideoDecoderMutex.Unlock()
 	if err != nil {
 		log.Log.Error("RTSPClient(Golibrtsp).DecodePacket(): " + err.Error())
 		return image.YCbCr{}, err
@@ -703,15 +701,17 @@ func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
 func (g *Golibrtsp) DecodePacketRaw(pkt packets.Packet) (image.Gray, error) {
 	var img image.Gray
 	var err error
-	g.VideoH264DecoderMutex.Lock()
+	g.VideoDecoderMutex.Lock()
 	if len(pkt.Data) == 0 {
 		err = errors.New("Empty frame")
 	} else if g.VideoH264Decoder != nil {
 		img, err = g.VideoH264FrameDecoder.decodeRaw(pkt.Data)
+	} else if g.VideoH265Decoder != nil {
+		img, err = g.VideoH265FrameDecoder.decodeRaw(pkt.Data)
 	} else {
 		err = errors.New("No decoder found, might already be closed")
 	}
-	g.VideoH264DecoderMutex.Unlock()
+	g.VideoDecoderMutex.Unlock()
 	if err != nil {
 		log.Log.Error("RTSPClient(Golibrtsp).DecodePacketRaw(): " + err.Error())
 		return image.Gray{}, err
@@ -762,6 +762,9 @@ func (g *Golibrtsp) Close() error {
 	g.Client.Close()
 	if g.VideoH264Decoder != nil {
 		g.VideoH264FrameDecoder.Close()
+	}
+	if g.VideoH265FrameDecoder != nil {
+		g.VideoH265FrameDecoder.Close()
 	}
 	return nil
 }
