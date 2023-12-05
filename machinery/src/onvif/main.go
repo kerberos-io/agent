@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 )
 
 func HandleONVIFActions(configuration *models.Configuration, communication *models.Communication) {
-	log.Log.Debug("HandleONVIFActions: started")
+	log.Log.Debug("onvif.HandleONVIFActions(): started")
 
 	for onvifAction := range communication.HandleONVIF {
 
@@ -55,7 +56,7 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 						functions, _, _ := GetPTZFunctionsFromDevice(configurations)
 
 						// Log functions
-						log.Log.Info("HandleONVIFActions: functions: " + strings.Join(functions, ", "))
+						log.Log.Debug("onvif.HandleONVIFActions(): functions: " + strings.Join(functions, ", "))
 
 						// Check if we need to use absolute or continuous move
 						/*canAbsoluteMove := false
@@ -76,9 +77,9 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 						// on the ContinuousPanTiltMove function which is more compatible with more cameras.
 						err = AbsolutePanTiltMoveFake(device, configurations, token, x, y, z)
 						if err != nil {
-							log.Log.Error("HandleONVIFActions (AbsolutePanTitleMoveFake): " + err.Error())
+							log.Log.Debug("onvif.HandleONVIFActions() - AbsolutePanTitleMoveFake: " + err.Error())
 						} else {
-							log.Log.Info("HandleONVIFActions (AbsolutePanTitleMoveFake): successfully moved camera")
+							log.Log.Info("onvif.HandleONVIFActions() - AbsolutePanTitleMoveFake: successfully moved camera.")
 						}
 
 						/*if canAbsoluteMove {
@@ -99,9 +100,9 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 						preset := ptzAction.Preset
 						err := GoToPresetFromDevice(device, preset)
 						if err != nil {
-							log.Log.Error("HandleONVIFActions (GotoPreset): " + err.Error())
+							log.Log.Debug("onvif.HandleONVIFActions() - GotoPreset: " + err.Error())
 						} else {
-							log.Log.Info("HandleONVIFActions (GotoPreset): successfully moved camera")
+							log.Log.Info("onvif.HandleONVIFActions() - GotoPreset: successfully moved camera")
 						}
 
 					} else if onvifAction.Action == "ptz" {
@@ -113,7 +114,9 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 								// We will move the camera to zero position.
 								err := AbsolutePanTiltMove(device, configurations, token, 0, 0, 0)
 								if err != nil {
-									log.Log.Error("HandleONVIFActions (AbsolutePanTitleMove): " + err.Error())
+									log.Log.Debug("onvif.HandleONVIFActions() - AbsolutePanTitleMove: " + err.Error())
+								} else {
+									log.Log.Info("onvif.HandleONVIFActions() - AbsolutePanTitleMove: successfully centered camera")
 								}
 
 							} else {
@@ -140,7 +143,9 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 
 								err := ContinuousPanTilt(device, configurations, token, x, y)
 								if err != nil {
-									log.Log.Error("HandleONVIFActions (ContinuousPanTilt): " + err.Error())
+									log.Log.Debug("onvif.HandleONVIFActions() - ContinuousPanTilt: " + err.Error())
+								} else {
+									log.Log.Info("onvif.HandleONVIFActions() - ContinuousPanTilt: successfully pan tilted camera")
 								}
 							}
 						}
@@ -150,7 +155,9 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 							zoom := ptzAction.Zoom
 							err := ContinuousZoom(device, configurations, token, zoom)
 							if err != nil {
-								log.Log.Error("HandleONVIFActions (ContinuousZoom): " + err.Error())
+								log.Log.Debug("onvif.HandleONVIFActions() - ContinuousZoom: " + err.Error())
+							} else {
+								log.Log.Info("onvif.HandleONVIFActions() - ContinuousZoom: successfully zoomed camera")
 							}
 						}
 					}
@@ -158,23 +165,22 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 			}
 		}
 	}
-	log.Log.Debug("HandleONVIFActions: finished")
+	log.Log.Debug("onvif.HandleONVIFActions(): finished")
 }
 
 func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, error) {
-	log.Log.Debug("ConnectToOnvifDevice: started")
-
+	log.Log.Debug("onvif.ConnectToOnvifDevice(): started")
 	device, err := onvif.NewDevice(onvif.DeviceParams{
 		Xaddr:    cameraConfiguration.ONVIFXAddr,
 		Username: cameraConfiguration.ONVIFUsername,
 		Password: cameraConfiguration.ONVIFPassword,
 	})
-
 	if err != nil {
-		log.Log.Error("ConnectToOnvifDevice: " + err.Error())
+		log.Log.Debug("onvif.ConnectToOnvifDevice(): " + err.Error())
+	} else {
+		log.Log.Info("onvif.ConnectToOnvifDevice(): successfully connected to device")
 	}
-
-	log.Log.Debug("ConnectToOnvifDevice: finished")
+	log.Log.Debug("onvif.ConnectToOnvifDevice(): finished")
 	return device, err
 }
 
@@ -191,13 +197,13 @@ func GetTokenFromProfile(device *onvif.Device, profileId int) (xsd.ReferenceToke
 			stringBody := string(b)
 			decodedXML, et, err := getXMLNode(stringBody, "GetProfilesResponse")
 			if err != nil {
-				log.Log.Error("GetTokenFromProfile: " + err.Error())
+				log.Log.Debug("onvif.GetTokenFromProfile(): " + err.Error())
 				return profileToken, err
 			} else {
 				// Decode the profiles from the server
 				var mProfilesResp media.GetProfilesResponse
 				if err := decodedXML.DecodeElement(&mProfilesResp, et); err != nil {
-					log.Log.Error("GetTokenFromProfile: " + err.Error())
+					log.Log.Debug("onvif.GetTokenFromProfile(): " + err.Error())
 				}
 
 				// We'll try to get the token from a preferred profile
@@ -228,11 +234,11 @@ func GetPTZConfigurationsFromDevice(device *onvif.Device) (ptz.GetConfigurations
 			stringBody := string(b)
 			decodedXML, et, err := getXMLNode(stringBody, "GetConfigurationsResponse")
 			if err != nil {
-				log.Log.Error("GetPTZConfigurationsFromDevice: " + err.Error())
+				log.Log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
 				return configurations, err
 			} else {
 				if err := decodedXML.DecodeElement(&configurations, et); err != nil {
-					log.Log.Error("GetPTZConfigurationsFromDevice: " + err.Error())
+					log.Log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
 					return configurations, err
 				}
 			}
@@ -254,17 +260,22 @@ func GetPositionFromDevice(configuration models.Configuration) (xsd.PTZVector, e
 			// Get the PTZ configurations from the device
 			position, err := GetPosition(device, token)
 			if err == nil {
+				// float to string
+				x := strconv.FormatFloat(position.PanTilt.X, 'f', 6, 64)
+				y := strconv.FormatFloat(position.PanTilt.Y, 'f', 6, 64)
+				z := strconv.FormatFloat(position.Zoom.X, 'f', 6, 64)
+				log.Log.Info("onvif.GetPositionFromDevice(): successfully got position (" + x + ", " + y + ", " + z + ")")
 				return position, err
 			} else {
-				log.Log.Error("GetPositionFromDevice: " + err.Error())
+				log.Log.Debug("onvif.GetPositionFromDevice(): " + err.Error())
 				return position, err
 			}
 		} else {
-			log.Log.Error("GetPositionFromDevice: " + err.Error())
+			log.Log.Debug("onvif.GetPositionFromDevice(): " + err.Error())
 			return position, err
 		}
 	} else {
-		log.Log.Error("GetPositionFromDevice: " + err.Error())
+		log.Log.Debug("onvif.GetPositionFromDevice(): " + err.Error())
 		return position, err
 	}
 }
