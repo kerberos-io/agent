@@ -643,7 +643,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 
 				// Store snapshots (jpg) for hull.
 				// We'll store the last snapshot, so we can use it for hull on the frontend.
-				// But we'll also store the last 10 snapshots, so we can use it for the timelapse.
+				// This will also be used to retrieve the last snapshot from the API.
 				if config.Capture.Snapshots != "false" {
 					image, err := g.DecodePacket(pkt)
 					if err == nil {

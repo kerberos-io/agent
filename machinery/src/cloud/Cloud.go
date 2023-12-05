@@ -220,6 +220,16 @@ func GetSystemInfo() (models.System, error) {
 func HandleHeartBeat(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time) {
 	log.Log.Debug("HandleHeartBeat: started")
 
+	var client *http.Client
+	if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client = &http.Client{Transport: tr}
+	} else {
+		client = &http.Client{}
+	}
+
 loop:
 	for {
 
@@ -323,7 +333,7 @@ loop:
 							}
 						} else {
 							if err != nil {
-								log.Log.Error("HandleHeartBeat: error while getting presets: " + err.Error())
+								log.Log.Debug("HandleHeartBeat: error while getting presets: " + err.Error())
 							} else {
 								log.Log.Debug("HandleHeartBeat: no presets found.")
 							}
@@ -340,16 +350,6 @@ loop:
 			} else {
 				log.Log.Debug("HandleHeartBeat: ONVIF is not enabled.")
 				onvifPresetsList = []byte("[]")
-			}
-
-			var client *http.Client
-			if os.Getenv("AGENT_TLS_INSECURE") == "true" {
-				tr := &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-				}
-				client = &http.Client{Transport: tr}
-			} else {
-				client = &http.Client{}
 			}
 
 			// We need a hub URI and hub public key before we will send a heartbeat

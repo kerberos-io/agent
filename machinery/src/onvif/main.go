@@ -6,7 +6,6 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
-	"io/ioutil"
 	"strings"
 	"time"
 
@@ -219,8 +218,11 @@ func GetPTZConfigurationsFromDevice(device *onvif.Device) (ptz.GetConfigurations
 
 	// Get the PTZ configurations from the device
 	resp, err := device.CallMethod(ptz.GetConfigurations{})
+	if resp != nil {
+		resp.Body.Close()
+	}
+
 	if err == nil {
-		defer resp.Body.Close()
 		b, err := io.ReadAll(resp.Body)
 		if err == nil {
 			stringBody := string(b)
@@ -277,20 +279,22 @@ func GetPosition(device *onvif.Device, token xsd.ReferenceToken) (xsd.PTZVector,
 		ProfileToken: token,
 	})
 
+	var b []byte
+	if resp != nil {
+		b, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+	}
+
 	if err == nil {
-		defer resp.Body.Close()
-		b, err := io.ReadAll(resp.Body)
-		if err == nil {
-			stringBody := string(b)
-			decodedXML, et, err := getXMLNode(stringBody, "GetStatusResponse")
-			if err != nil {
+		stringBody := string(b)
+		decodedXML, et, err := getXMLNode(stringBody, "GetStatusResponse")
+		if err != nil {
+			log.Log.Error("GetPositionFromDevice: " + err.Error())
+			return position, err
+		} else {
+			if err := decodedXML.DecodeElement(&status, et); err != nil {
 				log.Log.Error("GetPositionFromDevice: " + err.Error())
 				return position, err
-			} else {
-				if err := decodedXML.DecodeElement(&status, et); err != nil {
-					log.Log.Error("GetPositionFromDevice: " + err.Error())
-					return position, err
-				}
 			}
 		}
 	}
@@ -311,7 +315,7 @@ func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfiguratio
 		Space: configuration.PTZConfiguration.DefaultAbsoluteZoomPositionSpace,
 	}
 
-	res, err := device.CallMethod(ptz.AbsoluteMove{
+	resp, err := device.CallMethod(ptz.AbsoluteMove{
 		ProfileToken: token,
 		Position: xsd.PTZVector{
 			PanTilt: absolutePantiltVector,
@@ -319,12 +323,15 @@ func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfiguratio
 		},
 	})
 
+	var b []byte
+	if resp != nil {
+		b, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+	}
 	if err != nil {
 		log.Log.Error("AbsoluteMove: " + err.Error())
 	}
-
-	bs, _ := ioutil.ReadAll(res.Body)
-	log.Log.Info("AbsoluteMove: " + string(bs))
+	log.Log.Info("AbsoluteMove: " + string(b))
 
 	return err
 }
@@ -373,6 +380,10 @@ func ZoomOutCompletely(device *onvif.Device, configuration ptz.GetConfigurations
 			Zoom: zoomOut,
 		},
 	})
+	if err != nil {
+		log.Log.Error("ZoomOutCompletely: " + err.Error())
+	}
+
 	for {
 		position, _ := GetPosition(device, token)
 		if position.Zoom.X == 0 {
@@ -381,10 +392,13 @@ func ZoomOutCompletely(device *onvif.Device, configuration ptz.GetConfigurations
 		time.Sleep(250 * time.Millisecond)
 	}
 
-	device.CallMethod(ptz.Stop{
+	_, err = device.CallMethod(ptz.Stop{
 		ProfileToken: token,
 		Zoom:         true,
 	})
+	if err != nil {
+		log.Log.Error("ZoomOutCompletely: " + err.Error())
+	}
 	return err
 }
 
@@ -407,19 +421,22 @@ func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsR
 			Y:     0,
 			Space: configuration.PTZConfiguration.DefaultContinuousPanTiltVelocitySpace,
 		}
-		res, err := device.CallMethod(ptz.ContinuousMove{
+		resp, err := device.CallMethod(ptz.ContinuousMove{
 			ProfileToken: token,
 			Velocity: xsd.PTZSpeedPanTilt{
 				PanTilt: panTiltVector,
 			},
 		})
 
+		var b []byte
+		if resp != nil {
+			b, err = io.ReadAll(resp.Body)
+			resp.Body.Close()
+		}
 		if err != nil {
 			log.Log.Error("ContinuousPanTiltMove (Pan): " + err.Error())
 		}
-
-		bs, _ := ioutil.ReadAll(res.Body)
-		log.Log.Debug("ContinuousPanTiltMove (Pan): " + string(bs))
+		log.Log.Debug("ContinuousPanTiltMove (Pan): " + string(b))
 
 		// While moving we'll check if we reached the desired position.
 		// or if we overshot the desired position.
@@ -437,14 +454,14 @@ func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsR
 			time.Sleep(wait)
 		}
 
-		_, errStop := device.CallMethod(ptz.Stop{
+		_, err = device.CallMethod(ptz.Stop{
 			ProfileToken: token,
 			PanTilt:      true,
 			Zoom:         true,
 		})
 
-		if errStop != nil {
-			log.Log.Error("ContinuousPanTiltMove (Pan): " + errStop.Error())
+		if err != nil {
+			log.Log.Error("ContinuousPanTiltMove (Pan): " + err.Error())
 		}
 	}
 	return err
@@ -469,19 +486,23 @@ func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 			Y:     directionY,
 			Space: configuration.PTZConfiguration.DefaultContinuousPanTiltVelocitySpace,
 		}
-		res, err := device.CallMethod(ptz.ContinuousMove{
+		resp, err := device.CallMethod(ptz.ContinuousMove{
 			ProfileToken: token,
 			Velocity: xsd.PTZSpeedPanTilt{
 				PanTilt: panTiltVector,
 			},
 		})
 
+		var b []byte
+		if resp != nil {
+			b, err = io.ReadAll(resp.Body)
+			resp.Body.Close()
+		}
+
 		if err != nil {
 			log.Log.Error("ContinuousPanTiltMove (Tilt): " + err.Error())
 		}
-
-		bs, _ := ioutil.ReadAll(res.Body)
-		log.Log.Debug("ContinuousPanTiltMove (Tilt) " + string(bs))
+		log.Log.Debug("ContinuousPanTiltMove (Tilt) " + string(b))
 
 		// While moving we'll check if we reached the desired position.
 		// or if we overshot the desired position.
@@ -499,14 +520,14 @@ func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 			time.Sleep(wait)
 		}
 
-		_, errStop := device.CallMethod(ptz.Stop{
+		_, err = device.CallMethod(ptz.Stop{
 			ProfileToken: token,
 			PanTilt:      true,
 			Zoom:         true,
 		})
 
-		if errStop != nil {
-			log.Log.Error("ContinuousPanTiltMove (Tilt): " + errStop.Error())
+		if err != nil {
+			log.Log.Error("ContinuousPanTiltMove (Tilt): " + err.Error())
 		}
 	}
 	return err
@@ -530,19 +551,23 @@ func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 			X:     directionZ,
 			Space: configuration.PTZConfiguration.DefaultContinuousZoomVelocitySpace,
 		}
-		res, err := device.CallMethod(ptz.ContinuousMove{
+		resp, err := device.CallMethod(ptz.ContinuousMove{
 			ProfileToken: token,
 			Velocity: xsd.PTZSpeedZoom{
 				Zoom: zoomVector,
 			},
 		})
 
+		var b []byte
+		if resp != nil {
+			b, err = io.ReadAll(resp.Body)
+			resp.Body.Close()
+		}
 		if err != nil {
 			log.Log.Error("ContinuousPanTiltMove (Zoom): " + err.Error())
 		}
 
-		bs, _ := ioutil.ReadAll(res.Body)
-		log.Log.Debug("ContinuousPanTiltMove (Zoom) " + string(bs))
+		log.Log.Debug("ContinuousPanTiltMove (Zoom) " + string(b))
 
 		// While moving we'll check if we reached the desired position.
 		// or if we overshot the desired position.
@@ -560,14 +585,14 @@ func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 			time.Sleep(wait)
 		}
 
-		_, errStop := device.CallMethod(ptz.Stop{
+		_, err = device.CallMethod(ptz.Stop{
 			ProfileToken: token,
 			PanTilt:      true,
 			Zoom:         true,
 		})
 
-		if errStop != nil {
-			log.Log.Error("ContinuousPanTiltMove (Zoom): " + errStop.Error())
+		if err != nil {
+			log.Log.Error("ContinuousPanTiltMove (Zoom): " + err.Error())
 		}
 	}
 	return err
@@ -581,36 +606,42 @@ func ContinuousPanTilt(device *onvif.Device, configuration ptz.GetConfigurations
 		Space: configuration.PTZConfiguration.DefaultContinuousPanTiltVelocitySpace,
 	}
 
-	res, err := device.CallMethod(ptz.ContinuousMove{
+	resp, err := device.CallMethod(ptz.ContinuousMove{
 		ProfileToken: token,
 		Velocity: xsd.PTZSpeedPanTilt{
 			PanTilt: panTiltVector,
 		},
 	})
 
+	var b []byte
+	if resp != nil {
+		b, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+	}
 	if err != nil {
 		log.Log.Error("ContinuousPanTiltMove: " + err.Error())
 	}
 
-	bs, _ := ioutil.ReadAll(res.Body)
-	log.Log.Debug("ContinuousPanTiltMove: " + string(bs))
+	log.Log.Debug("ContinuousPanTiltMove: " + string(b))
 
 	time.Sleep(200 * time.Millisecond)
 
-	res, errStop := device.CallMethod(ptz.Stop{
+	resp, err = device.CallMethod(ptz.Stop{
 		ProfileToken: token,
 		PanTilt:      true,
 	})
 
-	if errStop != nil {
-		log.Log.Error("ContinuousPanTiltMove: " + errStop.Error())
+	b = []byte{}
+	if resp != nil {
+		b, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
 	}
 
-	if errStop == nil {
-		return err
-	} else {
-		return errStop
+	if err != nil {
+		log.Log.Error("ContinuousPanTiltMove: " + err.Error())
 	}
+
+	return err
 }
 
 func ContinuousZoom(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, zoom float64) error {
@@ -620,36 +651,41 @@ func ContinuousZoom(device *onvif.Device, configuration ptz.GetConfigurationsRes
 		Space: configuration.PTZConfiguration.DefaultContinuousZoomVelocitySpace,
 	}
 
-	res, err := device.CallMethod(ptz.ContinuousMove{
+	resp, err := device.CallMethod(ptz.ContinuousMove{
 		ProfileToken: token,
 		Velocity: xsd.PTZSpeedZoom{
 			Zoom: zoomVector,
 		},
 	})
 
+	var b []byte
+	if resp != nil {
+		b, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+	}
 	if err != nil {
 		log.Log.Error("ContinuousPanTiltZoom: " + err.Error())
 	}
 
-	bs, _ := ioutil.ReadAll(res.Body)
-	log.Log.Debug("ContinuousPanTiltZoom: " + string(bs))
+	log.Log.Debug("ContinuousPanTiltZoom: " + string(b))
 
 	time.Sleep(500 * time.Millisecond)
 
-	res, errStop := device.CallMethod(ptz.Stop{
+	resp, err = device.CallMethod(ptz.Stop{
 		ProfileToken: token,
 		Zoom:         true,
 	})
 
-	if errStop != nil {
-		log.Log.Error("ContinuousPanTiltZoom: " + errStop.Error())
+	b = []byte{}
+	if resp != nil {
+		b, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+	}
+	if err != nil {
+		log.Log.Error("ContinuousPanTiltZoom: " + err.Error())
 	}
 
-	if errStop == nil {
-		return err
-	} else {
-		return errStop
-	}
+	return err
 }
 
 func GetCapabilitiesFromDevice(device *onvif.Device) []string {
@@ -679,8 +715,12 @@ func GetPresetsFromDevice(device *onvif.Device) ([]models.OnvifActionPreset, err
 			ProfileToken: token,
 		})
 
-		defer resp.Body.Close()
-		b, err := io.ReadAll(resp.Body)
+		var b []byte
+		if resp != nil {
+			b, err = io.ReadAll(resp.Body)
+			resp.Body.Close()
+		}
+
 		if err == nil {
 			stringBody := string(b)
 			decodedXML, et, err := getXMLNode(stringBody, "GetPresetsResponse")
@@ -725,9 +765,11 @@ func GoToPresetFromDevice(device *onvif.Device, presetName string) error {
 			ProfileToken: token,
 			PresetToken:  xsd.ReferenceToken(presetName),
 		})
-
-		defer resp.Body.Close()
-		b, err := io.ReadAll(resp.Body)
+		var b []byte
+		if resp != nil {
+			b, err = io.ReadAll(resp.Body)
+			resp.Body.Close()
+		}
 		if err == nil {
 			stringBody := string(b)
 			decodedXML, et, err := getXMLNode(stringBody, "GotoPresetResponses")

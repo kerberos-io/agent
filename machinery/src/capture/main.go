@@ -73,10 +73,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 		startRecording := now
 		timestamp := now
 
+		// For continuous and motion based recording we will use a single file.
+		var file *os.File
+
 		// Check if continuous recording.
 		if config.Capture.Continuous == "true" {
 
-			var cws *cacheWriterSeeker
+			//var cws *cacheWriterSeeker
 			var myMuxer *mp4.Movmuxer
 			var videoTrack uint32
 			var audioTrack uint32
@@ -89,7 +92,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			timestamp = now
 			start := false
 			var name string
-			var file *os.File
 			var err error
 
 			// If continuous record the full length
@@ -144,10 +146,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					// Cleanup muxer
 					start = false
-					_, err = file.Write(cws.buf)
-					if err != nil {
-						log.Log.Info("capture.HandleRecordStream() - continuous: " + err.Error())
-					}
+					//_, err = file.Write(cws.buf)
+					//if err != nil {
+					//	log.Log.Info("capture.HandleRecordStream() - continuous: " + err.Error())
+					//}
 					file.Close()
 					file = nil
 
@@ -243,9 +245,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					file, err = os.Create(fullName)
 					if err == nil {
-						//myMuxer = mp4.NewMuxer(file)
-						cws = newCacheWriterSeeker(4096)
-						myMuxer, _ = mp4.CreateMp4Muxer(cws)
+						//cws = newCacheWriterSeeker(4096)
+						myMuxer, _ = mp4.CreateMp4Muxer(file)
 						// We choose between H264 and H265
 						if pkt.Codec == "H264" {
 							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264)
@@ -311,10 +312,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					// Cleanup muxer
 					start = false
-					_, err = file.Write(cws.buf)
-					if err != nil {
-						log.Log.Info("capture.HandleRecordStream() - continuous: " + err.Error())
-					}
+					//_, err = file.Write(cws.buf)
+					//if err != nil {
+					//	log.Log.Info("capture.HandleRecordStream() - continuous: " + err.Error())
+					//}
 					file.Close()
 					file = nil
 
@@ -358,11 +359,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 			log.Log.Info("capture.HandleRecordStream() - motiondetection: Start motion based recording ")
 
-			var file *os.File
 			var lastDuration time.Duration
 			var lastRecordingTime int64
 
-			var cws *cacheWriterSeeker
+			//var cws *cacheWriterSeeker
 			var myMuxer *mp4.Movmuxer
 			var videoTrack uint32
 			var audioTrack uint32
@@ -411,9 +411,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// Running...
 				log.Log.Info("HandleRecordStream: Recording started")
 				file, _ = os.Create(fullName)
-
-				cws = newCacheWriterSeeker(4096)
-				myMuxer, _ = mp4.CreateMp4Muxer(cws)
+				myMuxer, _ = mp4.CreateMp4Muxer(file)
 
 				// Check which video codec we need to use.
 				videoSteams, _ := rtspClient.GetVideoStreams()
@@ -506,10 +504,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				lastRecordingTime = time.Now().Unix()
 
 				// Cleanup muxer
-				_, err := file.Write(cws.buf)
-				if err != nil {
-					panic(err)
-				}
+				//_, err := file.Write(cws.buf)
+				//if err != nil {
+				//	panic(err)
+				//}
 				file.Close()
 				file = nil
 
