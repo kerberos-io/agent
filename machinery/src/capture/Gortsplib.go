@@ -7,10 +7,14 @@ package capture
 import "C"
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"image"
+	"image/jpeg"
 	"reflect"
 	"strconv"
 	"sync"
@@ -81,8 +85,10 @@ type Golibrtsp struct {
 // Connect to the RTSP server.
 func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 
+	transport := gortsplib.TransportTCP
 	g.Client = gortsplib.Client{
 		RequestBackChannels: false,
+		Transport:           &transport,
 	}
 
 	// parse URL
@@ -284,11 +290,12 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 }
 
 func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
-
+	// Transport TCP
+	transport := gortsplib.TransportTCP
 	g.Client = gortsplib.Client{
 		RequestBackChannels: true,
+		Transport:           &transport,
 	}
-
 	// parse URL
 	u, err := base.ParseURL(g.Url)
 	if err != nil {
@@ -341,8 +348,10 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 }
 
 // Start the RTSP client, and start reading packets.
-func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communication *models.Communication) (err error) {
+func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) (err error) {
 	log.Log.Debug("RTSPClient(Golibrtsp).Start(): started")
+
+	config := configuration.Config
 
 	// called when a MULAW audio RTP packet arrives
 	if g.AudioG711Media != nil {
@@ -416,6 +425,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 	}
 
 	// called when a video RTP packet arrives for H264
+	var filteredAU [][]byte
 	if g.VideoH264Media != nil {
 		g.Client.OnPacketRTP(g.VideoH264Media, g.VideoH264Forma, func(rtppkt *rtp.Packet) {
 
@@ -450,7 +460,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 
 				// We'll need to read out a few things.
 				// prepend an AUD. This is required by some players
-				filteredAU := [][]byte{
+				filteredAU = [][]byte{
 					{byte(h264.NALUTypeAccessUnitDelimiter), 240},
 				}
 
@@ -504,6 +514,22 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 				}
 
 				queue.WritePacket(pkt)
+
+				// Store snapshots (jpg) for hull.
+				// We'll store the last snapshot, so we can use it for hull on the frontend.
+				// But we'll also store the last 10 snapshots, so we can use it for the timelapse.
+				if config.Capture.Snapshots != "false" {
+					image, err := g.DecodePacket(pkt)
+					if err == nil {
+						buffer := new(bytes.Buffer)
+						w := bufio.NewWriter(buffer)
+						err := jpeg.Encode(w, &image, &jpeg.Options{Quality: 15})
+						if err == nil {
+							snapshot := base64.StdEncoding.EncodeToString(buffer.Bytes())
+							communication.Image = snapshot
+						}
+					}
+				}
 
 				// This will check if we need to stop the thread,
 				// because of a reconfiguration.
@@ -559,7 +585,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 					return
 				}
 
-				filteredAU := [][]byte{
+				filteredAU = [][]byte{
 					{byte(h265.NALUType_AUD_NUT) << 1, 1, 0x50},
 				}
 
@@ -614,6 +640,22 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, communicati
 				}
 
 				queue.WritePacket(pkt)
+
+				// Store snapshots (jpg) for hull.
+				// We'll store the last snapshot, so we can use it for hull on the frontend.
+				// But we'll also store the last 10 snapshots, so we can use it for the timelapse.
+				if config.Capture.Snapshots != "false" {
+					image, err := g.DecodePacket(pkt)
+					if err == nil {
+						buffer := new(bytes.Buffer)
+						w := bufio.NewWriter(buffer)
+						err := jpeg.Encode(w, &image, &jpeg.Options{Quality: 15})
+						if err == nil {
+							snapshot := base64.StdEncoding.EncodeToString(buffer.Bytes())
+							communication.Image = snapshot
+						}
+					}
+				}
 
 				// This will check if we need to stop the thread,
 				// because of a reconfiguration.

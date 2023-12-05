@@ -241,7 +241,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
 	queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
 	queue.WriteHeader(videoStreams)
-	go rtspClient.Start(context.Background(), queue, communication)
+	go rtspClient.Start(context.Background(), queue, configuration, communication)
 
 	// Try to create backchannel
 	rtspBackChannelClient := captureDevice.SetBackChannelClient(rtspUrl)
@@ -259,7 +259,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		communication.SubQueue = subQueue
 		subQueue.SetMaxGopCount(1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
 		subQueue.WriteHeader(videoSubStreams)
-		go rtspSubClient.Start(context.Background(), subQueue, communication)
+		go rtspSubClient.Start(context.Background(), subQueue, configuration, communication)
 	}
 
 	// Handle livestream SD (low resolution over MQTT)

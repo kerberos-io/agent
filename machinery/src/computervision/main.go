@@ -3,7 +3,6 @@ package computervision
 import (
 	"bufio"
 	"bytes"
-	"encoding/base64"
 	"image"
 	"image/jpeg"
 	"time"
@@ -64,34 +63,33 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 			}
 		}
 
-		img := imageArray[0]
-		if img != nil {
+		// Calculate mask
+		var polyObjects []geo.Polygon
 
-			// Calculate mask
-			var polyObjects []geo.Polygon
-
-			if config.Region != nil {
-				for _, polygon := range config.Region.Polygon {
-					coords := polygon.Coordinates
-					poly := geo.Polygon{}
-					for _, c := range coords {
-						x := c.X
-						y := c.Y
-						p := geo.NewPoint(x, y)
-						if !poly.Contains(p) {
-							poly.Add(p)
-						}
+		if config.Region != nil {
+			for _, polygon := range config.Region.Polygon {
+				coords := polygon.Coordinates
+				poly := geo.Polygon{}
+				for _, c := range coords {
+					x := c.X
+					y := c.Y
+					p := geo.NewPoint(x, y)
+					if !poly.Contains(p) {
+						poly.Add(p)
 					}
-					polyObjects = append(polyObjects, poly)
 				}
+				polyObjects = append(polyObjects, poly)
 			}
+		}
 
+		img := imageArray[0]
+		var coordinatesToCheck []int
+		if img != nil {
 			bounds := img.Bounds()
 			rows := bounds.Dy()
 			cols := bounds.Dx()
 
 			// Make fixed size array of uinty8
-			var coordinatesToCheck []int
 			for y := 0; y < rows; y++ {
 				for x := 0; x < cols; x++ {
 					for _, poly := range polyObjects {
@@ -102,6 +100,10 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 					}
 				}
 			}
+		}
+
+		// If no region is set, we'll skip the motion detection
+		if len(coordinatesToCheck) > 0 {
 
 			// Start the motion detection
 			i := 0
@@ -118,22 +120,6 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 				grayImage, err := rtspClient.DecodePacketRaw(pkt)
 				if err == nil {
 					imageArray[2] = &grayImage
-				}
-
-				// Store snapshots (jpg) for hull.
-				// We'll store the last snapshot, so we can use it for hull on the frontend.
-				// But we'll also store the last 10 snapshots, so we can use it for the timelapse.
-				if config.Capture.Snapshots != "false" {
-					image, err := rtspClient.DecodePacket(pkt)
-					if err == nil {
-						buffer := new(bytes.Buffer)
-						w := bufio.NewWriter(buffer)
-						err := jpeg.Encode(w, &image, &jpeg.Options{Quality: 15})
-						if err == nil {
-							snapshot := base64.StdEncoding.EncodeToString(buffer.Bytes())
-							communication.Image = snapshot
-						}
-					}
 				}
 
 				// Check if within time interval
