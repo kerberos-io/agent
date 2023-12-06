@@ -299,20 +299,20 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 	// parse URL
 	u, err := base.ParseURL(g.Url)
 	if err != nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+		log.Log.Debug("RTSPClient(Golibrtsp).ConnectBackChannel(): " + err.Error())
 		return
 	}
 
 	// connect to the server
 	err = g.Client.Start(u.Scheme, u.Host)
 	if err != nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+		log.Log.Debug("RTSPClient(Golibrtsp).ConnectBackChannel(): " + err.Error())
 	}
 
 	// find published medias
 	desc, _, err := g.Client.Describe(u)
 	if err != nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+		log.Log.Debug("RTSPClient(Golibrtsp).ConnectBackChannel(): " + err.Error())
 		return
 	}
 
@@ -323,9 +323,9 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 	g.AudioG711MediaBackChannel = audioMediBackChannel
 	g.AudioG711FormaBackChannel = audioFormaBackChannel
 	if audioMediBackChannel == nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "audio backchannel not found")
+		log.Log.Debug("RTSPClient(Golibrtsp).ConnectBackChannel(): " + "audio backchannel not found")
+		err = errors.New("no audio backchannel found")
 	} else {
-
 		g.Streams = append(g.Streams, packets.Stream{
 			Name:          "PCM_MULAW",
 			IsVideo:       false,
