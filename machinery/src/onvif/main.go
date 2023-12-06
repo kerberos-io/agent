@@ -224,12 +224,13 @@ func GetPTZConfigurationsFromDevice(device *onvif.Device) (ptz.GetConfigurations
 
 	// Get the PTZ configurations from the device
 	resp, err := device.CallMethod(ptz.GetConfigurations{})
+	var b []byte
 	if resp != nil {
+		b, err = io.ReadAll(resp.Body)
 		resp.Body.Close()
 	}
 
 	if err == nil {
-		b, err := io.ReadAll(resp.Body)
 		if err == nil {
 			stringBody := string(b)
 			decodedXML, et, err := getXMLNode(stringBody, "GetConfigurationsResponse")

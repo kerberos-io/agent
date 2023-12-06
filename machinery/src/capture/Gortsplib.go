@@ -691,13 +691,13 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 
 // Start the RTSP client, and start reading packets.
 func (g *Golibrtsp) StartBackChannel(ctx context.Context) (err error) {
-	log.Log.Info("RTSPClient(Golibrtsp).Start(): started")
+	log.Log.Info("RTSPClient(Golibrtsp).StartBackChannel(): started")
 	// Wait for a second, so we can be sure the stream is playing.
 	time.Sleep(1 * time.Second)
 	// Play the stream.
 	_, err = g.Client.Play(nil)
 	if err != nil {
-		log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+		log.Log.Error("RTSPClient(Golibrtsp).StartBackChannel(): " + err.Error())
 	}
 	return
 }
@@ -706,7 +706,7 @@ func (g *Golibrtsp) WritePacket(pkt packets.Packet) error {
 	if g.HasBackChannel {
 		err := g.Client.WritePacketRTP(g.AudioG711MediaBackChannel, pkt.Packet)
 		if err != nil {
-			log.Log.Debug("RTSPClient(Golibrtsp).WritePacketBackChannel(): " + err.Error())
+			log.Log.Debug("RTSPClient(Golibrtsp).WritePacket(): " + err.Error())
 			return err
 		}
 	}
@@ -719,13 +719,13 @@ func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
 	var err error
 	g.VideoDecoderMutex.Lock()
 	if len(pkt.Data) == 0 {
-		err = errors.New("Empty frame")
+		err = errors.New("TSPClient(Golibrtsp).DecodePacket(): empty frame")
 	} else if g.VideoH264Decoder != nil {
 		img, err = g.VideoH264FrameDecoder.decode(pkt.Data)
 	} else if g.VideoH265Decoder != nil {
 		img, err = g.VideoH265FrameDecoder.decode(pkt.Data)
 	} else {
-		err = errors.New("No decoder found, might already be closed")
+		err = errors.New("TSPClient(Golibrtsp).DecodePacket(): no decoder found, might already be closed")
 	}
 	g.VideoDecoderMutex.Unlock()
 	if err != nil {
@@ -733,7 +733,7 @@ func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
 		return image.YCbCr{}, err
 	}
 	if img.Bounds().Empty() {
-		log.Log.Debug("RTSPClient(Golibrtsp).DecodePacket(): " + "empty frame")
+		log.Log.Debug("RTSPClient(Golibrtsp).DecodePacket(): empty frame")
 		return image.YCbCr{}, errors.New("Empty image")
 	}
 	return img, nil
@@ -745,13 +745,13 @@ func (g *Golibrtsp) DecodePacketRaw(pkt packets.Packet) (image.Gray, error) {
 	var err error
 	g.VideoDecoderMutex.Lock()
 	if len(pkt.Data) == 0 {
-		err = errors.New("Empty frame")
+		err = errors.New("RTSPClient(Golibrtsp).DecodePacketRaw(): empty frame")
 	} else if g.VideoH264Decoder != nil {
 		img, err = g.VideoH264FrameDecoder.decodeRaw(pkt.Data)
 	} else if g.VideoH265Decoder != nil {
 		img, err = g.VideoH265FrameDecoder.decodeRaw(pkt.Data)
 	} else {
-		err = errors.New("No decoder found, might already be closed")
+		err = errors.New("RTSPClient(Golibrtsp).DecodePacketRaw(): no decoder found, might already be closed")
 	}
 	g.VideoDecoderMutex.Unlock()
 	if err != nil {
@@ -759,7 +759,7 @@ func (g *Golibrtsp) DecodePacketRaw(pkt packets.Packet) (image.Gray, error) {
 		return image.Gray{}, err
 	}
 	if img.Bounds().Empty() {
-		log.Log.Debug("RTSPClient(Golibrtsp).DecodePacketRaw(): " + "empty image")
+		log.Log.Debug("RTSPClient(Golibrtsp).DecodePacketRaw(): empty image")
 		return image.Gray{}, errors.New("Empty image")
 	}
 

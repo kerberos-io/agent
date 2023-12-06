@@ -52,7 +52,6 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 	communication.HandleLiveSD = make(chan int64, 1)
 	communication.HandleLiveHDKeepalive = make(chan string, 1)
 	communication.HandleLiveHDPeers = make(chan string, 1)
-	communication.HandleONVIF = make(chan models.OnvifAction, 1)
 	communication.IsConfiguring = abool.New()
 
 	cameraSettings := &models.Camera{}
@@ -298,6 +297,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	go cloud.HandleUpload(configDirectory, configuration, communication)
 
 	// Handle ONVIF actions
+	communication.HandleONVIF = make(chan models.OnvifAction, 1)
 	go onvif.HandleONVIFActions(configuration, communication)
 
 	communication.HandleAudio = make(chan models.AudioDataPartial, 1)
@@ -363,14 +363,23 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	}
 
 	err = rtspBackChannelClient.Close()
+	if err != nil {
+		log.Log.Error("RunAgent: error closing RTSP backchannel stream: " + err.Error())
+	}
 
 	time.Sleep(time.Second * 3)
+
+	close(communication.HandleLiveHDHandshake)
+	communication.HandleLiveHDHandshake = nil
 
 	close(communication.HandleMotion)
 	communication.HandleMotion = nil
 
 	close(communication.HandleAudio)
 	communication.HandleAudio = nil
+
+	close(communication.HandleONVIF)
+	communication.HandleONVIF = nil
 
 	// Waiting for some seconds to make sure everything is properly closed.
 	log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")

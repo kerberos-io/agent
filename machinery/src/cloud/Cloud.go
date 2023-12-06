@@ -581,21 +581,12 @@ func HandleLiveStreamHD(livestreamCursor *packets.QueueCursor, configuration *mo
 			go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, videoTrack, audioTrack, rtspClient)
 
 			if config.Capture.ForwardWebRTC == "true" {
-				// We get a request with an offer, but we'll forward it.
-				/*for m := range communication.HandleLiveHDHandshake {
-					// Forward SDP
-					m.CloudKey = config.Key
-					request, err := json.Marshal(m)
-					if err == nil {
-						mqttClient.Publish("kerberos/webrtc/request", 2, false, request)
-					}
-				}*/
+
 			} else {
 				log.Log.Info("HandleLiveStreamHD: Waiting for peer connections.")
 				for handshake := range communication.HandleLiveHDHandshake {
 					log.Log.Info("HandleLiveStreamHD: setting up a peer connection.")
 					go webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, videoTrack, audioTrack, handshake)
-
 				}
 			}
 
