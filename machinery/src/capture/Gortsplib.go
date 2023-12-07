@@ -7,14 +7,10 @@ package capture
 import "C"
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"image"
-	"image/jpeg"
 	"reflect"
 	"strconv"
 	"sync"
@@ -351,8 +347,6 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) (err error) {
 	log.Log.Debug("RTSPClient(Golibrtsp).Start(): started")
 
-	config := configuration.Config
-
 	// called when a MULAW audio RTP packet arrives
 	if g.AudioG711Media != nil {
 		g.Client.OnPacketRTP(g.AudioG711Media, g.AudioG711Forma, func(rtppkt *rtp.Packet) {
@@ -515,22 +509,6 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 
 				queue.WritePacket(pkt)
 
-				// Store snapshots (jpg) for hull.
-				// We'll store the last snapshot, so we can use it for hull on the frontend.
-				// But we'll also store the last 10 snapshots, so we can use it for the timelapse.
-				if config.Capture.Snapshots != "false" {
-					image, err := g.DecodePacket(pkt)
-					if err == nil {
-						buffer := new(bytes.Buffer)
-						w := bufio.NewWriter(buffer)
-						err := jpeg.Encode(w, &image, &jpeg.Options{Quality: 15})
-						if err == nil {
-							snapshot := base64.StdEncoding.EncodeToString(buffer.Bytes())
-							communication.Image = snapshot
-						}
-					}
-				}
-
 				// This will check if we need to stop the thread,
 				// because of a reconfiguration.
 				select {
@@ -640,22 +618,6 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 				}
 
 				queue.WritePacket(pkt)
-
-				// Store snapshots (jpg) for hull.
-				// We'll store the last snapshot, so we can use it for hull on the frontend.
-				// This will also be used to retrieve the last snapshot from the API.
-				if config.Capture.Snapshots != "false" {
-					image, err := g.DecodePacket(pkt)
-					if err == nil {
-						buffer := new(bytes.Buffer)
-						w := bufio.NewWriter(buffer)
-						err := jpeg.Encode(w, &image, &jpeg.Options{Quality: 15})
-						if err == nil {
-							snapshot := base64.StdEncoding.EncodeToString(buffer.Bytes())
-							communication.Image = snapshot
-						}
-					}
-				}
 
 				// This will check if we need to stop the thread,
 				// because of a reconfiguration.
