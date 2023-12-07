@@ -703,7 +703,7 @@ func (g *Golibrtsp) StartBackChannel(ctx context.Context) (err error) {
 }
 
 func (g *Golibrtsp) WritePacket(pkt packets.Packet) error {
-	if g.HasBackChannel {
+	if g.HasBackChannel && g.AudioG711MediaBackChannel != nil {
 		err := g.Client.WritePacketRTP(g.AudioG711MediaBackChannel, pkt.Packet)
 		if err != nil {
 			log.Log.Debug("RTSPClient(Golibrtsp).WritePacket(): " + err.Error())
