@@ -9,7 +9,7 @@ go 1.19
 require (
 	github.com/InVisionApp/conjungo v1.1.0
 	github.com/appleboy/gin-jwt/v2 v2.9.1
-	github.com/bluenviron/gortsplib/v4 v4.6.0
+	github.com/bluenviron/gortsplib/v4 v4.6.1
 	github.com/bluenviron/mediacommon v1.5.1
 	github.com/cedricve/go-onvif v0.0.0-20200222191200-567e8ce298f6
 	github.com/deepch/vdk v0.0.19
@@ -134,11 +134,11 @@ require (
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
 	go4.org/unsafe/assume-no-moving-gc v0.0.0-20220617031537-928513b29760 // indirect
 	golang.org/x/arch v0.3.0 // indirect
-	golang.org/x/crypto v0.15.0 // indirect
-	golang.org/x/net v0.18.0 // indirect
+	golang.org/x/crypto v0.16.0 // indirect
+	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20201208152858-08078c50e5b5 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
 	golang.org/x/tools v0.7.0 // indirect

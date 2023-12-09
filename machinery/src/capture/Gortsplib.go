@@ -348,7 +348,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 	log.Log.Debug("RTSPClient(Golibrtsp).Start(): started")
 
 	// called when a MULAW audio RTP packet arrives
-	if g.AudioG711Media != nil {
+	if g.AudioG711Media != nil && g.AudioG711Forma != nil {
 		g.Client.OnPacketRTP(g.AudioG711Media, g.AudioG711Forma, func(rtppkt *rtp.Packet) {
 			// decode timestamp
 			pts, ok := g.Client.PacketPTS(g.AudioG711Media, rtppkt)
@@ -380,7 +380,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 	}
 
 	// called when a AAC audio RTP packet arrives
-	if g.AudioMPEG4Media != nil {
+	if g.AudioMPEG4Media != nil && g.AudioMPEG4Forma != nil {
 		g.Client.OnPacketRTP(g.AudioMPEG4Media, g.AudioMPEG4Forma, func(rtppkt *rtp.Packet) {
 			// decode timestamp
 			pts, ok := g.Client.PacketPTS(g.AudioMPEG4Media, rtppkt)
@@ -420,7 +420,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 
 	// called when a video RTP packet arrives for H264
 	var filteredAU [][]byte
-	if g.VideoH264Media != nil {
+	if g.VideoH264Media != nil && g.VideoH264Forma != nil {
 		g.Client.OnPacketRTP(g.VideoH264Media, g.VideoH264Forma, func(rtppkt *rtp.Packet) {
 
 			// This will check if we need to stop the thread,
@@ -531,7 +531,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 	}
 
 	// called when a video RTP packet arrives for H265
-	if g.VideoH265Media != nil {
+	if g.VideoH265Media != nil && g.VideoH265Forma != nil {
 		g.Client.OnPacketRTP(g.VideoH265Media, g.VideoH265Forma, func(rtppkt *rtp.Packet) {
 
 			// This will check if we need to stop the thread,
