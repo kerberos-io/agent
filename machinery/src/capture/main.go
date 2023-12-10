@@ -3,9 +3,8 @@ package capture
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"io"
+	"encoding/base64"
+	"image"
 	"os"
 	"strconv"
 	"time"
@@ -625,54 +624,47 @@ func VerifyCamera(c *gin.Context) {
 	}
 }
 
-type cacheWriterSeeker struct {
-	buf    []byte
-	offset int
-}
+func Base64Image(captureDevice *Capture, communication *models.Communication) string {
+	// We'll try to get a snapshot from the camera.
+	var queue *packets.Queue
+	var cursor *packets.QueueCursor
 
-func newCacheWriterSeeker(capacity int) *cacheWriterSeeker {
-	return &cacheWriterSeeker{
-		buf:    make([]byte, 0, capacity),
-		offset: 0,
-	}
-}
-
-func (ws *cacheWriterSeeker) Write(p []byte) (n int, err error) {
-	if cap(ws.buf)-ws.offset >= len(p) {
-		if len(ws.buf) < ws.offset+len(p) {
-			ws.buf = ws.buf[:ws.offset+len(p)]
-		}
-		copy(ws.buf[ws.offset:], p)
-		ws.offset += len(p)
-		return len(p), nil
-	}
-	tmp := make([]byte, len(ws.buf), cap(ws.buf)+len(p)*2)
-	copy(tmp, ws.buf)
-	if len(ws.buf) < ws.offset+len(p) {
-		tmp = tmp[:ws.offset+len(p)]
-	}
-	copy(tmp[ws.offset:], p)
-	ws.buf = tmp
-	ws.offset += len(p)
-	return len(p), nil
-}
-
-func (ws *cacheWriterSeeker) Seek(offset int64, whence int) (int64, error) {
-	if whence == io.SeekCurrent {
-		if ws.offset+int(offset) > len(ws.buf) {
-			return -1, errors.New(fmt.Sprint("SeekCurrent out of range", len(ws.buf), offset, ws.offset))
-		}
-		ws.offset += int(offset)
-		return int64(ws.offset), nil
-	} else if whence == io.SeekStart {
-		if offset > int64(len(ws.buf)) {
-			return -1, errors.New(fmt.Sprint("SeekStart out of range", len(ws.buf), offset, ws.offset))
-		}
-		ws.offset = int(offset)
-		return offset, nil
+	// We'll pick the right client and decoder.
+	rtspClient := captureDevice.RTSPSubClient
+	if rtspClient != nil {
+		queue = communication.SubQueue
+		cursor = queue.Latest()
 	} else {
-		return 0, errors.New("unsupport SeekEnd")
+		rtspClient = captureDevice.RTSPClient
+		queue = communication.Queue
+		cursor = queue.Latest()
 	}
+
+	// We'll try to have a keyframe, if not we'll return an empty string.
+	var encodedImage string
+	for {
+		if queue != nil && cursor != nil && rtspClient != nil {
+			pkt, err := cursor.ReadPacket()
+			if err == nil {
+				if !pkt.IsKeyFrame {
+					continue
+				}
+				var img image.YCbCr
+				img, err = (*rtspClient).DecodePacket(pkt)
+				if err == nil {
+					bytes, _ := utils.ImageToBytes(&img)
+					encodedImage = base64.StdEncoding.EncodeToString(bytes)
+					break
+				} else {
+					break
+				}
+			}
+		} else {
+			break
+		}
+	}
+
+	return encodedImage
 }
 
 func convertPTS(v time.Duration) uint64 {

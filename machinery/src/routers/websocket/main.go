@@ -10,10 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/kerberos-io/agent/machinery/src/capture"
-	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 )
 
 type Message struct {
@@ -154,7 +154,7 @@ logreader:
 				var img image.YCbCr
 				img, err = (*rtspClient).DecodePacket(pkt)
 				if err == nil {
-					bytes, _ := computervision.ImageToBytes(&img)
+					bytes, _ := utils.ImageToBytes(&img)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				}
 			} else {

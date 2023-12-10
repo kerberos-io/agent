@@ -22,6 +22,13 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 	// This is legacy should be removed in future! Now everything
 	// lives under the /api prefix.
 	r.GET("/config", func(c *gin.Context) {
+
+		// We'll try to get a snapshot from the camera.
+		base64Image := capture.Base64Image(captureDevice, communication)
+		if base64Image != "" {
+			communication.Image = base64Image
+		}
+
 		c.JSON(200, gin.H{
 			"config":   configuration.Config,
 			"custom":   configuration.CustomConfig,
@@ -149,6 +156,13 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 		})
 
 		api.GET("/config", func(c *gin.Context) {
+
+			// We'll try to get a snapshot from the camera.
+			base64Image := capture.Base64Image(captureDevice, communication)
+			if base64Image != "" {
+				communication.Image = base64Image
+			}
+
 			c.JSON(200, gin.H{
 				"config":   configuration.Config,
 				"custom":   configuration.CustomConfig,

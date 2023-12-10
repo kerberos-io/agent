@@ -1,10 +1,7 @@
 package computervision
 
 import (
-	"bufio"
-	"bytes"
 	"image"
-	"image/jpeg"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -212,13 +209,6 @@ func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChange
 	threshold := 60
 	changes := AbsDiffBitwiseAndThreshold(image1, image2, image3, threshold, coordinatesToCheck)
 	return changes > pixelChangeThreshold, changes
-}
-
-func ImageToBytes(img image.Image) ([]byte, error) {
-	buffer := new(bytes.Buffer)
-	w := bufio.NewWriter(buffer)
-	err := jpeg.Encode(w, img, &jpeg.Options{Quality: 15})
-	return buffer.Bytes(), err
 }
 
 func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.Gray, threshold int, coordinatesToCheck []int) int {

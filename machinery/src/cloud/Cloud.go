@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
-	"github.com/kerberos-io/agent/machinery/src/computervision"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
@@ -534,7 +533,7 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 				log.Log.Info("cloud.HandleLiveStreamSD(): Sending base64 encoded images to MQTT.")
 				img, err := rtspClient.DecodePacket(pkt)
 				if err == nil {
-					bytes, _ := computervision.ImageToBytes(&img)
+					bytes, _ := utils.ImageToBytes(&img)
 					encoded := base64.StdEncoding.EncodeToString(bytes)
 
 					valueMap := make(map[string]interface{})
