@@ -88,6 +88,8 @@ definitions:
         type: string
       dropbox:
         $ref: '#/definitions/models.Dropbox'
+      encryption:
+        $ref: '#/definitions/models.Encryption'
       friendly_name:
         type: string
       heartbeaturi:
@@ -156,10 +158,25 @@ definitions:
       directory:
         type: string
     type: object
+  models.Encryption:
+    properties:
+      enabled:
+        type: string
+      fingerprint:
+        type: string
+      private_key:
+        type: string
+      recordings:
+        type: string
+      symmetric_key:
+        type: string
+    type: object
   models.IPCamera:
     properties:
       fps:
         type: string
+      height:
+        type: integer
       onvif:
         type: string
       onvif_password:
@@ -172,6 +189,8 @@ definitions:
         type: string
       sub_rtsp:
         type: string
+      width:
+        type: integer
     type: object
   models.KStorage:
     properties:
@@ -415,6 +434,42 @@ paths:
           schema:
             $ref: '#/definitions/models.APIResponse'
       summary: Zooming in or out the camera.
+      tags:
+      - camera
+  /api/camera/record:
+    post:
+      description: Make a recording.
+      operationId: camera-record
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Make a recording.
+      tags:
+      - camera
+  /api/camera/restart:
+    post:
+      description: Restart the agent.
+      operationId: camera-restart
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Restart the agent.
+      tags:
+      - camera
+  /api/camera/stop:
+    post:
+      description: Stop the agent.
+      operationId: camera-stop
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Stop the agent.
       tags:
       - camera
   /api/camera/verify/{streamType}:

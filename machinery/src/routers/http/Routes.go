@@ -4,6 +4,7 @@ import (
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/capture"
+	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
 	"github.com/kerberos-io/agent/machinery/src/routers/websocket"
 
@@ -192,18 +193,16 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 			}
 		})
 
-		api.GET("/restart", func(c *gin.Context) {
-			communication.HandleBootstrap <- "restart"
-			c.JSON(200, gin.H{
-				"restarted": true,
-			})
+		api.POST("/camera/restart", func(c *gin.Context) {
+			components.RestartAgent(c, communication)
 		})
 
-		api.GET("/stop", func(c *gin.Context) {
-			communication.HandleBootstrap <- "stop"
-			c.JSON(200, gin.H{
-				"stopped": true,
-			})
+		api.POST("/camera/stop", func(c *gin.Context) {
+			components.StopAgent(c, communication)
+		})
+
+		api.POST("/camera/record", func(c *gin.Context) {
+			components.MakeRecording(c, communication)
 		})
 
 		api.POST("/onvif/verify", func(c *gin.Context) {

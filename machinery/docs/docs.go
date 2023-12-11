@@ -199,6 +199,60 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/camera/record": {
+            "post": {
+                "description": "Make a recording.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Make a recording.",
+                "operationId": "camera-record",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/camera/restart": {
+            "post": {
+                "description": "Restart the agent.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Restart the agent.",
+                "operationId": "camera-restart",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/camera/stop": {
+            "post": {
+                "description": "Stop the agent.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Stop the agent.",
+                "operationId": "camera-stop",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/camera/verify/{streamType}": {
             "post": {
                 "description": "This method will validate a specific profile connection from an RTSP camera, and try to get the codec.",
@@ -505,6 +559,9 @@ const docTemplate = `{
                 "dropbox": {
                     "$ref": "#/definitions/models.Dropbox"
                 },
+                "encryption": {
+                    "$ref": "#/definitions/models.Encryption"
+                },
                 "friendly_name": {
                     "type": "string"
                 },
@@ -608,11 +665,34 @@ const docTemplate = `{
                 }
             }
         },
+        "models.Encryption": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "string"
+                },
+                "fingerprint": {
+                    "type": "string"
+                },
+                "private_key": {
+                    "type": "string"
+                },
+                "recordings": {
+                    "type": "string"
+                },
+                "symmetric_key": {
+                    "type": "string"
+                }
+            }
+        },
         "models.IPCamera": {
             "type": "object",
             "properties": {
                 "fps": {
                     "type": "string"
+                },
+                "height": {
+                    "type": "integer"
                 },
                 "onvif": {
                     "type": "string"
@@ -631,6 +711,9 @@ const docTemplate = `{
                 },
                 "sub_rtsp": {
                     "type": "string"
+                },
+                "width": {
+                    "type": "integer"
                 }
             }
         },
