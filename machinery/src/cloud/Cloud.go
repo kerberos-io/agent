@@ -602,7 +602,7 @@ func HandleLiveStreamHD(livestreamCursor *packets.QueueCursor, configuration *mo
 // @securityDefinitions.apikey Bearer
 // @in header
 // @name Authorization
-// @Tags config
+// @Tags general
 // @Param config body models.Config true "Config"
 // @Summary Will verify the hub connectivity.
 // @Description Will verify the hub connectivity.
@@ -672,7 +672,7 @@ func VerifyHub(c *gin.Context) {
 // @securityDefinitions.apikey Bearer
 // @in header
 // @name Authorization
-// @Tags config
+// @Tags general
 // @Param config body models.Config true "Config"
 // @Summary Will verify the persistence.
 // @Description Will verify the persistence.

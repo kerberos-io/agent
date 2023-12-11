@@ -171,6 +171,15 @@ definitions:
       symmetric_key:
         type: string
     type: object
+  models.EventFilter:
+    properties:
+      number_of_elements:
+        type: integer
+      timestamp_offset_end:
+        type: integer
+      timestamp_offset_start:
+        type: integer
+    type: object
   models.IPCamera:
     properties:
       fps:
@@ -500,6 +509,52 @@ paths:
       summary: Validate a specific RTSP profile camera connection.
       tags:
       - camera
+  /api/config:
+    get:
+      description: Get the current configuration.
+      operationId: config
+      responses:
+        "200":
+          description: ""
+      summary: Get the current configuration.
+      tags:
+      - general
+    post:
+      description: Update the current configuration.
+      operationId: config
+      parameters:
+      - description: Configuration
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.Config'
+      responses:
+        "200":
+          description: ""
+      summary: Update the current configuration.
+      tags:
+      - general
+  /api/dashboard:
+    get:
+      description: Get all information showed on the dashboard.
+      operationId: dashboard
+      responses:
+        "200":
+          description: ""
+      summary: Get all information showed on the dashboard.
+      tags:
+      - general
+  /api/days:
+    get:
+      description: Get all days stored in the recordings directory.
+      operationId: days
+      responses:
+        "200":
+          description: ""
+      summary: Get all days stored in the recordings directory.
+      tags:
+      - general
   /api/hub/verify:
     post:
       description: Will verify the hub connectivity.
@@ -520,7 +575,24 @@ paths:
       - Bearer: []
       summary: Will verify the hub connectivity.
       tags:
-      - config
+      - general
+  /api/latest-events:
+    post:
+      description: Get the latest recordings (events) from the recordings directory.
+      operationId: latest-events
+      parameters:
+      - description: Event filter
+        in: body
+        name: eventFilter
+        required: true
+        schema:
+          $ref: '#/definitions/models.EventFilter'
+      responses:
+        "200":
+          description: ""
+      summary: Get the latest recordings (events) from the recordings directory.
+      tags:
+      - general
   /api/login:
     post:
       description: Get Authorization token.
@@ -560,7 +632,7 @@ paths:
       - Bearer: []
       summary: Will verify the ONVIF connectivity.
       tags:
-      - config
+      - general
   /api/persistence/verify:
     post:
       description: Will verify the persistence.
@@ -581,7 +653,7 @@ paths:
       - Bearer: []
       summary: Will verify the persistence.
       tags:
-      - config
+      - general
 securityDefinitions:
   Bearer:
     in: header

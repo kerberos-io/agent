@@ -851,7 +851,7 @@ func GetPTZFunctionsFromDevice(configurations ptz.GetConfigurationsResponse) ([]
 // @securityDefinitions.apikey Bearer
 // @in header
 // @name Authorization
-// @Tags config
+// @Tags general
 // @Param cameraConfig body models.IPCamera true "Camera Config"
 // @Summary Will verify the ONVIF connectivity.
 // @Description Will verify the ONVIF connectivity.

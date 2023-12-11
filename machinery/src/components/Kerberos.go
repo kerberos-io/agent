@@ -19,6 +19,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/onvif"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	routers "github.com/kerberos-io/agent/machinery/src/routers/mqtt"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/tevino/abool"
 )
 
@@ -434,6 +435,119 @@ func ControlAgent(communication *models.Communication) {
 	log.Log.Debug("components.Kerberos.ControlAgent(): finished")
 }
 
+// GetDashboard godoc
+// @Router /api/dashboard [get]
+// @ID dashboard
+// @Tags general
+// @Summary Get all information showed on the dashboard.
+// @Description Get all information showed on the dashboard.
+// @Success 200
+func GetDashboard(c *gin.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+
+	// Check if camera is online.
+	cameraIsOnline := communication.CameraConnected
+
+	// If an agent is properly setup with Kerberos Hub, we will send
+	// a ping to Kerberos Hub every 15seconds. On receiving a positive response
+	// it will update the CloudTimestamp value.
+	cloudIsOnline := false
+	if communication.CloudTimestamp != nil && communication.CloudTimestamp.Load() != nil {
+		timestamp := communication.CloudTimestamp.Load().(int64)
+		if timestamp > 0 {
+			cloudIsOnline = true
+		}
+	}
+
+	// The total number of recordings stored in the directory.
+	recordingDirectory := configDirectory + "/data/recordings"
+	numberOfRecordings := utils.NumberOfMP4sInDirectory(recordingDirectory)
+
+	// All days stored in this agent.
+	days := []string{}
+	latestEvents := []models.Media{}
+	files, err := utils.ReadDirectory(recordingDirectory)
+	if err == nil {
+		events := utils.GetSortedDirectory(files)
+
+		// Get All days
+		days = utils.GetDays(events, recordingDirectory, configuration)
+
+		// Get all latest events
+		var eventFilter models.EventFilter
+		eventFilter.NumberOfElements = 5
+		latestEvents = utils.GetMediaFormatted(events, recordingDirectory, configuration, eventFilter) // will get 5 latest recordings.
+	}
+
+	c.JSON(200, gin.H{
+		"offlineMode":        configuration.Config.Offline,
+		"cameraOnline":       cameraIsOnline,
+		"cloudOnline":        cloudIsOnline,
+		"numberOfRecordings": numberOfRecordings,
+		"days":               days,
+		"latestEvents":       latestEvents,
+	})
+}
+
+// GetLatestEvents godoc
+// @Router /api/latest-events [post]
+// @ID latest-events
+// @Tags general
+// @Param eventFilter body models.EventFilter true "Event filter"
+// @Summary Get the latest recordings (events) from the recordings directory.
+// @Description Get the latest recordings (events) from the recordings directory.
+// @Success 200
+func GetLatestEvents(c *gin.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+	var eventFilter models.EventFilter
+	err := c.BindJSON(&eventFilter)
+	if err == nil {
+		// Default to 10 if no limit is set.
+		if eventFilter.NumberOfElements == 0 {
+			eventFilter.NumberOfElements = 10
+		}
+		recordingDirectory := configDirectory + "/data/recordings"
+		files, err := utils.ReadDirectory(recordingDirectory)
+		if err == nil {
+			events := utils.GetSortedDirectory(files)
+			// We will get all recordings from the directory (as defined by the filter).
+			fileObjects := utils.GetMediaFormatted(events, recordingDirectory, configuration, eventFilter)
+			c.JSON(200, gin.H{
+				"events": fileObjects,
+			})
+		} else {
+			c.JSON(400, gin.H{
+				"data": "Something went wrong: " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
+		})
+	}
+}
+
+// GetDays godoc
+// @Router /api/days [get]
+// @ID days
+// @Tags general
+// @Summary Get all days stored in the recordings directory.
+// @Description Get all days stored in the recordings directory.
+// @Success 200
+func GetDays(c *gin.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+	recordingDirectory := configDirectory + "/data/recordings"
+	files, err := utils.ReadDirectory(recordingDirectory)
+	if err == nil {
+		events := utils.GetSortedDirectory(files)
+		days := utils.GetDays(events, recordingDirectory, configuration)
+		c.JSON(200, gin.H{
+			"events": days,
+		})
+	} else {
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
+		})
+	}
+}
+
 // StopAgent godoc
 // @Router /api/camera/stop [post]
 // @ID camera-stop
@@ -481,4 +595,55 @@ func MakeRecording(c *gin.Context, communication *models.Communication) {
 	c.JSON(200, gin.H{
 		"recording": true,
 	})
+}
+
+// GetConfig godoc
+// @Router /api/config [get]
+// @ID config
+// @Tags general
+// @Summary Get the current configuration.
+// @Description Get the current configuration.
+// @Success 200
+func GetConfig(c *gin.Context, captureDevice *capture.Capture, configuration *models.Configuration, communication *models.Communication) {
+	// We'll try to get a snapshot from the camera.
+	base64Image := capture.Base64Image(captureDevice, communication)
+	if base64Image != "" {
+		communication.Image = base64Image
+	}
+
+	c.JSON(200, gin.H{
+		"config":   configuration.Config,
+		"custom":   configuration.CustomConfig,
+		"global":   configuration.GlobalConfig,
+		"snapshot": communication.Image,
+	})
+}
+
+// UpdateConfig godoc
+// @Router /api/config [post]
+// @ID config
+// @Tags general
+// @Param config body models.Config true "Configuration"
+// @Summary Update the current configuration.
+// @Description Update the current configuration.
+// @Success 200
+func UpdateConfig(c *gin.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+	var config models.Config
+	err := c.BindJSON(&config)
+	if err == nil {
+		err := configService.SaveConfig(configDirectory, config, configuration, communication)
+		if err == nil {
+			c.JSON(200, gin.H{
+				"data": "☄ Reconfiguring",
+			})
+		} else {
+			c.JSON(200, gin.H{
+				"data": "☄ Reconfiguring",
+			})
+		}
+	} else {
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
+		})
+	}
 }

@@ -293,6 +293,75 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/config": {
+            "get": {
+                "description": "Get the current configuration.",
+                "tags": [
+                    "general"
+                ],
+                "summary": "Get the current configuration.",
+                "operationId": "config",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            },
+            "post": {
+                "description": "Update the current configuration.",
+                "tags": [
+                    "general"
+                ],
+                "summary": "Update the current configuration.",
+                "operationId": "config",
+                "parameters": [
+                    {
+                        "description": "Configuration",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.Config"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/dashboard": {
+            "get": {
+                "description": "Get all information showed on the dashboard.",
+                "tags": [
+                    "general"
+                ],
+                "summary": "Get all information showed on the dashboard.",
+                "operationId": "dashboard",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/days": {
+            "get": {
+                "description": "Get all days stored in the recordings directory.",
+                "tags": [
+                    "general"
+                ],
+                "summary": "Get all days stored in the recordings directory.",
+                "operationId": "days",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/hub/verify": {
             "post": {
                 "security": [
@@ -302,7 +371,7 @@ const docTemplate = `{
                 ],
                 "description": "Will verify the hub connectivity.",
                 "tags": [
-                    "config"
+                    "general"
                 ],
                 "summary": "Will verify the hub connectivity.",
                 "operationId": "verify-hub",
@@ -323,6 +392,32 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }
+                    }
+                }
+            }
+        },
+        "/api/latest-events": {
+            "post": {
+                "description": "Get the latest recordings (events) from the recordings directory.",
+                "tags": [
+                    "general"
+                ],
+                "summary": "Get the latest recordings (events) from the recordings directory.",
+                "operationId": "latest-events",
+                "parameters": [
+                    {
+                        "description": "Event filter",
+                        "name": "eventFilter",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.EventFilter"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
                     }
                 }
             }
@@ -365,7 +460,7 @@ const docTemplate = `{
                 ],
                 "description": "Will verify the ONVIF connectivity.",
                 "tags": [
-                    "config"
+                    "general"
                 ],
                 "summary": "Will verify the ONVIF connectivity.",
                 "operationId": "verify-onvif",
@@ -399,7 +494,7 @@ const docTemplate = `{
                 ],
                 "description": "Will verify the persistence.",
                 "tags": [
-                    "config"
+                    "general"
                 ],
                 "summary": "Will verify the persistence.",
                 "operationId": "verify-persistence",
@@ -682,6 +777,20 @@ const docTemplate = `{
                 },
                 "symmetric_key": {
                     "type": "string"
+                }
+            }
+        },
+        "models.EventFilter": {
+            "type": "object",
+            "properties": {
+                "number_of_elements": {
+                    "type": "integer"
+                },
+                "timestamp_offset_end": {
+                    "type": "integer"
+                },
+                "timestamp_offset_start": {
+                    "type": "integer"
                 }
             }
         },
