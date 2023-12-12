@@ -352,3 +352,58 @@ func GoToOnvifPreset(c *gin.Context) {
 		})
 	}
 }
+
+// DoGetDigitalInputs godoc
+// @Router /api/camera/onvif/inputs [post]
+// @ID get-digital-inputs
+// @Security Bearer
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @Tags camera
+// @Param cameraConfig body models.IPCamera true "Camera Config"
+// @Summary Will get the digital inputs from the ONVIF device.
+// @Description Will get the digital inputs from the ONVIF device.
+// @Success 200 {object} models.APIResponse
+func DoGetDigitalInputs(c *gin.Context) {
+	var onvifPreset models.OnvifPreset
+	err := c.BindJSON(&onvifPreset)
+
+	if err == nil || onvifPreset.OnvifCredentials.ONVIFXAddr != "" {
+
+		configuration := &models.Configuration{
+			Config: models.Config{
+				Capture: models.Capture{
+					IPCamera: models.IPCamera{
+						ONVIFXAddr:    onvifPreset.OnvifCredentials.ONVIFXAddr,
+						ONVIFUsername: onvifPreset.OnvifCredentials.ONVIFUsername,
+						ONVIFPassword: onvifPreset.OnvifCredentials.ONVIFPassword,
+					},
+				},
+			},
+		}
+
+		cameraConfiguration := configuration.Config.Capture.IPCamera
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		if err == nil {
+			inputs, err := onvif.GetDigitalInputs(device)
+			if err == nil {
+				c.JSON(200, gin.H{
+					"data": inputs,
+				})
+			} else {
+				c.JSON(400, gin.H{
+					"data": "Something went wrong: " + err.Error(),
+				})
+			}
+		} else {
+			c.JSON(400, gin.H{
+				"data": "Something went wrong: " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
+		})
+	}
+}

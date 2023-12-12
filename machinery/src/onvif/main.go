@@ -909,6 +909,36 @@ func VerifyOnvifConnection(c *gin.Context) {
 	}
 }
 
+func GetDigitalInputs(device *onvif.Device) (ptz.GetConfigurationsResponse, error) {
+	// We'll try to receive the PTZ configurations from the server
+	var configurations ptz.GetConfigurationsResponse
+
+	// Get the PTZ configurations from the device
+	resp, err := device.CallMethod(ptz.GetConfigurations{})
+	var b []byte
+	if resp != nil {
+		b, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+	}
+
+	if err == nil {
+		if err == nil {
+			stringBody := string(b)
+			decodedXML, et, err := getXMLNode(stringBody, "GetConfigurationsResponse")
+			if err != nil {
+				log.Log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
+				return configurations, err
+			} else {
+				if err := decodedXML.DecodeElement(&configurations, et); err != nil {
+					log.Log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
+					return configurations, err
+				}
+			}
+		}
+	}
+	return configurations, err
+}
+
 func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, error) {
 	xmlBytes := bytes.NewBufferString(xmlBody)
 	decodedXML := xml.NewDecoder(xmlBytes)

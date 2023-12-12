@@ -369,6 +369,27 @@ paths:
       summary: Will activate the desired ONVIF preset.
       tags:
       - camera
+  /api/camera/onvif/inputs:
+    post:
+      description: Will get the digital inputs from the ONVIF device.
+      operationId: get-digital-inputs
+      parameters:
+      - description: Camera Config
+        in: body
+        name: cameraConfig
+        required: true
+        schema:
+          $ref: '#/definitions/models.IPCamera'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will get the digital inputs from the ONVIF device.
+      tags:
+      - camera
   /api/camera/onvif/login:
     post:
       description: Try to login into ONVIF supported camera.

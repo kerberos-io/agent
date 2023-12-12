@@ -12,7 +12,6 @@ require (
 	github.com/bluenviron/gortsplib/v4 v4.6.1
 	github.com/bluenviron/mediacommon v1.5.1
 	github.com/cedricve/go-onvif v0.0.0-20200222191200-567e8ce298f6
-	github.com/deepch/vdk v0.0.19
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/eclipse/paho.mqtt.golang v1.4.2
 	github.com/elastic/go-sysinfo v1.9.0
@@ -28,7 +27,6 @@ require (
 	github.com/kerberos-io/joy4 v1.0.64
 	github.com/kerberos-io/onvif v0.0.9
 	github.com/minio/minio-go/v6 v6.0.57
-	github.com/nsmith5/mjpeg v0.0.0-20200913181537-54b8ada0e53e
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pion/rtp v1.8.3
 	github.com/pion/webrtc/v3 v3.1.50

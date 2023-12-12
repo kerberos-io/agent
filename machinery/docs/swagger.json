@@ -75,6 +75,40 @@
                 }
             }
         },
+        "/api/camera/onvif/inputs": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Will get the digital inputs from the ONVIF device.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Will get the digital inputs from the ONVIF device.",
+                "operationId": "get-digital-inputs",
+                "parameters": [
+                    {
+                        "description": "Camera Config",
+                        "name": "cameraConfig",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.IPCamera"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/camera/onvif/login": {
             "post": {
                 "description": "Try to login into ONVIF supported camera.",
