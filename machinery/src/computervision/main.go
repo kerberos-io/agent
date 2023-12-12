@@ -15,7 +15,7 @@ import (
 
 func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
 
-	log.Log.Debug("ProcessMotion: started")
+	log.Log.Debug("computervision.main.ProcessMotion(): start motion detection")
 	config := configuration.Config
 	loc, _ := time.LoadLocation(config.Timezone)
 
@@ -30,11 +30,11 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 
 	if config.Capture.Continuous == "true" {
 
-		log.Log.Info("ProcessMotion: Continuous recording, so no motion detection.")
+		log.Log.Info("computervision.main.ProcessMotion(): you've enabled continuous recording, so no motion detection required.")
 
 	} else {
 
-		log.Log.Info("ProcessMotion: Motion detection enabled.")
+		log.Log.Info("computervision.main.ProcessMotion(): motion detected is enabled, so starting the motion detection.")
 
 		hubKey := config.HubKey
 		deviceKey := config.Key
@@ -120,9 +120,12 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 					imageArray[2] = &grayImage
 				}
 
-				// Check if within time interval
-				detectMotion := true
-				detectMotion = conditions.IsWithinTimeInterval(loc, configuration)
+				// We might have different conditions enabled such as time window or uri response.
+				// We'll validate those conditions and if not valid we'll not do anything.
+				detectMotion, err := conditions.Validate(loc, configuration)
+				if !detectMotion && err != nil {
+					log.Log.Debug("computervision.main.ProcessMotion(): " + err.Error() + ".")
+				}
 
 				if config.Capture.Motion != "false" {
 
@@ -149,7 +152,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 										if err == nil {
 											mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
 										} else {
-											log.Log.Info("ProcessMotion: failed to package MQTT message: " + err.Error())
+											log.Log.Info("computervision.main.ProcessMotion(): failed to package MQTT message: " + err.Error())
 										}
 									} else {
 										mqttClient.Publish("kerberos/agent/"+deviceKey, 2, false, "motion")
@@ -179,7 +182,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 		}
 	}
 
-	log.Log.Debug("ProcessMotion: finished")
+	log.Log.Debug("computervision.main.ProcessMotion(): stop the motion detection.")
 }
 
 func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {

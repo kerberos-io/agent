@@ -81,6 +81,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var myMuxer *mp4.Movmuxer
 			var videoTrack uint32
 			var audioTrack uint32
+			var name string
 
 			// Do not do anything!
 			log.Log.Info("capture.main.HandleRecordStream(continuous): start recording")
@@ -88,8 +89,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			now = time.Now().Unix()
 			timestamp = now
 			start := false
-			var name string
-			var err error
 
 			// If continuous record the full length
 			recordingPeriod = maxRecordingPeriod
@@ -184,9 +183,11 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// If not yet started and a keyframe, let's make a recording
 				if !start && pkt.IsKeyFrame {
 
-					makeRecording := conditions.IsWithinTimeInterval(loc, configuration)
-					if !makeRecording {
-						log.Log.Debug("capture.main.HandleRecordStream(continuous): no continuous recording at this moment, as not within specified time interval.")
+					// We might have different conditions enabled such as time window or uri response.
+					// We'll validate those conditions and if not valid we'll not do anything.
+					valid, err := conditions.Validate(loc, configuration)
+					if !valid && err != nil {
+						log.Log.Debug("capture.main.HandleRecordStream(continuous): " + err.Error() + ".")
 						time.Sleep(5 * time.Second)
 						continue
 					}

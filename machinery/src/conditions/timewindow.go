@@ -7,10 +7,10 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
-func IsWithinTimeInterval(loc *time.Location, configuration *models.Configuration) bool {
+func IsWithinTimeInterval(loc *time.Location, configuration *models.Configuration) (enabled bool) {
 	config := configuration.Config
 	timeEnabled := config.Time
-	detectMotion := true
+	enabled = true
 	if timeEnabled != "false" {
 		now := time.Now().In(loc)
 		weekday := now.Weekday()
@@ -27,12 +27,13 @@ func IsWithinTimeInterval(loc *time.Location, configuration *models.Configuratio
 				currentTimeInSeconds := hour*60*60 + minute*60 + second
 				if (currentTimeInSeconds >= start1 && currentTimeInSeconds <= end1) ||
 					(currentTimeInSeconds >= start2 && currentTimeInSeconds <= end2) {
-
+					log.Log.Info("conditions.timewindow.IsWithinTimeInterval(): time interval valid, enabling recording.")
 				} else {
-					log.Log.Info("ProcessMotion: Time interval not valid, disabling motion detection.")
+					log.Log.Info("conditions.timewindow.IsWithinTimeInterval(): time interval not valid, disabling recording.")
+					enabled = false
 				}
 			}
 		}
 	}
-	return detectMotion
+	return
 }
