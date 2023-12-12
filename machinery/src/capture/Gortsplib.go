@@ -90,20 +90,20 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	// parse URL
 	u, err := base.ParseURL(g.Url)
 	if err != nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+		log.Log.Debug("capture.golibrtsp.Connect(): " + err.Error())
 		return
 	}
 
 	// connect to the server
 	err = g.Client.Start(u.Scheme, u.Host)
 	if err != nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+		log.Log.Debug("capture.golibrtsp.Connect(): " + err.Error())
 	}
 
 	// find published medias
 	desc, _, err := g.Client.Describe(u)
 	if err != nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+		log.Log.Debug("capture.golibrtsp.Connect(): " + err.Error())
 		return
 	}
 
@@ -116,14 +116,14 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.VideoH264Media = mediH264
 	g.VideoH264Forma = formaH264
 	if mediH264 == nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "video media not found")
+		log.Log.Debug("capture.golibrtsp.Connect(): " + "video media not found")
 	} else {
 		// Get SPS from the SDP
 		// Calculate the width and height of the video
 		var sps h264.SPS
 		err = sps.Unmarshal(formaH264.SPS)
 		if err != nil {
-			log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+			log.Log.Debug("capture.golibrtsp.Connect(): " + err.Error())
 			return
 		}
 
@@ -169,14 +169,14 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.VideoH265Media = mediH265
 	g.VideoH265Forma = formaH265
 	if mediH265 == nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "video media not found")
+		log.Log.Info("capture.golibrtsp.Connect(): " + "video media not found")
 	} else {
 		// Get SPS from the SDP
 		// Calculate the width and height of the video
 		var sps h265.SPS
 		err = sps.Unmarshal(formaH265.SPS)
 		if err != nil {
-			log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + err.Error())
+			log.Log.Info("capture.golibrtsp.Connect(): " + err.Error())
 			return
 		}
 
@@ -223,7 +223,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.AudioG711Media = audioMedi
 	g.AudioG711Forma = audioForma
 	if audioMedi == nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "audio media not found")
+		log.Log.Info("capture.golibrtsp.Connect(): " + "audio media not found")
 	} else {
 
 		g.Streams = append(g.Streams, packets.Stream{
@@ -256,7 +256,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.AudioMPEG4Media = audioMediMPEG4
 	g.AudioMPEG4Forma = audioFormaMPEG4
 	if audioMediMPEG4 == nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).Connect(): " + "audio media not found")
+		log.Log.Info("capture.golibrtsp.Connect(): " + "audio media not found")
 	} else {
 		g.Streams = append(g.Streams, packets.Stream{
 			Name:          "AAC",
@@ -295,20 +295,20 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 	// parse URL
 	u, err := base.ParseURL(g.Url)
 	if err != nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).ConnectBackChannel(): " + err.Error())
+		log.Log.Error("capture.golibrtsp.ConnectBackChannel(): " + err.Error())
 		return
 	}
 
 	// connect to the server
 	err = g.Client.Start(u.Scheme, u.Host)
 	if err != nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).ConnectBackChannel(): " + err.Error())
+		log.Log.Error("capture.golibrtsp.ConnectBackChannel(): " + err.Error())
 	}
 
 	// find published medias
 	desc, _, err := g.Client.Describe(u)
 	if err != nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).ConnectBackChannel(): " + err.Error())
+		log.Log.Error("capture.golibrtsp.ConnectBackChannel(): " + err.Error())
 		return
 	}
 
@@ -319,7 +319,7 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 	g.AudioG711MediaBackChannel = audioMediBackChannel
 	g.AudioG711FormaBackChannel = audioFormaBackChannel
 	if audioMediBackChannel == nil {
-		log.Log.Debug("RTSPClient(Golibrtsp).ConnectBackChannel(): " + "audio backchannel not found")
+		log.Log.Info("capture.golibrtsp.ConnectBackChannel(): " + "audio backchannel not found")
 		err = errors.New("no audio backchannel found")
 	} else {
 		g.Streams = append(g.Streams, packets.Stream{
@@ -345,7 +345,7 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 
 // Start the RTSP client, and start reading packets.
 func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) (err error) {
-	log.Log.Debug("RTSPClient(Golibrtsp).Start(): started")
+	log.Log.Debug("capture.golibrtsp.Start(): started")
 
 	// called when a MULAW audio RTP packet arrives
 	if g.AudioG711Media != nil && g.AudioG711Forma != nil {
@@ -353,14 +353,14 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 			// decode timestamp
 			pts, ok := g.Client.PacketPTS(g.AudioG711Media, rtppkt)
 			if !ok {
-				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + "unable to get PTS")
+				log.Log.Warning("capture.golibrtsp.Start(): " + "unable to get PTS")
 				return
 			}
 
 			// extract LPCM samples from RTP packets
 			op, err := g.AudioG711Decoder.Decode(rtppkt)
 			if err != nil {
-				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+				log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
 				return
 			}
 
@@ -385,7 +385,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 			// decode timestamp
 			pts, ok := g.Client.PacketPTS(g.AudioMPEG4Media, rtppkt)
 			if !ok {
-				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + "unable to get PTS")
+				log.Log.Error("capture.golibrtsp.Start(): " + "unable to get PTS")
 				return
 			}
 
@@ -393,13 +393,13 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 			// extract access units from RTP packets
 			aus, err := g.AudioMPEG4Decoder.Decode(rtppkt)
 			if err != nil {
-				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+				log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
 				return
 			}
 
 			enc, err := WriteMPEG4Audio(g.AudioMPEG4Forma, aus)
 			if err != nil {
-				log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+				log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
 				return
 			}
 
@@ -436,7 +436,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 				// decode timestamp
 				pts, ok := g.Client.PacketPTS(g.VideoH264Media, rtppkt)
 				if !ok {
-					log.Log.Warning("RTSPClient(Golibrtsp).Start(): " + "unable to get PTS")
+					log.Log.Warning("capture.golibrtsp.Start(): " + "unable to get PTS")
 					return
 				}
 
@@ -447,7 +447,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 				au, errDecode := g.VideoH264Decoder.Decode(rtppkt)
 				if errDecode != nil {
 					if errDecode != rtph264.ErrNonStartingPacketAndNoPrevious && errDecode != rtph264.ErrMorePacketsNeeded {
-						log.Log.Warning("RTSPClient(Golibrtsp).Start(): " + errDecode.Error())
+						log.Log.Error("capture.golibrtsp.Start(): " + errDecode.Error())
 					}
 					return
 				}
@@ -481,7 +481,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 				// Convert to packet.
 				enc, err := h264.AnnexBMarshal(filteredAU)
 				if err != nil {
-					log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+					log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
 					return
 				}
 
@@ -521,7 +521,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 					// Increment packets, so we know the device
 					// is not blocking.
 					r := communication.PackageCounter.Load().(int64)
-					log.Log.Info("RTSPClient(Golibrtsp).Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
 					communication.PackageCounter.Store((r + 1) % 1000)
 					communication.LastPacketTimer.Store(time.Now().Unix())
 				}
@@ -547,7 +547,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 				// decode timestamp
 				pts, ok := g.Client.PacketPTS(g.VideoH265Media, rtppkt)
 				if !ok {
-					log.Log.Warning("RTSPClient(Golibrtsp).Start(): " + "unable to get PTS")
+					log.Log.Warning("capture.golibrtsp.Start(): " + "unable to get PTS")
 					return
 				}
 
@@ -558,7 +558,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 				au, errDecode := g.VideoH265Decoder.Decode(rtppkt)
 				if errDecode != nil {
 					if errDecode != rtph265.ErrNonStartingPacketAndNoPrevious && errDecode != rtph265.ErrMorePacketsNeeded {
-						log.Log.Warning("RTSPClient(Golibrtsp).Start(): " + errDecode.Error())
+						log.Log.Error("capture.golibrtsp.Start(): " + errDecode.Error())
 					}
 					return
 				}
@@ -601,7 +601,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 
 				enc, err := h264.AnnexBMarshal(au)
 				if err != nil {
-					log.Log.Error("RTSPClient(Golibrtsp).Start(): " + err.Error())
+					log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
 					return
 				}
 
@@ -631,7 +631,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 					// Increment packets, so we know the device
 					// is not blocking.
 					r := communication.PackageCounter.Load().(int64)
-					log.Log.Info("RTSPClient(Golibrtsp).Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
 					communication.PackageCounter.Store((r + 1) % 1000)
 					communication.LastPacketTimer.Store(time.Now().Unix())
 				}
@@ -653,13 +653,13 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 
 // Start the RTSP client, and start reading packets.
 func (g *Golibrtsp) StartBackChannel(ctx context.Context) (err error) {
-	log.Log.Info("RTSPClient(Golibrtsp).StartBackChannel(): started")
+	log.Log.Info("capture.golibrtsp.StartBackChannel(): started")
 	// Wait for a second, so we can be sure the stream is playing.
 	time.Sleep(1 * time.Second)
 	// Play the stream.
 	_, err = g.Client.Play(nil)
 	if err != nil {
-		log.Log.Error("RTSPClient(Golibrtsp).StartBackChannel(): " + err.Error())
+		log.Log.Error("capture.golibrtsp.StartBackChannel(): " + err.Error())
 	}
 	return
 }
@@ -668,7 +668,7 @@ func (g *Golibrtsp) WritePacket(pkt packets.Packet) error {
 	if g.HasBackChannel && g.AudioG711MediaBackChannel != nil {
 		err := g.Client.WritePacketRTP(g.AudioG711MediaBackChannel, pkt.Packet)
 		if err != nil {
-			log.Log.Debug("RTSPClient(Golibrtsp).WritePacket(): " + err.Error())
+			log.Log.Debug("capture.golibrtsp.WritePacket(): " + err.Error())
 			return err
 		}
 	}
@@ -691,11 +691,11 @@ func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
 	}
 	g.VideoDecoderMutex.Unlock()
 	if err != nil {
-		log.Log.Error("RTSPClient(Golibrtsp).DecodePacket(): " + err.Error())
+		log.Log.Error("capture.golibrtsp.DecodePacket(): " + err.Error())
 		return image.YCbCr{}, err
 	}
 	if img.Bounds().Empty() {
-		log.Log.Debug("RTSPClient(Golibrtsp).DecodePacket(): empty frame")
+		log.Log.Debug("capture.golibrtsp.DecodePacket(): empty frame")
 		return image.YCbCr{}, errors.New("Empty image")
 	}
 	return img, nil
@@ -707,21 +707,21 @@ func (g *Golibrtsp) DecodePacketRaw(pkt packets.Packet) (image.Gray, error) {
 	var err error
 	g.VideoDecoderMutex.Lock()
 	if len(pkt.Data) == 0 {
-		err = errors.New("RTSPClient(Golibrtsp).DecodePacketRaw(): empty frame")
+		err = errors.New("capture.golibrtsp.DecodePacketRaw(): empty frame")
 	} else if g.VideoH264Decoder != nil {
 		img, err = g.VideoH264FrameDecoder.decodeRaw(pkt.Data)
 	} else if g.VideoH265Decoder != nil {
 		img, err = g.VideoH265FrameDecoder.decodeRaw(pkt.Data)
 	} else {
-		err = errors.New("RTSPClient(Golibrtsp).DecodePacketRaw(): no decoder found, might already be closed")
+		err = errors.New("capture.golibrtsp.DecodePacketRaw(): no decoder found, might already be closed")
 	}
 	g.VideoDecoderMutex.Unlock()
 	if err != nil {
-		log.Log.Error("RTSPClient(Golibrtsp).DecodePacketRaw(): " + err.Error())
+		log.Log.Error("capture.golibrtsp.DecodePacketRaw(): " + err.Error())
 		return image.Gray{}, err
 	}
 	if img.Bounds().Empty() {
-		log.Log.Debug("RTSPClient(Golibrtsp).DecodePacketRaw(): empty image")
+		log.Log.Debug("capture.golibrtsp.DecodePacketRaw(): empty image")
 		return image.Gray{}, errors.New("Empty image")
 	}
 
