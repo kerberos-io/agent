@@ -7,6 +7,7 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	geo "github.com/kellydunn/golang-geo"
 	"github.com/kerberos-io/agent/machinery/src/capture"
+	"github.com/kerberos-io/agent/machinery/src/conditions"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
@@ -16,6 +17,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 
 	log.Log.Debug("ProcessMotion: started")
 	config := configuration.Config
+	loc, _ := time.LoadLocation(config.Timezone)
 
 	var isPixelChangeThresholdReached = false
 	var changesToReturn = 0
@@ -104,7 +106,6 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 
 			// Start the motion detection
 			i := 0
-			loc, _ := time.LoadLocation(config.Timezone)
 
 			for cursorError == nil {
 				pkt, cursorError = motionCursor.ReadPacket()
@@ -121,69 +122,48 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 
 				// Check if within time interval
 				detectMotion := true
-				timeEnabled := config.Time
-				if timeEnabled != "false" {
-					now := time.Now().In(loc)
-					weekday := now.Weekday()
-					hour := now.Hour()
-					minute := now.Minute()
-					second := now.Second()
-					if config.Timetable != nil && len(config.Timetable) > 0 {
-						timeInterval := config.Timetable[int(weekday)]
-						if timeInterval != nil {
-							start1 := timeInterval.Start1
-							end1 := timeInterval.End1
-							start2 := timeInterval.Start2
-							end2 := timeInterval.End2
-							currentTimeInSeconds := hour*60*60 + minute*60 + second
-							if (currentTimeInSeconds >= start1 && currentTimeInSeconds <= end1) ||
-								(currentTimeInSeconds >= start2 && currentTimeInSeconds <= end2) {
-
-							} else {
-								detectMotion = false
-								log.Log.Info("ProcessMotion: Time interval not valid, disabling motion detection.")
-							}
-						}
-					}
-				}
+				detectMotion = conditions.IsWithinTimeInterval(loc, configuration)
 
 				if config.Capture.Motion != "false" {
 
-					// Remember additional information about the result of findmotion
-					isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
-					if detectMotion && isPixelChangeThresholdReached {
+					if detectMotion {
 
-						// If offline mode is disabled, send a message to the hub
-						if config.Offline != "true" {
-							if mqttClient != nil {
-								if hubKey != "" {
-									message := models.Message{
-										Payload: models.Payload{
-											Action:   "motion",
-											DeviceId: configuration.Config.Key,
-											Value: map[string]interface{}{
-												"timestamp": time.Now().Unix(),
+						// Remember additional information about the result of findmotion
+						isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
+						if isPixelChangeThresholdReached {
+
+							// If offline mode is disabled, send a message to the hub
+							if config.Offline != "true" {
+								if mqttClient != nil {
+									if hubKey != "" {
+										message := models.Message{
+											Payload: models.Payload{
+												Action:   "motion",
+												DeviceId: configuration.Config.Key,
+												Value: map[string]interface{}{
+													"timestamp": time.Now().Unix(),
+												},
 											},
-										},
-									}
-									payload, err := models.PackageMQTTMessage(configuration, message)
-									if err == nil {
-										mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+										}
+										payload, err := models.PackageMQTTMessage(configuration, message)
+										if err == nil {
+											mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+										} else {
+											log.Log.Info("ProcessMotion: failed to package MQTT message: " + err.Error())
+										}
 									} else {
-										log.Log.Info("ProcessMotion: failed to package MQTT message: " + err.Error())
+										mqttClient.Publish("kerberos/agent/"+deviceKey, 2, false, "motion")
 									}
-								} else {
-									mqttClient.Publish("kerberos/agent/"+deviceKey, 2, false, "motion")
 								}
 							}
-						}
 
-						if config.Capture.Recording != "false" {
-							dataToPass := models.MotionDataPartial{
-								Timestamp:       time.Now().Unix(),
-								NumberOfChanges: changesToReturn,
+							if config.Capture.Recording != "false" {
+								dataToPass := models.MotionDataPartial{
+									Timestamp:       time.Now().Unix(),
+									NumberOfChanges: changesToReturn,
+								}
+								communication.HandleMotion <- dataToPass //Save data to the channel
 							}
-							communication.HandleMotion <- dataToPass //Save data to the channel
 						}
 					}
 

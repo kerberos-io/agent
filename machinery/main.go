@@ -10,6 +10,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/onvif"
 
 	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/routers"
@@ -74,21 +75,27 @@ func main() {
 	switch action {
 
 	case "version":
-		log.Log.Info("You are currrently running Kerberos Agent " + VERSION)
+		log.Log.Info("Main(): You are currrently running Kerberos Agent " + VERSION)
 
 	case "discover":
-		log.Log.Info(timeout)
+		// Convert duration to int
+		timeout, err := time.ParseDuration(timeout + "ms")
+		if err != nil {
+			log.Log.Fatal("Main(): could not parse timeout: " + err.Error())
+			return
+		}
+		onvif.Discover(timeout)
 
 	case "decrypt":
-		log.Log.Info("Decrypting: " + flag.Arg(0) + " with key: " + flag.Arg(1))
+		log.Log.Info("Main(): Decrypting: " + flag.Arg(0) + " with key: " + flag.Arg(1))
 		symmetricKey := []byte(flag.Arg(1))
 
 		if symmetricKey == nil || len(symmetricKey) == 0 {
-			log.Log.Fatal("Main: symmetric key should not be empty")
+			log.Log.Fatal("Main(): symmetric key should not be empty")
 			return
 		}
 		if len(symmetricKey) != 32 {
-			log.Log.Fatal("Main: symmetric key should be 32 bytes")
+			log.Log.Fatal("Main(): symmetric key should be 32 bytes")
 			return
 		}
 
@@ -133,9 +140,9 @@ func main() {
 				configuration.Config.Key = key
 				err := configService.StoreConfig(configDirectory, configuration.Config)
 				if err == nil {
-					log.Log.Info("Main: updated unique key for agent to: " + key)
+					log.Log.Info("Main(): updated unique key for agent to: " + key)
 				} else {
-					log.Log.Info("Main: something went wrong while trying to store key: " + key)
+					log.Log.Info("Main(): something went wrong while trying to store key: " + key)
 				}
 			}
 
@@ -162,6 +169,6 @@ func main() {
 			routers.StartWebserver(configDirectory, &configuration, &communication, &capture)
 		}
 	default:
-		log.Log.Error("Main: Sorry I don't understand :(")
+		log.Log.Error("Main(): Sorry I don't understand :(")
 	}
 }

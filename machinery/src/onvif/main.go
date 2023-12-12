@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	onvifc "github.com/cedricve/go-onvif"
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -19,6 +20,23 @@ import (
 	"github.com/kerberos-io/onvif/ptz"
 	xsd "github.com/kerberos-io/onvif/xsd/onvif"
 )
+
+func Discover(timeout time.Duration) {
+	log.Log.Info("onvif.Discover(): Discovering devices")
+	log.Log.Info("Waiting for " + timeout.String())
+	devices, err := onvifc.StartDiscovery(timeout)
+	if err != nil {
+		log.Log.Error("onvif.Discover(): " + err.Error())
+	} else {
+		for _, device := range devices {
+			hostname, _ := device.GetHostname()
+			log.Log.Info("onvif.Discover(): " + hostname.Name + " (" + device.XAddr + ")")
+		}
+		if len(devices) == 0 {
+			log.Log.Info("onvif.Discover(): No devices descovered\n")
+		}
+	}
+}
 
 func HandleONVIFActions(configuration *models.Configuration, communication *models.Communication) {
 	log.Log.Debug("onvif.HandleONVIFActions(): started")

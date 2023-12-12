@@ -198,14 +198,11 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		cameraSettings.SubRTSP != subRtspUrl ||
 		cameraSettings.Width != width ||
 		cameraSettings.Height != height {
-		//cameraSettings.Num != num ||
-		//cameraSettings.Denum != denum ||
-		//cameraSettings.Codec != videoStream.(av.VideoCodecData).Type() {
 
 		// TODO: this condition is used to reset the decoder when the camera settings change.
 		// The main idea is that you only set the decoder once, and then reuse it on each restart (no new memory allocation).
 		// However the stream settings of the camera might have been changed, and so the decoder might need to be reloaded.
-		// ....
+		// .... Not used for the moment ....
 
 		if cameraSettings.RTSP != "" && cameraSettings.SubRTSP != "" && cameraSettings.Initialized {
 			//decoder.Close()
@@ -226,10 +223,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		cameraSettings.SubRTSP = subRtspUrl
 		cameraSettings.Width = width
 		cameraSettings.Height = height
-		//cameraSettings.Framerate = float64(num) / float64(denum)
-		//cameraSettings.Num = num
-		//cameraSettings.Denum = denum
-		//cameraSettings.Codec = videoStream.(av.VideoCodecData).Type()
 		cameraSettings.Initialized = true
 	} else {
 		log.Log.Info("components.Kerberos.RunAgent(): camera settings did not change, keeping decoder")

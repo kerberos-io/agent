@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kerberos-io/agent/machinery/src/conditions"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -55,9 +56,7 @@ func CleanupRecordingDirectory(configDirectory string, configuration *models.Con
 func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient) {
 
 	config := configuration.Config
-
-	// Get the streams from the rtsp client.
-	//streams, _ := rtspClient.GetStreams()
+	loc, _ := time.LoadLocation(config.Timezone)
 
 	if config.Capture.Recording == "false" {
 		log.Log.Info("capture.HandleRecordStream(): disabled, we will not record anything.")
@@ -86,7 +85,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			// Do not do anything!
 			log.Log.Info("capture.HandleRecordStream() - continuous: Start continuous recording ")
 
-			loc, _ := time.LoadLocation(config.Timezone)
 			now = time.Now().Unix()
 			timestamp = now
 			start := false
@@ -99,7 +97,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			fullName := ""
 
 			// Get as much packets we need.
-			//for pkt := range packets {
 			var cursorError error
 			var pkt packets.Packet
 			var nextPkt packets.Packet
@@ -145,10 +142,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					// Cleanup muxer
 					start = false
-					//_, err = file.Write(cws.buf)
-					//if err != nil {
-					//	log.Log.Info("capture.HandleRecordStream() - continuous: " + err.Error())
-					//}
 					file.Close()
 					file = nil
 
@@ -191,29 +184,11 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// If not yet started and a keyframe, let's make a recording
 				if !start && pkt.IsKeyFrame {
 
-					// Check if within time interval
-					nowInTimezone := time.Now().In(loc)
-					weekday := nowInTimezone.Weekday()
-					hour := nowInTimezone.Hour()
-					minute := nowInTimezone.Minute()
-					second := nowInTimezone.Second()
-					timeEnabled := config.Time
-					timeInterval := config.Timetable[int(weekday)]
-
-					if timeEnabled == "true" && timeInterval != nil {
-						start1 := timeInterval.Start1
-						end1 := timeInterval.End1
-						start2 := timeInterval.Start2
-						end2 := timeInterval.End2
-						currentTimeInSeconds := hour*60*60 + minute*60 + second
-						if (currentTimeInSeconds >= start1 && currentTimeInSeconds <= end1) ||
-							(currentTimeInSeconds >= start2 && currentTimeInSeconds <= end2) {
-
-						} else {
-							log.Log.Debug("capture.HandleRecordStream() - continuous: Disabled: no continuous recording at this moment. Not within specified time interval.")
-							time.Sleep(5 * time.Second)
-							continue
-						}
+					makeRecording := conditions.IsWithinTimeInterval(loc, configuration)
+					if !makeRecording {
+						log.Log.Debug("capture.HandleRecordStream() - continuous: Disabled: no continuous recording at this moment. Not within specified time interval.")
+						time.Sleep(5 * time.Second)
+						continue
 					}
 
 					start = true
@@ -311,10 +286,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					// Cleanup muxer
 					start = false
-					//_, err = file.Write(cws.buf)
-					//if err != nil {
-					//	log.Log.Info("capture.HandleRecordStream() - continuous: " + err.Error())
-					//}
 					file.Close()
 					file = nil
 
@@ -501,12 +472,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				lastDuration = pkt.Time
 				lastRecordingTime = time.Now().Unix()
-
-				// Cleanup muxer
-				//_, err := file.Write(cws.buf)
-				//if err != nil {
-				//	panic(err)
-				//}
 				file.Close()
 				file = nil
 
@@ -663,7 +628,6 @@ func Base64Image(captureDevice *Capture, communication *models.Communication) st
 			break
 		}
 	}
-
 	return encodedImage
 }
 
