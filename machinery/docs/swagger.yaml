@@ -379,7 +379,7 @@ paths:
         name: cameraConfig
         required: true
         schema:
-          $ref: '#/definitions/models.IPCamera'
+          $ref: '#/definitions/models.OnvifPreset'
       responses:
         "200":
           description: OK

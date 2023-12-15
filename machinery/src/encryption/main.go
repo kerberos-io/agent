@@ -14,27 +14,15 @@ import (
 	"hash"
 )
 
-// DecryptWithPrivateKey decrypts data with private key
 func DecryptWithPrivateKey(ciphertext string, privateKey *rsa.PrivateKey) ([]byte, error) {
-
-	// decode our encrypted string into cipher bytes
 	cipheredValue, _ := base64.StdEncoding.DecodeString(ciphertext)
-
-	// decrypt the data
 	out, err := rsa.DecryptPKCS1v15(nil, privateKey, cipheredValue)
-
 	return out, err
 }
 
-// SignWithPrivateKey signs data with private key
 func SignWithPrivateKey(data []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
-
-	// hash the data with sha256
 	hashed := sha256.Sum256(data)
-
-	// sign the data
 	signature, err := rsa.SignPKCS1v15(nil, privateKey, crypto.SHA256, hashed[:])
-
 	return signature, err
 }
 
@@ -59,16 +47,10 @@ func AesEncrypt(content []byte, password string) ([]byte, error) {
 	copy(cipherText[:8], []byte("Salted__"))
 	copy(cipherText[8:16], salt)
 	copy(cipherText[16:], cipherBytes)
-
-	//cipherText := base64.StdEncoding.EncodeToString(data)
 	return cipherText, nil
 }
 
 func AesDecrypt(cipherText []byte, password string) ([]byte, error) {
-	//data, err := base64.StdEncoding.DecodeString(cipherText)
-	//if err != nil {
-	//	return nil, err
-	//}
 	if string(cipherText[:8]) != "Salted__" {
 		return nil, errors.New("invalid crypto js aes encryption")
 	}
@@ -92,8 +74,6 @@ func AesDecrypt(cipherText []byte, password string) ([]byte, error) {
 	return result, nil
 }
 
-// https://stackoverflow.com/questions/27677236/encryption-in-javascript-and-decryption-with-php/27678978#27678978
-// https://github.com/brix/crypto-js/blob/8e6d15bf2e26d6ff0af5277df2604ca12b60a718/src/evpkdf.js#L55
 func EvpKDF(password []byte, salt []byte, keySize int, iterations int, hashAlgorithm string) ([]byte, error) {
 	var block []byte
 	var hasher hash.Hash
@@ -124,7 +104,6 @@ func EvpKDF(password []byte, salt []byte, keySize int, iterations int, hashAlgor
 }
 
 func DefaultEvpKDF(password []byte, salt []byte) (key []byte, iv []byte, err error) {
-	// https://github.com/brix/crypto-js/blob/8e6d15bf2e26d6ff0af5277df2604ca12b60a718/src/cipher-core.js#L775
 	keySize := 256 / 32
 	ivSize := 128 / 32
 	derivedKeyBytes, err := EvpKDF(password, salt, keySize+ivSize, 1, "md5")
@@ -134,7 +113,6 @@ func DefaultEvpKDF(password []byte, salt []byte) (key []byte, iv []byte, err err
 	return derivedKeyBytes[:keySize*4], derivedKeyBytes[keySize*4:], nil
 }
 
-// https://stackoverflow.com/questions/41579325/golang-how-do-i-decrypt-with-des-cbc-and-pkcs7
 func PKCS5UnPadding(src []byte) []byte {
 	length := len(src)
 	unpadding := int(src[length-1])

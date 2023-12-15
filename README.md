@@ -28,8 +28,8 @@ Kerberos Agent is an isolated and scalable video (surveillance) management agent
 
 ## :thinking: Prerequisites
 
-- An IP camera which supports a RTSP H264 encoded stream,
-  - (or) a USB camera, Raspberry Pi camera or other camera, that [you can transform to a valid RTSP H264 stream](https://github.com/kerberos-io/camera-to-rtsp).
+- An IP camera which supports a RTSP H264 or H265 encoded stream,
+  - (or) a USB camera, Raspberry Pi camera or other camera, that [you can transform to a valid RTSP H264 or H265 stream](https://github.com/kerberos-io/camera-to-rtsp).
 - Any hardware (ARMv6, ARMv7, ARM64, AMD) that can run a binary or container, for example: a Raspberry Pi, NVidia Jetson, Intel NUC, a VM, Bare metal machine or a full blown Kubernetes cluster.
 
 ## :video_camera: Is my camera working?
@@ -104,19 +104,21 @@ This repository contains everything you'll need to know about our core product, 
 
 - Low memory and CPU usage.
 - Simplified and modern user interface.
-- Multi architecture (ARMv7, ARMv8, amd64, etc).
-- Multi camera support: IP Cameras (H264), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp).
+- Multi architecture (ARMv7, ARMv8, amd64, etc).).
+- Multi stream, for example recording in H265, live streaming and motion detection in H264.
+- Multi camera support: IP Cameras (H264 and H265), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp
 - Single camera per instance (e.g. one container per camera).
-- Primary and secondary stream setup (record full-res, stream low-res).
-- Low resolution streaming through MQTT and full resolution streaming through WebRTC.
-- End-to-end encryption through MQTT using RSA and AES.
-- Ability to specifiy conditions: offline mode, motion region, time table, continuous recording, etc.
-- Post- and pre-recording on motion detection.
+- Low resolution streaming through MQTT and high resolution streaming through WebRTC (only supports H264/PCM).
+- Backchannel audio from Kerberos Hub to IP camera (requires PCM ULAW codec)
+- Audio (AAC) and video (H264/H265) recording in MP4 container.
+- End-to-end encryption through MQTT using RSA and AES (livestreaming, ONVIF, remote configuration, etc)
+- Conditional recording: offline mode, motion region, time table, continuous recording, webhook condition etc.
+- Post- and pre-recording for motion detection.
 - Encryption at rest using AES-256-CBC.
-- Ability to create fragmented recordings, and streaming though HLS fMP4.
+- Ability to create fragmented recordings, and streaming through HLS fMP4.
 - [Deploy where you want](#how-to-run-and-deploy-a-kerberos-agent) with the tools you use: `docker`, `docker compose`, `ansible`, `terraform`, `kubernetes`, etc.
 - Cloud storage/persistance: Kerberos Hub, Kerberos Vault and Dropbox. [(WIP: Minio, Storj, Google Drive, FTP etc.)](https://github.com/kerberos-io/agent/issues/95)
-- WIP: Integrations (Webhooks, MQTT, Script, etc).
+- Outputs: trigger an integration (Webhooks, MQTT, Script, etc) when a specific event (motion detection or start recording ) occurs
 - REST API access and documentation through Swagger (trigger recording, update configuration, etc).
 - MIT License
 
@@ -192,6 +194,7 @@ Next to attaching the configuration file, it is also possible to override the co
 
 | Name                                    | Description                                                                                     | Default Value                  |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
+| `LOG_LEVEL`                             | Level for logging, could be "info", "warning", "debug", "error" or "fatal".                     | "info"                         |
 | `AGENT_MODE`                            | You can choose to run this in 'release' for production, and or 'demo' for showcasing.           | "release"                      |
 | `AGENT_TLS_INSECURE`                    | Specify if you want to use `InsecureSkipVerify` for the internal HTTP client.                   | "false"                        |
 | `AGENT_USERNAME`                        | The username used to authenticate against the Kerberos Agent login page.                        | "root"                         |

@@ -14,9 +14,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"github.com/kerberos-io/onvif/media"
-
 	"github.com/kerberos-io/onvif"
+	"github.com/kerberos-io/onvif/device"
+	"github.com/kerberos-io/onvif/media"
 	"github.com/kerberos-io/onvif/ptz"
 	xsd "github.com/kerberos-io/onvif/xsd/onvif"
 )
@@ -718,9 +718,9 @@ func ContinuousZoom(device *onvif.Device, configuration ptz.GetConfigurationsRes
 	return err
 }
 
-func GetCapabilitiesFromDevice(device *onvif.Device) []string {
+func GetCapabilitiesFromDevice(dev *onvif.Device) []string {
 	var capabilities []string
-	services := device.GetServices()
+	services := dev.GetServices()
 	for key, _ := range services {
 		log.Log.Debug("GetCapabilitiesFromDevice: has key: " + key)
 		if key != "" {
@@ -731,6 +731,34 @@ func GetCapabilitiesFromDevice(device *onvif.Device) []string {
 			}
 		}
 	}
+
+	var getCapabilitiesResponse device.GetCapabilitiesResponse
+	resp, err := dev.CallMethod(device.GetCapabilities{
+		Category: "All",
+	})
+
+	var b []byte
+	if resp != nil {
+		b, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+	}
+	if err == nil {
+		stringBody := string(b)
+		decodedXML, et, err := getXMLNode(stringBody, "GetCapabilitiesResponse")
+		if err != nil {
+			log.Log.Error("GetCapabilitiesResponse: " + err.Error())
+			//return err
+		} else {
+			if err := decodedXML.DecodeElement(&getCapabilitiesResponse, et); err != nil {
+				log.Log.Error("GetCapabilitiesResponse: " + err.Error())
+				//	return err
+			}
+			//return err
+		}
+	} else {
+		log.Log.Error("GoToPresetFromDevice: " + err.Error())
+	}
+
 	return capabilities
 }
 
@@ -909,12 +937,12 @@ func VerifyOnvifConnection(c *gin.Context) {
 	}
 }
 
-func GetDigitalInputs(device *onvif.Device) (ptz.GetConfigurationsResponse, error) {
-	// We'll try to receive the PTZ configurations from the server
-	var configurations ptz.GetConfigurationsResponse
+func GetRelayOutputs(dev *onvif.Device) (device.GetRelayOutputsResponse, error) {
+	// We'll try to receive the relay outputs from the server
+	var relayoutputs device.GetRelayOutputsResponse
 
 	// Get the PTZ configurations from the device
-	resp, err := device.CallMethod(ptz.GetConfigurations{})
+	resp, err := dev.CallMethod(device.GetRelayOutputs{})
 	var b []byte
 	if resp != nil {
 		b, err = io.ReadAll(resp.Body)
@@ -924,19 +952,19 @@ func GetDigitalInputs(device *onvif.Device) (ptz.GetConfigurationsResponse, erro
 	if err == nil {
 		if err == nil {
 			stringBody := string(b)
-			decodedXML, et, err := getXMLNode(stringBody, "GetConfigurationsResponse")
+			decodedXML, et, err := getXMLNode(stringBody, "GetRelayOutputsResponse")
 			if err != nil {
-				log.Log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
-				return configurations, err
+				log.Log.Error("onvif.main.GetRelayOutputs(): " + err.Error())
+				return relayoutputs, err
 			} else {
-				if err := decodedXML.DecodeElement(&configurations, et); err != nil {
-					log.Log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
-					return configurations, err
+				if err := decodedXML.DecodeElement(&relayoutputs, et); err != nil {
+					log.Log.Debug("onvif.main.GetRelayOutputs(): " + err.Error())
+					return relayoutputs, err
 				}
 			}
 		}
 	}
-	return configurations, err
+	return relayoutputs, err
 }
 
 func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, error) {

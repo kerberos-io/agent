@@ -361,7 +361,7 @@ func GoToOnvifPreset(c *gin.Context) {
 // @in header
 // @name Authorization
 // @Tags camera
-// @Param cameraConfig body models.IPCamera true "Camera Config"
+// @Param cameraConfig body models.OnvifPreset true "Camera Config"
 // @Summary Will get the digital inputs from the ONVIF device.
 // @Description Will get the digital inputs from the ONVIF device.
 // @Success 200 {object} models.APIResponse
@@ -386,10 +386,10 @@ func DoGetDigitalInputs(c *gin.Context) {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			inputs, err := onvif.GetDigitalInputs(device)
+			outputs, err := onvif.GetRelayOutputs(device)
 			if err == nil {
 				c.JSON(200, gin.H{
-					"data": inputs,
+					"data": outputs,
 				})
 			} else {
 				c.JSON(400, gin.H{

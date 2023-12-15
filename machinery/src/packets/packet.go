@@ -8,10 +8,7 @@ import (
 
 // Packet represents an RTP Packet
 type Packet struct {
-	// for Gortsplib library
-	Packet *rtp.Packet
-
-	// for JOY4 and Gortsplib library
+	Packet          *rtp.Packet
 	IsAudio         bool          // packet is audio
 	IsVideo         bool          // packet is video
 	IsKeyFrame      bool          // video packet is key frame

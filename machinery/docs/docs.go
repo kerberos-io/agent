@@ -103,7 +103,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.IPCamera"
+                            "$ref": "#/definitions/models.OnvifPreset"
                         }
                     }
                 ],

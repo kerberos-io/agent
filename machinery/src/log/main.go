@@ -12,7 +12,6 @@ import (
 // The logging library being used everywhere.
 var Log = Logging{
 	Logger: "logrus",
-	Level:  "debug",
 }
 
 // -----------------
@@ -45,7 +44,7 @@ func ConfigureGoLogging(configDirectory string, timezone *time.Location) {
 // This a logrus
 // -> github.com/sirupsen/logrus
 
-func ConfigureLogrus(timezone *time.Location) {
+func ConfigureLogrus(level string, timezone *time.Location) {
 	// Log as JSON instead of the default ASCII formatter.
 	logrus.SetFormatter(LocalTimeZoneFormatter{
 		Timezone:  timezone,
@@ -57,7 +56,17 @@ func ConfigureLogrus(timezone *time.Location) {
 	logrus.SetOutput(os.Stdout)
 
 	// Only log the warning severity or above.
-	logrus.SetLevel(logrus.InfoLevel)
+	logLevel := logrus.InfoLevel
+	if level == "error" {
+		logLevel = logrus.ErrorLevel
+	} else if level == "debug" {
+		logLevel = logrus.DebugLevel
+	} else if level == "fatal" {
+		logLevel = logrus.FatalLevel
+	} else if level == "warning" {
+		logLevel = logrus.WarnLevel
+	}
+	logrus.SetLevel(logLevel)
 }
 
 type LocalTimeZoneFormatter struct {
@@ -72,15 +81,14 @@ func (u LocalTimeZoneFormatter) Format(e *logrus.Entry) ([]byte, error) {
 
 type Logging struct {
 	Logger string
-	Level  string
 }
 
-func (self *Logging) Init(configDirectory string, timezone *time.Location) {
+func (self *Logging) Init(level string, configDirectory string, timezone *time.Location) {
 	switch self.Logger {
 	case "go-logging":
 		ConfigureGoLogging(configDirectory, timezone)
 	case "logrus":
-		ConfigureLogrus(timezone)
+		ConfigureLogrus(level, timezone)
 	default:
 	}
 }
