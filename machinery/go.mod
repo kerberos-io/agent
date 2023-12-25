@@ -1,10 +1,10 @@
 module github.com/kerberos-io/agent/machinery
 
-go 1.19
+go 1.20
 
 //replace github.com/kerberos-io/joy4 v1.0.63 => ../../../../github.com/kerberos-io/joy4
 
-replace github.com/kerberos-io/onvif v0.0.9 => ../../../../github.com/kerberos-io/onvif
+//replace github.com/kerberos-io/onvif v0.0.9 => ../../../../github.com/kerberos-io/onvif
 
 require (
 	github.com/InVisionApp/conjungo v1.1.0
@@ -25,7 +25,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/kellydunn/golang-geo v0.7.0
 	github.com/kerberos-io/joy4 v1.0.64
-	github.com/kerberos-io/onvif v0.0.9
+	github.com/kerberos-io/onvif v0.0.10
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pion/rtp v1.8.3
