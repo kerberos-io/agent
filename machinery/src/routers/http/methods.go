@@ -361,23 +361,23 @@ func GoToOnvifPreset(c *gin.Context) {
 // @in header
 // @name Authorization
 // @Tags camera
-// @Param cameraConfig body models.OnvifPreset true "Camera Config"
+// @Param config body models.OnvifCredentials true "OnvifCredentials"
 // @Summary Will get the digital inputs from the ONVIF device.
 // @Description Will get the digital inputs from the ONVIF device.
 // @Success 200 {object} models.APIResponse
 func DoGetDigitalInputs(c *gin.Context) {
-	var onvifPreset models.OnvifPreset
-	err := c.BindJSON(&onvifPreset)
+	var onvifCredentials models.OnvifCredentials
+	err := c.BindJSON(&onvifCredentials)
 
-	if err == nil || onvifPreset.OnvifCredentials.ONVIFXAddr != "" {
+	if err == nil && onvifCredentials.ONVIFXAddr != "" {
 
 		configuration := &models.Configuration{
 			Config: models.Config{
 				Capture: models.Capture{
 					IPCamera: models.IPCamera{
-						ONVIFXAddr:    onvifPreset.OnvifCredentials.ONVIFXAddr,
-						ONVIFUsername: onvifPreset.OnvifCredentials.ONVIFUsername,
-						ONVIFPassword: onvifPreset.OnvifCredentials.ONVIFPassword,
+						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
+						ONVIFUsername: onvifCredentials.ONVIFUsername,
+						ONVIFPassword: onvifCredentials.ONVIFPassword,
 					},
 				},
 			},
@@ -386,7 +386,136 @@ func DoGetDigitalInputs(c *gin.Context) {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			outputs, err := onvif.GetRelayOutputs(device)
+			events, err := onvif.GetEventMessages(device)
+			if err == nil {
+				// Get the digital inputs from the device
+				var inputs []onvif.ONVIFEvents
+				for _, event := range events {
+					if event.Type == "input" {
+						inputs = append(inputs, event)
+					}
+				}
+
+				c.JSON(200, gin.H{
+					"data": inputs,
+				})
+			} else {
+				c.JSON(400, gin.H{
+					"data": "Something went wrong: " + err.Error(),
+				})
+			}
+		} else {
+			c.JSON(400, gin.H{
+				"data": "Something went wrong: " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
+		})
+	}
+}
+
+// DoGetRelayOutputs godoc
+// @Router /api/camera/onvif/outputs [post]
+// @ID get-relay-outputs
+// @Security Bearer
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @Tags camera
+// @Param config body models.OnvifCredentials true "OnvifCredentials"
+// @Summary Will get the relay outputs from the ONVIF device.
+// @Description Will get the relay outputs from the ONVIF device.
+// @Success 200 {object} models.APIResponse
+func DoGetRelayOutputs(c *gin.Context) {
+	var onvifCredentials models.OnvifCredentials
+	err := c.BindJSON(&onvifCredentials)
+
+	if err == nil && onvifCredentials.ONVIFXAddr != "" {
+
+		configuration := &models.Configuration{
+			Config: models.Config{
+				Capture: models.Capture{
+					IPCamera: models.IPCamera{
+						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
+						ONVIFUsername: onvifCredentials.ONVIFUsername,
+						ONVIFPassword: onvifCredentials.ONVIFPassword,
+					},
+				},
+			},
+		}
+
+		cameraConfiguration := configuration.Config.Capture.IPCamera
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		if err == nil {
+			events, err := onvif.GetEventMessages(device)
+			if err == nil {
+				// Get the digital inputs from the device
+				var outputs []onvif.ONVIFEvents
+				for _, event := range events {
+					if event.Type == "output" {
+						outputs = append(outputs, event)
+					}
+				}
+				c.JSON(200, gin.H{
+					"data": outputs,
+				})
+			} else {
+				c.JSON(400, gin.H{
+					"data": "Something went wrong: " + err.Error(),
+				})
+			}
+		} else {
+			c.JSON(400, gin.H{
+				"data": "Something went wrong: " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
+		})
+	}
+}
+
+// DoTriggerRelayOutput godoc
+// @Router /api/camera/onvif/outputs/{output} [post]
+// @ID trigger-relay-output
+// @Security Bearer
+// @securityDefinitions.apikey Bearer
+// @in header
+// @name Authorization
+// @Tags camera
+// @Param config body models.OnvifCredentials true "OnvifCredentials"
+// @Param output path string true "Output"
+// @Summary Will trigger the relay output from the ONVIF device.
+// @Description Will trigger the relay output from the ONVIF device.
+// @Success 200 {object} models.APIResponse
+func DoTriggerRelayOutput(c *gin.Context) {
+	var onvifCredentials models.OnvifCredentials
+	err := c.BindJSON(&onvifCredentials)
+
+	// Get the output from the url
+	output := c.Param("output")
+
+	if err == nil && onvifCredentials.ONVIFXAddr != "" && output != "" {
+
+		configuration := &models.Configuration{
+			Config: models.Config{
+				Capture: models.Capture{
+					IPCamera: models.IPCamera{
+						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
+						ONVIFUsername: onvifCredentials.ONVIFUsername,
+						ONVIFPassword: onvifCredentials.ONVIFPassword,
+					},
+				},
+			},
+		}
+
+		cameraConfiguration := configuration.Config.Capture.IPCamera
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		if err == nil {
+			outputs, err := onvif.TriggerRelayOutput(device, output)
 			if err == nil {
 				c.JSON(200, gin.H{
 					"data": outputs,

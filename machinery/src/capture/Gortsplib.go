@@ -90,20 +90,20 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	// parse URL
 	u, err := base.ParseURL(g.Url)
 	if err != nil {
-		log.Log.Debug("capture.golibrtsp.Connect(): " + err.Error())
+		log.Log.Debug("capture.golibrtsp.Connect(ParseURL): " + err.Error())
 		return
 	}
 
 	// connect to the server
 	err = g.Client.Start(u.Scheme, u.Host)
 	if err != nil {
-		log.Log.Debug("capture.golibrtsp.Connect(): " + err.Error())
+		log.Log.Debug("capture.golibrtsp.Connect(Start): " + err.Error())
 	}
 
 	// find published medias
 	desc, _, err := g.Client.Describe(u)
 	if err != nil {
-		log.Log.Debug("capture.golibrtsp.Connect(): " + err.Error())
+		log.Log.Debug("capture.golibrtsp.Connect(Describe): " + err.Error())
 		return
 	}
 
@@ -116,50 +116,51 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.VideoH264Media = mediH264
 	g.VideoH264Forma = formaH264
 	if mediH264 == nil {
-		log.Log.Debug("capture.golibrtsp.Connect(): " + "video media not found")
+		log.Log.Debug("capture.golibrtsp.Connect(H264): " + "video media not found")
 	} else {
-		// Get SPS from the SDP
-		// Calculate the width and height of the video
-		var sps h264.SPS
-		err = sps.Unmarshal(formaH264.SPS)
-		if err != nil {
-			log.Log.Debug("capture.golibrtsp.Connect(): " + err.Error())
-			return
-		}
-
-		g.Streams = append(g.Streams, packets.Stream{
-			Name:          formaH264.Codec(),
-			IsVideo:       true,
-			IsAudio:       false,
-			SPS:           formaH264.SPS,
-			PPS:           formaH264.PPS,
-			Width:         sps.Width(),
-			Height:        sps.Height(),
-			FPS:           sps.FPS(),
-			IsBackChannel: false,
-		})
-
-		// Set the index for the video
-		g.VideoH264Index = int8(len(g.Streams)) - 1
-
-		// setup RTP/H264 -> H264 decoder
-		rtpDec, err := formaH264.CreateDecoder()
-		if err != nil {
-			// Something went wrong .. Do something
-		}
-		g.VideoH264Decoder = rtpDec
-
-		// setup H264 -> raw frames decoder
-		frameDec, err := newDecoder("H264")
-		if err != nil {
-			// Something went wrong .. Do something
-		}
-		g.VideoH264FrameDecoder = frameDec
-
 		// setup a video media
 		_, err = g.Client.Setup(desc.BaseURL, mediH264, 0, 0)
 		if err != nil {
 			// Something went wrong .. Do something
+			log.Log.Error("capture.golibrtsp.Connect(H264): " + err.Error())
+		} else {
+			// Get SPS from the SDP
+			// Calculate the width and height of the video
+			var sps h264.SPS
+			err = sps.Unmarshal(formaH264.SPS)
+			if err != nil {
+				log.Log.Debug("capture.golibrtsp.Connect(H264): " + err.Error())
+				return
+			}
+
+			g.Streams = append(g.Streams, packets.Stream{
+				Name:          formaH264.Codec(),
+				IsVideo:       true,
+				IsAudio:       false,
+				SPS:           formaH264.SPS,
+				PPS:           formaH264.PPS,
+				Width:         sps.Width(),
+				Height:        sps.Height(),
+				FPS:           sps.FPS(),
+				IsBackChannel: false,
+			})
+
+			// Set the index for the video
+			g.VideoH264Index = int8(len(g.Streams)) - 1
+
+			// setup RTP/H264 -> H264 decoder
+			rtpDec, err := formaH264.CreateDecoder()
+			if err != nil {
+				// Something went wrong .. Do something
+			}
+			g.VideoH264Decoder = rtpDec
+
+			// setup H264 -> raw frames decoder
+			frameDec, err := newDecoder("H264")
+			if err != nil {
+				// Something went wrong .. Do something
+			}
+			g.VideoH264FrameDecoder = frameDec
 		}
 	}
 
@@ -169,51 +170,52 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.VideoH265Media = mediH265
 	g.VideoH265Forma = formaH265
 	if mediH265 == nil {
-		log.Log.Info("capture.golibrtsp.Connect(): " + "video media not found")
+		log.Log.Info("capture.golibrtsp.Connect(H265): " + "video media not found")
 	} else {
-		// Get SPS from the SDP
-		// Calculate the width and height of the video
-		var sps h265.SPS
-		err = sps.Unmarshal(formaH265.SPS)
-		if err != nil {
-			log.Log.Info("capture.golibrtsp.Connect(): " + err.Error())
-			return
-		}
-
-		g.Streams = append(g.Streams, packets.Stream{
-			Name:          formaH265.Codec(),
-			IsVideo:       true,
-			IsAudio:       false,
-			SPS:           formaH265.SPS,
-			PPS:           formaH265.PPS,
-			VPS:           formaH265.VPS,
-			Width:         sps.Width(),
-			Height:        sps.Height(),
-			FPS:           sps.FPS(),
-			IsBackChannel: false,
-		})
-
-		// Set the index for the video
-		g.VideoH265Index = int8(len(g.Streams)) - 1
-
-		// setup RTP/H265 -> H265 decoder
-		rtpDec, err := formaH265.CreateDecoder()
-		if err != nil {
-			// Something went wrong .. Do something
-		}
-		g.VideoH265Decoder = rtpDec
-
-		// setup H265 -> raw frames decoder
-		frameDec, err := newDecoder("H265")
-		if err != nil {
-			// Something went wrong .. Do something
-		}
-		g.VideoH265FrameDecoder = frameDec
-
 		// setup a video media
 		_, err = g.Client.Setup(desc.BaseURL, mediH265, 0, 0)
 		if err != nil {
 			// Something went wrong .. Do something
+			log.Log.Error("capture.golibrtsp.Connect(H265): " + err.Error())
+		} else {
+			// Get SPS from the SDP
+			// Calculate the width and height of the video
+			var sps h265.SPS
+			err = sps.Unmarshal(formaH265.SPS)
+			if err != nil {
+				log.Log.Info("capture.golibrtsp.Connect(H265): " + err.Error())
+				return
+			}
+
+			g.Streams = append(g.Streams, packets.Stream{
+				Name:          formaH265.Codec(),
+				IsVideo:       true,
+				IsAudio:       false,
+				SPS:           formaH265.SPS,
+				PPS:           formaH265.PPS,
+				VPS:           formaH265.VPS,
+				Width:         sps.Width(),
+				Height:        sps.Height(),
+				FPS:           sps.FPS(),
+				IsBackChannel: false,
+			})
+
+			// Set the index for the video
+			g.VideoH265Index = int8(len(g.Streams)) - 1
+
+			// setup RTP/H265 -> H265 decoder
+			rtpDec, err := formaH265.CreateDecoder()
+			if err != nil {
+				// Something went wrong .. Do something
+			}
+			g.VideoH265Decoder = rtpDec
+
+			// setup H265 -> raw frames decoder
+			frameDec, err := newDecoder("H265")
+			if err != nil {
+				// Something went wrong .. Do something
+			}
+			g.VideoH265FrameDecoder = frameDec
 		}
 	}
 
@@ -223,62 +225,67 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.AudioG711Media = audioMedi
 	g.AudioG711Forma = audioForma
 	if audioMedi == nil {
-		log.Log.Info("capture.golibrtsp.Connect(): " + "audio media not found")
+		log.Log.Info("capture.golibrtsp.Connect(G711): " + "audio media not found")
 	} else {
-
-		g.Streams = append(g.Streams, packets.Stream{
-			Name:          "PCM_MULAW",
-			IsVideo:       false,
-			IsAudio:       true,
-			IsBackChannel: false,
-		})
-
-		// Set the index for the audio
-		g.AudioG711Index = int8(len(g.Streams)) - 1
-
-		// create decoder
-		audiortpDec, err := audioForma.CreateDecoder()
-		if err != nil {
-			// Something went wrong .. Do something
-		}
-		g.AudioG711Decoder = audiortpDec
-
 		// setup a audio media
 		_, err = g.Client.Setup(desc.BaseURL, audioMedi, 0, 0)
 		if err != nil {
 			// Something went wrong .. Do something
+			log.Log.Error("capture.golibrtsp.Connect(G711): " + err.Error())
+		} else {
+			// create decoder
+			audiortpDec, err := audioForma.CreateDecoder()
+			if err != nil {
+				// Something went wrong .. Do something
+				log.Log.Error("capture.golibrtsp.Connect(G711): " + err.Error())
+			} else {
+				g.AudioG711Decoder = audiortpDec
+
+				g.Streams = append(g.Streams, packets.Stream{
+					Name:          "PCM_MULAW",
+					IsVideo:       false,
+					IsAudio:       true,
+					IsBackChannel: false,
+				})
+
+				// Set the index for the audio
+				g.AudioG711Index = int8(len(g.Streams)) - 1
+			}
 		}
 	}
 
 	// Look for audio stream.
-	// find the G711 media and format
+	// find the AAC media and format
 	audioFormaMPEG4, audioMediMPEG4 := FindMPEG4Audio(desc, false)
 	g.AudioMPEG4Media = audioMediMPEG4
 	g.AudioMPEG4Forma = audioFormaMPEG4
 	if audioMediMPEG4 == nil {
-		log.Log.Info("capture.golibrtsp.Connect(): " + "audio media not found")
+		log.Log.Info("capture.golibrtsp.Connect(MPEG4): " + "audio media not found")
 	} else {
-		g.Streams = append(g.Streams, packets.Stream{
-			Name:          "AAC",
-			IsVideo:       false,
-			IsAudio:       true,
-			IsBackChannel: false,
-		})
-
-		// Set the index for the audio
-		g.AudioMPEG4Index = int8(len(g.Streams)) - 1
-
-		// create decoder
-		audiortpDec, err := audioFormaMPEG4.CreateDecoder()
-		if err != nil {
-			// Something went wrong .. Do something
-		}
-		g.AudioMPEG4Decoder = audiortpDec
-
 		// setup a audio media
 		_, err = g.Client.Setup(desc.BaseURL, audioMediMPEG4, 0, 0)
 		if err != nil {
 			// Something went wrong .. Do something
+			log.Log.Error("capture.golibrtsp.Connect(MPEG4): " + err.Error())
+		} else {
+			g.Streams = append(g.Streams, packets.Stream{
+				Name:          "AAC",
+				IsVideo:       false,
+				IsAudio:       true,
+				IsBackChannel: false,
+			})
+
+			// Set the index for the audio
+			g.AudioMPEG4Index = int8(len(g.Streams)) - 1
+
+			// create decoder
+			audiortpDec, err := audioFormaMPEG4.CreateDecoder()
+			if err != nil {
+				// Something went wrong .. Do something
+				log.Log.Error("capture.golibrtsp.Connect(MPEG4): " + err.Error())
+			}
+			g.AudioMPEG4Decoder = audiortpDec
+
 		}
 	}
 
@@ -322,22 +329,22 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 		log.Log.Info("capture.golibrtsp.ConnectBackChannel(): " + "audio backchannel not found")
 		err = errors.New("no audio backchannel found")
 	} else {
-		g.Streams = append(g.Streams, packets.Stream{
-			Name:          "PCM_MULAW",
-			IsVideo:       false,
-			IsAudio:       true,
-			IsBackChannel: true,
-		})
-
-		// Set the index for the audio
-		g.AudioG711IndexBackChannel = int8(len(g.Streams)) - 1
-
 		// setup a audio media
 		_, err = g.Client.Setup(desc.BaseURL, audioMediBackChannel, 0, 0)
 		if err != nil {
 			// Something went wrong .. Do something
+			log.Log.Error("capture.golibrtsp.ConnectBackChannel(): " + err.Error())
+			g.HasBackChannel = false
 		} else {
 			g.HasBackChannel = true
+			g.Streams = append(g.Streams, packets.Stream{
+				Name:          "PCM_MULAW",
+				IsVideo:       false,
+				IsAudio:       true,
+				IsBackChannel: true,
+			})
+			// Set the index for the audio
+			g.AudioG711IndexBackChannel = int8(len(g.Streams)) - 1
 		}
 	}
 	return
@@ -645,7 +652,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 	// Play the stream.
 	_, err = g.Client.Play(nil)
 	if err != nil {
-		panic(err)
+		log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
 	}
 
 	return

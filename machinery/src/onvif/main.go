@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -16,9 +19,12 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/onvif"
 	"github.com/kerberos-io/onvif/device"
+	"github.com/kerberos-io/onvif/deviceio"
+	"github.com/kerberos-io/onvif/event"
 	"github.com/kerberos-io/onvif/media"
 	"github.com/kerberos-io/onvif/ptz"
-	xsd "github.com/kerberos-io/onvif/xsd/onvif"
+	xsd "github.com/kerberos-io/onvif/xsd"
+	xsdonvif "github.com/kerberos-io/onvif/xsd/onvif"
 )
 
 func Discover(timeout time.Duration) {
@@ -188,23 +194,41 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 
 func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, error) {
 	log.Log.Debug("onvif.ConnectToOnvifDevice(): started")
-	device, err := onvif.NewDevice(onvif.DeviceParams{
+	dev, err := onvif.NewDevice(onvif.DeviceParams{
 		Xaddr:    cameraConfiguration.ONVIFXAddr,
 		Username: cameraConfiguration.ONVIFUsername,
 		Password: cameraConfiguration.ONVIFPassword,
+		AuthMode: "both",
 	})
 	if err != nil {
 		log.Log.Debug("onvif.ConnectToOnvifDevice(): " + err.Error())
 	} else {
+
+		getCapabilities := device.GetCapabilities{Category: []xsdonvif.CapabilityCategory{"All"}}
+		getCapabilitiesResponse, err := dev.CallMethod(getCapabilities)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Println(readResponse(getCapabilitiesResponse))
+		}
+
 		log.Log.Info("onvif.ConnectToOnvifDevice(): successfully connected to device")
 	}
 	log.Log.Debug("onvif.ConnectToOnvifDevice(): finished")
-	return device, err
+	return dev, err
 }
 
-func GetTokenFromProfile(device *onvif.Device, profileId int) (xsd.ReferenceToken, error) {
+func readResponse(resp *http.Response) string {
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
+func GetTokenFromProfile(device *onvif.Device, profileId int) (xsdonvif.ReferenceToken, error) {
 	// We aim to receive a profile token from the server
-	var profileToken xsd.ReferenceToken
+	var profileToken xsdonvif.ReferenceToken
 
 	// Get Profiles
 	resp, err := device.CallMethod(media.GetProfiles{})
@@ -266,8 +290,8 @@ func GetPTZConfigurationsFromDevice(device *onvif.Device) (ptz.GetConfigurations
 	return configurations, err
 }
 
-func GetPositionFromDevice(configuration models.Configuration) (xsd.PTZVector, error) {
-	var position xsd.PTZVector
+func GetPositionFromDevice(configuration models.Configuration) (xsdonvif.PTZVector, error) {
+	var position xsdonvif.PTZVector
 	// Connect to Onvif device
 	cameraConfiguration := configuration.Config.Capture.IPCamera
 	device, err := ConnectToOnvifDevice(&cameraConfiguration)
@@ -299,10 +323,10 @@ func GetPositionFromDevice(configuration models.Configuration) (xsd.PTZVector, e
 	}
 }
 
-func GetPosition(device *onvif.Device, token xsd.ReferenceToken) (xsd.PTZVector, error) {
+func GetPosition(device *onvif.Device, token xsdonvif.ReferenceToken) (xsdonvif.PTZVector, error) {
 	// We'll try to receive the PTZ configurations from the server
 	var status ptz.GetStatusResponse
-	var position xsd.PTZVector
+	var position xsdonvif.PTZVector
 
 	// Get the PTZ configurations from the device
 	resp, err := device.CallMethod(ptz.GetStatus{
@@ -332,24 +356,24 @@ func GetPosition(device *onvif.Device, token xsd.ReferenceToken) (xsd.PTZVector,
 	return position, err
 }
 
-func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float64, tilt float64, zoom float64) error {
+func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, tilt float64, zoom float64) error {
 
-	absolutePantiltVector := xsd.Vector2D{
+	absolutePantiltVector := xsdonvif.Vector2D{
 		X:     pan,
 		Y:     tilt,
-		Space: configuration.PTZConfiguration.DefaultAbsolutePantTiltPositionSpace,
+		Space: configuration.PTZConfiguration[0].DefaultAbsolutePantTiltPositionSpace,
 	}
 
-	absoluteZoomVector := xsd.Vector1D{
+	absoluteZoomVector := xsdonvif.Vector1D{
 		X:     zoom,
-		Space: configuration.PTZConfiguration.DefaultAbsoluteZoomPositionSpace,
+		Space: configuration.PTZConfiguration[0].DefaultAbsoluteZoomPositionSpace,
 	}
 
 	resp, err := device.CallMethod(ptz.AbsoluteMove{
 		ProfileToken: token,
-		Position: xsd.PTZVector{
-			PanTilt: absolutePantiltVector,
-			Zoom:    absoluteZoomVector,
+		Position: xsdonvif.PTZVector{
+			PanTilt: &absolutePantiltVector,
+			Zoom:    &absoluteZoomVector,
 		},
 	})
 
@@ -369,7 +393,7 @@ func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfiguratio
 // This function will simulate the AbsolutePanTiltMove function.
 // However the AboslutePanTiltMove function is not working on all cameras.
 // So we'll use the ContinuousMove function to simulate the AbsolutePanTiltMove function using the position polling.
-func AbsolutePanTiltMoveFake(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float64, tilt float64, zoom float64) error {
+func AbsolutePanTiltMoveFake(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, tilt float64, zoom float64) error {
 	position, err := GetPosition(device, token)
 	if position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01 && position.PanTilt.Y >= tilt-0.01 && position.PanTilt.Y <= tilt+0.01 && position.Zoom.X >= zoom-0.01 && position.Zoom.X <= zoom+0.01 {
 		log.Log.Debug("AbsolutePanTiltMoveFake: already at position")
@@ -398,15 +422,15 @@ func AbsolutePanTiltMoveFake(device *onvif.Device, configuration ptz.GetConfigur
 	return err
 }
 
-func ZoomOutCompletely(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken) error {
+func ZoomOutCompletely(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken) error {
 	// Zoom out completely!!!
-	zoomOut := xsd.Vector1D{
+	zoomOut := xsdonvif.Vector1D{
 		X:     -1,
-		Space: configuration.PTZConfiguration.DefaultContinuousZoomVelocitySpace,
+		Space: configuration.PTZConfiguration[0].DefaultContinuousZoomVelocitySpace,
 	}
 	_, err := device.CallMethod(ptz.ContinuousMove{
-		ProfileToken: token,
-		Velocity: xsd.PTZSpeedZoom{
+		ProfileToken: &token,
+		Velocity: xsdonvif.PTZSpeedZoom{
 			Zoom: zoomOut,
 		},
 	})
@@ -432,7 +456,7 @@ func ZoomOutCompletely(device *onvif.Device, configuration ptz.GetConfigurations
 	return err
 }
 
-func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float64, zoom float64, speed float64, wait time.Duration) error {
+func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, zoom float64, speed float64, wait time.Duration) error {
 	position, err := GetPosition(device, token)
 
 	if position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01 {
@@ -446,14 +470,14 @@ func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsR
 			directionX = speed * -1
 		}
 
-		panTiltVector := xsd.Vector2D{
+		panTiltVector := xsdonvif.Vector2D{
 			X:     directionX,
 			Y:     0,
-			Space: configuration.PTZConfiguration.DefaultContinuousPanTiltVelocitySpace,
+			Space: configuration.PTZConfiguration[0].DefaultContinuousPanTiltVelocitySpace,
 		}
 		resp, err := device.CallMethod(ptz.ContinuousMove{
-			ProfileToken: token,
-			Velocity: xsd.PTZSpeedPanTilt{
+			ProfileToken: &token,
+			Velocity: xsdonvif.PTZSpeedPanTilt{
 				PanTilt: panTiltVector,
 			},
 		})
@@ -497,7 +521,7 @@ func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsR
 	return err
 }
 
-func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, tilt float64, zoom float64, speed float64, wait time.Duration) error {
+func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, tilt float64, zoom float64, speed float64, wait time.Duration) error {
 	position, err := GetPosition(device, token)
 
 	if position.PanTilt.Y >= tilt-0.005 && position.PanTilt.Y <= tilt+0.005 {
@@ -511,16 +535,19 @@ func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 			directionY = speed * -1
 		}
 
-		panTiltVector := xsd.Vector2D{
+		panTiltVector := xsdonvif.Vector2D{
 			X:     0,
 			Y:     directionY,
-			Space: configuration.PTZConfiguration.DefaultContinuousPanTiltVelocitySpace,
+			Space: configuration.PTZConfiguration[0].DefaultContinuousPanTiltVelocitySpace,
 		}
+
+		velocity := xsdonvif.PTZSpeedPanTilt{
+			PanTilt: panTiltVector,
+		}
+
 		resp, err := device.CallMethod(ptz.ContinuousMove{
-			ProfileToken: token,
-			Velocity: xsd.PTZSpeedPanTilt{
-				PanTilt: panTiltVector,
-			},
+			ProfileToken: &token,
+			Velocity:     velocity,
 		})
 
 		var b []byte
@@ -563,7 +590,7 @@ func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 	return err
 }
 
-func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, zoom float64, speed float64, wait time.Duration) error {
+func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, zoom float64, speed float64, wait time.Duration) error {
 	position, err := GetPosition(device, token)
 
 	if position.Zoom.X >= zoom-0.005 && position.Zoom.X <= zoom+0.005 {
@@ -577,13 +604,13 @@ func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 			directionZ = speed * -1
 		}
 
-		zoomVector := xsd.Vector1D{
+		zoomVector := xsdonvif.Vector1D{
 			X:     directionZ,
-			Space: configuration.PTZConfiguration.DefaultContinuousZoomVelocitySpace,
+			Space: configuration.PTZConfiguration[0].DefaultContinuousZoomVelocitySpace,
 		}
 		resp, err := device.CallMethod(ptz.ContinuousMove{
-			ProfileToken: token,
-			Velocity: xsd.PTZSpeedZoom{
+			ProfileToken: &token,
+			Velocity: xsdonvif.PTZSpeedZoom{
 				Zoom: zoomVector,
 			},
 		})
@@ -628,17 +655,17 @@ func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 	return err
 }
 
-func ContinuousPanTilt(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float64, tilt float64) error {
+func ContinuousPanTilt(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, tilt float64) error {
 
-	panTiltVector := xsd.Vector2D{
+	panTiltVector := xsdonvif.Vector2D{
 		X:     pan,
 		Y:     tilt,
-		Space: configuration.PTZConfiguration.DefaultContinuousPanTiltVelocitySpace,
+		Space: configuration.PTZConfiguration[0].DefaultContinuousPanTiltVelocitySpace,
 	}
 
 	resp, err := device.CallMethod(ptz.ContinuousMove{
-		ProfileToken: token,
-		Velocity: xsd.PTZSpeedPanTilt{
+		ProfileToken: &token,
+		Velocity: xsdonvif.PTZSpeedPanTilt{
 			PanTilt: panTiltVector,
 		},
 	})
@@ -674,18 +701,20 @@ func ContinuousPanTilt(device *onvif.Device, configuration ptz.GetConfigurations
 	return err
 }
 
-func ContinuousZoom(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, zoom float64) error {
+func ContinuousZoom(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, zoom float64) error {
 
-	zoomVector := xsd.Vector1D{
+	zoomVector := xsdonvif.Vector1D{
 		X:     zoom,
-		Space: configuration.PTZConfiguration.DefaultContinuousZoomVelocitySpace,
+		Space: configuration.PTZConfiguration[0].DefaultContinuousZoomVelocitySpace,
+	}
+
+	velocity := xsdonvif.PTZSpeedZoom{
+		Zoom: zoomVector,
 	}
 
 	resp, err := device.CallMethod(ptz.ContinuousMove{
-		ProfileToken: token,
-		Velocity: xsd.PTZSpeedZoom{
-			Zoom: zoomVector,
-		},
+		ProfileToken: &token,
+		Velocity:     &velocity,
 	})
 
 	var b []byte
@@ -731,34 +760,6 @@ func GetCapabilitiesFromDevice(dev *onvif.Device) []string {
 			}
 		}
 	}
-
-	var getCapabilitiesResponse device.GetCapabilitiesResponse
-	resp, err := dev.CallMethod(device.GetCapabilities{
-		Category: "All",
-	})
-
-	var b []byte
-	if resp != nil {
-		b, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
-	}
-	if err == nil {
-		stringBody := string(b)
-		decodedXML, et, err := getXMLNode(stringBody, "GetCapabilitiesResponse")
-		if err != nil {
-			log.Log.Error("GetCapabilitiesResponse: " + err.Error())
-			//return err
-		} else {
-			if err := decodedXML.DecodeElement(&getCapabilitiesResponse, et); err != nil {
-				log.Log.Error("GetCapabilitiesResponse: " + err.Error())
-				//	return err
-			}
-			//return err
-		}
-	} else {
-		log.Log.Error("GoToPresetFromDevice: " + err.Error())
-	}
-
 	return capabilities
 }
 
@@ -818,10 +819,10 @@ func GoToPresetFromDevice(device *onvif.Device, presetName string) error {
 	// Get token from the first profile
 	token, err := GetTokenFromProfile(device, 0)
 	if err == nil {
-
+		preset := xsdonvif.ReferenceToken(presetName)
 		resp, err := device.CallMethod(ptz.GotoPreset{
-			ProfileToken: token,
-			PresetToken:  xsd.ReferenceToken(presetName),
+			ProfileToken: &token,
+			PresetToken:  &preset,
 		})
 		var b []byte
 		if resp != nil {
@@ -856,34 +857,34 @@ func GetPTZFunctionsFromDevice(configurations ptz.GetConfigurationsResponse) ([]
 	canZoom := false
 	canPanTilt := false
 
-	if configurations.PTZConfiguration.DefaultAbsolutePantTiltPositionSpace != "" {
+	if configurations.PTZConfiguration[0].DefaultAbsolutePantTiltPositionSpace != nil {
 		functions = append(functions, "AbsolutePanTiltMove")
 		canPanTilt = true
 	}
-	if configurations.PTZConfiguration.DefaultAbsoluteZoomPositionSpace != "" {
+	if configurations.PTZConfiguration[0].DefaultAbsoluteZoomPositionSpace != nil {
 		functions = append(functions, "AbsoluteZoomMove")
 		canZoom = true
 	}
-	if configurations.PTZConfiguration.DefaultRelativePanTiltTranslationSpace != "" {
+	if configurations.PTZConfiguration[0].DefaultRelativePanTiltTranslationSpace != nil {
 		functions = append(functions, "RelativePanTiltMove")
 		canPanTilt = true
 	}
-	if configurations.PTZConfiguration.DefaultRelativeZoomTranslationSpace != "" {
+	if configurations.PTZConfiguration[0].DefaultRelativeZoomTranslationSpace != nil {
 		functions = append(functions, "RelativeZoomMove")
 		canZoom = true
 	}
-	if configurations.PTZConfiguration.DefaultContinuousPanTiltVelocitySpace != "" {
+	if configurations.PTZConfiguration[0].DefaultContinuousPanTiltVelocitySpace != nil {
 		functions = append(functions, "ContinuousPanTiltMove")
 		canPanTilt = true
 	}
-	if configurations.PTZConfiguration.DefaultContinuousZoomVelocitySpace != "" {
+	if configurations.PTZConfiguration[0].DefaultContinuousZoomVelocitySpace != nil {
 		functions = append(functions, "ContinuousZoomMove")
 		canZoom = true
 	}
-	if configurations.PTZConfiguration.DefaultPTZSpeed != nil {
+	if configurations.PTZConfiguration[0].DefaultPTZSpeed != nil {
 		functions = append(functions, "PTZSpeed")
 	}
-	if configurations.PTZConfiguration.DefaultPTZTimeout != "" {
+	if configurations.PTZConfiguration[0].DefaultPTZTimeout != nil {
 		functions = append(functions, "PTZTimeout")
 	}
 
@@ -937,6 +938,199 @@ func VerifyOnvifConnection(c *gin.Context) {
 	}
 }
 
+type ONVIFEvents struct {
+	Key   string
+	Type  string
+	Value string
+}
+
+// ONVIF has a specific profile that requires a subscription to receive events.
+// These events can show if an input or output is active or inactive, and also other events.
+// For the time being we are only interested in the input and output events, but this can be extended in the future.
+func GetEventMessages(dev *onvif.Device) ([]ONVIFEvents, error) {
+
+	var eventsArray []ONVIFEvents
+
+	// We'll create a subscription to the device
+	// This will allow us to receive events from the device
+	var createPullPointSubscriptionResponse event.CreatePullPointSubscriptionResponse
+
+	// For the time being we are just interested in the digital inputs and outputs, therefore
+	// we have set the topic to the followin filter.
+	terminate := xsd.String("PT10S")
+	resp, err := dev.CallMethod(event.CreatePullPointSubscription{
+		InitialTerminationTime: &terminate,
+		Filter: &event.FilterType{
+			TopicExpression: &event.TopicExpressionType{
+				Dialect:    xsd.String("http://www.onvif.org/ver10/tev/topicExpression/ConcreteSet"),
+				TopicKinds: "tns1:Device/Trigger//.",
+			},
+		},
+	})
+	var b2 []byte
+	if resp != nil {
+		b2, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err == nil {
+			stringBody := string(b2)
+			decodedXML, et, err := getXMLNode(stringBody, "CreatePullPointSubscriptionResponse")
+			if err != nil {
+				log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
+			} else {
+				if err := decodedXML.DecodeElement(&createPullPointSubscriptionResponse, et); err != nil {
+					log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
+				} else {
+					// We were able to create a subscription to the device. Now pull some messages from the subscription.
+					subscriptionURI := string(createPullPointSubscriptionResponse.SubscriptionReference.Address)
+					if subscriptionURI == "" {
+						log.Log.Error("onvif.main.GetEventMessages(createPullPoint): subscriptionURI is empty")
+					} else {
+						pullMessage := event.PullMessages{
+							Timeout:      xsd.Duration("PT5S"),
+							MessageLimit: 30,
+						}
+						requestBody, err := xml.Marshal(pullMessage)
+						if err != nil {
+							log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
+						}
+						res, err := dev.SendSoap(string(subscriptionURI), string(requestBody))
+						if err != nil {
+							log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
+						}
+
+						var pullMessagesResponse event.PullMessagesResponse
+						if res != nil {
+							bs, err := io.ReadAll(res.Body)
+							res.Body.Close()
+
+							stringBody := string(bs)
+							decodedXML, et, err := getXMLNode(stringBody, "PullMessagesResponse")
+							if err != nil {
+								log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
+							} else {
+								if err := decodedXML.DecodeElement(&pullMessagesResponse, et); err != nil {
+									log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
+								} else {
+									log.Log.Info("onvif.main.GetEventMessages(pullMessages): " + stringBody)
+								}
+							}
+						}
+
+						// Look for Source of input and output
+						for _, message := range pullMessagesResponse.NotificationMessage {
+							if message.Topic.TopicKinds == "tns1:Device/Trigger/Relay" {
+								if len(message.Message.Message.Data.SimpleItem) > 0 {
+									if message.Message.Message.Data.SimpleItem[0].Name == "LogicalState" {
+										key := string(message.Message.Message.Source.SimpleItem[0].Value)
+										value := string(message.Message.Message.Data.SimpleItem[0].Value)
+										log.Log.Debug("onvif.main.GetEventMessages(pullMessages) output: " + key + " " + value)
+
+										// Depending on the onvif library they might use different values for active and inactive.
+										if value == "active" || value == "1" {
+											value = "true"
+										} else if value == "inactive" || value == "0" {
+											value = "false"
+										}
+
+										eventsArray = append(eventsArray, ONVIFEvents{
+											Key:   key,
+											Type:  "output",
+											Value: value,
+										})
+									}
+								}
+							} else if message.Topic.TopicKinds == "tns1:Device/Trigger/DigitalInput" {
+								if len(message.Message.Message.Data.SimpleItem) > 0 {
+									if message.Message.Message.Data.SimpleItem[0].Name == "LogicalState" {
+										key := string(message.Message.Message.Source.SimpleItem[0].Value)
+										value := string(message.Message.Message.Data.SimpleItem[0].Value)
+										log.Log.Debug("onvif.main.GetEventMessages(pullMessages) input: " + key + " " + value)
+
+										// Depending on the onvif library they might use different values for active and inactive.
+										if value == "active" || value == "1" {
+											value = "true"
+										} else if value == "inactive" || value == "0" {
+											value = "false"
+										}
+
+										eventsArray = append(eventsArray, ONVIFEvents{
+											Key:   key,
+											Type:  "input",
+											Value: value,
+										})
+									}
+								}
+							}
+						}
+
+						// Unscubscribe from the device
+						unsubscribe := event.Unsubscribe{}
+						requestBody, err = xml.Marshal(unsubscribe)
+						if err != nil {
+							log.Log.Error("onvif.main.GetEventMessages(unsubscribe): " + err.Error())
+						}
+						res, err = dev.SendSoap(subscriptionURI, string(requestBody))
+						if err != nil {
+							log.Log.Error("onvif.main.GetEventMessages(unsubscribe): " + err.Error())
+						}
+						if res != nil {
+							bs, err := io.ReadAll(res.Body)
+							res.Body.Close()
+							if err == nil {
+								stringBody := string(bs)
+								log.Log.Info("onvif.main.GetEventMessages(unsubscribe): " + stringBody)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return eventsArray, err
+}
+
+// This method will get the digital inputs from the device.
+// But will not give any status information.
+func GetDigitalInputs(dev *onvif.Device) (device.GetDigitalInputsResponse, error) {
+
+	events, err := GetEventMessages(dev)
+	if err == nil {
+		for _, event := range events {
+			log.Log.Debug("onvif.main.GetDigitalInputs(): " + event.Key + " " + event.Value)
+		}
+	}
+
+	// We'll try to receive the relay outputs from the server
+	var digitalinputs device.GetDigitalInputsResponse
+
+	var b []byte
+	resp, err := dev.CallMethod(deviceio.GetDigitalInputs{})
+	if resp != nil {
+		b, err = io.ReadAll(resp.Body)
+		resp.Body.Close()
+	}
+
+	if err == nil {
+		if err == nil {
+			stringBody := string(b)
+			decodedXML, et, err := getXMLNode(stringBody, "GetDigitalInputsResponse")
+			if err != nil {
+				log.Log.Error("onvif.main.GetDigitalInputs(): " + err.Error())
+				return digitalinputs, err
+			} else {
+				if err := decodedXML.DecodeElement(&digitalinputs, et); err != nil {
+					log.Log.Debug("onvif.main.GetDigitalInputs(): " + err.Error())
+					return digitalinputs, err
+				}
+			}
+		}
+	}
+
+	return digitalinputs, err
+}
+
+// This method will get the relay outputs from the device.
+// But will not give any status information.
 func GetRelayOutputs(dev *onvif.Device) (device.GetRelayOutputsResponse, error) {
 	// We'll try to receive the relay outputs from the server
 	var relayoutputs device.GetRelayOutputsResponse
@@ -964,7 +1158,48 @@ func GetRelayOutputs(dev *onvif.Device) (device.GetRelayOutputsResponse, error) 
 			}
 		}
 	}
+
 	return relayoutputs, err
+}
+
+func TriggerRelayOutput(dev *onvif.Device, output string) (setRelayOutputState device.SetRelayOutputStateResponse, err error) {
+	err = nil
+
+	// Get all outputs
+	relayoutputs, err := GetRelayOutputs(dev)
+
+	// For the moment we expect a single output
+	// However in theory there might be multiple outputs. We might need to change
+	// this in the future "kerberos-io/onvif" library.
+	if err == nil {
+		token := relayoutputs.RelayOutputs.Token
+
+		if output == string(token) {
+			outputState := device.SetRelayOutputState{
+				RelayOutputToken: token,
+				LogicalState:     "active",
+			}
+
+			resp, errResp := dev.CallMethod(outputState)
+			var b []byte
+			if errResp != nil {
+				b, err = io.ReadAll(resp.Body)
+				resp.Body.Close()
+			}
+			stringBody := string(b)
+			decodedXML, et, errXML := getXMLNode(stringBody, "SetRelayOutputStateResponse")
+			if errXML != nil {
+				log.Log.Error("onvif.main.TriggerRelayOutput(): " + errXML.Error())
+				return
+			} else {
+				if errDecode := decodedXML.DecodeElement(&setRelayOutputState, et); err != nil {
+					log.Log.Debug("onvif.main.TriggerRelayOutput(): " + errDecode.Error())
+					return
+				}
+			}
+		}
+	}
+	return
 }
 
 func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, error) {

@@ -98,12 +98,12 @@ const docTemplate = `{
                 "operationId": "get-digital-inputs",
                 "parameters": [
                     {
-                        "description": "Camera Config",
-                        "name": "cameraConfig",
+                        "description": "OnvifCredentials",
+                        "name": "config",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.OnvifPreset"
+                            "$ref": "#/definitions/models.OnvifCredentials"
                         }
                     }
                 ],
@@ -134,6 +134,81 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/models.OnvifCredentials"
                         }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/camera/onvif/outputs": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Will get the relay outputs from the ONVIF device.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Will get the relay outputs from the ONVIF device.",
+                "operationId": "get-relay-outputs",
+                "parameters": [
+                    {
+                        "description": "OnvifCredentials",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OnvifCredentials"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/camera/onvif/outputs/{output}": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Will trigger the relay output from the ONVIF device.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Will trigger the relay output from the ONVIF device.",
+                "operationId": "trigger-relay-output",
+                "parameters": [
+                    {
+                        "description": "OnvifCredentials",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OnvifCredentials"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Output",
+                        "name": "output",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {

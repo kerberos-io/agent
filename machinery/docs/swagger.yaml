@@ -374,12 +374,12 @@ paths:
       description: Will get the digital inputs from the ONVIF device.
       operationId: get-digital-inputs
       parameters:
-      - description: Camera Config
+      - description: OnvifCredentials
         in: body
-        name: cameraConfig
+        name: config
         required: true
         schema:
-          $ref: '#/definitions/models.OnvifPreset'
+          $ref: '#/definitions/models.OnvifCredentials'
       responses:
         "200":
           description: OK
@@ -407,6 +407,53 @@ paths:
           schema:
             $ref: '#/definitions/models.APIResponse'
       summary: Try to login into ONVIF supported camera.
+      tags:
+      - camera
+  /api/camera/onvif/outputs:
+    post:
+      description: Will get the relay outputs from the ONVIF device.
+      operationId: get-relay-outputs
+      parameters:
+      - description: OnvifCredentials
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.OnvifCredentials'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will get the relay outputs from the ONVIF device.
+      tags:
+      - camera
+  /api/camera/onvif/outputs/{output}:
+    post:
+      description: Will trigger the relay output from the ONVIF device.
+      operationId: trigger-relay-output
+      parameters:
+      - description: OnvifCredentials
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.OnvifCredentials'
+      - description: Output
+        in: path
+        name: output
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will trigger the relay output from the ONVIF device.
       tags:
       - camera
   /api/camera/onvif/pantilt:

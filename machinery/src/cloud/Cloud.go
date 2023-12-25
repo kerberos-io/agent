@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
+	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
@@ -307,6 +308,7 @@ loop:
 			onvifPanTilt := "false"
 			onvifPresets := "false"
 			var onvifPresetsList []byte
+			var onvifEventsList []byte
 			if config.Capture.IPCamera.ONVIFXAddr != "" {
 				cameraConfiguration := configuration.Config.Capture.IPCamera
 				device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
@@ -342,6 +344,21 @@ loop:
 						log.Log.Error("HandleHeartBeat: error while getting PTZ configurations: " + err.Error())
 						onvifPresetsList = []byte("[]")
 					}
+
+					// We will also fetch some events, to know the status of the inputs and outputs.
+					// More event types might be added.
+					events, err := onvif.GetEventMessages(device)
+					if err == nil && len(events) > 0 {
+						onvifEventsList, err = json.Marshal(events)
+						if err != nil {
+							log.Log.Error("HandleHeartBeat: error while marshalling events: " + err.Error())
+							onvifEventsList = []byte("[]")
+						}
+					} else {
+						log.Log.Debug("HandleHeartBeat: no events found.")
+						onvifEventsList = []byte("[]")
+					}
+
 				} else {
 					log.Log.Error("HandleHeartBeat: error while connecting to ONVIF device: " + err.Error())
 					onvifPresetsList = []byte("[]")
@@ -383,6 +400,7 @@ loop:
 						"onvif_pantilt" : "%s",
 						"onvif_presets": "%s",
 						"onvif_presets_list": %s,
+						"onvif_events_list": %s,
 						"cameraConnected": "%s",
 						"hasBackChannel": "%s",
 						"numberoffiles" : "33",
@@ -391,7 +409,26 @@ loop:
 						"docker" : true,
 						"kios" : false,
 						"raspberrypi" : false
-					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, cameraConnected, hasBackChannel)
+					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, onvifEventsList, cameraConnected, hasBackChannel)
+
+				// Get the private key to encrypt the data using symmetric encryption: AES.
+				privateKey := config.HubPrivateKey
+				if privateKey != "" {
+					// Encrypt the data using AES.
+					encrypted, err := encryption.AesEncrypt([]byte(object), privateKey)
+					if err != nil {
+						encrypted = []byte("")
+						log.Log.Error("HandleHeartBeat: error while encrypting data: " + err.Error())
+					}
+
+					// Base64 encode the encrypted data.
+					encryptedBase64 := base64.StdEncoding.EncodeToString(encrypted)
+					object = fmt.Sprintf(`{
+						"cloudpublicKey": "%s",
+						"encrypted" : %t,
+						"encryptedData" : "%s"
+					}`, config.HubKey, true, encryptedBase64)
+				}
 
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)
@@ -479,7 +516,7 @@ loop:
 		select {
 		case <-communication.HandleHeartBeat:
 			break loop
-		case <-time.After(15 * time.Second):
+		case <-time.After(10 * time.Second):
 		}
 	}
 
