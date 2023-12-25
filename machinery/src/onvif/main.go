@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"io"
-	"io/ioutil"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -205,25 +202,36 @@ func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, 
 	} else {
 
 		getCapabilities := device.GetCapabilities{Category: []xsdonvif.CapabilityCategory{"All"}}
-		getCapabilitiesResponse, err := dev.CallMethod(getCapabilities)
+		resp, err := dev.CallMethod(getCapabilities)
 		if err != nil {
-			fmt.Println(err)
+			log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
+		}
+
+		var b []byte
+		if resp != nil {
+			b, err = io.ReadAll(resp.Body)
+			if err != nil {
+				log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
+			}
+			resp.Body.Close()
+		}
+		stringBody := string(b)
+		decodedXML, et, err := getXMLNode(stringBody, "GetCapabilitiesResponse")
+		if err != nil {
+			log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
 		} else {
-			fmt.Println(readResponse(getCapabilitiesResponse))
+			var capabilities device.GetCapabilitiesResponse
+			if err := decodedXML.DecodeElement(&capabilities, et); err != nil {
+				log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
+			} else {
+				log.Log.Debug("onvif.ConnectToOnvifDevice(): capabilities: " + strings.Join(GetCapabilitiesFromDevice(dev), ", "))
+			}
 		}
 
 		log.Log.Info("onvif.ConnectToOnvifDevice(): successfully connected to device")
 	}
 	log.Log.Debug("onvif.ConnectToOnvifDevice(): finished")
 	return dev, err
-}
-
-func readResponse(resp *http.Response) string {
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-	return string(b)
 }
 
 func GetTokenFromProfile(device *onvif.Device, profileId int) (xsdonvif.ReferenceToken, error) {
@@ -1011,7 +1019,7 @@ func GetEventMessages(dev *onvif.Device) ([]ONVIFEvents, error) {
 								if err := decodedXML.DecodeElement(&pullMessagesResponse, et); err != nil {
 									log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
 								} else {
-									log.Log.Info("onvif.main.GetEventMessages(pullMessages): " + stringBody)
+									log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + stringBody)
 								}
 							}
 						}
@@ -1078,7 +1086,7 @@ func GetEventMessages(dev *onvif.Device) ([]ONVIFEvents, error) {
 							res.Body.Close()
 							if err == nil {
 								stringBody := string(bs)
-								log.Log.Info("onvif.main.GetEventMessages(unsubscribe): " + stringBody)
+								log.Log.Debug("onvif.main.GetEventMessages(unsubscribe): " + stringBody)
 							}
 						}
 					}
