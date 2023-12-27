@@ -247,6 +247,8 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 					go HandleRequestHDStream(mqttClient, hubKey, payload, configuration, communication)
 				case "receive-hd-candidates":
 					go HandleReceiveHDCandidates(mqttClient, hubKey, payload, configuration, communication)
+				case "trigger-relay":
+					go HandleTriggerRelay(mqttClient, hubKey, payload, configuration, communication)
 				}
 
 			}
@@ -498,9 +500,39 @@ func HandleNavigatePTZ(mqttClient mqtt.Client, hubKey string, payload models.Pay
 			json.Unmarshal([]byte(action), &onvifAction)
 			communication.HandleONVIF <- onvifAction
 			log.Log.Info("routers.mqtt.main.HandleNavigatePTZ(): Received an action - " + onvifAction.Action)
-
 		} else {
 			log.Log.Info("routers.mqtt.main.HandleNavigatePTZ(): received action, but camera is not connected.")
+		}
+	}
+}
+
+func HandleTriggerRelay(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
+	value := payload.Value
+	jsonData, _ := json.Marshal(value)
+	var triggerRelayPayload models.TriggerRelay
+	json.Unmarshal(jsonData, &triggerRelayPayload)
+
+	if triggerRelayPayload.Timestamp != 0 {
+		if communication.CameraConnected {
+			// Get token (name of relay)
+			token := triggerRelayPayload.Token
+			// Connect to Onvif device
+			cameraConfiguration := configuration.Config.Capture.IPCamera
+			device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+			if err == nil {
+				// Trigger relay output
+				err := onvif.TriggerRelayOutput(device, token)
+				if err != nil {
+					log.Log.Error("routers.mqtt.main.HandleTriggerRelay(): error triggering relay: " + err.Error())
+				} else {
+					log.Log.Info("routers.mqtt.main.HandleTriggerRelay(): trigger (" + token + ") relay output.")
+				}
+			} else {
+				log.Log.Error("routers.mqtt.main.HandleTriggerRelay(): error connecting to device: " + err.Error())
+			}
+
+		} else {
+			log.Log.Info("routers.mqtt.main.HandleTriggerRelay(): received trigger, but camera is not connected.")
 		}
 	}
 }

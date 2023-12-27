@@ -528,24 +528,24 @@ func DoTriggerRelayOutput(c *gin.Context) {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			outputs, err := onvif.TriggerRelayOutput(device, output)
+			err := onvif.TriggerRelayOutput(device, output)
 			if err == nil {
 				c.JSON(200, gin.H{
-					"data": outputs,
+					"data": "routers.http.methods.DoTriggerRelayOutput(): relay output triggered: " + output,
 				})
 			} else {
 				c.JSON(400, gin.H{
-					"data": "Something went wrong: " + err.Error(),
+					"data": "routers.http.methods.DoTriggerRelayOutput(): something went wrong: " + err.Error(),
 				})
 			}
 		} else {
 			c.JSON(400, gin.H{
-				"data": "Something went wrong: " + err.Error(),
+				"data": "routers.http.methods.DoTriggerRelayOutput(): something went wrong: " + err.Error(),
 			})
 		}
 	} else {
 		c.JSON(400, gin.H{
-			"data": "Something went wrong: " + err.Error(),
+			"data": "routers.http.methods.DoTriggerRelayOutput(): something went wrong: " + err.Error(),
 		})
 	}
 }

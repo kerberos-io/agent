@@ -975,22 +975,22 @@ func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
 	return pullPointAdress, err
 }
 
-func Unsubscribe(dev *onvif.Device, pullPointAddress string) error {
+func UnsubscribePullPoint(dev *onvif.Device, pullPointAddress string) error {
 	// Unsubscribe from the device
 	unsubscribe := event.Unsubscribe{}
 	requestBody, err := xml.Marshal(unsubscribe)
 	if err != nil {
-		log.Log.Error("onvif.main.GetEventMessages(unsubscribe): " + err.Error())
+		log.Log.Error("onvif.main.UnsubscribePullPoint(): " + err.Error())
 	}
 	res, err := dev.SendSoap(pullPointAddress, string(requestBody))
 	if err != nil {
-		log.Log.Error("onvif.main.GetEventMessages(unsubscribe): " + err.Error())
+		log.Log.Error("onvif.main.UnsubscribePullPoint(): " + err.Error())
 	}
 	if res != nil {
 		_, err := io.ReadAll(res.Body)
 		res.Body.Close()
 		if err != nil {
-			log.Log.Error("onvif.main.GetEventMessages(unsubscribe): " + err.Error())
+			log.Log.Error("onvif.main.UnsubscribePullPoint(): " + err.Error())
 		}
 	}
 	return err
@@ -1144,18 +1144,6 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 // But will not give any status information.
 func GetDigitalInputs(dev *onvif.Device) (device.GetDigitalInputsResponse, error) {
 
-	// Create a pull point subscription
-	pullPointAddress, err := CreatePullPointSubscription(dev)
-
-	if err == nil {
-		events, err := GetEventMessages(dev, pullPointAddress)
-		if err == nil {
-			for _, event := range events {
-				log.Log.Debug("onvif.main.GetDigitalInputs(): " + event.Key + " " + event.Value)
-			}
-		}
-	}
-
 	// We'll try to receive the relay outputs from the server
 	var digitalinputs device.GetDigitalInputsResponse
 
@@ -1181,13 +1169,6 @@ func GetDigitalInputs(dev *onvif.Device) (device.GetDigitalInputsResponse, error
 			}
 		}
 	}
-
-	// Unsubscribe from the device
-	err = Unsubscribe(dev, pullPointAddress)
-	if err != nil {
-		log.Log.Error("onvif.main.GetDigitalInputs(): " + err.Error())
-	}
-
 	return digitalinputs, err
 }
 
@@ -1224,7 +1205,7 @@ func GetRelayOutputs(dev *onvif.Device) (device.GetRelayOutputsResponse, error) 
 	return relayoutputs, err
 }
 
-func TriggerRelayOutput(dev *onvif.Device, output string) (setRelayOutputState device.SetRelayOutputStateResponse, err error) {
+func TriggerRelayOutput(dev *onvif.Device, output string) (err error) {
 	err = nil
 
 	// Get all outputs

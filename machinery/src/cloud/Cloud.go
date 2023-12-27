@@ -546,7 +546,7 @@ loop:
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			onvif.Unsubscribe(device, pullPointAddress)
+			onvif.UnsubscribePullPoint(device, pullPointAddress)
 		}
 	}
 

@@ -159,3 +159,9 @@ type NavigatePTZPayload struct {
 	DeviceId  string `json:"device_id"` // device id
 	Action    string `json:"action"`    // action
 }
+
+type TriggerRelay struct {
+	Timestamp int64  `json:"timestamp"` // timestamp
+	DeviceId  string `json:"device_id"` // device id
+	Token     string `json:"token"`     // token
+}
