@@ -224,7 +224,7 @@ func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, 
 			if err := decodedXML.DecodeElement(&capabilities, et); err != nil {
 				log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
 			} else {
-				log.Log.Debug("onvif.ConnectToOnvifDevice(): capabilities: " + strings.Join(GetCapabilitiesFromDevice(dev), ", "))
+				log.Log.Debug("onvif.ConnectToOnvifDevice(): capabilities.")
 			}
 		}
 
@@ -947,27 +947,27 @@ func VerifyOnvifConnection(c *gin.Context) {
 }
 
 type ONVIFEvents struct {
-	Key   string
-	Type  string
-	Value string
+	Key       string
+	Type      string
+	Value     string
+	Timestamp int64
 }
 
-// ONVIF has a specific profile that requires a subscription to receive events.
-// These events can show if an input or output is active or inactive, and also other events.
-// For the time being we are only interested in the input and output events, but this can be extended in the future.
-func GetEventMessages(dev *onvif.Device) ([]ONVIFEvents, error) {
-
-	var eventsArray []ONVIFEvents
+// Create PullPointSubscription
+func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
 
 	// We'll create a subscription to the device
 	// This will allow us to receive events from the device
 	var createPullPointSubscriptionResponse event.CreatePullPointSubscriptionResponse
+	var pullPointAdress string
+	var err error
 
 	// For the time being we are just interested in the digital inputs and outputs, therefore
 	// we have set the topic to the followin filter.
-	terminate := xsd.String("PT10S")
+	terminate := xsd.String("PT60S")
 	resp, err := dev.CallMethod(event.CreatePullPointSubscription{
 		InitialTerminationTime: &terminate,
+
 		Filter: &event.FilterType{
 			TopicExpression: &event.TopicExpressionType{
 				Dialect:    xsd.String("http://www.onvif.org/ver10/tev/topicExpression/ConcreteSet"),
@@ -988,105 +988,167 @@ func GetEventMessages(dev *onvif.Device) ([]ONVIFEvents, error) {
 				if err := decodedXML.DecodeElement(&createPullPointSubscriptionResponse, et); err != nil {
 					log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
 				} else {
-					// We were able to create a subscription to the device. Now pull some messages from the subscription.
-					subscriptionURI := string(createPullPointSubscriptionResponse.SubscriptionReference.Address)
-					if subscriptionURI == "" {
-						log.Log.Error("onvif.main.GetEventMessages(createPullPoint): subscriptionURI is empty")
+					pullPointAdress = string(createPullPointSubscriptionResponse.SubscriptionReference.Address)
+				}
+			}
+		}
+	}
+	return pullPointAdress, err
+}
+
+func Unsubscribe(dev *onvif.Device, pullPointAddress string) error {
+	// Unsubscribe from the device
+	unsubscribe := event.Unsubscribe{}
+	requestBody, err := xml.Marshal(unsubscribe)
+	if err != nil {
+		log.Log.Error("onvif.main.GetEventMessages(unsubscribe): " + err.Error())
+	}
+	res, err := dev.SendSoap(pullPointAddress, string(requestBody))
+	if err != nil {
+		log.Log.Error("onvif.main.GetEventMessages(unsubscribe): " + err.Error())
+	}
+	if res != nil {
+		_, err := io.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			log.Log.Error("onvif.main.GetEventMessages(unsubscribe): " + err.Error())
+		}
+	}
+	return err
+}
+
+// Look for Source of input and output
+// Creat a map of the source and the value
+// We'll use this map to determine if the value has changed.
+// If the value has changed we'll send an event to the frontend.
+var inputOutputDeviceMap = make(map[string]*ONVIFEvents)
+
+func GetInputOutputs() ([]ONVIFEvents, error) {
+	var eventsArray []ONVIFEvents
+	// We have some odd behaviour for inputs: the logical state is set to false even if circuit is closed. However we do see repeated events (looks like heartbeats).
+	// We are assuming that if we do not receive an event for 15 seconds the input is inactive, otherwise we set to active.
+	for key, value := range inputOutputDeviceMap {
+		if value.Type == "input" {
+			if time.Now().Unix()-value.Timestamp > 15 {
+				value.Value = "false"
+			} else {
+				value.Value = "true"
+			}
+			inputOutputDeviceMap[key] = value
+		}
+		eventsArray = append(eventsArray, *value)
+	}
+	for _, value := range eventsArray {
+		log.Log.Info("onvif.main.GetInputOutputs(): " + value.Key + " - " + value.Value + " (" + strconv.FormatInt(value.Timestamp, 10) + ")")
+	}
+	return eventsArray, nil
+}
+
+// ONVIF has a specific profile that requires a subscription to receive events.
+// These events can show if an input or output is active or inactive, and also other events.
+// For the time being we are only interested in the input and output events, but this can be extended in the future.
+func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents, error) {
+
+	var eventsArray []ONVIFEvents
+	var err error
+
+	if pullPointAddress != "" {
+		// We were able to create a subscription to the device. Now pull some messages from the subscription.
+		subscriptionURI := pullPointAddress
+		if subscriptionURI == "" {
+			log.Log.Error("onvif.main.GetEventMessages(createPullPoint): subscriptionURI is empty")
+		} else {
+			// Pull message
+			pullMessage := event.PullMessages{
+				Timeout:      xsd.Duration("PT5S"),
+				MessageLimit: 100,
+			}
+			requestBody, err := xml.Marshal(pullMessage)
+			if err != nil {
+				log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
+			}
+			res, err := dev.SendSoap(string(subscriptionURI), string(requestBody))
+			if err != nil {
+				log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
+			}
+
+			var pullMessagesResponse event.PullMessagesResponse
+			if res != nil {
+				bs, err := io.ReadAll(res.Body)
+				res.Body.Close()
+				if err == nil {
+					stringBody := string(bs)
+					decodedXML, et, err := getXMLNode(stringBody, "PullMessagesResponse")
+					if err != nil {
+						log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
 					} else {
-						pullMessage := event.PullMessages{
-							Timeout:      xsd.Duration("PT5S"),
-							MessageLimit: 30,
+						if err := decodedXML.DecodeElement(&pullMessagesResponse, et); err != nil {
+							log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
 						}
-						requestBody, err := xml.Marshal(pullMessage)
-						if err != nil {
-							log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
-						}
-						res, err := dev.SendSoap(string(subscriptionURI), string(requestBody))
-						if err != nil {
-							log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
-						}
+					}
+				}
+			}
 
-						var pullMessagesResponse event.PullMessagesResponse
-						if res != nil {
-							bs, err := io.ReadAll(res.Body)
-							res.Body.Close()
+			for _, message := range pullMessagesResponse.NotificationMessage {
+				log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Topic.TopicKinds))
+				log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Message.Message.Data.SimpleItem[0].Name) + " " + string(message.Message.Message.Data.SimpleItem[0].Value))
+				if message.Topic.TopicKinds == "tns1:Device/Trigger/Relay" {
+					if len(message.Message.Message.Data.SimpleItem) > 0 {
+						if message.Message.Message.Data.SimpleItem[0].Name == "LogicalState" {
+							key := string(message.Message.Message.Source.SimpleItem[0].Value)
+							value := string(message.Message.Message.Data.SimpleItem[0].Value)
+							log.Log.Debug("onvif.main.GetEventMessages(pullMessages) output: " + key + " " + value)
 
-							stringBody := string(bs)
-							decodedXML, et, err := getXMLNode(stringBody, "PullMessagesResponse")
-							if err != nil {
-								log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
+							// Depending on the onvif library they might use different values for active and inactive.
+							if value == "active" || value == "1" {
+								value = "true"
+							} else if value == "inactive" || value == "0" {
+								value = "false"
+							}
+
+							// Check if key exists in map
+							// If it does not exist we'll add it to the map otherwise we'll update the value.
+							if _, ok := inputOutputDeviceMap[key]; !ok {
+								inputOutputDeviceMap[key] = &ONVIFEvents{
+									Key:       key,
+									Type:      "output",
+									Value:     value,
+									Timestamp: 0,
+								}
 							} else {
-								if err := decodedXML.DecodeElement(&pullMessagesResponse, et); err != nil {
-									log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
-								} else {
-									log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + stringBody)
-								}
+								log.Log.Debug("onvif.main.GetEventMessages(pullMessages) output: " + key + " " + value)
+								inputOutputDeviceMap[key].Value = value
+								inputOutputDeviceMap[key].Timestamp = time.Now().Unix()
 							}
 						}
+					}
+				} else if message.Topic.TopicKinds == "tns1:Device/Trigger/DigitalInput" {
+					if len(message.Message.Message.Data.SimpleItem) > 0 {
+						if message.Message.Message.Data.SimpleItem[0].Name == "LogicalState" {
+							key := string(message.Message.Message.Source.SimpleItem[0].Value)
+							value := string(message.Message.Message.Data.SimpleItem[0].Value)
+							log.Log.Debug("onvif.main.GetEventMessages(pullMessages) input: " + key + " " + value)
 
-						// Look for Source of input and output
-						for _, message := range pullMessagesResponse.NotificationMessage {
-							if message.Topic.TopicKinds == "tns1:Device/Trigger/Relay" {
-								if len(message.Message.Message.Data.SimpleItem) > 0 {
-									if message.Message.Message.Data.SimpleItem[0].Name == "LogicalState" {
-										key := string(message.Message.Message.Source.SimpleItem[0].Value)
-										value := string(message.Message.Message.Data.SimpleItem[0].Value)
-										log.Log.Debug("onvif.main.GetEventMessages(pullMessages) output: " + key + " " + value)
-
-										// Depending on the onvif library they might use different values for active and inactive.
-										if value == "active" || value == "1" {
-											value = "true"
-										} else if value == "inactive" || value == "0" {
-											value = "false"
-										}
-
-										eventsArray = append(eventsArray, ONVIFEvents{
-											Key:   key,
-											Type:  "output",
-											Value: value,
-										})
-									}
-								}
-							} else if message.Topic.TopicKinds == "tns1:Device/Trigger/DigitalInput" {
-								if len(message.Message.Message.Data.SimpleItem) > 0 {
-									if message.Message.Message.Data.SimpleItem[0].Name == "LogicalState" {
-										key := string(message.Message.Message.Source.SimpleItem[0].Value)
-										value := string(message.Message.Message.Data.SimpleItem[0].Value)
-										log.Log.Debug("onvif.main.GetEventMessages(pullMessages) input: " + key + " " + value)
-
-										// Depending on the onvif library they might use different values for active and inactive.
-										if value == "active" || value == "1" {
-											value = "true"
-										} else if value == "inactive" || value == "0" {
-											value = "false"
-										}
-
-										eventsArray = append(eventsArray, ONVIFEvents{
-											Key:   key,
-											Type:  "input",
-											Value: value,
-										})
-									}
-								}
+							// Depending on the onvif library they might use different values for active and inactive.
+							if value == "active" || value == "1" {
+								value = "true"
+							} else if value == "inactive" || value == "0" {
+								value = "false"
 							}
-						}
 
-						// Unscubscribe from the device
-						unsubscribe := event.Unsubscribe{}
-						requestBody, err = xml.Marshal(unsubscribe)
-						if err != nil {
-							log.Log.Error("onvif.main.GetEventMessages(unsubscribe): " + err.Error())
-						}
-						res, err = dev.SendSoap(subscriptionURI, string(requestBody))
-						if err != nil {
-							log.Log.Error("onvif.main.GetEventMessages(unsubscribe): " + err.Error())
-						}
-						if res != nil {
-							bs, err := io.ReadAll(res.Body)
-							res.Body.Close()
-							if err == nil {
-								stringBody := string(bs)
-								log.Log.Debug("onvif.main.GetEventMessages(unsubscribe): " + stringBody)
+							// Check if key exists in map
+							// If it does not exist we'll add it to the map otherwise we'll update the value.
+							if _, ok := inputOutputDeviceMap[key]; !ok {
+								inputOutputDeviceMap[key] = &ONVIFEvents{
+									Key:       key,
+									Type:      "input",
+									Value:     value,
+									Timestamp: 0,
+								}
+							} else {
+								log.Log.Debug("onvif.main.GetEventMessages(pullMessages) input: " + key + " " + value)
+								inputOutputDeviceMap[key].Value = value
+								inputOutputDeviceMap[key].Timestamp = time.Now().Unix()
 							}
 						}
 					}
@@ -1094,6 +1156,8 @@ func GetEventMessages(dev *onvif.Device) ([]ONVIFEvents, error) {
 			}
 		}
 	}
+
+	eventsArray, _ = GetInputOutputs()
 	return eventsArray, err
 }
 
@@ -1101,10 +1165,15 @@ func GetEventMessages(dev *onvif.Device) ([]ONVIFEvents, error) {
 // But will not give any status information.
 func GetDigitalInputs(dev *onvif.Device) (device.GetDigitalInputsResponse, error) {
 
-	events, err := GetEventMessages(dev)
+	// Create a pull point subscription
+	pullPointAddress, err := CreatePullPointSubscription(dev)
+
 	if err == nil {
-		for _, event := range events {
-			log.Log.Debug("onvif.main.GetDigitalInputs(): " + event.Key + " " + event.Value)
+		events, err := GetEventMessages(dev, pullPointAddress)
+		if err == nil {
+			for _, event := range events {
+				log.Log.Debug("onvif.main.GetDigitalInputs(): " + event.Key + " " + event.Value)
+			}
 		}
 	}
 
@@ -1132,6 +1201,12 @@ func GetDigitalInputs(dev *onvif.Device) (device.GetDigitalInputsResponse, error
 				}
 			}
 		}
+	}
+
+	// Unsubscribe from the device
+	err = Unsubscribe(dev, pullPointAddress)
+	if err != nil {
+		log.Log.Error("onvif.main.GetDigitalInputs(): " + err.Error())
 	}
 
 	return digitalinputs, err
@@ -1181,7 +1256,6 @@ func TriggerRelayOutput(dev *onvif.Device, output string) (setRelayOutputState d
 	// this in the future "kerberos-io/onvif" library.
 	if err == nil {
 		token := relayoutputs.RelayOutputs.Token
-
 		if output == string(token) {
 			outputState := device.SetRelayOutputState{
 				RelayOutputToken: token,
@@ -1195,17 +1269,16 @@ func TriggerRelayOutput(dev *onvif.Device, output string) (setRelayOutputState d
 				resp.Body.Close()
 			}
 			stringBody := string(b)
-			decodedXML, et, errXML := getXMLNode(stringBody, "SetRelayOutputStateResponse")
-			if errXML != nil {
-				log.Log.Error("onvif.main.TriggerRelayOutput(): " + errXML.Error())
-				return
+			if err == nil && resp.StatusCode == 200 {
+				log.Log.Info("onvif.main.TriggerRelayOutput(): triggered relay output (" + string(token) + ")")
 			} else {
-				if errDecode := decodedXML.DecodeElement(&setRelayOutputState, et); err != nil {
-					log.Log.Debug("onvif.main.TriggerRelayOutput(): " + errDecode.Error())
-					return
-				}
+				log.Log.Error("onvif.main.TriggerRelayOutput(): " + stringBody)
 			}
+		} else {
+			log.Log.Error("onvif.main.TriggerRelayOutput(): could not find relay output (" + output + ")")
 		}
+	} else {
+		log.Log.Error("onvif.main.TriggerRelayOutput(): something went wrong while getting the relay outputs " + err.Error())
 	}
 	return
 }

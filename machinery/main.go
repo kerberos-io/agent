@@ -76,7 +76,11 @@ func main() {
 	if logLevel == "" {
 		logLevel = "info"
 	}
-	log.Log.Init(logLevel, configDirectory, timezone)
+	logOutput := os.Getenv("LOG_OUTPUT")
+	if logOutput == "" {
+		logOutput = "text"
+	}
+	log.Log.Init(logLevel, logOutput, configDirectory, timezone)
 
 	switch action {
 
@@ -137,7 +141,7 @@ func main() {
 
 			// Set timezone
 			timezone, _ := time.LoadLocation(configuration.Config.Timezone)
-			log.Log.Init(logLevel, configDirectory, timezone)
+			log.Log.Init(logLevel, logOutput, configDirectory, timezone)
 
 			// Check if we have a device Key or not, if not
 			// we will generate one.

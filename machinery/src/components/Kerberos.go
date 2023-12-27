@@ -242,9 +242,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Try to create backchannel
 	rtspBackChannelClient := captureDevice.SetBackChannelClient(rtspUrl)
 	err = rtspBackChannelClient.ConnectBackChannel(context.Background())
-	if err != nil {
-		log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP backchannel stream: " + err.Error())
-	} else {
+	if err == nil {
 		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP backchannel stream: " + rtspUrl)
 		go rtspBackChannelClient.StartBackChannel(context.Background())
 	}

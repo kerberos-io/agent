@@ -66,7 +66,7 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 	PREV_AgentKey = configuration.Config.Key
 
 	if config.Offline == "true" {
-		log.Log.Info("ConfigureMQTT: not starting as running in Offline mode.")
+		log.Log.Info("routers.mqtt.main.ConfigureMQTT(): not starting as running in Offline mode.")
 	} else {
 
 		opts := mqtt.NewClientOptions()
@@ -75,7 +75,7 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 		// and share and receive messages to/from.
 		mqttURL := config.MQTTURI
 		opts.AddBroker(mqttURL)
-		log.Log.Info("ConfigureMQTT: Set broker uri " + mqttURL)
+		log.Log.Debug("routers.mqtt.main.ConfigureMQTT(): Set broker uri " + mqttURL)
 
 		// Our MQTT broker can have username/password credentials
 		// to protect it from the outside.
@@ -84,8 +84,8 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 		if mqtt_username != "" || mqtt_password != "" {
 			opts.SetUsername(mqtt_username)
 			opts.SetPassword(mqtt_password)
-			log.Log.Info("ConfigureMQTT: Set username " + mqtt_username)
-			log.Log.Info("ConfigureMQTT: Set password " + mqtt_password)
+			log.Log.Debug("routers.mqtt.main.ConfigureMQTT(): Set username " + mqtt_username)
+			log.Log.Debug("routers.mqtt.main.ConfigureMQTT(): Set password " + mqtt_password)
 		}
 
 		// Some extra options to make sure the connection behaves
@@ -121,13 +121,13 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 			}
 
 			opts.SetClientID(mqttClientID)
-			log.Log.Info("ConfigureMQTT: Set ClientID " + mqttClientID)
+			log.Log.Info("routers.mqtt.main.ConfigureMQTT(): Set ClientID " + mqttClientID)
 			rand.Seed(time.Now().UnixNano())
 			webrtc.CandidateArrays = make(map[string](chan string))
 
 			opts.OnConnect = func(c mqtt.Client) {
 				// We managed to connect to the MQTT broker, hurray!
-				log.Log.Info("ConfigureMQTT: " + mqttClientID + " connected to " + mqttURL)
+				log.Log.Info("routers.mqtt.main.ConfigureMQTT(): " + mqttClientID + " connected to " + mqttURL)
 
 				// Create a susbcription for listen and reply
 				MQTTListenerHandler(c, hubKey, configDirectory, configuration, communication)
@@ -136,7 +136,7 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 		mqc := mqtt.NewClient(opts)
 		if token := mqc.Connect(); token.WaitTimeout(3 * time.Second) {
 			if token.Error() != nil {
-				log.Log.Error("ConfigureMQTT: unable to establish mqtt broker connection, error was: " + token.Error().Error())
+				log.Log.Error("routers.mqtt.main.ConfigureMQTT(): unable to establish mqtt broker connection, error was: " + token.Error().Error())
 			}
 		}
 		return mqc
@@ -147,7 +147,7 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 
 func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 	if hubKey == "" {
-		log.Log.Info("MQTTListenerHandler: no hub key provided, not subscribing to kerberos/hub/{hubkey}")
+		log.Log.Info("routers.mqtt.main.MQTTListenerHandler(): no hub key provided, not subscribing to kerberos/hub/{hubkey}")
 	} else {
 		topicOnvif := fmt.Sprintf("kerberos/agent/%s", hubKey)
 		mqttClient.Subscribe(topicOnvif, 1, func(c mqtt.Client, msg mqtt.Message) {
@@ -178,14 +178,14 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 						pemBytes, _ := ioutil.ReadAll(r)
 						block, _ := pem.Decode(pemBytes)
 						if block == nil {
-							log.Log.Error("MQTTListenerHandler: error decoding PEM block containing private key")
+							log.Log.Error("routers.mqtt.main.MQTTListenerHandler(): error decoding PEM block containing private key")
 							return
 						} else {
 							// Parse private key
 							b := block.Bytes
 							key, err := x509.ParsePKCS8PrivateKey(b)
 							if err != nil {
-								log.Log.Error("MQTTListenerHandler: error parsing private key: " + err.Error())
+								log.Log.Error("routers.mqtt.main.MQTTListenerHandler(): error parsing private key: " + err.Error())
 								return
 							} else {
 								// Conver key to *rsa.PrivateKey
@@ -205,16 +205,16 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 										}
 										decryptedValue, err := encryption.AesDecrypt(data, string(decryptedKey))
 										if err != nil {
-											log.Log.Error("MQTTListenerHandler: error decrypting message: " + err.Error())
+											log.Log.Error("routers.mqtt.main.MQTTListenerHandler(): error decrypting message: " + err.Error())
 											return
 										}
 										json.Unmarshal(decryptedValue, &payload)
 									} else {
-										log.Log.Error("MQTTListenerHandler: error decrypting message, assymetric keys do not match.")
+										log.Log.Error("routers.mqtt.main.MQTTListenerHandler(): error decrypting message, assymetric keys do not match.")
 										return
 									}
 								} else if err != nil {
-									log.Log.Error("MQTTListenerHandler: error decrypting message: " + err.Error())
+									log.Log.Error("routers.mqtt.main.MQTTListenerHandler(): error decrypting message: " + err.Error())
 									return
 								}
 							}
@@ -225,7 +225,7 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 				}
 
 				// We'll find out which message we received, and act accordingly.
-				log.Log.Info("MQTTListenerHandler: received message with action: " + payload.Action)
+				log.Log.Info("routers.mqtt.main.MQTTListenerHandler(): received message with action: " + payload.Action)
 				switch payload.Action {
 				case "record":
 					go HandleRecording(mqttClient, hubKey, payload, configuration, communication)
@@ -299,7 +299,7 @@ func HandleGetPTZPosition(mqttClient mqtt.Client, hubKey string, payload models.
 		// Get Position from device
 		pos, err := onvif.GetPositionFromDevice(*configuration)
 		if err != nil {
-			log.Log.Error("HandlePTZPosition: error getting position from device: " + err.Error())
+			log.Log.Error("routers.mqtt.main.HandlePTZPosition(): error getting position from device: " + err.Error())
 		} else {
 			// Needs to wrapped!
 			posString := fmt.Sprintf("%f,%f,%f", pos.PanTilt.X, pos.PanTilt.Y, pos.Zoom.X)
@@ -317,7 +317,7 @@ func HandleGetPTZPosition(mqttClient mqtt.Client, hubKey string, payload models.
 			if err == nil {
 				mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
 			} else {
-				log.Log.Info("HandlePTZPosition: something went wrong while sending position to hub: " + string(payload))
+				log.Log.Info("routers.mqtt.main.HandlePTZPosition(): something went wrong while sending position to hub: " + string(payload))
 			}
 		}
 	}
@@ -334,9 +334,9 @@ func HandleUpdatePTZPosition(mqttClient mqtt.Client, hubKey string, payload mode
 	if onvifAction.Action != "" {
 		if communication.CameraConnected {
 			communication.HandleONVIF <- onvifAction
-			log.Log.Info("MQTTListenerHandleONVIF: Received an action - " + onvifAction.Action)
+			log.Log.Info("routers.mqtt.main.MQTTListenerHandleONVIF(): Received an action - " + onvifAction.Action)
 		} else {
-			log.Log.Info("MQTTListenerHandleONVIF: received action, but camera is not connected.")
+			log.Log.Info("routers.mqtt.main.MQTTListenerHandleONVIF(): received action, but camera is not connected.")
 		}
 	}
 }
@@ -378,14 +378,14 @@ func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload models.P
 			if err == nil {
 				mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
 			} else {
-				log.Log.Info("HandleRequestConfig: something went wrong while sending config to hub: " + string(payload))
+				log.Log.Info("routers.mqtt.main.HandleRequestConfig(): something went wrong while sending config to hub: " + string(payload))
 			}
 
 		} else {
-			log.Log.Info("HandleRequestConfig: no config available")
+			log.Log.Info("routers.mqtt.main.HandleRequestConfig(): no config available")
 		}
 
-		log.Log.Info("HandleRequestConfig: Received a request for the config")
+		log.Log.Info("routers.mqtt.main.HandleRequestConfig(): Received a request for the config")
 	}
 }
 
@@ -406,7 +406,7 @@ func HandleUpdateConfig(mqttClient mqtt.Client, hubKey string, payload models.Pa
 
 		err := configService.SaveConfig(configDirectory, config, configuration, communication)
 		if err == nil {
-			log.Log.Info("HandleUpdateConfig: Config updated")
+			log.Log.Info("routers.mqtt.main.HandleUpdateConfig(): Config updated")
 			message := models.Message{
 				Payload: models.Payload{
 					Action:   "acknowledge-update-config",
@@ -417,10 +417,10 @@ func HandleUpdateConfig(mqttClient mqtt.Client, hubKey string, payload models.Pa
 			if err == nil {
 				mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
 			} else {
-				log.Log.Info("HandleRequestConfig: something went wrong while sending acknowledge config to hub: " + string(payload))
+				log.Log.Info("routers.mqtt.main.HandleUpdateConfig(): something went wrong while sending acknowledge config to hub: " + string(payload))
 			}
 		} else {
-			log.Log.Info("HandleUpdateConfig: Config update failed")
+			log.Log.Info("routers.mqtt.main.HandleUpdateConfig(): Config update failed")
 		}
 	}
 }
@@ -438,9 +438,9 @@ func HandleRequestSDStream(mqttClient mqtt.Client, hubKey string, payload models
 			case communication.HandleLiveSD <- time.Now().Unix():
 			default:
 			}
-			log.Log.Info("HandleRequestSDStream: received request to livestream.")
+			log.Log.Info("routers.mqtt.main.HandleRequestSDStream(): received request to livestream.")
 		} else {
-			log.Log.Info("HandleRequestSDStream: received request to livestream, but camera is not connected.")
+			log.Log.Info("routers.mqtt.main.HandleRequestSDStream(): received request to livestream, but camera is not connected.")
 		}
 	}
 }
@@ -460,9 +460,9 @@ func HandleRequestHDStream(mqttClient mqtt.Client, hubKey string, payload models
 			case communication.HandleLiveHDHandshake <- requestHDStreamPayload:
 			default:
 			}
-			log.Log.Info("HandleRequestHDStream: received request to setup webrtc.")
+			log.Log.Info("routers.mqtt.main.HandleRequestHDStream(): received request to setup webrtc.")
 		} else {
-			log.Log.Info("HandleRequestHDStream: received request to setup webrtc, but camera is not connected.")
+			log.Log.Info("routers.mqtt.main.HandleRequestHDStream(): received request to setup webrtc, but camera is not connected.")
 		}
 	}
 }
@@ -480,7 +480,7 @@ func HandleReceiveHDCandidates(mqttClient mqtt.Client, hubKey string, payload mo
 			key := configuration.Config.Key + "/" + receiveHDCandidatesPayload.SessionID
 			go webrtc.RegisterCandidates(key, receiveHDCandidatesPayload)
 		} else {
-			log.Log.Info("HandleReceiveHDCandidates: received candidate, but camera is not connected.")
+			log.Log.Info("routers.mqtt.main.HandleReceiveHDCandidates(): received candidate, but camera is not connected.")
 		}
 	}
 }
@@ -497,10 +497,10 @@ func HandleNavigatePTZ(mqttClient mqtt.Client, hubKey string, payload models.Pay
 			var onvifAction models.OnvifAction
 			json.Unmarshal([]byte(action), &onvifAction)
 			communication.HandleONVIF <- onvifAction
-			log.Log.Info("HandleNavigatePTZ: Received an action - " + onvifAction.Action)
+			log.Log.Info("routers.mqtt.main.HandleNavigatePTZ(): Received an action - " + onvifAction.Action)
 
 		} else {
-			log.Log.Info("HandleNavigatePTZ: received action, but camera is not connected.")
+			log.Log.Info("routers.mqtt.main.HandleNavigatePTZ(): received action, but camera is not connected.")
 		}
 	}
 }
@@ -512,6 +512,6 @@ func DisconnectMQTT(mqttClient mqtt.Client, config *models.Config) {
 		mqttClient.Unsubscribe("kerberos/agent/" + PREV_HubKey)
 		mqttClient.Disconnect(1000)
 		mqttClient = nil
-		log.Log.Info("DisconnectMQTT: MQTT client disconnected.")
+		log.Log.Info("routers.mqtt.main.DisconnectMQTT(): MQTT client disconnected.")
 	}
 }

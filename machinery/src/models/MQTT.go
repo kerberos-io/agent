@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
-	"io/ioutil"
+	"io"
 	"strings"
 	"time"
 
@@ -42,22 +42,22 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 		// Pload to base64
 		data, err := json.Marshal(pload)
 		if err != nil {
-			log.Log.Error("failed to marshal payload: " + err.Error())
+			log.Log.Error("models.mqtt.PackageMQTTMessage(): failed to marshal payload: " + err.Error())
 		}
 
 		// Encrypt the value
 		privateKey := configuration.Config.Encryption.PrivateKey
 		r := strings.NewReader(privateKey)
-		pemBytes, _ := ioutil.ReadAll(r)
+		pemBytes, _ := io.ReadAll(r)
 		block, _ := pem.Decode(pemBytes)
 		if block == nil {
-			log.Log.Error("MQTTListenerHandler: error decoding PEM block containing private key")
+			log.Log.Error("models.mqtt.PackageMQTTMessage(): error decoding PEM block containing private key")
 		} else {
 			// Parse private key
 			b := block.Bytes
 			key, err := x509.ParsePKCS8PrivateKey(b)
 			if err != nil {
-				log.Log.Error("MQTTListenerHandler: error parsing private key: " + err.Error())
+				log.Log.Error("models.mqtt.PackageMQTTMessage(): error parsing private key: " + err.Error())
 			}
 
 			// Conver key to *rsa.PrivateKey

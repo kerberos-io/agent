@@ -170,7 +170,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.VideoH265Media = mediH265
 	g.VideoH265Forma = formaH265
 	if mediH265 == nil {
-		log.Log.Info("capture.golibrtsp.Connect(H265): " + "video media not found")
+		log.Log.Debug("capture.golibrtsp.Connect(H265): " + "video media not found")
 	} else {
 		// setup a video media
 		_, err = g.Client.Setup(desc.BaseURL, mediH265, 0, 0)
@@ -225,7 +225,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.AudioG711Media = audioMedi
 	g.AudioG711Forma = audioForma
 	if audioMedi == nil {
-		log.Log.Info("capture.golibrtsp.Connect(G711): " + "audio media not found")
+		log.Log.Debug("capture.golibrtsp.Connect(G711): " + "audio media not found")
 	} else {
 		// setup a audio media
 		_, err = g.Client.Setup(desc.BaseURL, audioMedi, 0, 0)
@@ -260,7 +260,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	g.AudioMPEG4Media = audioMediMPEG4
 	g.AudioMPEG4Forma = audioFormaMPEG4
 	if audioMediMPEG4 == nil {
-		log.Log.Info("capture.golibrtsp.Connect(MPEG4): " + "audio media not found")
+		log.Log.Debug("capture.golibrtsp.Connect(MPEG4): " + "audio media not found")
 	} else {
 		// setup a audio media
 		_, err = g.Client.Setup(desc.BaseURL, audioMediMPEG4, 0, 0)
@@ -326,7 +326,7 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 	g.AudioG711MediaBackChannel = audioMediBackChannel
 	g.AudioG711FormaBackChannel = audioFormaBackChannel
 	if audioMediBackChannel == nil {
-		log.Log.Info("capture.golibrtsp.ConnectBackChannel(): " + "audio backchannel not found")
+		log.Log.Error("capture.golibrtsp.ConnectBackChannel(): audio backchannel not found, not a real error, however you might expect a backchannel. One of the reasons might be that the device already has an active client connected to the backchannel.")
 		err = errors.New("no audio backchannel found")
 	} else {
 		// setup a audio media

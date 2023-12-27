@@ -384,21 +384,27 @@ func DoGetDigitalInputs(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		_, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			events, err := onvif.GetEventMessages(device)
+			// Get the digital inputs and outputs from the device
+			inputOutputs, err := onvif.GetInputOutputs()
 			if err == nil {
-				// Get the digital inputs from the device
-				var inputs []onvif.ONVIFEvents
-				for _, event := range events {
-					if event.Type == "input" {
-						inputs = append(inputs, event)
+				if err == nil {
+					// Get the digital outputs from the device
+					var inputs []onvif.ONVIFEvents
+					for _, event := range inputOutputs {
+						if event.Type == "input" {
+							inputs = append(inputs, event)
+						}
 					}
+					c.JSON(200, gin.H{
+						"data": inputs,
+					})
+				} else {
+					c.JSON(400, gin.H{
+						"data": "Something went wrong: " + err.Error(),
+					})
 				}
-
-				c.JSON(200, gin.H{
-					"data": inputs,
-				})
 			} else {
 				c.JSON(400, gin.H{
 					"data": "Something went wrong: " + err.Error(),
@@ -447,20 +453,27 @@ func DoGetRelayOutputs(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		_, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			events, err := onvif.GetEventMessages(device)
+			// Get the digital inputs and outputs from the device
+			inputOutputs, err := onvif.GetInputOutputs()
 			if err == nil {
-				// Get the digital inputs from the device
-				var outputs []onvif.ONVIFEvents
-				for _, event := range events {
-					if event.Type == "output" {
-						outputs = append(outputs, event)
+				if err == nil {
+					// Get the digital outputs from the device
+					var outputs []onvif.ONVIFEvents
+					for _, event := range inputOutputs {
+						if event.Type == "output" {
+							outputs = append(outputs, event)
+						}
 					}
+					c.JSON(200, gin.H{
+						"data": outputs,
+					})
+				} else {
+					c.JSON(400, gin.H{
+						"data": "Something went wrong: " + err.Error(),
+					})
 				}
-				c.JSON(200, gin.H{
-					"data": outputs,
-				})
 			} else {
 				c.JSON(400, gin.H{
 					"data": "Something went wrong: " + err.Error(),
