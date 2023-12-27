@@ -60,6 +60,10 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication, captu
 
 		var message Message
 		err = conn.ReadJSON(&message)
+		if err != nil {
+			log.Log.Error("routers.websocket.main.WebsocketHandler(): " + err.Error())
+			return
+		}
 		clientID := message.ClientID
 		if sockets[clientID] == nil {
 			connection := new(Connection)
@@ -87,14 +91,14 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication, captu
 				if exists {
 					sockets[clientID].Cancels["stream-sd"]()
 				} else {
-					log.Log.Error("Streaming sd does not exists for " + clientID)
+					log.Log.Error("routers.websocket.main.WebsocketHandler(): streaming sd does not exists for " + clientID)
 				}
 
 			case "stream-sd":
 				if communication.CameraConnected {
 					_, exists := sockets[clientID].Cancels["stream-sd"]
 					if exists {
-						log.Log.Info("Already streaming sd for " + clientID)
+						log.Log.Info("routers.websocket.main.WebsocketHandler(): already streaming sd for " + clientID)
 					} else {
 						startStream := Message{
 							ClientID:    clientID,
@@ -121,7 +125,7 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication, captu
 		_, exists := sockets[clientID]
 		if exists {
 			delete(sockets, clientID)
-			log.Log.Info("WebsocketHandler: " + clientID + ": terminated and disconnected websocket connection.")
+			log.Log.Info("routers.websocket.main.WebsocketHandler(): " + clientID + ": terminated and disconnected websocket connection.")
 		}
 	}
 }
@@ -158,7 +162,7 @@ logreader:
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				}
 			} else {
-				log.Log.Error("ForwardSDStream:" + err.Error())
+				log.Log.Error("routers.websocket.main.ForwardSDStream():" + err.Error())
 				break logreader
 			}
 		}
@@ -172,7 +176,7 @@ logreader:
 		}
 		err := connection.WriteJson(startStrean)
 		if err != nil {
-			log.Log.Error("ForwardSDStream:" + err.Error())
+			log.Log.Error("routers.websocket.main.ForwardSDStream():" + err.Error())
 			break logreader
 		}
 		select {
@@ -182,16 +186,14 @@ logreader:
 		}
 	}
 
-	//frame.Free()
-
 	// Close socket for streaming
 	_, exists := connection.Cancels["stream-sd"]
 	if exists {
 		delete(connection.Cancels, "stream-sd")
 	} else {
-		log.Log.Error("Streaming sd does not exists for " + clientID)
+		log.Log.Error("routers.websocket.main.ForwardSDStream(): streaming sd does not exists for " + clientID)
 	}
 
 	// Send stop streaming message
-	log.Log.Info("ForwardSDStream: stop sending streaming over websocket")
+	log.Log.Info("routers.websocket.main.ForwardSDStream(): stop sending streaming over websocket")
 }

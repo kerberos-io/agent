@@ -731,25 +731,19 @@ func ContinuousZoom(device *onvif.Device, configuration ptz.GetConfigurationsRes
 		resp.Body.Close()
 	}
 	if err != nil {
-		log.Log.Error("ContinuousPanTiltZoom: " + err.Error())
+		log.Log.Error("onvif.main.ContinuousZoom(): " + err.Error())
 	}
 
-	log.Log.Debug("ContinuousPanTiltZoom: " + string(b))
-
+	log.Log.Debug("onvif.main.ContinuousZoom(): " + string(b))
 	time.Sleep(500 * time.Millisecond)
 
-	resp, err = device.CallMethod(ptz.Stop{
+	_, err = device.CallMethod(ptz.Stop{
 		ProfileToken: token,
 		Zoom:         true,
 	})
 
-	b = []byte{}
-	if resp != nil {
-		b, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
-	}
 	if err != nil {
-		log.Log.Error("ContinuousPanTiltZoom: " + err.Error())
+		log.Log.Error("onvif.main.ContinuousZoom(): " + err.Error())
 	}
 
 	return err
@@ -759,7 +753,7 @@ func GetCapabilitiesFromDevice(dev *onvif.Device) []string {
 	var capabilities []string
 	services := dev.GetServices()
 	for key, _ := range services {
-		log.Log.Debug("GetCapabilitiesFromDevice: has key: " + key)
+		log.Log.Debug("onvif.main.GetCapabilitiesFromDevice(): has key: " + key)
 		if key != "" {
 			keyParts := strings.Split(key, "/")
 			if len(keyParts) > 0 {
@@ -781,41 +775,39 @@ func GetPresetsFromDevice(device *onvif.Device) ([]models.OnvifActionPreset, err
 		resp, err := device.CallMethod(ptz.GetPresets{
 			ProfileToken: token,
 		})
-
 		var b []byte
 		if resp != nil {
 			b, err = io.ReadAll(resp.Body)
 			resp.Body.Close()
 		}
-
 		if err == nil {
 			stringBody := string(b)
 			decodedXML, et, err := getXMLNode(stringBody, "GetPresetsResponse")
 			if err != nil {
-				log.Log.Error("GetPresetsFromDevice: " + err.Error())
+				log.Log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
 				return presets, err
 			} else {
 				if err := decodedXML.DecodeElement(&presetsResponse, et); err != nil {
-					log.Log.Error("GetPresetsFromDevice: " + err.Error())
+					log.Log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
 					return presets, err
 				}
 
 				for _, preset := range presetsResponse.Preset {
+					log.Log.Debug("onvif.main.GetPresetsFromDevice(): " + string(preset.Name) + " (" + string(preset.Token) + ")")
 					p := models.OnvifActionPreset{
 						Name:  string(preset.Name),
 						Token: string(preset.Token),
 					}
-
 					presets = append(presets, p)
 				}
 
 				return presets, err
 			}
 		} else {
-			log.Log.Error("GetPresetsFromDevice: " + err.Error())
+			log.Log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
 		}
 	} else {
-		log.Log.Error("GetPresetsFromDevice: " + err.Error())
+		log.Log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
 	}
 
 	return presets, err
@@ -841,20 +833,20 @@ func GoToPresetFromDevice(device *onvif.Device, presetName string) error {
 			stringBody := string(b)
 			decodedXML, et, err := getXMLNode(stringBody, "GotoPresetResponses")
 			if err != nil {
-				log.Log.Error("GoToPresetFromDevice: " + err.Error())
+				log.Log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
 				return err
 			} else {
 				if err := decodedXML.DecodeElement(&goToPresetResponse, et); err != nil {
-					log.Log.Error("GoToPresetFromDevice: " + err.Error())
+					log.Log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
 					return err
 				}
 				return err
 			}
 		} else {
-			log.Log.Error("GoToPresetFromDevice: " + err.Error())
+			log.Log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
 		}
 	} else {
-		log.Log.Error("GoToPresetFromDevice: " + err.Error())
+		log.Log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
 	}
 
 	return err
@@ -917,31 +909,18 @@ func VerifyOnvifConnection(c *gin.Context) {
 	if err == nil {
 		device, err := ConnectToOnvifDevice(&cameraConfig)
 		if err == nil {
-			// Get the list of configurations
-			configurations, err := GetPTZConfigurationsFromDevice(device)
-			if err == nil {
-
-				// Check if can zoom and/or pan/tilt is supported
-				ptzFunctions, canZoom, canPanTilt := GetPTZFunctionsFromDevice(configurations)
-				c.JSON(200, models.APIResponse{
-					Data:         device,
-					PTZFunctions: ptzFunctions,
-					CanZoom:      canZoom,
-					CanPanTilt:   canPanTilt,
-				})
-			} else {
-				c.JSON(400, models.APIResponse{
-					Message: "Something went wrong while getting the configurations " + err.Error(),
-				})
-			}
+			log.Log.Info("onvif.main.VerifyOnvifConnection(): successfully verified the ONVIF connection")
+			c.JSON(200, models.APIResponse{
+				Data: device,
+			})
 		} else {
 			c.JSON(400, models.APIResponse{
-				Message: "Something went wrong while verifying the ONVIF connection " + err.Error(),
+				Message: "onvif.main.VerifyOnvifConnection(): s went wrong while verifying the ONVIF connection " + err.Error(),
 			})
 		}
 	} else {
 		c.JSON(400, models.APIResponse{
-			Message: "Something went wrong while receiving the config " + err.Error(),
+			Message: "onvif.main.VerifyOnvifConnection(): s went wrong while receiving the config " + err.Error(),
 		})
 	}
 }
@@ -1286,8 +1265,10 @@ func TriggerRelayOutput(dev *onvif.Device, output string) (setRelayOutputState d
 func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, error) {
 	xmlBytes := bytes.NewBufferString(xmlBody)
 	decodedXML := xml.NewDecoder(xmlBytes)
+	var token xml.Token
+	var err error
 	for {
-		token, err := decodedXML.Token()
+		token, err = decodedXML.Token()
 		if err != nil {
 			break
 		}
@@ -1298,5 +1279,5 @@ func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElemen
 			}
 		}
 	}
-	return nil, nil, errors.New("error in NodeName - username and password might be wrong")
+	return nil, nil, errors.New("getXMLNode(): " + err.Error())
 }

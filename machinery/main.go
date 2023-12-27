@@ -69,17 +69,18 @@ func main() {
 	flag.StringVar(&timeout, "timeout", "2000", "Number of milliseconds to wait for the ONVIF discovery to complete")
 	flag.Parse()
 
-	timezone, _ := time.LoadLocation("CET")
-
 	// Specify the level of loggin: "info", "warning", "debug", "error" or "fatal."
 	logLevel := os.Getenv("LOG_LEVEL")
 	if logLevel == "" {
 		logLevel = "info"
 	}
+	// Specify the output formatter of the log: "text" or "json".
 	logOutput := os.Getenv("LOG_OUTPUT")
 	if logOutput == "" {
 		logOutput = "text"
 	}
+	// Specify the timezone of the log: "UTC" or "Local".
+	timezone, _ := time.LoadLocation("CET")
 	log.Log.Init(logLevel, logOutput, configDirectory, timezone)
 
 	switch action {
