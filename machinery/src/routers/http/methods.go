@@ -2,6 +2,7 @@ package http
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
 )
@@ -530,22 +531,30 @@ func DoTriggerRelayOutput(c *gin.Context) {
 		if err == nil {
 			err := onvif.TriggerRelayOutput(device, output)
 			if err == nil {
+				msg := "relay output triggered: " + output
+				log.Log.Info("routers.http.methods.DoTriggerRelayOutput(): " + msg)
 				c.JSON(200, gin.H{
-					"data": "routers.http.methods.DoTriggerRelayOutput(): relay output triggered: " + output,
+					"data": msg,
 				})
 			} else {
+				msg := "something went wrong: " + err.Error()
+				log.Log.Error("routers.http.methods.DoTriggerRelayOutput(): " + msg)
 				c.JSON(400, gin.H{
-					"data": "routers.http.methods.DoTriggerRelayOutput(): something went wrong: " + err.Error(),
+					"data": msg,
 				})
 			}
 		} else {
+			msg := "something went wrong: " + err.Error()
+			log.Log.Error("routers.http.methods.DoTriggerRelayOutput(): " + msg)
 			c.JSON(400, gin.H{
-				"data": "routers.http.methods.DoTriggerRelayOutput(): something went wrong: " + err.Error(),
+				"data": msg,
 			})
 		}
 	} else {
+		msg := "something went wrong: " + err.Error()
+		log.Log.Error("routers.http.methods.DoTriggerRelayOutput(): " + msg)
 		c.JSON(400, gin.H{
-			"data": "routers.http.methods.DoTriggerRelayOutput(): something went wrong: " + err.Error(),
+			"data": msg,
 		})
 	}
 }
