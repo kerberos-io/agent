@@ -5,7 +5,7 @@ version: 2
 jobs:
   machinery:
     docker:
-      - image: kerberos/base:91ab4d4
+      - image: kerberos/base:0a50dc9
     working_directory: /go/src/github.com/{{ORG_NAME}}/{{REPO_NAME}}
     steps:
       - checkout
