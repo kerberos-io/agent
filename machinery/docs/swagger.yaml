@@ -349,7 +349,7 @@ paths:
             $ref: '#/definitions/models.APIResponse'
       summary: Will return the ONVIF capabilities for the specific camera.
       tags:
-      - camera
+      - onvif
   /api/camera/onvif/gotopreset:
     post:
       description: Will activate the desired ONVIF preset.
@@ -368,7 +368,7 @@ paths:
             $ref: '#/definitions/models.APIResponse'
       summary: Will activate the desired ONVIF preset.
       tags:
-      - camera
+      - onvif
   /api/camera/onvif/inputs:
     post:
       description: Will get the digital inputs from the ONVIF device.
@@ -389,7 +389,7 @@ paths:
       - Bearer: []
       summary: Will get the digital inputs from the ONVIF device.
       tags:
-      - camera
+      - onvif
   /api/camera/onvif/login:
     post:
       description: Try to login into ONVIF supported camera.
@@ -408,7 +408,7 @@ paths:
             $ref: '#/definitions/models.APIResponse'
       summary: Try to login into ONVIF supported camera.
       tags:
-      - camera
+      - onvif
   /api/camera/onvif/outputs:
     post:
       description: Will get the relay outputs from the ONVIF device.
@@ -429,7 +429,7 @@ paths:
       - Bearer: []
       summary: Will get the relay outputs from the ONVIF device.
       tags:
-      - camera
+      - onvif
   /api/camera/onvif/outputs/{output}:
     post:
       description: Will trigger the relay output from the ONVIF device.
@@ -455,7 +455,7 @@ paths:
       - Bearer: []
       summary: Will trigger the relay output from the ONVIF device.
       tags:
-      - camera
+      - onvif
   /api/camera/onvif/pantilt:
     post:
       description: Panning or/and tilting the camera using a direction (x,y).
@@ -474,7 +474,7 @@ paths:
             $ref: '#/definitions/models.APIResponse'
       summary: Panning or/and tilting the camera.
       tags:
-      - camera
+      - onvif
   /api/camera/onvif/presets:
     post:
       description: Will return the ONVIF presets for the specific camera.
@@ -493,7 +493,7 @@ paths:
             $ref: '#/definitions/models.APIResponse'
       summary: Will return the ONVIF presets for the specific camera.
       tags:
-      - camera
+      - onvif
   /api/camera/onvif/zoom:
     post:
       description: Zooming in or out the camera.
@@ -512,7 +512,7 @@ paths:
             $ref: '#/definitions/models.APIResponse'
       summary: Zooming in or out the camera.
       tags:
-      - camera
+      - onvif
   /api/camera/record:
     post:
       description: Make a recording.
@@ -535,6 +535,26 @@ paths:
           schema:
             $ref: '#/definitions/models.APIResponse'
       summary: Restart the agent.
+      tags:
+      - camera
+  /api/camera/snapshot/base64:
+    get:
+      description: Get a snapshot from the camera in base64.
+      operationId: snapshot-base64
+      responses:
+        "200":
+          description: ""
+      summary: Get a snapshot from the camera in base64.
+      tags:
+      - camera
+  /api/camera/snapshot/jpeg:
+    get:
+      description: Get a snapshot from the camera in jpeg format.
+      operationId: snapshot-jpeg
+      responses:
+        "200":
+          description: ""
+      summary: Get a snapshot from the camera in jpeg format.
       tags:
       - camera
   /api/camera/stop:
@@ -586,7 +606,7 @@ paths:
           description: ""
       summary: Get the current configuration.
       tags:
-      - general
+      - config
     post:
       description: Update the current configuration.
       operationId: config
@@ -602,7 +622,7 @@ paths:
           description: ""
       summary: Update the current configuration.
       tags:
-      - general
+      - config
   /api/dashboard:
     get:
       description: Get all information showed on the dashboard.
@@ -643,7 +663,7 @@ paths:
       - Bearer: []
       summary: Will verify the hub connectivity.
       tags:
-      - general
+      - persistence
   /api/latest-events:
     post:
       description: Get the latest recordings (events) from the recordings directory.
@@ -700,7 +720,7 @@ paths:
       - Bearer: []
       summary: Will verify the ONVIF connectivity.
       tags:
-      - general
+      - onvif
   /api/persistence/verify:
     post:
       description: Will verify the persistence.
@@ -721,7 +741,7 @@ paths:
       - Bearer: []
       summary: Will verify the persistence.
       tags:
-      - general
+      - persistence
 securityDefinitions:
   Bearer:
     in: header

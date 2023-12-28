@@ -618,15 +618,49 @@ func Base64Image(captureDevice *Capture, communication *models.Communication) st
 					bytes, _ := utils.ImageToBytes(&img)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 					break
-				} else {
-					break
 				}
+				break
 			}
 		} else {
 			break
 		}
 	}
 	return encodedImage
+}
+
+func JpegImage(captureDevice *Capture, communication *models.Communication) image.YCbCr {
+	// We'll try to get a snapshot from the camera.
+	var queue *packets.Queue
+	var cursor *packets.QueueCursor
+
+	// We'll pick the right client and decoder.
+	rtspClient := captureDevice.RTSPSubClient
+	if rtspClient != nil {
+		queue = communication.SubQueue
+		cursor = queue.Latest()
+	} else {
+		rtspClient = captureDevice.RTSPClient
+		queue = communication.Queue
+		cursor = queue.Latest()
+	}
+
+	// We'll try to have a keyframe, if not we'll return an empty string.
+	var image image.YCbCr
+	for {
+		if queue != nil && cursor != nil && rtspClient != nil {
+			pkt, err := cursor.ReadPacket()
+			if err == nil {
+				if !pkt.IsKeyFrame {
+					continue
+				}
+				image, _ = (*rtspClient).DecodePacket(pkt)
+				break
+			}
+		} else {
+			break
+		}
+	}
+	return image
 }
 
 func convertPTS(v time.Duration) uint64 {

@@ -898,7 +898,7 @@ func GetPTZFunctionsFromDevice(configurations ptz.GetConfigurationsResponse) ([]
 // @securityDefinitions.apikey Bearer
 // @in header
 // @name Authorization
-// @Tags general
+// @Tags onvif
 // @Param cameraConfig body models.IPCamera true "Camera Config"
 // @Summary Will verify the ONVIF connectivity.
 // @Description Will verify the ONVIF connectivity.
@@ -1018,7 +1018,7 @@ func GetInputOutputs() ([]ONVIFEvents, error) {
 		eventsArray = append(eventsArray, *value)
 	}
 	for _, value := range eventsArray {
-		log.Log.Info("onvif.main.GetInputOutputs(): " + value.Key + " - " + value.Value + " (" + strconv.FormatInt(value.Timestamp, 10) + ")")
+		log.Log.Debug("onvif.main.GetInputOutputs(): " + value.Key + " - " + value.Value + " (" + strconv.FormatInt(value.Timestamp, 10) + ")")
 	}
 	return eventsArray, nil
 }

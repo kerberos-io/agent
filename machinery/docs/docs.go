@@ -29,7 +29,7 @@ const docTemplate = `{
             "post": {
                 "description": "Will return the ONVIF capabilities for the specific camera.",
                 "tags": [
-                    "camera"
+                    "onvif"
                 ],
                 "summary": "Will return the ONVIF capabilities for the specific camera.",
                 "operationId": "camera-onvif-capabilities",
@@ -58,7 +58,7 @@ const docTemplate = `{
             "post": {
                 "description": "Will activate the desired ONVIF preset.",
                 "tags": [
-                    "camera"
+                    "onvif"
                 ],
                 "summary": "Will activate the desired ONVIF preset.",
                 "operationId": "camera-onvif-gotopreset",
@@ -92,7 +92,7 @@ const docTemplate = `{
                 ],
                 "description": "Will get the digital inputs from the ONVIF device.",
                 "tags": [
-                    "camera"
+                    "onvif"
                 ],
                 "summary": "Will get the digital inputs from the ONVIF device.",
                 "operationId": "get-digital-inputs",
@@ -121,7 +121,7 @@ const docTemplate = `{
             "post": {
                 "description": "Try to login into ONVIF supported camera.",
                 "tags": [
-                    "camera"
+                    "onvif"
                 ],
                 "summary": "Try to login into ONVIF supported camera.",
                 "operationId": "camera-onvif-login",
@@ -155,7 +155,7 @@ const docTemplate = `{
                 ],
                 "description": "Will get the relay outputs from the ONVIF device.",
                 "tags": [
-                    "camera"
+                    "onvif"
                 ],
                 "summary": "Will get the relay outputs from the ONVIF device.",
                 "operationId": "get-relay-outputs",
@@ -189,7 +189,7 @@ const docTemplate = `{
                 ],
                 "description": "Will trigger the relay output from the ONVIF device.",
                 "tags": [
-                    "camera"
+                    "onvif"
                 ],
                 "summary": "Will trigger the relay output from the ONVIF device.",
                 "operationId": "trigger-relay-output",
@@ -225,7 +225,7 @@ const docTemplate = `{
             "post": {
                 "description": "Panning or/and tilting the camera using a direction (x,y).",
                 "tags": [
-                    "camera"
+                    "onvif"
                 ],
                 "summary": "Panning or/and tilting the camera.",
                 "operationId": "camera-onvif-pantilt",
@@ -254,7 +254,7 @@ const docTemplate = `{
             "post": {
                 "description": "Will return the ONVIF presets for the specific camera.",
                 "tags": [
-                    "camera"
+                    "onvif"
                 ],
                 "summary": "Will return the ONVIF presets for the specific camera.",
                 "operationId": "camera-onvif-presets",
@@ -283,7 +283,7 @@ const docTemplate = `{
             "post": {
                 "description": "Zooming in or out the camera.",
                 "tags": [
-                    "camera"
+                    "onvif"
                 ],
                 "summary": "Zooming in or out the camera.",
                 "operationId": "camera-onvif-zoom",
@@ -340,6 +340,36 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/models.APIResponse"
                         }
+                    }
+                }
+            }
+        },
+        "/api/camera/snapshot/base64": {
+            "get": {
+                "description": "Get a snapshot from the camera in base64.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Get a snapshot from the camera in base64.",
+                "operationId": "snapshot-base64",
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/camera/snapshot/jpeg": {
+            "get": {
+                "description": "Get a snapshot from the camera in jpeg format.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Get a snapshot from the camera in jpeg format.",
+                "operationId": "snapshot-jpeg",
+                "responses": {
+                    "200": {
+                        "description": ""
                     }
                 }
             }
@@ -406,7 +436,7 @@ const docTemplate = `{
             "get": {
                 "description": "Get the current configuration.",
                 "tags": [
-                    "general"
+                    "config"
                 ],
                 "summary": "Get the current configuration.",
                 "operationId": "config",
@@ -419,7 +449,7 @@ const docTemplate = `{
             "post": {
                 "description": "Update the current configuration.",
                 "tags": [
-                    "general"
+                    "config"
                 ],
                 "summary": "Update the current configuration.",
                 "operationId": "config",
@@ -480,7 +510,7 @@ const docTemplate = `{
                 ],
                 "description": "Will verify the hub connectivity.",
                 "tags": [
-                    "general"
+                    "persistence"
                 ],
                 "summary": "Will verify the hub connectivity.",
                 "operationId": "verify-hub",
@@ -569,7 +599,7 @@ const docTemplate = `{
                 ],
                 "description": "Will verify the ONVIF connectivity.",
                 "tags": [
-                    "general"
+                    "onvif"
                 ],
                 "summary": "Will verify the ONVIF connectivity.",
                 "operationId": "verify-onvif",
@@ -603,7 +633,7 @@ const docTemplate = `{
                 ],
                 "description": "Will verify the persistence.",
                 "tags": [
-                    "general"
+                    "persistence"
                 ],
                 "summary": "Will verify the persistence.",
                 "operationId": "verify-persistence",

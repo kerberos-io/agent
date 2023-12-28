@@ -70,6 +70,7 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication, captu
 			connection.Socket = conn
 			sockets[clientID] = connection
 			sockets[clientID].Cancels = make(map[string]context.CancelFunc)
+			log.Log.Info("routers.websocket.main.WebsocketHandler(): " + clientID + ": connected.")
 		}
 
 		// Continuously read messages
@@ -98,7 +99,7 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication, captu
 				if communication.CameraConnected {
 					_, exists := sockets[clientID].Cancels["stream-sd"]
 					if exists {
-						log.Log.Info("routers.websocket.main.WebsocketHandler(): already streaming sd for " + clientID)
+						log.Log.Debug("routers.websocket.main.WebsocketHandler(): already streaming sd for " + clientID)
 					} else {
 						startStream := Message{
 							ClientID:    clientID,

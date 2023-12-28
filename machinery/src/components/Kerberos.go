@@ -588,10 +588,47 @@ func MakeRecording(c *gin.Context, communication *models.Communication) {
 	})
 }
 
+// GetSnapshotBase64 godoc
+// @Router /api/camera/snapshot/base64 [get]
+// @ID snapshot-base64
+// @Tags camera
+// @Summary Get a snapshot from the camera in base64.
+// @Description Get a snapshot from the camera in base64.
+// @Success 200
+func GetSnapshotBase64(c *gin.Context, captureDevice *capture.Capture, configuration *models.Configuration, communication *models.Communication) {
+	// We'll try to get a snapshot from the camera.
+	base64Image := capture.Base64Image(captureDevice, communication)
+	if base64Image != "" {
+		communication.Image = base64Image
+	}
+
+	c.JSON(200, gin.H{
+		"base64": communication.Image,
+	})
+}
+
+// GetSnapshotJpeg godoc
+// @Router /api/camera/snapshot/jpeg [get]
+// @ID snapshot-jpeg
+// @Tags camera
+// @Summary Get a snapshot from the camera in jpeg format.
+// @Description Get a snapshot from the camera in jpeg format.
+// @Success 200
+func GetSnapshotRaw(c *gin.Context, captureDevice *capture.Capture, configuration *models.Configuration, communication *models.Communication) {
+	// We'll try to get a snapshot from the camera.
+	image := capture.JpegImage(captureDevice, communication)
+
+	// encode image to jpeg
+	bytes, _ := utils.ImageToBytes(&image)
+
+	// Return image/jpeg
+	c.Data(200, "image/jpeg", bytes)
+}
+
 // GetConfig godoc
 // @Router /api/config [get]
 // @ID config
-// @Tags general
+// @Tags config
 // @Summary Get the current configuration.
 // @Description Get the current configuration.
 // @Success 200
@@ -613,7 +650,7 @@ func GetConfig(c *gin.Context, captureDevice *capture.Capture, configuration *mo
 // UpdateConfig godoc
 // @Router /api/config [post]
 // @ID config
-// @Tags general
+// @Tags config
 // @Param config body models.Config true "Configuration"
 // @Summary Update the current configuration.
 // @Description Update the current configuration.

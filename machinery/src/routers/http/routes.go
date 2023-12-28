@@ -85,6 +85,16 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 			components.MakeRecording(c, communication)
 		})
 
+		api.GET("/camera/snapshot/jpeg", func(c *gin.Context) {
+			components.GetSnapshotRaw(c, captureDevice, configuration, communication)
+		})
+
+		api.GET("/camera/snapshot/base64", func(c *gin.Context) {
+			components.GetSnapshotBase64(c, captureDevice, configuration, communication)
+		})
+
+		// Onvif specific methods. Doesn't require any authorization.
+
 		api.POST("/camera/onvif/login", LoginToOnvif)
 		api.POST("/camera/onvif/capabilities", GetOnvifCapabilities)
 		api.POST("/camera/onvif/presets", GetOnvifPresets)

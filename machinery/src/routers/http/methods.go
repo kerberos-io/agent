@@ -20,7 +20,7 @@ func Login() {}
 // LoginToOnvif godoc
 // @Router /api/camera/onvif/login [post]
 // @ID camera-onvif-login
-// @Tags camera
+// @Tags onvif
 // @Param config body models.OnvifCredentials true "OnvifCredentials"
 // @Summary Try to login into ONVIF supported camera.
 // @Description Try to login into ONVIF supported camera.
@@ -64,7 +64,7 @@ func LoginToOnvif(c *gin.Context) {
 // GetOnvifCapabilities godoc
 // @Router /api/camera/onvif/capabilities [post]
 // @ID camera-onvif-capabilities
-// @Tags camera
+// @Tags onvif
 // @Param config body models.OnvifCredentials true "OnvifCredentials"
 // @Summary Will return the ONVIF capabilities for the specific camera.
 // @Description Will return the ONVIF capabilities for the specific camera.
@@ -108,7 +108,7 @@ func GetOnvifCapabilities(c *gin.Context) {
 // DoOnvifPanTilt godoc
 // @Router /api/camera/onvif/pantilt [post]
 // @ID camera-onvif-pantilt
-// @Tags camera
+// @Tags onvif
 // @Param panTilt body models.OnvifPanTilt true "OnvifPanTilt"
 // @Summary Panning or/and tilting the camera.
 // @Description Panning or/and tilting the camera using a direction (x,y).
@@ -182,7 +182,7 @@ func DoOnvifPanTilt(c *gin.Context) {
 // DoOnvifZoom godoc
 // @Router /api/camera/onvif/zoom [post]
 // @ID camera-onvif-zoom
-// @Tags camera
+// @Tags onvif
 // @Param zoom body models.OnvifZoom true "OnvifZoom"
 // @Summary Zooming in or out the camera.
 // @Description Zooming in or out the camera.
@@ -255,7 +255,7 @@ func DoOnvifZoom(c *gin.Context) {
 // GetOnvifPresets godoc
 // @Router /api/camera/onvif/presets [post]
 // @ID camera-onvif-presets
-// @Tags camera
+// @Tags onvif
 // @Param config body models.OnvifCredentials true "OnvifCredentials"
 // @Summary Will return the ONVIF presets for the specific camera.
 // @Description Will return the ONVIF presets for the specific camera.
@@ -306,7 +306,7 @@ func GetOnvifPresets(c *gin.Context) {
 // GoToOnvifPReset godoc
 // @Router /api/camera/onvif/gotopreset [post]
 // @ID camera-onvif-gotopreset
-// @Tags camera
+// @Tags onvif
 // @Param config body models.OnvifPreset true "OnvifPreset"
 // @Summary Will activate the desired ONVIF preset.
 // @Description Will activate the desired ONVIF preset.
@@ -361,7 +361,7 @@ func GoToOnvifPreset(c *gin.Context) {
 // @securityDefinitions.apikey Bearer
 // @in header
 // @name Authorization
-// @Tags camera
+// @Tags onvif
 // @Param config body models.OnvifCredentials true "OnvifCredentials"
 // @Summary Will get the digital inputs from the ONVIF device.
 // @Description Will get the digital inputs from the ONVIF device.
@@ -430,7 +430,7 @@ func DoGetDigitalInputs(c *gin.Context) {
 // @securityDefinitions.apikey Bearer
 // @in header
 // @name Authorization
-// @Tags camera
+// @Tags onvif
 // @Param config body models.OnvifCredentials true "OnvifCredentials"
 // @Summary Will get the relay outputs from the ONVIF device.
 // @Description Will get the relay outputs from the ONVIF device.
@@ -499,7 +499,7 @@ func DoGetRelayOutputs(c *gin.Context) {
 // @securityDefinitions.apikey Bearer
 // @in header
 // @name Authorization
-// @Tags camera
+// @Tags onvif
 // @Param config body models.OnvifCredentials true "OnvifCredentials"
 // @Param output path string true "Output"
 // @Summary Will trigger the relay output from the ONVIF device.
