@@ -962,10 +962,10 @@ func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
 			stringBody := string(b2)
 			decodedXML, et, err := getXMLNode(stringBody, "CreatePullPointSubscriptionResponse")
 			if err != nil {
-				log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
+				log.Log.Error("onvif.main.CreatePullPointSubscription(): " + err.Error())
 			} else {
 				if err := decodedXML.DecodeElement(&createPullPointSubscriptionResponse, et); err != nil {
-					log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
+					log.Log.Error("onvif.main.CreatePullPointSubscription(): " + err.Error())
 				} else {
 					pullPointAdress = string(createPullPointSubscriptionResponse.SubscriptionReference.Address)
 				}
@@ -1035,7 +1035,7 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 		// We were able to create a subscription to the device. Now pull some messages from the subscription.
 		subscriptionURI := pullPointAddress
 		if subscriptionURI == "" {
-			log.Log.Error("onvif.main.GetEventMessages(createPullPoint): subscriptionURI is empty")
+			log.Log.Error("onvif.main.GetEventMessages(): subscriptionURI is empty")
 		} else {
 			// Pull message
 			pullMessage := event.PullMessages{
@@ -1044,11 +1044,13 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 			}
 			requestBody, err := xml.Marshal(pullMessage)
 			if err != nil {
-				log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
+				log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
+				return eventsArray, err
 			}
 			res, err := dev.SendSoap(string(subscriptionURI), string(requestBody))
 			if err != nil {
-				log.Log.Error("onvif.main.GetEventMessages(createPullPoint): " + err.Error())
+				log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
+				return eventsArray, err
 			}
 
 			var pullMessagesResponse event.PullMessagesResponse
@@ -1060,9 +1062,11 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 					decodedXML, et, err := getXMLNode(stringBody, "PullMessagesResponse")
 					if err != nil {
 						log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
+						return eventsArray, err
 					} else {
 						if err := decodedXML.DecodeElement(&pullMessagesResponse, et); err != nil {
 							log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
+							return eventsArray, err
 						}
 					}
 				}
