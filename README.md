@@ -260,11 +260,11 @@ or for a single file:
 
 ## H264 vs H265
 
-If we talk about video encoders and decoders (codecs) there are 2 major video encoders on the market: H264 and H265. Taking into account your use cases you might use one over the other. We will provide an (not complete) overview of the advantages and disadvantages of each codec in the field of video surveillance and video analytics. If you would like to know more, you should look for additional resources on the internet (or if you like to read physical items, books still exists).
+If we talk about video encoders and decoders (codecs) there are 2 major video codecs on the market: H264 and H265. Taking into account your use case, you might use one over the other. We will provide an (not complete) overview of the advantages and disadvantages of each codec in the field of video surveillance and video analytics. If you would like to know more, you should look for additional resources on the internet (or if you like to read physical items, books still exists nowadays).
 
 - H264 (also known as AVC or MPEG-4 Part 10)
   - Is the most common one and most widely supported for IP cameras.
-  - Supported in the majority browsers, operating system and third-party applications.
+  - Supported in the majority of browsers, operating system and third-party applications.
   - Can be embedded in commercial and 3rd party applications.
   - Different levels of compression (high, medium, low, ..)
   - Better quality / compression ratio, shows less artifacts at medium compression ratios.
@@ -274,7 +274,7 @@ If we talk about video encoders and decoders (codecs) there are 2 major video en
   - Is not supported on legacy cameras, though becoming rapidly available on "newer" IP cameras.
   - Might not always be supported due to licensing. For example not supported in browers on a Linux distro.
   - Requires licensing when embedding in a commercial product (be careful).
-  - Higher levels of compression (50% more than h264).
+  - Higher levels of compression (50% more than H264).
   - H265 shows artifacts in motion based environments (which is less with H264).
   - Recording the same video (resolution, duration and FPS) in H264 and H265 will result in approx 50% the file size.
   - Not supported in technologies such as WebRTC
