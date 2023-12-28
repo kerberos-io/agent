@@ -44,11 +44,21 @@ func LoginToOnvif(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, capabilities, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			c.JSON(200, gin.H{
-				"device": device,
-			})
+			// Get token from the first profile
+			token, err := onvif.GetTokenFromProfile(device, 0)
+			if err == nil {
+				c.JSON(200, gin.H{
+					"device":       device,
+					"capabilities": capabilities,
+					"token":        token,
+				})
+			} else {
+				c.JSON(400, gin.H{
+					"data": "Something went wrong: " + err.Error(),
+				})
+			}
 		} else {
 			c.JSON(400, gin.H{
 				"data": "Something went wrong: " + err.Error(),
@@ -88,10 +98,10 @@ func GetOnvifCapabilities(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		_, capabilities, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			c.JSON(200, gin.H{
-				"capabilities": onvif.GetCapabilitiesFromDevice(device),
+				"capabilities": capabilities,
 			})
 		} else {
 			c.JSON(400, gin.H{
@@ -132,7 +142,7 @@ func DoOnvifPanTilt(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 
 		if err == nil {
 			// Get token from the first profile
@@ -206,7 +216,7 @@ func DoOnvifZoom(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 
 		if err == nil {
 			// Get token from the first profile
@@ -279,7 +289,7 @@ func GetOnvifPresets(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			presets, err := onvif.GetPresetsFromDevice(device)
 			if err == nil {
@@ -330,7 +340,7 @@ func GoToOnvifPreset(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			err := onvif.GoToPresetFromDevice(device, onvifPreset.Preset)
 			if err == nil {
@@ -385,7 +395,7 @@ func DoGetDigitalInputs(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		_, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		_, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			// Get the digital inputs and outputs from the device
 			inputOutputs, err := onvif.GetInputOutputs()
@@ -454,7 +464,7 @@ func DoGetRelayOutputs(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		_, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		_, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			// Get the digital inputs and outputs from the device
 			inputOutputs, err := onvif.GetInputOutputs()
@@ -527,7 +537,7 @@ func DoTriggerRelayOutput(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			err := onvif.TriggerRelayOutput(device, output)
 			if err == nil {

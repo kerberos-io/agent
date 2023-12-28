@@ -705,12 +705,12 @@ paths:
       description: Will verify the ONVIF connectivity.
       operationId: verify-onvif
       parameters:
-      - description: Camera Config
+      - description: OnvifCredentials
         in: body
-        name: cameraConfig
+        name: config
         required: true
         schema:
-          $ref: '#/definitions/models.IPCamera'
+          $ref: '#/definitions/models.OnvifCredentials'
       responses:
         "200":
           description: OK

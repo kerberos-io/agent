@@ -54,7 +54,7 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 
 		// Connect to Onvif device
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := ConnectToOnvifDevice(&cameraConfiguration)
+		device, _, err := ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 
 			// Get token from the first profile
@@ -189,7 +189,7 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 	log.Log.Debug("onvif.HandleONVIFActions(): finished")
 }
 
-func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, error) {
+func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, device.GetCapabilitiesResponse, error) {
 	log.Log.Debug("onvif.ConnectToOnvifDevice(): started")
 	dev, err := onvif.NewDevice(onvif.DeviceParams{
 		Xaddr:    cameraConfiguration.ONVIFXAddr,
@@ -197,6 +197,8 @@ func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, 
 		Password: cameraConfiguration.ONVIFPassword,
 		AuthMode: "both",
 	})
+
+	var capabilities device.GetCapabilitiesResponse
 	if err != nil {
 		log.Log.Debug("onvif.ConnectToOnvifDevice(): " + err.Error())
 	} else {
@@ -220,7 +222,6 @@ func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, 
 		if err != nil {
 			log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
 		} else {
-			var capabilities device.GetCapabilitiesResponse
 			if err := decodedXML.DecodeElement(&capabilities, et); err != nil {
 				log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
 			} else {
@@ -231,7 +232,7 @@ func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, 
 		log.Log.Info("onvif.ConnectToOnvifDevice(): successfully connected to device")
 	}
 	log.Log.Debug("onvif.ConnectToOnvifDevice(): finished")
-	return dev, err
+	return dev, capabilities, err
 }
 
 func GetTokenFromProfile(device *onvif.Device, profileId int) (xsdonvif.ReferenceToken, error) {
@@ -302,7 +303,7 @@ func GetPositionFromDevice(configuration models.Configuration) (xsdonvif.PTZVect
 	var position xsdonvif.PTZVector
 	// Connect to Onvif device
 	cameraConfiguration := configuration.Config.Capture.IPCamera
-	device, err := ConnectToOnvifDevice(&cameraConfiguration)
+	device, _, err := ConnectToOnvifDevice(&cameraConfiguration)
 	if err == nil {
 
 		// Get token from the first profile
@@ -899,28 +900,52 @@ func GetPTZFunctionsFromDevice(configurations ptz.GetConfigurationsResponse) ([]
 // @in header
 // @name Authorization
 // @Tags onvif
-// @Param cameraConfig body models.IPCamera true "Camera Config"
+// @Param config body models.OnvifCredentials true "OnvifCredentials"
 // @Summary Will verify the ONVIF connectivity.
 // @Description Will verify the ONVIF connectivity.
 // @Success 200 {object} models.APIResponse
 func VerifyOnvifConnection(c *gin.Context) {
-	var cameraConfig models.IPCamera
-	err := c.BindJSON(&cameraConfig)
-	if err == nil {
-		device, err := ConnectToOnvifDevice(&cameraConfig)
+	var onvifCredentials models.OnvifCredentials
+	err := c.BindJSON(&onvifCredentials)
+
+	if err == nil && onvifCredentials.ONVIFXAddr != "" {
+
+		configuration := &models.Configuration{
+			Config: models.Config{
+				Capture: models.Capture{
+					IPCamera: models.IPCamera{
+						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
+						ONVIFUsername: onvifCredentials.ONVIFUsername,
+						ONVIFPassword: onvifCredentials.ONVIFPassword,
+					},
+				},
+			},
+		}
+
+		cameraConfiguration := configuration.Config.Capture.IPCamera
+		device, capabilities, err := ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			log.Log.Info("onvif.main.VerifyOnvifConnection(): successfully verified the ONVIF connection")
-			c.JSON(200, models.APIResponse{
-				Data: device,
-			})
+			// Get token from the first profile
+			token, err := GetTokenFromProfile(device, 0)
+			if err == nil {
+				c.JSON(200, gin.H{
+					"device":       device,
+					"capabilities": capabilities,
+					"token":        token,
+				})
+			} else {
+				c.JSON(400, gin.H{
+					"data": "Something went wrong: " + err.Error(),
+				})
+			}
 		} else {
-			c.JSON(400, models.APIResponse{
-				Message: "onvif.main.VerifyOnvifConnection(): s went wrong while verifying the ONVIF connection " + err.Error(),
+			c.JSON(400, gin.H{
+				"data": "Something went wrong: " + err.Error(),
 			})
 		}
 	} else {
-		c.JSON(400, models.APIResponse{
-			Message: "onvif.main.VerifyOnvifConnection(): s went wrong while receiving the config " + err.Error(),
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
 		})
 	}
 }
@@ -1264,5 +1289,12 @@ func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElemen
 			}
 		}
 	}
-	return nil, nil, errors.New("getXMLNode(): " + err.Error())
+
+	// Check for authorisation error
+	// - The action requested requires authorization and the sender is not authorized
+	if strings.Contains(xmlBody, "not authorized") {
+		return nil, nil, errors.New("getXMLNode(): not authorized, make sure you have the correct credentials")
+	} else {
+		return nil, nil, errors.New("getXMLNode(): " + err.Error())
+	}
 }

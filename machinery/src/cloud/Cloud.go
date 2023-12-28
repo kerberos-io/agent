@@ -235,7 +235,7 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 	var pullPointAddress string
 	if config.Capture.IPCamera.ONVIFXAddr != "" {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			pullPointAddress, err = onvif.CreatePullPointSubscription(device)
 			if err != nil {
@@ -260,7 +260,7 @@ loop:
 		var onvifEventsList []byte
 		if config.Capture.IPCamera.ONVIFXAddr != "" {
 			cameraConfiguration := configuration.Config.Capture.IPCamera
-			device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+			device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 			if err == nil {
 				configurations, err := onvif.GetPTZConfigurationsFromDevice(device)
 				if err == nil {
@@ -553,7 +553,7 @@ loop:
 
 	if pullPointAddress != "" {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			onvif.UnsubscribePullPoint(device, pullPointAddress)
 		}

@@ -518,7 +518,7 @@ func HandleTriggerRelay(mqttClient mqtt.Client, hubKey string, payload models.Pa
 			token := triggerRelayPayload.Token
 			// Connect to Onvif device
 			cameraConfiguration := configuration.Config.Capture.IPCamera
-			device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+			device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 			if err == nil {
 				// Trigger relay output
 				err := onvif.TriggerRelayOutput(device, token)

@@ -605,12 +605,12 @@ const docTemplate = `{
                 "operationId": "verify-onvif",
                 "parameters": [
                     {
-                        "description": "Camera Config",
-                        "name": "cameraConfig",
+                        "description": "OnvifCredentials",
+                        "name": "config",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.IPCamera"
+                            "$ref": "#/definitions/models.OnvifCredentials"
                         }
                     }
                 ],
