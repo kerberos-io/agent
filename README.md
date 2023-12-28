@@ -46,27 +46,32 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 ### Introduction
 
-3. [A world of Kerberos Agents](#a-world-of-kerberos-agents)
+1. [A world of Kerberos Agents](#a-world-of-kerberos-agents)
 
 ### Running and automation
 
-4. [How to run and deploy a Kerberos Agent](#how-to-run-and-deploy-a-kerberos-agent)
-5. [Access the Kerberos Agent](#access-the-kerberos-agent)
-6. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
-7. [Configure with environment variables](#configure-with-environment-variables)
+1. [How to run and deploy a Kerberos Agent](#how-to-run-and-deploy-a-kerberos-agent)
+2. [Access the Kerberos Agent](#access-the-kerberos-agent)
+3. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
+4. [Configure with environment variables](#configure-with-environment-variables)
+
+### Insights
+
+1. [Encryption](#encryption)
+2. [H264 vs H265](#h264-vs-h265)
 
 ### Contributing
 
-8. [Contribute with Codespaces](#contribute-with-codespaces)
-9. [Develop and build](#develop-and-build)
-10. [Building from source](#building-from-source)
-11. [Building for Docker](#building-for-docker)
+1. [Contribute with Codespaces](#contribute-with-codespaces)
+2. [Develop and build](#develop-and-build)
+3.  [Building from source](#building-from-source)
+4.  [Building for Docker](#building-for-docker)
 
 ### Varia
 
-12. [Support our project](#support-our-project)
-13. [What is new?](#what-is-new)
-14. [Contributors](#contributors)
+1. [Support our project](#support-our-project)
+1. [What is new?](#what-is-new)
+1. [Contributors](#contributors)
 
 ## Quickstart - Docker
 
@@ -150,20 +155,6 @@ The default username and password for the Kerberos Agent is:
 - Password: `root`
 
 **_Please note that you change the username and password for a final installation, see [Configure with environment variables](#configure-with-environment-variables) below._**
-
-## Encryption
-
-You can encrypt your recordings and outgoing MQTT messages with your own AES and RSA keys by enabling the encryption settings. Once enabled all your recordings will be encrypted using AES-256-CBC and your symmetric key. You can either use the default `openssl` toolchain to decrypt the recordings with your AES key, as following:
-
-    openssl aes-256-cbc -d -md md5 -in encrypted.mp4 -out decrypted.mp4 -k your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
-
-, and additionally you can decrypt a folder of recordings, using the Kerberos Agent binary as following:
-
-    go run main.go -action decrypt ./data/recordings your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
-
-or for a single file:
-
-    go run main.go -action decrypt ./data/recordings/video.mp4 your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
 
 ## Configure and persist with volume mounts
 
@@ -252,6 +243,43 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_ENCRYPTION_FINGERPRINT`          | The fingerprint of the keypair (public/private keys), so you know which one to use.             | ""                             |
 | `AGENT_ENCRYPTION_PRIVATE_KEY`          | The private key (assymetric/RSA) to decryptand sign requests send over MQTT.                    | ""                             |
 | `AGENT_ENCRYPTION_SYMMETRIC_KEY`        | The symmetric key (AES) to encrypt and decrypt request send over MQTT.                          | ""                             |
+
+## Encryption
+
+You can encrypt your recordings and outgoing MQTT messages with your own AES and RSA keys by enabling the encryption settings. Once enabled all your recordings will be encrypted using AES-256-CBC and your symmetric key. You can either use the default `openssl` toolchain to decrypt the recordings with your AES key, as following:
+
+    openssl aes-256-cbc -d -md md5 -in encrypted.mp4 -out decrypted.mp4 -k your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
+
+, and additionally you can decrypt a folder of recordings, using the Kerberos Agent binary as following:
+
+    go run main.go -action decrypt ./data/recordings your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
+
+or for a single file:
+
+    go run main.go -action decrypt ./data/recordings/video.mp4 your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
+
+## H264 vs H265
+
+If we talk about video encoding there are 2 major video encoders on the market: H264 and H265. Depending on your use cases you might use one over the other. We will a (not complete) overview of the advantages and disadvantages of each in the field of video surveillance and video analytics. If you would like to know more, you should look for additional resources.
+
+- H264 (also known as AVC or MPEG-4 Part 10)
+  - Is the most common one and widely supported for IP cameras.
+  - Widely supported in browsers and other type of applications.
+  - Can be embedded in commercial and 3rd party applications.
+  - Different levels of compression (high, medium, low, ..)
+  - Better quality / compression ratio.
+  - Does support technologies such as WebRTC
+
+- H265 (also known as HEVC)
+  - Is not supported on legacy cameras, though becoming rapidly available on newer IP camera version.
+  - Might not always be supported due to licensing. For example not supported in browers on a Linux distro.
+  - Requires licensing when embedding in a commercial product (be careful).
+  - Higher levels of compression (50% more than h264).
+  - H265 shows artifacts in motion based environments (which is less with H264).
+  - Recording the same video (resolution, duration and FPS) in H264 and H265 will result in approx 50% the file size.
+  - Not supported in technologies such as WebRTC
+  
+Conclusion: depending on the use case you might choose one over the other, and you can use both at the same time. For example you can use H264 (main stream) for livestreaming, and H265 for recording. Depending on your use case where you wish to play recordings in a cross-platform and cross-browser you might opt for H264 for better support.
 
 ## Contribute with Codespaces
 
