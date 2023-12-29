@@ -304,9 +304,6 @@ loop:
 							log.Log.Error("cloud.HandleHeartBeat(): error while marshalling events: " + err.Error())
 							onvifEventsList = []byte("[]")
 						}
-					} else if len(events) == 0 {
-						log.Log.Debug("cloud.HandleHeartBeat(): no events found.")
-						onvifEventsList = []byte("[]")
 					} else if err != nil {
 						log.Log.Error("cloud.HandleHeartBeat(): error while getting events: " + err.Error())
 						onvifEventsList = []byte("[]")
@@ -316,6 +313,9 @@ loop:
 						if err != nil {
 							log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 						}
+					} else if len(events) == 0 {
+						log.Log.Debug("cloud.HandleHeartBeat(): no events found.")
+						onvifEventsList = []byte("[]")
 					}
 				} else {
 					log.Log.Debug("cloud.HandleHeartBeat(): no pull point address found.")
