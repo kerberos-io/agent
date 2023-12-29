@@ -149,8 +149,8 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 	if hubKey == "" {
 		log.Log.Info("routers.mqtt.main.MQTTListenerHandler(): no hub key provided, not subscribing to kerberos/hub/{hubkey}")
 	} else {
-		topicOnvif := fmt.Sprintf("kerberos/agent/%s", hubKey)
-		mqttClient.Subscribe(topicOnvif, 1, func(c mqtt.Client, msg mqtt.Message) {
+		agentListener := fmt.Sprintf("kerberos/agent/%s", hubKey)
+		mqttClient.Subscribe(agentListener, 1, func(c mqtt.Client, msg mqtt.Message) {
 
 			// Decode the message, we are expecting following format.
 			// {
