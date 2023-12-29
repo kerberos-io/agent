@@ -325,10 +325,12 @@ loop:
 			} else {
 				log.Log.Error("cloud.HandleHeartBeat(): error while connecting to ONVIF device: " + err.Error())
 				onvifPresetsList = []byte("[]")
+				onvifEventsList = []byte("[]")
 			}
 		} else {
 			log.Log.Debug("cloud.HandleHeartBeat(): ONVIF is not enabled.")
 			onvifPresetsList = []byte("[]")
+			onvifEventsList = []byte("[]")
 		}
 
 		// We'll capture some more metrics, and send it to Hub, if not in offline mode ofcourse ;) ;)
