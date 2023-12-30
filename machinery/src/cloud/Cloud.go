@@ -262,9 +262,9 @@ loop:
 			cameraConfiguration := configuration.Config.Capture.IPCamera
 			device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 			if err == nil {
+				onvifEnabled = "true"
 				configurations, err := onvif.GetPTZConfigurationsFromDevice(device)
 				if err == nil {
-					onvifEnabled = "true"
 					_, canZoom, canPanTilt := onvif.GetPTZFunctionsFromDevice(configurations)
 					if canZoom {
 						onvifZoom = "true"
