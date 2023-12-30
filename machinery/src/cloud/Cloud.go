@@ -343,7 +343,6 @@ loop:
 			username := ""
 			vaultURI := ""
 
-			username = config.S3.Username
 			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
 				username = config.S3.Username
 				key = config.S3.Publickey
