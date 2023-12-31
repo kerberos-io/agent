@@ -27,7 +27,7 @@ func IsWithinTimeInterval(loc *time.Location, configuration *models.Configuratio
 				currentTimeInSeconds := hour*60*60 + minute*60 + second
 				if (currentTimeInSeconds >= start1 && currentTimeInSeconds <= end1) ||
 					(currentTimeInSeconds >= start2 && currentTimeInSeconds <= end2) {
-					log.Log.Info("conditions.timewindow.IsWithinTimeInterval(): time interval valid, enabling recording.")
+					log.Log.Debug("conditions.timewindow.IsWithinTimeInterval(): time interval valid, enabling recording.")
 				} else {
 					log.Log.Info("conditions.timewindow.IsWithinTimeInterval(): time interval not valid, disabling recording.")
 					enabled = false
