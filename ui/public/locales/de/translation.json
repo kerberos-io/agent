@@ -99,9 +99,9 @@
     "camera": {
       "camera": "Kamera",
       "description_camera": "Diese Einstellungen sind notwendig um eine Verbindung mit der Kamera herzustellen",
-      "only_h264": "Aktuell werden nur H264 RTSP kompatible Kameras unterstützt",
+      "only_h264": "Aktuell werden nur H264/H265 RTSP kompatible Kameras unterstützt",
       "rtsp_url": "RTSP URL",
-      "rtsp_h264": "H264 RTSP URL der Kamera",
+      "rtsp_h264": "H264/H265 RTSP URL der Kamera",
       "sub_rtsp_url": "RTSP url für die Live Übertragung.",
       "sub_rtsp_h264": "Ergänzende URL der Kamera mit geringerer Auflösung für die Live Übertragung.",
       "onvif": "ONVIF",

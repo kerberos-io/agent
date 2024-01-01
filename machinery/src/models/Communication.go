@@ -2,11 +2,9 @@ package models
 
 import (
 	"context"
-	"sync"
 	"sync/atomic"
 
-	"github.com/kerberos-io/joy4/av/pubsub"
-	"github.com/kerberos-io/joy4/cgo/ffmpeg"
+	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/tevino/abool"
 )
 
@@ -31,12 +29,8 @@ type Communication struct {
 	HandleLiveHDPeers     chan string
 	HandleONVIF           chan OnvifAction
 	IsConfiguring         *abool.AtomicBool
-	Queue                 *pubsub.Queue
-	SubQueue              *pubsub.Queue
-	DecoderMutex          *sync.Mutex
-	SubDecoderMutex       *sync.Mutex
-	Decoder               *ffmpeg.VideoDecoder
-	SubDecoder            *ffmpeg.VideoDecoder
+	Queue                 *packets.Queue
+	SubQueue              *packets.Queue
 	Image                 string
 	CameraConnected       bool
 	HasBackChannel        bool

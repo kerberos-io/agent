@@ -3,21 +3,18 @@ package webrtc
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"github.com/kerberos-io/joy4/av/pubsub"
+	"github.com/kerberos-io/agent/machinery/src/packets"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	av "github.com/kerberos-io/joy4/av"
-	"github.com/kerberos-io/joy4/cgo/ffmpeg"
-	h264parser "github.com/kerberos-io/joy4/codec/h264parser"
 	pionWebRTC "github.com/pion/webrtc/v3"
 	pionMedia "github.com/pion/webrtc/v3/pkg/media"
 )
@@ -73,7 +70,7 @@ func CreateWebRTC(name string, stunServers []string, turnServers []string, turnS
 func (w WebRTC) DecodeSessionDescription(data string) ([]byte, error) {
 	sd, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
-		log.Log.Error("DecodeString error: " + err.Error())
+		log.Log.Error("webrtc.main.DecodeSessionDescription(): " + err.Error())
 		return []byte{}, err
 	}
 	return sd, nil
@@ -94,11 +91,11 @@ func RegisterCandidates(key string, candidate models.ReceiveHDCandidatesPayload)
 	if !ok {
 		CandidateArrays[key] = make(chan string)
 	}
-	log.Log.Info("HandleReceiveHDCandidates: " + candidate.Candidate)
+	log.Log.Info("webrtc.main.HandleReceiveHDCandidates(): " + candidate.Candidate)
 	select {
 	case CandidateArrays[key] <- candidate.Candidate:
 	default:
-		log.Log.Info("HandleReceiveHDCandidates: channel is full.")
+		log.Log.Info("webrtc.main.HandleReceiveHDCandidates(): channel is full.")
 	}
 	CandidatesMutex.Unlock()
 }
@@ -133,7 +130,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 		mediaEngine := &pionWebRTC.MediaEngine{}
 		if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
-			log.Log.Error("InitializeWebRTCConnection: something went wrong registering codecs.")
+			log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong registering codecs for media engine: " + err.Error())
 		}
 
 		api := pionWebRTC.NewAPI(pionWebRTC.WithMediaEngine(mediaEngine))
@@ -150,22 +147,18 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 						Credential: w.TurnServersCredential,
 					},
 				},
-				//ICETransportPolicy: pionWebRTC.ICETransportPolicyRelay,
+				//ICETransportPolicy: pionWebRTC.ICETransportPolicyRelay, // This will force a relay server, we might make this configurable.
 			},
 		)
 
 		if err == nil && peerConnection != nil {
 
 			if _, err = peerConnection.AddTrack(videoTrack); err != nil {
-				//panic(err)
+				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while adding video track: " + err.Error())
 			}
 
 			if _, err = peerConnection.AddTrack(audioTrack); err != nil {
-				//panic(err)
-			}
-
-			if err != nil {
-				//panic(err)
+				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while adding audio track: " + err.Error())
 			}
 
 			peerConnection.OnICEConnectionStateChange(func(connectionState pionWebRTC.ICEConnectionState) {
@@ -183,7 +176,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 					close(w.PacketsCount)
 					if err := peerConnection.Close(); err != nil {
-						//panic(err)
+						log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while closing peer connection: " + err.Error())
 					}
 				} else if connectionState == pionWebRTC.ICEConnectionStateConnected {
 					atomic.AddInt64(&peerConnectionCount, 1)
@@ -191,28 +184,28 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 					// Iterate over the candidates and send them to the remote client
 					// Non blocking channel
 					for candidate := range CandidateArrays[sessionKey] {
-						log.Log.Info("InitializeWebRTCConnection: Received candidate.")
+						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Received candidate from channel: " + candidate)
 						if candidateErr := peerConnection.AddICECandidate(pionWebRTC.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
-							log.Log.Error("InitializeWebRTCConnection: something went wrong while adding candidate: " + candidateErr.Error())
+							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while adding candidate: " + candidateErr.Error())
 						}
 					}
 				} else if connectionState == pionWebRTC.ICEConnectionStateFailed {
-
+					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): ICEConnectionStateFailed")
 				}
-				log.Log.Info("InitializeWebRTCConnection: connection state changed to: " + connectionState.String())
-				log.Log.Info("InitializeWebRTCConnection: Number of peers connected (" + strconv.FormatInt(peerConnectionCount, 10) + ")")
+				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): connection state changed to: " + connectionState.String())
+				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Number of peers connected (" + strconv.FormatInt(peerConnectionCount, 10) + ")")
 			})
 
 			offer := w.CreateOffer(sd)
 			if err = peerConnection.SetRemoteDescription(offer); err != nil {
-				//panic(err)
+				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting remote description: " + err.Error())
 			}
 
 			answer, err := peerConnection.CreateAnswer(nil)
 			if err != nil {
-				//panic(err)
+				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while creating answer: " + err.Error())
 			} else if err = peerConnection.SetLocalDescription(answer); err != nil {
-				//panic(err)
+				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting local description: " + err.Error())
 			}
 
 			// When an ICE candidate is available send to the other peer using the signaling server (MQTT).
@@ -230,7 +223,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				if err == nil {
 					valueMap["candidate"] = string(candateBinary)
 				} else {
-					log.Log.Info("HandleRequestConfig: something went wrong while marshalling candidate: " + err.Error())
+					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): something went wrong while marshalling candidate: " + err.Error())
 				}
 
 				// We'll send the candidate to the hub
@@ -243,11 +236,10 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				}
 				payload, err := models.PackageMQTTMessage(configuration, message)
 				if err == nil {
-					log.Log.Info("InitializeWebRTCConnection:" + string(candateBinary))
 					token := mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 					token.Wait()
 				} else {
-					log.Log.Info("HandleRequestConfig: something went wrong while sending acknowledge config to hub: " + string(payload))
+					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): while packaging mqtt message: " + err.Error())
 				}
 			})
 
@@ -258,7 +250,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				//  Create a config map
 				valueMap := make(map[string]interface{})
 				valueMap["sdp"] = []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP)))
-				log.Log.Info("InitializeWebRTCConnection: Send SDP answer")
+				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Send SDP answer")
 
 				// We'll send the candidate to the hub
 				message := models.Message{
@@ -273,30 +265,29 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 					token := mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 					token.Wait()
 				} else {
-					log.Log.Info("HandleRequestConfig: something went wrong while sending acknowledge config to hub: " + string(payload))
+					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): while packaging mqtt message: " + err.Error())
 				}
 			}
 		}
 	} else {
-		log.Log.Error("InitializeWebRTCConnection: NewPeerConnection failed: " + err.Error())
+		log.Log.Error("Initializwebrtc.main.InitializeWebRTCConnection()eWebRTCConnection: NewPeerConnection failed: " + err.Error())
 	}
 }
 
-func NewVideoTrack(codecs []av.CodecData) *pionWebRTC.TrackLocalStaticSample {
-	var mimeType string
-	mimeType = pionWebRTC.MimeTypeH264
+func NewVideoTrack(streams []packets.Stream) *pionWebRTC.TrackLocalStaticSample {
+	mimeType := pionWebRTC.MimeTypeH264
 	outboundVideoTrack, _ := pionWebRTC.NewTrackLocalStaticSample(pionWebRTC.RTPCodecCapability{MimeType: mimeType}, "video", "pion124")
 	return outboundVideoTrack
 }
 
-func NewAudioTrack(codecs []av.CodecData) *pionWebRTC.TrackLocalStaticSample {
+func NewAudioTrack(streams []packets.Stream) *pionWebRTC.TrackLocalStaticSample {
 	var mimeType string
-	for _, codec := range codecs {
-		if codec.Type().String() == "OPUS" {
+	for _, stream := range streams {
+		if stream.Name == "OPUS" {
 			mimeType = pionWebRTC.MimeTypeOpus
-		} else if codec.Type().String() == "PCM_MULAW" {
+		} else if stream.Name == "PCM_MULAW" {
 			mimeType = pionWebRTC.MimeTypePCMU
-		} else if codec.Type().String() == "PCM_ALAW" {
+		} else if stream.Name == "PCM_ALAW" {
 			mimeType = pionWebRTC.MimeTypePCMA
 		}
 	}
@@ -304,7 +295,7 @@ func NewAudioTrack(codecs []av.CodecData) *pionWebRTC.TrackLocalStaticSample {
 	return outboundAudioTrack
 }
 
-func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, codecs []av.CodecData, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
+func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, rtspClient capture.RTSPClient) {
 
 	config := configuration.Config
 
@@ -313,37 +304,32 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 
 	// Set the indexes for the video & audio streams
 	// Later when we read a packet we need to figure out which track to send it to.
-	videoIdx := -1
-	audioIdx := -1
-	for i, codec := range codecs {
-		if codec.Type().String() == "H264" && videoIdx < 0 {
-			videoIdx = i
-		} else if (codec.Type().String() == "OPUS" || codec.Type().String() == "PCM_MULAW" || codec.Type().String() == "PCM_ALAW") && audioIdx < 0 {
-			audioIdx = i
+	hasH264 := false
+	hasPCM_MULAW := false
+	streams, _ := rtspClient.GetStreams()
+	for _, stream := range streams {
+		if stream.Name == "H264" {
+			hasH264 = true
+		} else if stream.Name == "PCM_MULAW" {
+			hasPCM_MULAW = true
 		}
 	}
 
-	if videoIdx == -1 {
-		log.Log.Error("WriteToTrack: no video codec found.")
+	if !hasH264 && !hasPCM_MULAW {
+		log.Log.Error("webrtc.main.WriteToTrack(): no valid video codec and audio codec found.")
 	} else {
-		annexbNALUStartCode := func() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
-
 		if config.Capture.TranscodingWebRTC == "true" {
-			if videoIdx > -1 {
-				log.Log.Info("WriteToTrack: successfully using a transcoder.")
-			} else {
-			}
+			// Todo..
 		} else {
-			log.Log.Info("WriteToTrack: not using a transcoder.")
+			//log.Log.Info("webrtc.main.WriteToTrack(): not using a transcoder.")
 		}
 
 		var cursorError error
-		var pkt av.Packet
+		var pkt packets.Packet
 		var previousTime time.Duration
 
 		start := false
 		receivedKeyFrame := false
-		codecData := codecs[videoIdx]
 		lastKeepAlive := "0"
 		peerCount := "0"
 
@@ -393,64 +379,32 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 				}
 			}
 
-			if config.Capture.TranscodingWebRTC == "true" {
+			//if config.Capture.TranscodingWebRTC == "true" {
+			// We will transcode the video
+			// TODO..
+			//}
 
-				/*decoderMutex.Lock()
-				decoder.SetFramerate(30, 1)
-				frame, err := decoder.Decode(pkt.Data)
-				decoderMutex.Unlock()
-				if err == nil && frame != nil && frame.Width() > 0 && frame.Height() > 0 {
-					var _outpkts []av.Packet
-					transcodingResolution := config.Capture.TranscodingResolution
-					newWidth := frame.Width() * int(transcodingResolution) / 100
-					newHeight := frame.Height() * int(transcodingResolution) / 100
-					encoder.SetResolution(newWidth, newHeight)
-					if _outpkts, err = encoder.Encode(frame); err != nil {
-					}
-					if len(_outpkts) > 0 {
-						pkt = _outpkts[0]
-						codecData, _ = encoder.CodecData()
-					}
-				}*/
-
-			}
-
-			switch int(pkt.Idx) {
-			case videoIdx:
-				// For every key-frame pre-pend the SPS and PPS
-				pkt.Data = pkt.Data[4:]
+			if pkt.IsVideo {
+				// Start at the first keyframe
 				if pkt.IsKeyFrame {
 					start = true
-					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
-					pkt.Data = append(codecData.(h264parser.CodecData).PPS(), pkt.Data...)
-					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
-					pkt.Data = append(codecData.(h264parser.CodecData).SPS(), pkt.Data...)
-					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
-					log.Log.Info("WriteToTrack: Sending keyframe")
 				}
-
 				if start {
 					sample := pionMedia.Sample{Data: pkt.Data, Duration: bufferDuration}
 					if config.Capture.ForwardWebRTC == "true" {
-						samplePacket, err := json.Marshal(sample)
-						if err == nil {
-							// Write packets
-							topic := fmt.Sprintf("kerberos/webrtc/packets/%s", config.Key)
-							mqttClient.Publish(topic, 0, false, samplePacket)
-						} else {
-							log.Log.Info("WriteToTrack: Error marshalling frame, " + err.Error())
-						}
+						// We will send the video to a remote peer
+						// TODO..
 					} else {
 						if err := videoTrack.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
-							log.Log.Error("WriteToTrack: something went wrong while writing sample: " + err.Error())
+							log.Log.Error("webrtc.main.WriteToTrack(): something went wrong while writing sample: " + err.Error())
 						}
 					}
 				}
-			case audioIdx:
+			} else if pkt.IsAudio {
 				// We will send the audio
 				sample := pionMedia.Sample{Data: pkt.Data, Duration: pkt.Time}
 				if err := audioTrack.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
-					log.Log.Error("WriteToTrack: something went wrong while writing sample: " + err.Error())
+					log.Log.Error("webrtc.main.WriteToTrack(): something went wrong while writing sample: " + err.Error())
 				}
 			}
 		}
@@ -462,5 +416,5 @@ func WriteToTrack(livestreamCursor *pubsub.QueueCursor, configuration *models.Co
 	}
 
 	peerConnectionCount = 0
-	log.Log.Info("WriteToTrack: stop writing to track.")
+	log.Log.Info("webrtc.main.WriteToTrack(): stop writing to track.")
 }

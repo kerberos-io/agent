@@ -1,28 +1,23 @@
 package computervision
 
 import (
-	"bufio"
-	"bytes"
-	"encoding/base64"
 	"image"
-	"image/jpeg"
-	"sync"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	geo "github.com/kellydunn/golang-geo"
 	"github.com/kerberos-io/agent/machinery/src/capture"
+	"github.com/kerberos-io/agent/machinery/src/conditions"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"github.com/kerberos-io/joy4/av"
-	"github.com/kerberos-io/joy4/av/pubsub"
-	"github.com/kerberos-io/joy4/cgo/ffmpeg"
+	"github.com/kerberos-io/agent/machinery/src/packets"
 )
 
-func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) { //, wg *sync.WaitGroup) {
+func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
 
-	log.Log.Debug("ProcessMotion: started")
+	log.Log.Debug("computervision.main.ProcessMotion(): start motion detection")
 	config := configuration.Config
+	loc, _ := time.LoadLocation(config.Timezone)
 
 	var isPixelChangeThresholdReached = false
 	var changesToReturn = 0
@@ -35,17 +30,14 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 
 	if config.Capture.Continuous == "true" {
 
-		log.Log.Info("ProcessMotion: Continuous recording, so no motion detection.")
+		log.Log.Info("computervision.main.ProcessMotion(): you've enabled continuous recording, so no motion detection required.")
 
 	} else {
 
-		log.Log.Info("ProcessMotion: Motion detection enabled.")
+		log.Log.Info("computervision.main.ProcessMotion(): motion detected is enabled, so starting the motion detection.")
 
 		hubKey := config.HubKey
 		deviceKey := config.Key
-
-		// Allocate a VideoFrame
-		frame := ffmpeg.AllocVideoFrame()
 
 		// Initialise first 2 elements
 		var imageArray [3]*image.Gray
@@ -53,15 +45,15 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 		j := 0
 
 		var cursorError error
-		var pkt av.Packet
+		var pkt packets.Packet
 
 		for cursorError == nil {
 			pkt, cursorError = motionCursor.ReadPacket()
 			// Check If valid package.
 			if len(pkt.Data) > 0 && pkt.IsKeyFrame {
-				grayImage, err := GetGrayImage(frame, pkt, decoder, decoderMutex)
+				grayImage, err := rtspClient.DecodePacketRaw(pkt)
 				if err == nil {
-					imageArray[j] = grayImage
+					imageArray[j] = &grayImage
 					j++
 				}
 			}
@@ -70,34 +62,33 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 			}
 		}
 
-		img := imageArray[0]
-		if img != nil {
+		// Calculate mask
+		var polyObjects []geo.Polygon
 
-			// Calculate mask
-			var polyObjects []geo.Polygon
-
-			if config.Region != nil {
-				for _, polygon := range config.Region.Polygon {
-					coords := polygon.Coordinates
-					poly := geo.Polygon{}
-					for _, c := range coords {
-						x := c.X
-						y := c.Y
-						p := geo.NewPoint(x, y)
-						if !poly.Contains(p) {
-							poly.Add(p)
-						}
+		if config.Region != nil {
+			for _, polygon := range config.Region.Polygon {
+				coords := polygon.Coordinates
+				poly := geo.Polygon{}
+				for _, c := range coords {
+					x := c.X
+					y := c.Y
+					p := geo.NewPoint(x, y)
+					if !poly.Contains(p) {
+						poly.Add(p)
 					}
-					polyObjects = append(polyObjects, poly)
 				}
+				polyObjects = append(polyObjects, poly)
 			}
+		}
 
+		img := imageArray[0]
+		var coordinatesToCheck []int
+		if img != nil {
 			bounds := img.Bounds()
 			rows := bounds.Dy()
 			cols := bounds.Dx()
 
 			// Make fixed size array of uinty8
-			var coordinatesToCheck []int
 			for y := 0; y < rows; y++ {
 				for x := 0; x < cols; x++ {
 					for _, poly := range polyObjects {
@@ -108,10 +99,13 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					}
 				}
 			}
+		}
+
+		// If no region is set, we'll skip the motion detection
+		if len(coordinatesToCheck) > 0 {
 
 			// Start the motion detection
 			i := 0
-			loc, _ := time.LoadLocation(config.Timezone)
 
 			for cursorError == nil {
 				pkt, cursorError = motionCursor.ReadPacket()
@@ -121,81 +115,58 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					continue
 				}
 
-				grayImage, err := GetGrayImage(frame, pkt, decoder, decoderMutex)
+				grayImage, err := rtspClient.DecodePacketRaw(pkt)
 				if err == nil {
-					imageArray[2] = grayImage
+					imageArray[2] = &grayImage
 				}
 
-				// Store snapshots (jpg) for hull.
-				if config.Capture.Snapshots != "false" {
-					StoreSnapshot(communication, frame, pkt, decoder, decoderMutex)
-				}
-
-				// Check if within time interval
-				detectMotion := true
-				timeEnabled := config.Time
-				if timeEnabled != "false" {
-					now := time.Now().In(loc)
-					weekday := now.Weekday()
-					hour := now.Hour()
-					minute := now.Minute()
-					second := now.Second()
-					if config.Timetable != nil && len(config.Timetable) > 0 {
-						timeInterval := config.Timetable[int(weekday)]
-						if timeInterval != nil {
-							start1 := timeInterval.Start1
-							end1 := timeInterval.End1
-							start2 := timeInterval.Start2
-							end2 := timeInterval.End2
-							currentTimeInSeconds := hour*60*60 + minute*60 + second
-							if (currentTimeInSeconds >= start1 && currentTimeInSeconds <= end1) ||
-								(currentTimeInSeconds >= start2 && currentTimeInSeconds <= end2) {
-
-							} else {
-								detectMotion = false
-								log.Log.Info("ProcessMotion: Time interval not valid, disabling motion detection.")
-							}
-						}
-					}
+				// We might have different conditions enabled such as time window or uri response.
+				// We'll validate those conditions and if not valid we'll not do anything.
+				detectMotion, err := conditions.Validate(loc, configuration)
+				if !detectMotion && err != nil {
+					log.Log.Debug("computervision.main.ProcessMotion(): " + err.Error() + ".")
 				}
 
 				if config.Capture.Motion != "false" {
 
-					// Remember additional information about the result of findmotion
-					isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
-					if detectMotion && isPixelChangeThresholdReached {
+					if detectMotion {
 
-						// If offline mode is disabled, send a message to the hub
-						if config.Offline != "true" {
-							if mqttClient != nil {
-								if hubKey != "" {
-									message := models.Message{
-										Payload: models.Payload{
-											Action:   "motion",
-											DeviceId: configuration.Config.Key,
-											Value: map[string]interface{}{
-												"timestamp": time.Now().Unix(),
+						// Remember additional information about the result of findmotion
+						isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
+						if isPixelChangeThresholdReached {
+
+							// If offline mode is disabled, send a message to the hub
+							if config.Offline != "true" {
+								if mqttClient != nil {
+									if hubKey != "" {
+										message := models.Message{
+											Payload: models.Payload{
+												Action:   "motion",
+												DeviceId: configuration.Config.Key,
+												Value: map[string]interface{}{
+													"timestamp": time.Now().Unix(),
+												},
 											},
-										},
-									}
-									payload, err := models.PackageMQTTMessage(configuration, message)
-									if err == nil {
-										mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+										}
+										payload, err := models.PackageMQTTMessage(configuration, message)
+										if err == nil {
+											mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+										} else {
+											log.Log.Info("computervision.main.ProcessMotion(): failed to package MQTT message: " + err.Error())
+										}
 									} else {
-										log.Log.Info("ProcessMotion: failed to package MQTT message: " + err.Error())
+										mqttClient.Publish("kerberos/agent/"+deviceKey, 2, false, "motion")
 									}
-								} else {
-									mqttClient.Publish("kerberos/agent/"+deviceKey, 2, false, "motion")
 								}
 							}
-						}
 
-						if config.Capture.Recording != "false" {
-							dataToPass := models.MotionDataPartial{
-								Timestamp:       time.Now().Unix(),
-								NumberOfChanges: changesToReturn,
+							if config.Capture.Recording != "false" {
+								dataToPass := models.MotionDataPartial{
+									Timestamp:       time.Now().Unix(),
+									NumberOfChanges: changesToReturn,
+								}
+								communication.HandleMotion <- dataToPass //Save data to the channel
 							}
-							communication.HandleMotion <- dataToPass //Save data to the channel
 						}
 					}
 
@@ -209,11 +180,9 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 				img = nil
 			}
 		}
-
-		frame.Free()
 	}
 
-	log.Log.Debug("ProcessMotion: finished")
+	log.Log.Debug("computervision.main.ProcessMotion(): stop the motion detection.")
 }
 
 func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {
@@ -223,29 +192,6 @@ func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChange
 	threshold := 60
 	changes := AbsDiffBitwiseAndThreshold(image1, image2, image3, threshold, coordinatesToCheck)
 	return changes > pixelChangeThreshold, changes
-}
-
-func GetGrayImage(frame *ffmpeg.VideoFrame, pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*image.Gray, error) {
-	_, err := capture.DecodeImage(frame, pkt, dec, decoderMutex)
-
-	// Do a deep copy of the image
-	imgDeepCopy := image.NewGray(frame.ImageGray.Bounds())
-	imgDeepCopy.Stride = frame.ImageGray.Stride
-	copy(imgDeepCopy.Pix, frame.ImageGray.Pix)
-
-	return imgDeepCopy, err
-}
-
-func GetRawImage(frame *ffmpeg.VideoFrame, pkt av.Packet, dec *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) (*ffmpeg.VideoFrame, error) {
-	_, err := capture.DecodeImage(frame, pkt, dec, decoderMutex)
-	return frame, err
-}
-
-func ImageToBytes(img image.Image) ([]byte, error) {
-	buffer := new(bytes.Buffer)
-	w := bufio.NewWriter(buffer)
-	err := jpeg.Encode(w, img, &jpeg.Options{Quality: 15})
-	return buffer.Bytes(), err
 }
 
 func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.Gray, threshold int, coordinatesToCheck []int) int {
@@ -259,17 +205,4 @@ func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.
 		}
 	}
 	return changes
-}
-
-func StoreSnapshot(communication *models.Communication, frame *ffmpeg.VideoFrame, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
-	rgbImage, err := GetRawImage(frame, pkt, decoder, decoderMutex)
-	if err == nil {
-		buffer := new(bytes.Buffer)
-		w := bufio.NewWriter(buffer)
-		err := jpeg.Encode(w, &rgbImage.Image, &jpeg.Options{Quality: 15})
-		if err == nil {
-			snapshot := base64.StdEncoding.EncodeToString(buffer.Bytes())
-			communication.Image = snapshot
-		}
-	}
 }

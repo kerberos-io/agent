@@ -12,7 +12,6 @@ import (
 // The logging library being used everywhere.
 var Log = Logging{
 	Logger: "logrus",
-	Level:  "debug",
 }
 
 // -----------------
@@ -45,19 +44,45 @@ func ConfigureGoLogging(configDirectory string, timezone *time.Location) {
 // This a logrus
 // -> github.com/sirupsen/logrus
 
-func ConfigureLogrus(timezone *time.Location) {
-	// Log as JSON instead of the default ASCII formatter.
-	logrus.SetFormatter(LocalTimeZoneFormatter{
-		Timezone:  timezone,
-		Formatter: &logrus.JSONFormatter{},
-	}) // Use local timezone for providing datetime in logs!
+func ConfigureLogrus(level string, output string, timezone *time.Location) {
+
+	if output == "json" {
+		// Log as JSON instead of the default ASCII formatter.
+		logrus.SetFormatter(LocalTimeZoneFormatter{
+			Timezone:  timezone,
+			Formatter: &logrus.JSONFormatter{},
+		})
+	} else if output == "text" {
+		// Log as text with colors.
+		formatter := logrus.TextFormatter{
+			ForceColors:   true,
+			FullTimestamp: true,
+		}
+		logrus.SetFormatter(LocalTimeZoneFormatter{
+			Timezone:  timezone,
+			Formatter: &formatter,
+		})
+	}
+
+	// Use local timezone for providing datetime in logs!
 
 	// Output to stdout instead of the default stderr
 	// Can be any io.Writer, see below for File example
 	logrus.SetOutput(os.Stdout)
 
 	// Only log the warning severity or above.
-	logrus.SetLevel(logrus.InfoLevel)
+	logLevel := logrus.InfoLevel
+	if level == "error" {
+		logLevel = logrus.ErrorLevel
+	} else if level == "debug" {
+		logLevel = logrus.DebugLevel
+		logrus.SetReportCaller(true)
+	} else if level == "fatal" {
+		logLevel = logrus.FatalLevel
+	} else if level == "warning" {
+		logLevel = logrus.WarnLevel
+	} // Add this line for logging filename and line number!
+	logrus.SetLevel(logLevel)
 }
 
 type LocalTimeZoneFormatter struct {
@@ -72,15 +97,14 @@ func (u LocalTimeZoneFormatter) Format(e *logrus.Entry) ([]byte, error) {
 
 type Logging struct {
 	Logger string
-	Level  string
 }
 
-func (self *Logging) Init(configDirectory string, timezone *time.Location) {
+func (self *Logging) Init(level string, logoutput string, configDirectory string, timezone *time.Location) {
 	switch self.Logger {
 	case "go-logging":
 		ConfigureGoLogging(configDirectory, timezone)
 	case "logrus":
-		ConfigureLogrus(timezone)
+		ConfigureLogrus(level, logoutput, timezone)
 	default:
 	}
 }

@@ -1,9 +1,12 @@
 package utils
 
 import (
+	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
+	"image"
+	"image/jpeg"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -394,4 +397,11 @@ func Decrypt(directoryOrFile string, symmetricKey []byte) {
 			return
 		}
 	}
+}
+
+func ImageToBytes(img image.Image) ([]byte, error) {
+	buffer := new(bytes.Buffer)
+	w := bufio.NewWriter(buffer)
+	err := jpeg.Encode(w, img, &jpeg.Options{Quality: 15})
+	return buffer.Bytes(), err
 }

@@ -1,5 +1,5 @@
 
-FROM kerberos/base:dc12d68 AS build-machinery
+FROM kerberos/base:0a50dc9 AS build-machinery
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
@@ -20,6 +20,7 @@ RUN apt-get upgrade -y && apt-get update && apt-get install -y --fix-missing --n
 
 RUN mkdir -p /go/src/github.com/kerberos-io/agent
 COPY machinery /go/src/github.com/kerberos-io/agent/machinery
+RUN rm -rf /go/src/github.com/kerberos-io/agent/machinery/.env
 
 ##################################################################
 # Get the latest commit hash, so we know which version we're running

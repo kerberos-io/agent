@@ -19,6 +19,8 @@ import {
 } from '@kerberos-io/ui';
 import { Link, withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
+import { interval } from 'rxjs';
+import { send } from '@giantmachines/redux-websocket';
 import ImageCanvas from '../../components/ImageCanvas/ImageCanvas';
 import './Settings.scss';
 import timezones from './timezones';
@@ -121,6 +123,7 @@ class Settings extends React.Component {
     this.onUpdateToggle = this.onUpdateToggle.bind(this);
     this.onUpdateNumberField = this.onUpdateNumberField.bind(this);
     this.onUpdateTimeline = this.onUpdateTimeline.bind(this);
+    this.initialiseLiveview = this.initialiseLiveview.bind(this);
     this.verifyPersistenceSettings = this.verifyPersistenceSettings.bind(this);
     this.verifyHubSettings = this.verifyHubSettings.bind(this);
     this.verifyCameraSettings = this.verifyCameraSettings.bind(this);
@@ -144,11 +147,18 @@ class Settings extends React.Component {
       }));
       this.calculateTimetable(config.timetable);
     });
+    this.initialiseLiveview();
   }
 
   componentWillUnmount() {
     document.removeEventListener('keydown', this.escFunction, false);
     clearInterval(this.interval);
+
+    const { dispatchSend } = this.props;
+    const message = {
+      message_type: 'stop-sd',
+    };
+    dispatchSend(message);
   }
 
   onAddRegion(device, id, polygon) {
@@ -225,6 +235,24 @@ class Settings extends React.Component {
       },
       ...object.slice(index + 1),
     ]);
+  }
+
+  initialiseLiveview() {
+    const message = {
+      message_type: 'stream-sd',
+    };
+    const { connected, dispatchSend } = this.props;
+    if (connected) {
+      dispatchSend(message);
+    }
+
+    const requestStreamInterval = interval(2000);
+    this.requestStreamSubscription = requestStreamInterval.subscribe(() => {
+      const { connected: isConnected } = this.props;
+      if (isConnected) {
+        dispatchSend(message);
+      }
+    });
   }
 
   calculateTimetable(timetable) {
@@ -521,8 +549,8 @@ class Settings extends React.Component {
       loadingHub,
     } = this.state;
 
-    const { config: c, t } = this.props;
-    const { config, snapshot } = c;
+    const { config: c, t, images } = this.props;
+    const { config } = c;
 
     const snapshotBase64 = 'data:image/png;base64,';
     // Determine which section(s) to be shown, depending on the searching criteria.
@@ -1160,9 +1188,9 @@ class Settings extends React.Component {
                 </BlockHeader>
                 <BlockBody>
                   <p>{t('settings.conditions.description_regionofinterest')}</p>
-                  {config.region && (
+                  {config.region && images && images.length > 0 && (
                     <ImageCanvas
-                      image={snapshotBase64 + snapshot}
+                      image={snapshotBase64 + images[0]}
                       polygons={config.region.polygon}
                       rendered={false}
                       onAddRegion={this.onAddRegion}
@@ -2379,6 +2407,8 @@ class Settings extends React.Component {
 
 const mapStateToProps = (state /* , ownProps */) => ({
   config: state.agent.config,
+  connected: state.wss.connected,
+  images: state.wss.images,
 });
 
 const mapDispatchToProps = (dispatch /* , ownProps */) => ({
@@ -2397,11 +2427,14 @@ const mapDispatchToProps = (dispatch /* , ownProps */) => ({
   dispatchAddRegion: (id, polygon) => dispatch(addRegion(id, polygon)),
   dispatchRemoveRegion: (id, polygon) => dispatch(removeRegion(id, polygon)),
   dispatchUpdateRegion: (id, polygon) => dispatch(updateRegion(id, polygon)),
+  dispatchSend: (message) => dispatch(send(message)),
 });
 
 Settings.propTypes = {
   t: PropTypes.func.isRequired,
+  connected: PropTypes.bool.isRequired,
   config: PropTypes.objectOf(PropTypes.object).isRequired,
+  images: PropTypes.array.isRequired,
   dispatchVerifyHub: PropTypes.func.isRequired,
   dispatchVerifyPersistence: PropTypes.func.isRequired,
   dispatchGetConfig: PropTypes.func.isRequired,
@@ -2412,6 +2445,7 @@ Settings.propTypes = {
   dispatchRemoveRegion: PropTypes.func.isRequired,
   dispatchVerifyCamera: PropTypes.func.isRequired,
   dispatchVerifyOnvif: PropTypes.func.isRequired,
+  dispatchSend: PropTypes.func.isRequired,
 };
 
 export default withTranslation()(

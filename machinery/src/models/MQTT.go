@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
-	"io/ioutil"
+	"io"
 	"strings"
 	"time"
 
@@ -27,8 +27,29 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 	msg.DeviceId = msg.Payload.DeviceId
 	msg.Timestamp = time.Now().Unix()
 
-	// At the moment we don't do the encryption part, but we'll implement it
-	// once the legacy methods (subscriptions are moved).
+	// We'll hide the message (by default in latest version)
+	// We will encrypt using the Kerberos Hub private key if set.
+	/*msg.Hidden = false
+	if configuration.Config.HubPrivateKey != "" {
+		msg.Hidden = true
+		pload := msg.Payload
+		// Pload to base64
+		data, err := json.Marshal(pload)
+		if err != nil {
+			msg.Hidden = false
+		} else {
+			k := configuration.Config.Encryption.SymmetricKey
+			encryptedValue, err := encryption.AesEncrypt(data, k)
+			if err == nil {
+				data := base64.StdEncoding.EncodeToString(encryptedValue)
+				msg.Payload.HiddenValue = data
+				msg.Payload.Value = make(map[string]interface{})
+			}
+		}
+	}*/
+
+	// Next to hiding the message, we can also encrypt it using your own private key.
+	// Which is not stored in a remote environment (hence you are the only one owning it).
 	msg.Encrypted = false
 	if configuration.Config.Encryption != nil && configuration.Config.Encryption.Enabled == "true" {
 		msg.Encrypted = true
@@ -42,22 +63,22 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 		// Pload to base64
 		data, err := json.Marshal(pload)
 		if err != nil {
-			log.Log.Error("failed to marshal payload: " + err.Error())
+			log.Log.Error("models.mqtt.PackageMQTTMessage(): failed to marshal payload: " + err.Error())
 		}
 
 		// Encrypt the value
 		privateKey := configuration.Config.Encryption.PrivateKey
 		r := strings.NewReader(privateKey)
-		pemBytes, _ := ioutil.ReadAll(r)
+		pemBytes, _ := io.ReadAll(r)
 		block, _ := pem.Decode(pemBytes)
 		if block == nil {
-			log.Log.Error("MQTTListenerHandler: error decoding PEM block containing private key")
+			log.Log.Error("models.mqtt.PackageMQTTMessage(): error decoding PEM block containing private key")
 		} else {
 			// Parse private key
 			b := block.Bytes
 			key, err := x509.ParsePKCS8PrivateKey(b)
 			if err != nil {
-				log.Log.Error("MQTTListenerHandler: error parsing private key: " + err.Error())
+				log.Log.Error("models.mqtt.PackageMQTTMessage(): error parsing private key: " + err.Error())
 			}
 
 			// Conver key to *rsa.PrivateKey
@@ -92,6 +113,7 @@ type Message struct {
 	DeviceId    string  `json:"device_id"`
 	Timestamp   int64   `json:"timestamp"`
 	Encrypted   bool    `json:"encrypted"`
+	Hidden      bool    `json:"hidden"`
 	PublicKey   string  `json:"public_key"`
 	Fingerprint string  `json:"fingerprint"`
 	Payload     Payload `json:"payload"`
@@ -104,6 +126,7 @@ type Payload struct {
 	DeviceId       string                 `json:"device_id"`
 	Signature      string                 `json:"signature"`
 	EncryptedValue string                 `json:"encrypted_value"`
+	HiddenValue    string                 `json:"hidden_value"`
 	Value          map[string]interface{} `json:"value"`
 }
 
@@ -158,4 +181,10 @@ type NavigatePTZPayload struct {
 	Timestamp int64  `json:"timestamp"` // timestamp
 	DeviceId  string `json:"device_id"` // device id
 	Action    string `json:"action"`    // action
+}
+
+type TriggerRelay struct {
+	Timestamp int64  `json:"timestamp"` // timestamp
+	DeviceId  string `json:"device_id"` // device id
+	Token     string `json:"token"`     // token
 }

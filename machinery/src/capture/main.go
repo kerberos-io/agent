@@ -3,19 +3,20 @@ package capture
 
 import (
 	"context"
+	"encoding/base64"
+	"image"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kerberos-io/agent/machinery/src/conditions"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
-	"github.com/kerberos-io/joy4/av/pubsub"
-	"github.com/kerberos-io/joy4/format/mp4"
-
-	"github.com/kerberos-io/joy4/av"
+	"github.com/yapingcat/gomedia/go-mp4"
 )
 
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
@@ -52,14 +53,15 @@ func CleanupRecordingDirectory(configDirectory string, configuration *models.Con
 	}
 }
 
-func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, streams []av.CodecData) {
+func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient) {
 
 	config := configuration.Config
+	loc, _ := time.LoadLocation(config.Timezone)
 
 	if config.Capture.Recording == "false" {
-		log.Log.Info("HandleRecordStream: disabled, we will not record anything.")
+		log.Log.Info("capture.main.HandleRecordStream(): disabled, we will not record anything.")
 	} else {
-		log.Log.Debug("HandleRecordStream: started")
+		log.Log.Debug("capture.main.HandleRecordStream(): started")
 
 		recordingPeriod := config.Capture.PostRecording         // number of seconds to record.
 		maxRecordingPeriod := config.Capture.MaxLengthRecording // maximum number of seconds to record.
@@ -69,20 +71,24 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 		startRecording := now
 		timestamp := now
 
+		// For continuous and motion based recording we will use a single file.
+		var file *os.File
+
 		// Check if continuous recording.
 		if config.Capture.Continuous == "true" {
 
-			// Do not do anything!
-			log.Log.Info("HandleRecordStream: Start continuous recording ")
+			//var cws *cacheWriterSeeker
+			var myMuxer *mp4.Movmuxer
+			var videoTrack uint32
+			var audioTrack uint32
+			var name string
 
-			loc, _ := time.LoadLocation(config.Timezone)
+			// Do not do anything!
+			log.Log.Info("capture.main.HandleRecordStream(continuous): start recording")
+
 			now = time.Now().Unix()
 			timestamp = now
 			start := false
-			var name string
-			var myMuxer *mp4.Muxer
-			var file *os.File
-			var err error
 
 			// If continuous record the full length
 			recordingPeriod = maxRecordingPeriod
@@ -90,10 +96,9 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 			fullName := ""
 
 			// Get as much packets we need.
-			//for pkt := range packets {
 			var cursorError error
-			var pkt av.Packet
-			var nextPkt av.Packet
+			var pkt packets.Packet
+			var nextPkt packets.Packet
 			recordingStatus := "idle"
 			recordingCursor := queue.Oldest()
 
@@ -111,27 +116,58 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 					nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
 					// Write the last packet
-					if err := myMuxer.WritePacket(pkt); err != nil {
-						log.Log.Error(err.Error())
+					ttime := convertPTS(pkt.Time)
+					if pkt.IsVideo {
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+						}
+					} else if pkt.IsAudio {
+						if pkt.Codec == "AAC" {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+							}
+						} else if pkt.Codec == "PCM_MULAW" {
+							// TODO: transcode to AAC, some work to do..
+							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
+						}
 					}
 
 					// This will write the trailer a well.
-					if err := myMuxer.WriteTrailerWithPacket(nextPkt); err != nil {
-						log.Log.Error(err.Error())
+					if err := myMuxer.WriteTrailer(); err != nil {
+						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 					}
 
-					log.Log.Info("HandleRecordStream: Recording finished: file save: " + name)
+					log.Log.Info("capture.main.HandleRecordStream(continuous): recording finished: file save: " + name)
 
 					// Cleanup muxer
 					start = false
-					myMuxer.Close()
-					myMuxer = nil
 					file.Close()
 					file = nil
 
 					// Check if need to convert to fragmented using bento
 					if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
 						utils.CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
+					}
+
+					// Check if we need to encrypt the recording.
+					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
+						// reopen file into memory 'fullName'
+						contents, err := os.ReadFile(fullName)
+						if err == nil {
+							// encrypt
+							encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
+							if err == nil {
+								// write back to file
+								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
+								if err != nil {
+									log.Log.Error("capture.main.HandleRecordStream(continuous): error writing file: " + err.Error())
+								}
+							} else {
+								log.Log.Error("capture.main.HandleRecordStream(continuous): error encrypting file: " + err.Error())
+							}
+						} else {
+							log.Log.Error("capture.main.HandleRecordStream(continuous): error reading file: " + err.Error())
+						}
 					}
 
 					// Create a symbol link.
@@ -147,29 +183,13 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 				// If not yet started and a keyframe, let's make a recording
 				if !start && pkt.IsKeyFrame {
 
-					// Check if within time interval
-					nowInTimezone := time.Now().In(loc)
-					weekday := nowInTimezone.Weekday()
-					hour := nowInTimezone.Hour()
-					minute := nowInTimezone.Minute()
-					second := nowInTimezone.Second()
-					timeEnabled := config.Time
-					timeInterval := config.Timetable[int(weekday)]
-
-					if timeEnabled == "true" && timeInterval != nil {
-						start1 := timeInterval.Start1
-						end1 := timeInterval.End1
-						start2 := timeInterval.Start2
-						end2 := timeInterval.End2
-						currentTimeInSeconds := hour*60*60 + minute*60 + second
-						if (currentTimeInSeconds >= start1 && currentTimeInSeconds <= end1) ||
-							(currentTimeInSeconds >= start2 && currentTimeInSeconds <= end2) {
-
-						} else {
-							log.Log.Debug("HandleRecordStream: Disabled: no continuous recording at this moment. Not within specified time interval.")
-							time.Sleep(5 * time.Second)
-							continue
-						}
+					// We might have different conditions enabled such as time window or uri response.
+					// We'll validate those conditions and if not valid we'll not do anything.
+					valid, err := conditions.Validate(loc, configuration)
+					if !valid && err != nil {
+						log.Log.Debug("capture.main.HandleRecordStream(continuous): " + err.Error() + ".")
+						time.Sleep(5 * time.Second)
+						continue
 					}
 
 					start = true
@@ -196,39 +216,56 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 					fullName = configDirectory + "/data/recordings/" + name
 
 					// Running...
-					log.Log.Info("Recording started")
+					log.Log.Info("capture.main.HandleRecordStream(continuous): recording started")
 
 					file, err = os.Create(fullName)
 					if err == nil {
-						myMuxer = mp4.NewMuxer(file)
+						//cws = newCacheWriterSeeker(4096)
+						myMuxer, _ = mp4.CreateMp4Muxer(file)
+						// We choose between H264 and H265
+						if pkt.Codec == "H264" {
+							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264)
+						} else if pkt.Codec == "H265" {
+							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265)
+						}
+						// For an MP4 container, AAC is the only audio codec supported.
+						audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
+					} else {
+						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 					}
 
-					log.Log.Info("HandleRecordStream: composing recording")
-					log.Log.Info("HandleRecordStream: write header")
-
-					// Creating the file, might block sometimes.
-					if err := myMuxer.WriteHeader(streams); err != nil {
-						log.Log.Error(err.Error())
-					}
-
-					if err := myMuxer.WritePacket(pkt); err != nil {
-						log.Log.Error(err.Error())
+					ttime := convertPTS(pkt.Time)
+					if pkt.IsVideo {
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+						}
+					} else if pkt.IsAudio {
+						if pkt.Codec == "AAC" {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+							}
+						} else if pkt.Codec == "PCM_MULAW" {
+							// TODO: transcode to AAC, some work to do..
+							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
+						}
 					}
 
 					recordingStatus = "started"
 
 				} else if start {
-					if err := myMuxer.WritePacket(pkt); err != nil {
-						log.Log.Error(err.Error())
-					}
-
-					// We will sync to file every keyframe.
-					if pkt.IsKeyFrame {
-						err := file.Sync()
-						if err != nil {
-							log.Log.Error(err.Error())
-						} else {
-							log.Log.Info("HandleRecordStream: Synced file: " + name)
+					ttime := convertPTS(pkt.Time)
+					if pkt.IsVideo {
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+						}
+					} else if pkt.IsAudio {
+						if pkt.Codec == "AAC" {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+							}
+						} else if pkt.Codec == "PCM_MULAW" {
+							// TODO: transcode to AAC, some work to do..
+							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 						}
 					}
 				}
@@ -240,17 +277,15 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 			// If this happens we need to check to properly close the recording.
 			if cursorError != nil {
 				if recordingStatus == "started" {
-
 					// This will write the trailer a well.
 					if err := myMuxer.WriteTrailer(); err != nil {
 						log.Log.Error(err.Error())
 					}
 
-					log.Log.Info("HandleRecordStream: Recording finished: file save: " + name)
+					log.Log.Info("capture.main.HandleRecordStream(continuous): Recording finished: file save: " + name)
+
 					// Cleanup muxer
 					start = false
-					myMuxer.Close()
-					myMuxer = nil
 					file.Close()
 					file = nil
 
@@ -259,23 +294,48 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 						utils.CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
 					}
 
+					// Check if we need to encrypt the recording.
+					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
+						// reopen file into memory 'fullName'
+						contents, err := os.ReadFile(fullName)
+						if err == nil {
+							// encrypt
+							encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
+							if err == nil {
+								// write back to file
+								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
+								if err != nil {
+									log.Log.Error("capture.main.HandleRecordStream(motiondetection): error writing file: " + err.Error())
+								}
+							} else {
+								log.Log.Error("capture.main.HandleRecordStream(motiondetection): error encrypting file: " + err.Error())
+							}
+						} else {
+							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error reading file: " + err.Error())
+						}
+					}
+
 					// Create a symbol link.
 					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
 					fc.Close()
 
 					recordingStatus = "idle"
+
+					// Clean up the recording directory if necessary.
+					CleanupRecordingDirectory(configDirectory, configuration)
 				}
 			}
 		} else {
 
-			log.Log.Info("HandleRecordStream: Start motion based recording ")
-
-			var myMuxer *mp4.Muxer
-			var file *os.File
-			var err error
+			log.Log.Info("capture.main.HandleRecordStream(motiondetection): Start motion based recording ")
 
 			var lastDuration time.Duration
 			var lastRecordingTime int64
+
+			//var cws *cacheWriterSeeker
+			var myMuxer *mp4.Movmuxer
+			var videoTrack uint32
+			var audioTrack uint32
 
 			for motion := range communication.HandleMotion {
 
@@ -319,26 +379,28 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 				fullName := configDirectory + "/data/recordings/" + name
 
 				// Running...
-				log.Log.Info("HandleRecordStream: Recording started")
-				file, err = os.Create(fullName)
-				if err == nil {
-					myMuxer = mp4.NewMuxer(file)
-				}
+				log.Log.Info("capture.main.HandleRecordStream(motiondetection): recording started")
+				file, _ = os.Create(fullName)
+				myMuxer, _ = mp4.CreateMp4Muxer(file)
 
+				// Check which video codec we need to use.
+				videoSteams, _ := rtspClient.GetVideoStreams()
+				for _, stream := range videoSteams {
+					if stream.Name == "H264" {
+						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264)
+					} else if stream.Name == "H265" {
+						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265)
+					}
+				}
+				// For an MP4 container, AAC is the only audio codec supported.
+				audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
 				start := false
-
-				log.Log.Info("HandleRecordStream: composing recording")
-				log.Log.Info("HandleRecordStream: write header")
-				// Creating the file, might block sometimes.
-				if err := myMuxer.WriteHeader(streams); err != nil {
-					log.Log.Error(err.Error())
-				}
 
 				// Get as much packets we need.
 				var cursorError error
-				var pkt av.Packet
-				var nextPkt av.Packet
-				recordingCursor := queue.DelayedGopCount(int(config.Capture.PreRecording))
+				var pkt packets.Packet
+				var nextPkt packets.Packet
+				recordingCursor := queue.DelayedGopCount(int(config.Capture.PreRecording + 1))
 
 				if cursorError == nil {
 					pkt, cursorError = recordingCursor.ReadPacket()
@@ -348,39 +410,52 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 
 					nextPkt, cursorError = recordingCursor.ReadPacket()
 					if cursorError != nil {
-						log.Log.Error("HandleRecordStream: " + cursorError.Error())
+						log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + cursorError.Error())
 					}
 
 					now := time.Now().Unix()
 					select {
 					case motion := <-communication.HandleMotion:
 						timestamp = now
-						log.Log.Info("HandleRecordStream: motion detected while recording. Expanding recording.")
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): motion detected while recording. Expanding recording.")
 						numberOfChanges = motion.NumberOfChanges
-						log.Log.Info("Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
 					default:
 					}
 
 					if (timestamp+recordingPeriod-now < 0 || now-startRecording > maxRecordingPeriod) && nextPkt.IsKeyFrame {
-						log.Log.Info("HandleRecordStream: closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", recordingPeriod: " + strconv.FormatInt(recordingPeriod, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", recordingPeriod: " + strconv.FormatInt(recordingPeriod, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 						break
 					}
 					if pkt.IsKeyFrame && !start && pkt.Time >= lastDuration {
-						log.Log.Info("HandleRecordStream: write frames")
+						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): write frames")
 						start = true
 					}
 					if start {
-						if err := myMuxer.WritePacket(pkt); err != nil {
-							log.Log.Error(err.Error())
+
+						ttime := convertPTS(pkt.Time)
+						if pkt.IsVideo {
+							if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+								log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
+							}
+						} else if pkt.IsAudio {
+							if pkt.Codec == "AAC" {
+								if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+									log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
+								}
+							} else if pkt.Codec == "PCM_MULAW" {
+								// TODO: transcode to AAC, some work to do..
+								log.Log.Debug("capture.main.HandleRecordStream(motiondetection): no AAC audio codec detected, skipping audio track.")
+							}
 						}
 
 						// We will sync to file every keyframe.
 						if pkt.IsKeyFrame {
 							err := file.Sync()
 							if err != nil {
-								log.Log.Error(err.Error())
+								log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
 							} else {
-								log.Log.Info("HandleRecordStream: Synced file: " + name)
+								log.Log.Debug("capture.main.HandleRecordStream(motiondetection): synced file " + name)
 							}
 						}
 					}
@@ -388,16 +463,13 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 					pkt = nextPkt
 				}
 
-				// This will write the trailer as well.
-				myMuxer.WriteTrailerWithPacket(nextPkt)
-				log.Log.Info("HandleRecordStream:  file save: " + name)
+				// This will write the trailer a well.
+				myMuxer.WriteTrailer()
+
+				log.Log.Info("capture.main.HandleRecordStream(motiondetection): file save: " + name)
 
 				lastDuration = pkt.Time
 				lastRecordingTime = time.Now().Unix()
-
-				// Cleanup muxer
-				myMuxer.Close()
-				myMuxer = nil
 				file.Close()
 				file = nil
 
@@ -417,13 +489,13 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 							// write back to file
 							err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
 							if err != nil {
-								log.Log.Error("HandleRecordStream: error writing file: " + err.Error())
+								log.Log.Error("capture.main.HandleRecordStream(motiondetection): error writing file: " + err.Error())
 							}
 						} else {
-							log.Log.Error("HandleRecordStream: error encrypting file: " + err.Error())
+							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error encrypting file: " + err.Error())
 						}
 					} else {
-						log.Log.Error("HandleRecordStream: error reading file: " + err.Error())
+						log.Log.Error("capture.main.HandleRecordStream(motiondetection): error reading file: " + err.Error())
 					}
 				}
 
@@ -436,7 +508,7 @@ func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configurati
 			}
 		}
 
-		log.Log.Debug("HandleRecordStream: finished")
+		log.Log.Debug("capture.main.HandleRecordStream(): finished")
 	}
 }
 
@@ -469,15 +541,25 @@ func VerifyCamera(c *gin.Context) {
 		if streamType == "secondary" {
 			rtspUrl = cameraStreams.SubRTSP
 		}
-		_, codecs, err := OpenRTSP(ctx, rtspUrl, true)
+
+		// Currently only support H264 encoded cameras, this will change.
+		// Establishing the camera connection without backchannel if no substream
+		rtspClient := &Golibrtsp{
+			Url: rtspUrl,
+		}
+
+		err := rtspClient.Connect(ctx)
 		if err == nil {
+
+			// Get the streams from the rtsp client.
+			streams, _ := rtspClient.GetStreams()
 
 			videoIdx := -1
 			audioIdx := -1
-			for i, codec := range codecs {
-				if codec.Type().String() == "H264" && videoIdx < 0 {
+			for i, stream := range streams {
+				if (stream.Name == "H264" || stream.Name == "H265") && videoIdx < 0 {
 					videoIdx = i
-				} else if codec.Type().String() == "PCM_MULAW" && audioIdx < 0 {
+				} else if stream.Name == "PCM_MULAW" && audioIdx < 0 {
 					audioIdx = i
 				}
 			}
@@ -485,7 +567,7 @@ func VerifyCamera(c *gin.Context) {
 			if videoIdx > -1 {
 				c.JSON(200, models.APIResponse{
 					Message: "All good, detected a H264 codec.",
-					Data:    codecs,
+					Data:    streams,
 				})
 			} else {
 				c.JSON(400, models.APIResponse{
@@ -503,4 +585,84 @@ func VerifyCamera(c *gin.Context) {
 			Message: "Something went wrong while receiving the config " + err.Error(),
 		})
 	}
+}
+
+func Base64Image(captureDevice *Capture, communication *models.Communication) string {
+	// We'll try to get a snapshot from the camera.
+	var queue *packets.Queue
+	var cursor *packets.QueueCursor
+
+	// We'll pick the right client and decoder.
+	rtspClient := captureDevice.RTSPSubClient
+	if rtspClient != nil {
+		queue = communication.SubQueue
+		cursor = queue.Latest()
+	} else {
+		rtspClient = captureDevice.RTSPClient
+		queue = communication.Queue
+		cursor = queue.Latest()
+	}
+
+	// We'll try to have a keyframe, if not we'll return an empty string.
+	var encodedImage string
+	for {
+		if queue != nil && cursor != nil && rtspClient != nil {
+			pkt, err := cursor.ReadPacket()
+			if err == nil {
+				if !pkt.IsKeyFrame {
+					continue
+				}
+				var img image.YCbCr
+				img, err = (*rtspClient).DecodePacket(pkt)
+				if err == nil {
+					bytes, _ := utils.ImageToBytes(&img)
+					encodedImage = base64.StdEncoding.EncodeToString(bytes)
+					break
+				}
+				break
+			}
+		} else {
+			break
+		}
+	}
+	return encodedImage
+}
+
+func JpegImage(captureDevice *Capture, communication *models.Communication) image.YCbCr {
+	// We'll try to get a snapshot from the camera.
+	var queue *packets.Queue
+	var cursor *packets.QueueCursor
+
+	// We'll pick the right client and decoder.
+	rtspClient := captureDevice.RTSPSubClient
+	if rtspClient != nil {
+		queue = communication.SubQueue
+		cursor = queue.Latest()
+	} else {
+		rtspClient = captureDevice.RTSPClient
+		queue = communication.Queue
+		cursor = queue.Latest()
+	}
+
+	// We'll try to have a keyframe, if not we'll return an empty string.
+	var image image.YCbCr
+	for {
+		if queue != nil && cursor != nil && rtspClient != nil {
+			pkt, err := cursor.ReadPacket()
+			if err == nil {
+				if !pkt.IsKeyFrame {
+					continue
+				}
+				image, _ = (*rtspClient).DecodePacket(pkt)
+				break
+			}
+		} else {
+			break
+		}
+	}
+	return image
+}
+
+func convertPTS(v time.Duration) uint64 {
+	return uint64(v.Milliseconds())
 }

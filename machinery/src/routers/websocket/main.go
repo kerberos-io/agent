@@ -3,15 +3,17 @@ package websocket
 import (
 	"context"
 	"encoding/base64"
+	"image"
 	"net/http"
 	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/kerberos-io/agent/machinery/src/computervision"
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"github.com/kerberos-io/joy4/cgo/ffmpeg"
+	"github.com/kerberos-io/agent/machinery/src/packets"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 )
 
 type Message struct {
@@ -47,7 +49,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func WebsocketHandler(c *gin.Context, communication *models.Communication) {
+func WebsocketHandler(c *gin.Context, communication *models.Communication, captureDevice *capture.Capture) {
 	w := c.Writer
 	r := c.Request
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -58,12 +60,17 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication) {
 
 		var message Message
 		err = conn.ReadJSON(&message)
+		if err != nil {
+			log.Log.Error("routers.websocket.main.WebsocketHandler(): " + err.Error())
+			return
+		}
 		clientID := message.ClientID
 		if sockets[clientID] == nil {
 			connection := new(Connection)
 			connection.Socket = conn
 			sockets[clientID] = connection
 			sockets[clientID].Cancels = make(map[string]context.CancelFunc)
+			log.Log.Info("routers.websocket.main.WebsocketHandler(): " + clientID + ": connected.")
 		}
 
 		// Continuously read messages
@@ -85,14 +92,14 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication) {
 				if exists {
 					sockets[clientID].Cancels["stream-sd"]()
 				} else {
-					log.Log.Error("Streaming sd does not exists for " + clientID)
+					log.Log.Error("routers.websocket.main.WebsocketHandler(): streaming sd does not exists for " + clientID)
 				}
 
 			case "stream-sd":
 				if communication.CameraConnected {
 					_, exists := sockets[clientID].Cancels["stream-sd"]
 					if exists {
-						log.Log.Info("Already streaming sd for " + clientID)
+						log.Log.Debug("routers.websocket.main.WebsocketHandler(): already streaming sd for " + clientID)
 					} else {
 						startStream := Message{
 							ClientID:    clientID,
@@ -105,7 +112,7 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication) {
 
 						ctx, cancel := context.WithCancel(context.Background())
 						sockets[clientID].Cancels["stream-sd"] = cancel
-						go ForwardSDStream(ctx, clientID, sockets[clientID], communication)
+						go ForwardSDStream(ctx, clientID, sockets[clientID], communication, captureDevice)
 					}
 				}
 			}
@@ -119,37 +126,44 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication) {
 		_, exists := sockets[clientID]
 		if exists {
 			delete(sockets, clientID)
-			log.Log.Info("WebsocketHandler: " + clientID + ": terminated and disconnected websocket connection.")
+			log.Log.Info("routers.websocket.main.WebsocketHandler(): " + clientID + ": terminated and disconnected websocket connection.")
 		}
 	}
 }
 
-func ForwardSDStream(ctx context.Context, clientID string, connection *Connection, communication *models.Communication) {
+func ForwardSDStream(ctx context.Context, clientID string, connection *Connection, communication *models.Communication, captureDevice *capture.Capture) {
 
-	queue := communication.Queue
-	cursor := queue.Latest()
-	decoder := communication.Decoder
-	decoderMutex := communication.DecoderMutex
+	var queue *packets.Queue
+	var cursor *packets.QueueCursor
 
-	// Allocate ffmpeg.VideoFrame
-	frame := ffmpeg.AllocVideoFrame()
+	// We'll pick the right client and decoder.
+	rtspClient := captureDevice.RTSPSubClient
+	if rtspClient != nil {
+		queue = communication.SubQueue
+		cursor = queue.Latest()
+	} else {
+		rtspClient = captureDevice.RTSPClient
+		queue = communication.Queue
+		cursor = queue.Latest()
+	}
 
 logreader:
 	for {
 		var encodedImage string
-		if queue != nil && cursor != nil && decoder != nil {
+		if queue != nil && cursor != nil && rtspClient != nil {
 			pkt, err := cursor.ReadPacket()
 			if err == nil {
 				if !pkt.IsKeyFrame {
 					continue
 				}
-				img, err := computervision.GetRawImage(frame, pkt, decoder, decoderMutex)
+				var img image.YCbCr
+				img, err = (*rtspClient).DecodePacket(pkt)
 				if err == nil {
-					bytes, _ := computervision.ImageToBytes(&img.Image)
+					bytes, _ := utils.ImageToBytes(&img)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				}
 			} else {
-				log.Log.Error("ForwardSDStream:" + err.Error())
+				log.Log.Error("routers.websocket.main.ForwardSDStream():" + err.Error())
 				break logreader
 			}
 		}
@@ -163,7 +177,7 @@ logreader:
 		}
 		err := connection.WriteJson(startStrean)
 		if err != nil {
-			log.Log.Error("ForwardSDStream:" + err.Error())
+			log.Log.Error("routers.websocket.main.ForwardSDStream():" + err.Error())
 			break logreader
 		}
 		select {
@@ -173,16 +187,14 @@ logreader:
 		}
 	}
 
-	frame.Free()
-
 	// Close socket for streaming
 	_, exists := connection.Cancels["stream-sd"]
 	if exists {
 		delete(connection.Cancels, "stream-sd")
 	} else {
-		log.Log.Error("Streaming sd does not exists for " + clientID)
+		log.Log.Error("routers.websocket.main.ForwardSDStream(): streaming sd does not exists for " + clientID)
 	}
 
 	// Send stop streaming message
-	log.Log.Info("ForwardSDStream: stop sending streaming over websocket")
+	log.Log.Info("routers.websocket.main.ForwardSDStream(): stop sending streaming over websocket")
 }

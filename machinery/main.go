@@ -6,9 +6,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/onvif"
 
 	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/routers"
@@ -67,27 +69,44 @@ func main() {
 	flag.StringVar(&timeout, "timeout", "2000", "Number of milliseconds to wait for the ONVIF discovery to complete")
 	flag.Parse()
 
+	// Specify the level of loggin: "info", "warning", "debug", "error" or "fatal."
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel == "" {
+		logLevel = "info"
+	}
+	// Specify the output formatter of the log: "text" or "json".
+	logOutput := os.Getenv("LOG_OUTPUT")
+	if logOutput == "" {
+		logOutput = "text"
+	}
+	// Specify the timezone of the log: "UTC" or "Local".
 	timezone, _ := time.LoadLocation("CET")
-	log.Log.Init(configDirectory, timezone)
+	log.Log.Init(logLevel, logOutput, configDirectory, timezone)
 
 	switch action {
 
 	case "version":
-		log.Log.Info("You are currrently running Kerberos Agent " + VERSION)
+		log.Log.Info("main.Main(): You are currrently running Kerberos Agent " + VERSION)
 
 	case "discover":
-		log.Log.Info(timeout)
+		// Convert duration to int
+		timeout, err := time.ParseDuration(timeout + "ms")
+		if err != nil {
+			log.Log.Fatal("main.Main(): could not parse timeout: " + err.Error())
+			return
+		}
+		onvif.Discover(timeout)
 
 	case "decrypt":
-		log.Log.Info("Decrypting: " + flag.Arg(0) + " with key: " + flag.Arg(1))
+		log.Log.Info("main.Main(): Decrypting: " + flag.Arg(0) + " with key: " + flag.Arg(1))
 		symmetricKey := []byte(flag.Arg(1))
 
 		if symmetricKey == nil || len(symmetricKey) == 0 {
-			log.Log.Fatal("Main: symmetric key should not be empty")
+			log.Log.Fatal("main.Main(): symmetric key should not be empty")
 			return
 		}
 		if len(symmetricKey) != 32 {
-			log.Log.Fatal("Main: symmetric key should be 32 bytes")
+			log.Log.Fatal("main.Main(): symmetric key should be 32 bytes")
 			return
 		}
 
@@ -123,7 +142,7 @@ func main() {
 
 			// Set timezone
 			timezone, _ := time.LoadLocation(configuration.Config.Timezone)
-			log.Log.Init(configDirectory, timezone)
+			log.Log.Init(logLevel, logOutput, configDirectory, timezone)
 
 			// Check if we have a device Key or not, if not
 			// we will generate one.
@@ -132,9 +151,9 @@ func main() {
 				configuration.Config.Key = key
 				err := configService.StoreConfig(configDirectory, configuration.Config)
 				if err == nil {
-					log.Log.Info("Main: updated unique key for agent to: " + key)
+					log.Log.Info("main.Main(): updated unique key for agent to: " + key)
 				} else {
-					log.Log.Info("Main: something went wrong while trying to store key: " + key)
+					log.Log.Info("main.Main(): something went wrong while trying to store key: " + key)
 				}
 			}
 
@@ -142,18 +161,26 @@ func main() {
 			// This is used to restart the agent when the configuration is updated.
 			ctx, cancel := context.WithCancel(context.Background())
 
+			// We create a capture object, this will contain all the streaming clients.
+			// And allow us to extract media from within difference places in the agent.
+			capture := capture.Capture{
+				RTSPClient:    nil,
+				RTSPSubClient: nil,
+			}
+
 			// Bootstrapping the agent
 			communication := models.Communication{
 				Context:         &ctx,
 				CancelContext:   &cancel,
 				HandleBootstrap: make(chan string, 1),
 			}
-			go components.Bootstrap(configDirectory, &configuration, &communication)
+
+			go components.Bootstrap(configDirectory, &configuration, &communication, &capture)
 
 			// Start the REST API.
-			routers.StartWebserver(configDirectory, &configuration, &communication)
+			routers.StartWebserver(configDirectory, &configuration, &communication, &capture)
 		}
 	default:
-		log.Log.Error("Main: Sorry I don't understand :(")
+		log.Log.Error("main.Main(): Sorry I don't understand :(")
 	}
 }

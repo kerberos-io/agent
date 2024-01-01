@@ -53,9 +53,9 @@ export const verifyOnvif = (config, onSuccess, onError) => {
         }
       },
       (error) => {
-        const { message } = error;
+        const { data } = error;
         if (onError) {
-          onError(message);
+          onError(data);
         }
       }
     );

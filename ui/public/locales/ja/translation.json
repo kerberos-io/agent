@@ -99,9 +99,9 @@
     "camera": {
       "camera": "カメラ",
       "description_camera": "選択したカメラに接続するには、カメラの設定が必要です。",
-      "only_h264": "現在、H264 RTSP ストリームのみがサポートされています。",
+      "only_h264": "現在、H264/H265 RTSP ストリームのみがサポートされています。",
       "rtsp_url": "RTSP URL",
-      "rtsp_h264": "カメラへの H264 RTSP 接続。",
+      "rtsp_h264": "カメラへの H264/H265 RTSP 接続。",
       "sub_rtsp_url": "Sub RTSP url (ライブストリーミングに使用)",
       "sub_rtsp_h264": "カメラの低解像度へのセカンダリ RTSP 接続。",
       "onvif": "ONVIF",

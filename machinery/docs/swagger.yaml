@@ -88,6 +88,8 @@ definitions:
         type: string
       dropbox:
         $ref: '#/definitions/models.Dropbox'
+      encryption:
+        $ref: '#/definitions/models.Encryption'
       friendly_name:
         type: string
       heartbeaturi:
@@ -156,10 +158,34 @@ definitions:
       directory:
         type: string
     type: object
+  models.Encryption:
+    properties:
+      enabled:
+        type: string
+      fingerprint:
+        type: string
+      private_key:
+        type: string
+      recordings:
+        type: string
+      symmetric_key:
+        type: string
+    type: object
+  models.EventFilter:
+    properties:
+      number_of_elements:
+        type: integer
+      timestamp_offset_end:
+        type: integer
+      timestamp_offset_start:
+        type: integer
+    type: object
   models.IPCamera:
     properties:
       fps:
         type: string
+      height:
+        type: integer
       onvif:
         type: string
       onvif_password:
@@ -172,6 +198,8 @@ definitions:
         type: string
       sub_rtsp:
         type: string
+      width:
+        type: integer
     type: object
   models.KStorage:
     properties:
@@ -321,7 +349,7 @@ paths:
             $ref: '#/definitions/models.APIResponse'
       summary: Will return the ONVIF capabilities for the specific camera.
       tags:
-      - camera
+      - onvif
   /api/camera/onvif/gotopreset:
     post:
       description: Will activate the desired ONVIF preset.
@@ -340,7 +368,28 @@ paths:
             $ref: '#/definitions/models.APIResponse'
       summary: Will activate the desired ONVIF preset.
       tags:
-      - camera
+      - onvif
+  /api/camera/onvif/inputs:
+    post:
+      description: Will get the digital inputs from the ONVIF device.
+      operationId: get-digital-inputs
+      parameters:
+      - description: OnvifCredentials
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.OnvifCredentials'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will get the digital inputs from the ONVIF device.
+      tags:
+      - onvif
   /api/camera/onvif/login:
     post:
       description: Try to login into ONVIF supported camera.
@@ -359,7 +408,54 @@ paths:
             $ref: '#/definitions/models.APIResponse'
       summary: Try to login into ONVIF supported camera.
       tags:
-      - camera
+      - onvif
+  /api/camera/onvif/outputs:
+    post:
+      description: Will get the relay outputs from the ONVIF device.
+      operationId: get-relay-outputs
+      parameters:
+      - description: OnvifCredentials
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.OnvifCredentials'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will get the relay outputs from the ONVIF device.
+      tags:
+      - onvif
+  /api/camera/onvif/outputs/{output}:
+    post:
+      description: Will trigger the relay output from the ONVIF device.
+      operationId: trigger-relay-output
+      parameters:
+      - description: OnvifCredentials
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.OnvifCredentials'
+      - description: Output
+        in: path
+        name: output
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will trigger the relay output from the ONVIF device.
+      tags:
+      - onvif
   /api/camera/onvif/pantilt:
     post:
       description: Panning or/and tilting the camera using a direction (x,y).
@@ -378,7 +474,7 @@ paths:
             $ref: '#/definitions/models.APIResponse'
       summary: Panning or/and tilting the camera.
       tags:
-      - camera
+      - onvif
   /api/camera/onvif/presets:
     post:
       description: Will return the ONVIF presets for the specific camera.
@@ -397,7 +493,7 @@ paths:
             $ref: '#/definitions/models.APIResponse'
       summary: Will return the ONVIF presets for the specific camera.
       tags:
-      - camera
+      - onvif
   /api/camera/onvif/zoom:
     post:
       description: Zooming in or out the camera.
@@ -415,6 +511,62 @@ paths:
           schema:
             $ref: '#/definitions/models.APIResponse'
       summary: Zooming in or out the camera.
+      tags:
+      - onvif
+  /api/camera/record:
+    post:
+      description: Make a recording.
+      operationId: camera-record
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Make a recording.
+      tags:
+      - camera
+  /api/camera/restart:
+    post:
+      description: Restart the agent.
+      operationId: camera-restart
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Restart the agent.
+      tags:
+      - camera
+  /api/camera/snapshot/base64:
+    get:
+      description: Get a snapshot from the camera in base64.
+      operationId: snapshot-base64
+      responses:
+        "200":
+          description: ""
+      summary: Get a snapshot from the camera in base64.
+      tags:
+      - camera
+  /api/camera/snapshot/jpeg:
+    get:
+      description: Get a snapshot from the camera in jpeg format.
+      operationId: snapshot-jpeg
+      responses:
+        "200":
+          description: ""
+      summary: Get a snapshot from the camera in jpeg format.
+      tags:
+      - camera
+  /api/camera/stop:
+    post:
+      description: Stop the agent.
+      operationId: camera-stop
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Stop the agent.
       tags:
       - camera
   /api/camera/verify/{streamType}:
@@ -445,6 +597,52 @@ paths:
       summary: Validate a specific RTSP profile camera connection.
       tags:
       - camera
+  /api/config:
+    get:
+      description: Get the current configuration.
+      operationId: config
+      responses:
+        "200":
+          description: ""
+      summary: Get the current configuration.
+      tags:
+      - config
+    post:
+      description: Update the current configuration.
+      operationId: config
+      parameters:
+      - description: Configuration
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.Config'
+      responses:
+        "200":
+          description: ""
+      summary: Update the current configuration.
+      tags:
+      - config
+  /api/dashboard:
+    get:
+      description: Get all information showed on the dashboard.
+      operationId: dashboard
+      responses:
+        "200":
+          description: ""
+      summary: Get all information showed on the dashboard.
+      tags:
+      - general
+  /api/days:
+    get:
+      description: Get all days stored in the recordings directory.
+      operationId: days
+      responses:
+        "200":
+          description: ""
+      summary: Get all days stored in the recordings directory.
+      tags:
+      - general
   /api/hub/verify:
     post:
       description: Will verify the hub connectivity.
@@ -465,7 +663,24 @@ paths:
       - Bearer: []
       summary: Will verify the hub connectivity.
       tags:
-      - config
+      - persistence
+  /api/latest-events:
+    post:
+      description: Get the latest recordings (events) from the recordings directory.
+      operationId: latest-events
+      parameters:
+      - description: Event filter
+        in: body
+        name: eventFilter
+        required: true
+        schema:
+          $ref: '#/definitions/models.EventFilter'
+      responses:
+        "200":
+          description: ""
+      summary: Get the latest recordings (events) from the recordings directory.
+      tags:
+      - general
   /api/login:
     post:
       description: Get Authorization token.
@@ -490,12 +705,12 @@ paths:
       description: Will verify the ONVIF connectivity.
       operationId: verify-onvif
       parameters:
-      - description: Camera Config
+      - description: OnvifCredentials
         in: body
-        name: cameraConfig
+        name: config
         required: true
         schema:
-          $ref: '#/definitions/models.IPCamera'
+          $ref: '#/definitions/models.OnvifCredentials'
       responses:
         "200":
           description: OK
@@ -505,7 +720,7 @@ paths:
       - Bearer: []
       summary: Will verify the ONVIF connectivity.
       tags:
-      - config
+      - onvif
   /api/persistence/verify:
     post:
       description: Will verify the persistence.
@@ -526,7 +741,7 @@ paths:
       - Bearer: []
       summary: Will verify the persistence.
       tags:
-      - config
+      - persistence
 securityDefinitions:
   Bearer:
     in: header

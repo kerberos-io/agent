@@ -4,11 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"image"
 	"io/ioutil"
 	"os"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -19,25 +17,6 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"go.mongodb.org/mongo-driver/bson"
 )
-
-func GetImageFromFilePath(configDirectory string) (image.Image, error) {
-	snapshotDirectory := configDirectory + "/data/snapshots"
-	files, err := ioutil.ReadDir(snapshotDirectory)
-	if err == nil && len(files) > 1 {
-		sort.Slice(files, func(i, j int) bool {
-			return files[i].ModTime().Before(files[j].ModTime())
-		})
-		filePath := configDirectory + "/data/snapshots/" + files[1].Name()
-		f, err := os.Open(filePath)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-		image, _, err := image.Decode(f)
-		return image, err
-	}
-	return nil, errors.New("Could not find a snapshot in " + snapshotDirectory)
-}
 
 // ReadUserConfig Reads the user configuration of the Kerberos Open Source instance.
 // This will return a models.User struct including the username, password,
@@ -479,7 +458,8 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				configuration.Config.Encryption.Fingerprint = value
 				break
 			case "AGENT_ENCRYPTION_PRIVATE_KEY":
-				configuration.Config.Encryption.PrivateKey = value
+				encryptionPrivateKey := strings.ReplaceAll(value, "\\n", "\n")
+				configuration.Config.Encryption.PrivateKey = encryptionPrivateKey
 				break
 			case "AGENT_ENCRYPTION_SYMMETRIC_KEY":
 				configuration.Config.Encryption.SymmetricKey = value

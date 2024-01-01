@@ -2,16 +2,13 @@ package components
 
 import (
 	"context"
-	"runtime"
+	"os"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/kerberos-io/joy4/cgo/ffmpeg"
-
-	//"github.com/youpy/go-wav"
+	"github.com/gin-gonic/gin"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
@@ -20,14 +17,14 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
+	"github.com/kerberos-io/agent/machinery/src/packets"
 	routers "github.com/kerberos-io/agent/machinery/src/routers/mqtt"
-	"github.com/kerberos-io/joy4/av"
-	"github.com/kerberos-io/joy4/av/pubsub"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/tevino/abool"
 )
 
-func Bootstrap(configDirectory string, configuration *models.Configuration, communication *models.Communication) {
-	log.Log.Debug("Bootstrap: started")
+func Bootstrap(configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
+	log.Log.Debug("components.Kerberos.Bootstrap(): bootstrapping the kerberos agent.")
 
 	// We will keep track of the Kerberos Agent up time
 	// This is send to Kerberos Hub in a heartbeat.
@@ -58,17 +55,13 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 	communication.HandleLiveSD = make(chan int64, 1)
 	communication.HandleLiveHDKeepalive = make(chan string, 1)
 	communication.HandleLiveHDPeers = make(chan string, 1)
-	communication.HandleONVIF = make(chan models.OnvifAction, 1)
 	communication.IsConfiguring = abool.New()
+
+	cameraSettings := &models.Camera{}
 
 	// Before starting the agent, we have a control goroutine, that might
 	// do several checks to see if the agent is still operational.
 	go ControlAgent(communication)
-
-	// Create some global variables
-	decoder := &ffmpeg.VideoDecoder{}
-	subDecoder := &ffmpeg.VideoDecoder{}
-	cameraSettings := &models.Camera{}
 
 	// Handle heartbeats
 	go cloud.HandleHeartBeat(configuration, communication, uptimeStart)
@@ -82,10 +75,12 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 	for {
 
 		// This will blocking until receiving a signal to be restarted, reconfigured, stopped, etc.
-		status := RunAgent(configDirectory, configuration, communication, mqttClient, uptimeStart, cameraSettings, decoder, subDecoder)
+		status := RunAgent(configDirectory, configuration, communication, mqttClient, uptimeStart, cameraSettings, captureDevice)
 
 		if status == "stop" {
-			break
+			log.Log.Info("components.Kerberos.Bootstrap(): shutting down the agent in 3 seconds.")
+			time.Sleep(time.Second * 3)
+			os.Exit(0)
 		}
 
 		if status == "not started" {
@@ -107,12 +102,11 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 		communication.Context = &ctx
 		communication.CancelContext = &cancel
 	}
-	log.Log.Debug("Bootstrap: finished")
 }
 
-func RunAgent(configDirectory string, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, uptimeStart time.Time, cameraSettings *models.Camera, decoder *ffmpeg.VideoDecoder, subDecoder *ffmpeg.VideoDecoder) string {
+func RunAgent(configDirectory string, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, uptimeStart time.Time, cameraSettings *models.Camera, captureDevice *capture.Capture) string {
 
-	log.Log.Debug("RunAgent: bootstrapping agent")
+	log.Log.Info("components.Kerberos.RunAgent(): Creating camera and processing threads.")
 	config := configuration.Config
 
 	status := "not started"
@@ -120,247 +114,280 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Currently only support H264 encoded cameras, this will change.
 	// Establishing the camera connection without backchannel if no substream
 	rtspUrl := config.Capture.IPCamera.RTSP
-	withBackChannel := true
-	infile, streams, err := capture.OpenRTSP(context.Background(), rtspUrl, withBackChannel)
+	rtspClient := captureDevice.SetMainClient(rtspUrl)
 
-	// We will initialise the camera settings object
-	// so we can check if the camera settings have changed, and we need
-	// to reload the decoders.
+	err := rtspClient.Connect(context.Background())
+	if err != nil {
+		log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP stream: " + err.Error())
+		rtspClient.Close()
+		time.Sleep(time.Second * 3)
+		return status
+	}
+	log.Log.Info("components.Kerberos.RunAgent(): opened RTSP stream: " + rtspUrl)
 
-	videoStream, _ := capture.GetVideoStream(streams)
-	if videoStream == nil {
-		log.Log.Error("RunAgent: no video stream found, might be the wrong codec (we only support H264 for the moment)")
+	// Get the video streams from the RTSP server.
+	videoStreams, err := rtspClient.GetVideoStreams()
+	if err != nil || len(videoStreams) == 0 {
+		log.Log.Error("components.Kerberos.RunAgent(): no video stream found, might be the wrong codec (we only support H264 for the moment)")
+		rtspClient.Close()
 		time.Sleep(time.Second * 3)
 		return status
 	}
 
-	num, denum := videoStream.(av.VideoCodecData).Framerate()
-	width := videoStream.(av.VideoCodecData).Width()
-	height := videoStream.(av.VideoCodecData).Height()
+	// Get the video stream from the RTSP server.
+	videoStream := videoStreams[0]
+
+	// Get some information from the video stream.
+	width := videoStream.Width
+	height := videoStream.Height
 
 	// Set config values as well
 	configuration.Config.Capture.IPCamera.Width = width
 	configuration.Config.Capture.IPCamera.Height = height
 
-	var queue *pubsub.Queue
-	var subQueue *pubsub.Queue
+	var queue *packets.Queue
+	var subQueue *packets.Queue
 
-	var decoderMutex sync.Mutex
-	var subDecoderMutex sync.Mutex
-
-	if err == nil {
-
-		log.Log.Info("RunAgent: opened RTSP stream: " + rtspUrl)
-
-		// We might have a secondary rtsp url, so we might need to use that.
-		var subInfile av.DemuxCloser
-		var subStreams []av.CodecData
-		subStreamEnabled := false
-		subRtspUrl := config.Capture.IPCamera.SubRTSP
-		if subRtspUrl != "" && subRtspUrl != rtspUrl {
-			withBackChannel := false
-			subInfile, subStreams, err = capture.OpenRTSP(context.Background(), subRtspUrl, withBackChannel) // We'll try to enable backchannel for the substream.
-			if err == nil {
-				log.Log.Info("RunAgent: opened RTSP sub stream " + subRtspUrl)
-				subStreamEnabled = true
-			}
-
-			videoStream, _ := capture.GetVideoStream(subStreams)
-			if videoStream == nil {
-				log.Log.Error("RunAgent: no video substream found, might be the wrong codec (we only support H264 for the moment)")
-				time.Sleep(time.Second * 3)
-				return status
-			}
-
-			width := videoStream.(av.VideoCodecData).Width()
-			height := videoStream.(av.VideoCodecData).Height()
-
-			// Set config values as well
-			configuration.Config.Capture.IPCamera.Width = width
-			configuration.Config.Capture.IPCamera.Height = height
-		}
-
-		if cameraSettings.RTSP != rtspUrl || cameraSettings.SubRTSP != subRtspUrl || cameraSettings.Width != width || cameraSettings.Height != height || cameraSettings.Num != num || cameraSettings.Denum != denum || cameraSettings.Codec != videoStream.(av.VideoCodecData).Type() {
-
-			if cameraSettings.RTSP != "" && cameraSettings.SubRTSP != "" && cameraSettings.Initialized {
-				decoder.Close()
-				if subStreamEnabled {
-					subDecoder.Close()
-				}
-			}
-
-			// At some routines we will need to decode the image.
-			// Make sure its properly locked as we only have a single decoder.
-			log.Log.Info("RunAgent: camera settings changed, reloading decoder")
-			capture.GetVideoDecoder(decoder, streams)
-			if subStreamEnabled {
-				capture.GetVideoDecoder(subDecoder, subStreams)
-			}
-
-			cameraSettings.RTSP = rtspUrl
-			cameraSettings.SubRTSP = subRtspUrl
-			cameraSettings.Width = width
-			cameraSettings.Height = height
-			cameraSettings.Framerate = float64(num) / float64(denum)
-			cameraSettings.Num = num
-			cameraSettings.Denum = denum
-			cameraSettings.Codec = videoStream.(av.VideoCodecData).Type()
-			cameraSettings.Initialized = true
-
-		} else {
-			log.Log.Info("RunAgent: camera settings did not change, keeping decoder")
-		}
-
-		communication.Decoder = decoder
-		communication.SubDecoder = subDecoder
-		communication.DecoderMutex = &decoderMutex
-		communication.SubDecoderMutex = &subDecoderMutex
-
-		// Create a packet queue, which is filled by the HandleStream routing
-		// and consumed by all other routines: motion, livestream, etc.
-		if config.Capture.PreRecording <= 0 {
-			config.Capture.PreRecording = 1
-			log.Log.Warning("RunAgent: Prerecording value not found in config or invalid value! Found: " + strconv.FormatInt(config.Capture.PreRecording, 10))
-		}
-
-		// We are creating a queue to store the RTSP frames in, these frames will be
-		// processed by the different consumers: motion detection, recording, etc.
-		queue = pubsub.NewQueue()
-		communication.Queue = queue
-		queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
-		log.Log.Info("RunAgent: SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
-		queue.WriteHeader(streams)
-
-		// We might have a substream, if so we'll create a seperate queue.
-		if subStreamEnabled {
-			log.Log.Info("RunAgent: Creating sub stream queue with SetMaxGopCount set to " + strconv.Itoa(int(1)))
-			subQueue = pubsub.NewQueue()
-			communication.SubQueue = subQueue
-			subQueue.SetMaxGopCount(1)
-			subQueue.WriteHeader(subStreams)
-		}
-
-		// Handle the camera stream
-		go capture.HandleStream(infile, queue, communication)
-
-		// Handle the substream if enabled
-		if subStreamEnabled {
-			go capture.HandleSubStream(subInfile, subQueue, communication)
-		}
-
-		// Handle processing of audio
-		communication.HandleAudio = make(chan models.AudioDataPartial)
-
-		// Handle processing of motion
-		communication.HandleMotion = make(chan models.MotionDataPartial, 1)
-		if subStreamEnabled {
-			motionCursor := subQueue.Latest()
-			go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, subDecoder, &subDecoderMutex)
-		} else {
-			motionCursor := queue.Latest()
-			go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
-		}
-
-		// Handle livestream SD (low resolution over MQTT)
-		if subStreamEnabled {
-			livestreamCursor := subQueue.Latest()
-			go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, subDecoder, &subDecoderMutex)
-		} else {
-			livestreamCursor := queue.Latest()
-			go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, decoder, &decoderMutex)
-		}
-
-		// Handle livestream HD (high resolution over WEBRTC)
-		communication.HandleLiveHDHandshake = make(chan models.RequestHDStreamPayload, 1)
-		if subStreamEnabled {
-			livestreamHDCursor := subQueue.Latest()
-			go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, subStreams, subDecoder, &decoderMutex)
-		} else {
-			livestreamHDCursor := queue.Latest()
-			go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, streams, decoder, &decoderMutex)
-		}
-
-		// Handle recording, will write an mp4 to disk.
-		go capture.HandleRecordStream(queue, configDirectory, configuration, communication, streams)
-
-		// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)
-		go cloud.HandleUpload(configDirectory, configuration, communication)
-
-		// Handle ONVIF actions
-		go onvif.HandleONVIFActions(configuration, communication)
-
-		// If we reach this point, we have a working RTSP connection.
-		communication.CameraConnected = true
-
-		// We might have a camera with audio backchannel enabled.
-		// Check if we have a stream with a backchannel and is PCMU encoded.
-		go WriteAudioToBackchannel(infile, streams, communication)
-
-		// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-		// This will go into a blocking state, once this channel is triggered
-		// the agent will cleanup and restart.
-
-		status = <-communication.HandleBootstrap
-
-		// If we reach this point, we are stopping the stream.
-		communication.CameraConnected = false
-
-		// Cancel the main context, this will stop all the other goroutines.
-		(*communication.CancelContext)()
-
-		// We will re open the configuration, might have changed :O!
-		configService.OpenConfig(configDirectory, configuration)
-
-		// We will override the configuration with the environment variables
-		configService.OverrideWithEnvironmentVariables(configuration)
-
-		// Here we are cleaning up everything!
-		if configuration.Config.Offline != "true" {
-			communication.HandleUpload <- "stop"
-		}
-		communication.HandleStream <- "stop"
-		if subStreamEnabled {
-			communication.HandleSubStream <- "stop"
-		}
-
-		time.Sleep(time.Second * 3)
-
-		infile.Close()
-		infile = nil
-		queue.Close()
-		queue = nil
-		communication.Queue = nil
-		if subStreamEnabled {
-			subInfile.Close()
-			subInfile = nil
-			subQueue.Close()
-			subQueue = nil
-			communication.SubQueue = nil
-		}
-		close(communication.HandleMotion)
-		communication.HandleMotion = nil
-		close(communication.HandleAudio)
-		communication.HandleAudio = nil
-
-		// Waiting for some seconds to make sure everything is properly closed.
-		log.Log.Info("RunAgent: waiting 3 seconds to make sure everything is properly closed.")
-		time.Sleep(time.Second * 3)
-
-	} else {
-		log.Log.Error("Something went wrong while opening RTSP: " + err.Error())
-		time.Sleep(time.Second * 3)
+	// Create a packet queue, which is filled by the HandleStream routing
+	// and consumed by all other routines: motion, livestream, etc.
+	if config.Capture.PreRecording <= 0 {
+		config.Capture.PreRecording = 1
+		log.Log.Warning("components.Kerberos.RunAgent(): Prerecording value not found in config or invalid value! Found: " + strconv.FormatInt(config.Capture.PreRecording, 10))
 	}
 
-	log.Log.Debug("RunAgent: finished")
+	// We might have a secondary rtsp url, so we might need to use that for livestreaming let us check first!
+	subStreamEnabled := false
+	subRtspUrl := config.Capture.IPCamera.SubRTSP
+	var videoSubStreams []packets.Stream
 
-	// Clean up, force garbage collection
-	runtime.GC()
+	if subRtspUrl != "" && subRtspUrl != rtspUrl {
+		// For the sub stream we will not enable backchannel.
+		subStreamEnabled = true
+		rtspSubClient := captureDevice.SetSubClient(subRtspUrl)
+		captureDevice.RTSPSubClient = rtspSubClient
+
+		err := rtspSubClient.Connect(context.Background())
+		if err != nil {
+			log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP sub stream: " + err.Error())
+			time.Sleep(time.Second * 3)
+			return status
+		}
+		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP sub stream: " + rtspUrl)
+
+		// Get the video streams from the RTSP server.
+		videoSubStreams, err = rtspSubClient.GetVideoStreams()
+		if err != nil || len(videoSubStreams) == 0 {
+			log.Log.Error("components.Kerberos.RunAgent(): no video sub stream found, might be the wrong codec (we only support H264 for the moment)")
+			rtspSubClient.Close()
+			time.Sleep(time.Second * 3)
+			return status
+		}
+
+		// Get the video stream from the RTSP server.
+		videoSubStream := videoSubStreams[0]
+
+		width := videoSubStream.Width
+		height := videoSubStream.Height
+
+		// Set config values as well
+		configuration.Config.Capture.IPCamera.Width = width
+		configuration.Config.Capture.IPCamera.Height = height
+	}
+
+	if cameraSettings.RTSP != rtspUrl ||
+		cameraSettings.SubRTSP != subRtspUrl ||
+		cameraSettings.Width != width ||
+		cameraSettings.Height != height {
+
+		// TODO: this condition is used to reset the decoder when the camera settings change.
+		// The main idea is that you only set the decoder once, and then reuse it on each restart (no new memory allocation).
+		// However the stream settings of the camera might have been changed, and so the decoder might need to be reloaded.
+		// .... Not used for the moment ....
+
+		if cameraSettings.RTSP != "" && cameraSettings.SubRTSP != "" && cameraSettings.Initialized {
+			//decoder.Close()
+			//if subStreamEnabled {
+			//	subDecoder.Close()
+			//}
+		}
+
+		// At some routines we will need to decode the image.
+		// Make sure its properly locked as we only have a single decoder.
+		log.Log.Info("components.Kerberos.RunAgent(): camera settings changed, reloading decoder")
+		//capture.GetVideoDecoder(decoder, streams)
+		//if subStreamEnabled {
+		//	capture.GetVideoDecoder(subDecoder, subStreams)
+		//}
+
+		cameraSettings.RTSP = rtspUrl
+		cameraSettings.SubRTSP = subRtspUrl
+		cameraSettings.Width = width
+		cameraSettings.Height = height
+		cameraSettings.Initialized = true
+	} else {
+		log.Log.Info("components.Kerberos.RunAgent(): camera settings did not change, keeping decoder")
+	}
+
+	// We are creating a queue to store the RTSP frames in, these frames will be
+	// processed by the different consumers: motion detection, recording, etc.
+	queue = packets.NewQueue()
+	communication.Queue = queue
+
+	// Set the maximum GOP count, this is used to determine the pre-recording time.
+	log.Log.Info("components.Kerberos.RunAgent(): SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
+	queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
+	queue.WriteHeader(videoStreams)
+	go rtspClient.Start(context.Background(), queue, configuration, communication)
+
+	// Try to create backchannel
+	rtspBackChannelClient := captureDevice.SetBackChannelClient(rtspUrl)
+	err = rtspBackChannelClient.ConnectBackChannel(context.Background())
+	if err == nil {
+		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP backchannel stream: " + rtspUrl)
+		go rtspBackChannelClient.StartBackChannel(context.Background())
+	}
+
+	rtspSubClient := captureDevice.RTSPSubClient
+	if subStreamEnabled && rtspSubClient != nil {
+		subQueue = packets.NewQueue()
+		communication.SubQueue = subQueue
+		subQueue.SetMaxGopCount(1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
+		subQueue.WriteHeader(videoSubStreams)
+		go rtspSubClient.Start(context.Background(), subQueue, configuration, communication)
+	}
+
+	// Handle livestream SD (low resolution over MQTT)
+	if subStreamEnabled {
+		livestreamCursor := subQueue.Latest()
+		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspSubClient)
+	} else {
+		livestreamCursor := queue.Latest()
+		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspClient)
+	}
+
+	// Handle livestream HD (high resolution over WEBRTC)
+	communication.HandleLiveHDHandshake = make(chan models.RequestHDStreamPayload, 1)
+	if subStreamEnabled {
+		livestreamHDCursor := subQueue.Latest()
+		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspSubClient)
+	} else {
+		livestreamHDCursor := queue.Latest()
+		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspClient)
+	}
+
+	// Handle recording, will write an mp4 to disk.
+	go capture.HandleRecordStream(queue, configDirectory, configuration, communication, rtspClient)
+
+	// Handle processing of motion
+	communication.HandleMotion = make(chan models.MotionDataPartial, 1)
+	if subStreamEnabled {
+		motionCursor := subQueue.Latest()
+		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspSubClient)
+	} else {
+		motionCursor := queue.Latest()
+		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspClient)
+	}
+
+	// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)
+	go cloud.HandleUpload(configDirectory, configuration, communication)
+
+	// Handle ONVIF actions
+	communication.HandleONVIF = make(chan models.OnvifAction, 1)
+	go onvif.HandleONVIFActions(configuration, communication)
+
+	communication.HandleAudio = make(chan models.AudioDataPartial, 1)
+	if rtspBackChannelClient.HasBackChannel {
+		communication.HasBackChannel = true
+		go WriteAudioToBackchannel(communication, rtspBackChannelClient)
+	}
+
+	// If we reach this point, we have a working RTSP connection.
+	communication.CameraConnected = true
+
+	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// This will go into a blocking state, once this channel is triggered
+	// the agent will cleanup and restart.
+
+	status = <-communication.HandleBootstrap
+
+	// If we reach this point, we are stopping the stream.
+	communication.CameraConnected = false
+
+	// Cancel the main context, this will stop all the other goroutines.
+	(*communication.CancelContext)()
+
+	// We will re open the configuration, might have changed :O!
+	configService.OpenConfig(configDirectory, configuration)
+
+	// We will override the configuration with the environment variables
+	configService.OverrideWithEnvironmentVariables(configuration)
+
+	// Here we are cleaning up everything!
+	if configuration.Config.Offline != "true" {
+		communication.HandleUpload <- "stop"
+	}
+	communication.HandleStream <- "stop"
+	// We use the steam channel to stop both main and sub stream.
+	//if subStreamEnabled {
+	//	communication.HandleSubStream <- "stop"
+	//}
+
+	time.Sleep(time.Second * 3)
+
+	err = rtspClient.Close()
+	if err != nil {
+		log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP stream: " + err.Error())
+		time.Sleep(time.Second * 3)
+		return status
+	}
+
+	queue.Close()
+	queue = nil
+	communication.Queue = nil
+
+	if subStreamEnabled {
+		err = rtspSubClient.Close()
+		if err != nil {
+			log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP sub stream: " + err.Error())
+			time.Sleep(time.Second * 3)
+			return status
+		}
+		subQueue.Close()
+		subQueue = nil
+		communication.SubQueue = nil
+	}
+
+	err = rtspBackChannelClient.Close()
+	if err != nil {
+		log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP backchannel stream: " + err.Error())
+	}
+
+	time.Sleep(time.Second * 3)
+
+	close(communication.HandleLiveHDHandshake)
+	communication.HandleLiveHDHandshake = nil
+
+	close(communication.HandleMotion)
+	communication.HandleMotion = nil
+
+	close(communication.HandleAudio)
+	communication.HandleAudio = nil
+
+	close(communication.HandleONVIF)
+	communication.HandleONVIF = nil
+
+	// Waiting for some seconds to make sure everything is properly closed.
+	log.Log.Info("components.Kerberos.RunAgent(): waiting 3 seconds to make sure everything is properly closed.")
+	time.Sleep(time.Second * 3)
 
 	return status
 }
 
+// ControlAgent will check if the camera is still connected, if not it will restart the agent.
+// In the other thread we are keeping track of the number of packets received, and particular the keyframe packets.
+// Once we are not receiving any packets anymore, we will restart the agent.
 func ControlAgent(communication *models.Communication) {
-	log.Log.Debug("ControlAgent: started")
+	log.Log.Debug("components.Kerberos.ControlAgent(): started")
 	packageCounter := communication.PackageCounter
 	go func() {
 		// A channel to check the camera activity
@@ -381,11 +408,11 @@ func ControlAgent(communication *models.Communication) {
 					occurence = 0
 				}
 
-				log.Log.Info("ControlAgent: Number of packets read " + strconv.FormatInt(packetsR, 10))
+				log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read " + strconv.FormatInt(packetsR, 10))
 
 				// After 15 seconds without activity this is thrown..
 				if occurence == 3 {
-					log.Log.Info("Main: Restarting machinery.")
+					log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery.")
 					communication.HandleBootstrap <- "restart"
 					time.Sleep(2 * time.Second)
 					occurence = 0
@@ -396,5 +423,255 @@ func ControlAgent(communication *models.Communication) {
 			time.Sleep(5 * time.Second)
 		}
 	}()
-	log.Log.Debug("ControlAgent: finished")
+	log.Log.Debug("components.Kerberos.ControlAgent(): finished")
+}
+
+// GetDashboard godoc
+// @Router /api/dashboard [get]
+// @ID dashboard
+// @Tags general
+// @Summary Get all information showed on the dashboard.
+// @Description Get all information showed on the dashboard.
+// @Success 200
+func GetDashboard(c *gin.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+
+	// Check if camera is online.
+	cameraIsOnline := communication.CameraConnected
+
+	// If an agent is properly setup with Kerberos Hub, we will send
+	// a ping to Kerberos Hub every 15seconds. On receiving a positive response
+	// it will update the CloudTimestamp value.
+	cloudIsOnline := false
+	if communication.CloudTimestamp != nil && communication.CloudTimestamp.Load() != nil {
+		timestamp := communication.CloudTimestamp.Load().(int64)
+		if timestamp > 0 {
+			cloudIsOnline = true
+		}
+	}
+
+	// The total number of recordings stored in the directory.
+	recordingDirectory := configDirectory + "/data/recordings"
+	numberOfRecordings := utils.NumberOfMP4sInDirectory(recordingDirectory)
+
+	// All days stored in this agent.
+	days := []string{}
+	latestEvents := []models.Media{}
+	files, err := utils.ReadDirectory(recordingDirectory)
+	if err == nil {
+		events := utils.GetSortedDirectory(files)
+
+		// Get All days
+		days = utils.GetDays(events, recordingDirectory, configuration)
+
+		// Get all latest events
+		var eventFilter models.EventFilter
+		eventFilter.NumberOfElements = 5
+		latestEvents = utils.GetMediaFormatted(events, recordingDirectory, configuration, eventFilter) // will get 5 latest recordings.
+	}
+
+	c.JSON(200, gin.H{
+		"offlineMode":        configuration.Config.Offline,
+		"cameraOnline":       cameraIsOnline,
+		"cloudOnline":        cloudIsOnline,
+		"numberOfRecordings": numberOfRecordings,
+		"days":               days,
+		"latestEvents":       latestEvents,
+	})
+}
+
+// GetLatestEvents godoc
+// @Router /api/latest-events [post]
+// @ID latest-events
+// @Tags general
+// @Param eventFilter body models.EventFilter true "Event filter"
+// @Summary Get the latest recordings (events) from the recordings directory.
+// @Description Get the latest recordings (events) from the recordings directory.
+// @Success 200
+func GetLatestEvents(c *gin.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+	var eventFilter models.EventFilter
+	err := c.BindJSON(&eventFilter)
+	if err == nil {
+		// Default to 10 if no limit is set.
+		if eventFilter.NumberOfElements == 0 {
+			eventFilter.NumberOfElements = 10
+		}
+		recordingDirectory := configDirectory + "/data/recordings"
+		files, err := utils.ReadDirectory(recordingDirectory)
+		if err == nil {
+			events := utils.GetSortedDirectory(files)
+			// We will get all recordings from the directory (as defined by the filter).
+			fileObjects := utils.GetMediaFormatted(events, recordingDirectory, configuration, eventFilter)
+			c.JSON(200, gin.H{
+				"events": fileObjects,
+			})
+		} else {
+			c.JSON(400, gin.H{
+				"data": "Something went wrong: " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
+		})
+	}
+}
+
+// GetDays godoc
+// @Router /api/days [get]
+// @ID days
+// @Tags general
+// @Summary Get all days stored in the recordings directory.
+// @Description Get all days stored in the recordings directory.
+// @Success 200
+func GetDays(c *gin.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+	recordingDirectory := configDirectory + "/data/recordings"
+	files, err := utils.ReadDirectory(recordingDirectory)
+	if err == nil {
+		events := utils.GetSortedDirectory(files)
+		days := utils.GetDays(events, recordingDirectory, configuration)
+		c.JSON(200, gin.H{
+			"events": days,
+		})
+	} else {
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
+		})
+	}
+}
+
+// StopAgent godoc
+// @Router /api/camera/stop [post]
+// @ID camera-stop
+// @Tags camera
+// @Summary Stop the agent.
+// @Description Stop the agent.
+// @Success 200 {object} models.APIResponse
+func StopAgent(c *gin.Context, communication *models.Communication) {
+	log.Log.Info("components.Kerberos.StopAgent(): sending signal to stop agent, this will os.Exit(0).")
+	communication.HandleBootstrap <- "stop"
+	c.JSON(200, gin.H{
+		"stopped": true,
+	})
+}
+
+// RestartAgent godoc
+// @Router /api/camera/restart [post]
+// @ID camera-restart
+// @Tags camera
+// @Summary Restart the agent.
+// @Description Restart the agent.
+// @Success 200 {object} models.APIResponse
+func RestartAgent(c *gin.Context, communication *models.Communication) {
+	log.Log.Info("components.Kerberos.RestartAgent(): sending signal to restart agent.")
+	communication.HandleBootstrap <- "restart"
+	c.JSON(200, gin.H{
+		"restarted": true,
+	})
+}
+
+// MakeRecording godoc
+// @Router /api/camera/record [post]
+// @ID camera-record
+// @Tags camera
+// @Summary Make a recording.
+// @Description Make a recording.
+// @Success 200 {object} models.APIResponse
+func MakeRecording(c *gin.Context, communication *models.Communication) {
+	log.Log.Info("components.Kerberos.MakeRecording(): sending signal to start recording.")
+	dataToPass := models.MotionDataPartial{
+		Timestamp:       time.Now().Unix(),
+		NumberOfChanges: 100000000, // hack set the number of changes to a high number to force recording
+	}
+	communication.HandleMotion <- dataToPass //Save data to the channel
+	c.JSON(200, gin.H{
+		"recording": true,
+	})
+}
+
+// GetSnapshotBase64 godoc
+// @Router /api/camera/snapshot/base64 [get]
+// @ID snapshot-base64
+// @Tags camera
+// @Summary Get a snapshot from the camera in base64.
+// @Description Get a snapshot from the camera in base64.
+// @Success 200
+func GetSnapshotBase64(c *gin.Context, captureDevice *capture.Capture, configuration *models.Configuration, communication *models.Communication) {
+	// We'll try to get a snapshot from the camera.
+	base64Image := capture.Base64Image(captureDevice, communication)
+	if base64Image != "" {
+		communication.Image = base64Image
+	}
+
+	c.JSON(200, gin.H{
+		"base64": communication.Image,
+	})
+}
+
+// GetSnapshotJpeg godoc
+// @Router /api/camera/snapshot/jpeg [get]
+// @ID snapshot-jpeg
+// @Tags camera
+// @Summary Get a snapshot from the camera in jpeg format.
+// @Description Get a snapshot from the camera in jpeg format.
+// @Success 200
+func GetSnapshotRaw(c *gin.Context, captureDevice *capture.Capture, configuration *models.Configuration, communication *models.Communication) {
+	// We'll try to get a snapshot from the camera.
+	image := capture.JpegImage(captureDevice, communication)
+
+	// encode image to jpeg
+	bytes, _ := utils.ImageToBytes(&image)
+
+	// Return image/jpeg
+	c.Data(200, "image/jpeg", bytes)
+}
+
+// GetConfig godoc
+// @Router /api/config [get]
+// @ID config
+// @Tags config
+// @Summary Get the current configuration.
+// @Description Get the current configuration.
+// @Success 200
+func GetConfig(c *gin.Context, captureDevice *capture.Capture, configuration *models.Configuration, communication *models.Communication) {
+	// We'll try to get a snapshot from the camera.
+	base64Image := capture.Base64Image(captureDevice, communication)
+	if base64Image != "" {
+		communication.Image = base64Image
+	}
+
+	c.JSON(200, gin.H{
+		"config":   configuration.Config,
+		"custom":   configuration.CustomConfig,
+		"global":   configuration.GlobalConfig,
+		"snapshot": communication.Image,
+	})
+}
+
+// UpdateConfig godoc
+// @Router /api/config [post]
+// @ID config
+// @Tags config
+// @Param config body models.Config true "Configuration"
+// @Summary Update the current configuration.
+// @Description Update the current configuration.
+// @Success 200
+func UpdateConfig(c *gin.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
+	var config models.Config
+	err := c.BindJSON(&config)
+	if err == nil {
+		err := configService.SaveConfig(configDirectory, config, configuration, communication)
+		if err == nil {
+			c.JSON(200, gin.H{
+				"data": "☄ Reconfiguring",
+			})
+		} else {
+			c.JSON(200, gin.H{
+				"data": "☄ Reconfiguring",
+			})
+		}
+	} else {
+		c.JSON(400, gin.H{
+			"data": "Something went wrong: " + err.Error(),
+		})
+	}
 }

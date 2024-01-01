@@ -28,8 +28,8 @@ Kerberos Agent is an isolated and scalable video (surveillance) management agent
 
 ## :thinking: Prerequisites
 
-- An IP camera which supports a RTSP H264 encoded stream,
-  - (or) a USB camera, Raspberry Pi camera or other camera, that [you can transform to a valid RTSP H264 stream](https://github.com/kerberos-io/camera-to-rtsp).
+- An IP camera which supports a RTSP H264 or H265 encoded stream,
+  - (or) a USB camera, Raspberry Pi camera or other camera, that [you can transform to a valid RTSP H264 or H265 stream](https://github.com/kerberos-io/camera-to-rtsp).
 - Any hardware (ARMv6, ARMv7, ARM64, AMD) that can run a binary or container, for example: a Raspberry Pi, NVidia Jetson, Intel NUC, a VM, Bare metal machine or a full blown Kubernetes cluster.
 
 ## :video_camera: Is my camera working?
@@ -46,27 +46,32 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 ### Introduction
 
-3. [A world of Kerberos Agents](#a-world-of-kerberos-agents)
+1. [A world of Kerberos Agents](#a-world-of-kerberos-agents)
 
 ### Running and automation
 
-4. [How to run and deploy a Kerberos Agent](#how-to-run-and-deploy-a-kerberos-agent)
-5. [Access the Kerberos Agent](#access-the-kerberos-agent)
-6. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
-7. [Configure with environment variables](#configure-with-environment-variables)
+1. [How to run and deploy a Kerberos Agent](#how-to-run-and-deploy-a-kerberos-agent)
+2. [Access the Kerberos Agent](#access-the-kerberos-agent)
+3. [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts)
+4. [Configure with environment variables](#configure-with-environment-variables)
+
+### Insights
+
+1. [Encryption](#encryption)
+2. [H264 vs H265](#h264-vs-h265)
 
 ### Contributing
 
-8. [Contribute with Codespaces](#contribute-with-codespaces)
-9. [Develop and build](#develop-and-build)
-10. [Building from source](#building-from-source)
-11. [Building for Docker](#building-for-docker)
+1. [Contribute with Codespaces](#contribute-with-codespaces)
+2. [Develop and build](#develop-and-build)
+3.  [Building from source](#building-from-source)
+4.  [Building for Docker](#building-for-docker)
 
 ### Varia
 
-12. [Support our project](#support-our-project)
-13. [What is new?](#what-is-new)
-14. [Contributors](#contributors)
+1. [Support our project](#support-our-project)
+1. [What is new?](#what-is-new)
+1. [Contributors](#contributors)
 
 ## Quickstart - Docker
 
@@ -104,19 +109,21 @@ This repository contains everything you'll need to know about our core product, 
 
 - Low memory and CPU usage.
 - Simplified and modern user interface.
-- Multi architecture (ARMv7, ARMv8, amd64, etc).
-- Multi camera support: IP Cameras (H264), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp).
+- Multi architecture (ARMv7, ARMv8, amd64, etc).).
+- Multi stream, for example recording in H265, live streaming and motion detection in H264.
+- Multi camera support: IP Cameras (H264 and H265), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp
 - Single camera per instance (e.g. one container per camera).
-- Primary and secondary stream setup (record full-res, stream low-res).
-- Low resolution streaming through MQTT and full resolution streaming through WebRTC.
-- End-to-end encryption through MQTT using RSA and AES.
-- Ability to specifiy conditions: offline mode, motion region, time table, continuous recording, etc.
-- Post- and pre-recording on motion detection.
+- Low resolution streaming through MQTT and high resolution streaming through WebRTC (only supports H264/PCM).
+- Backchannel audio from Kerberos Hub to IP camera (requires PCM ULAW codec)
+- Audio (AAC) and video (H264/H265) recording in MP4 container.
+- End-to-end encryption through MQTT using RSA and AES (livestreaming, ONVIF, remote configuration, etc)
+- Conditional recording: offline mode, motion region, time table, continuous recording, webhook condition etc.
+- Post- and pre-recording for motion detection.
 - Encryption at rest using AES-256-CBC.
-- Ability to create fragmented recordings, and streaming though HLS fMP4.
+- Ability to create fragmented recordings, and streaming through HLS fMP4.
 - [Deploy where you want](#how-to-run-and-deploy-a-kerberos-agent) with the tools you use: `docker`, `docker compose`, `ansible`, `terraform`, `kubernetes`, etc.
 - Cloud storage/persistance: Kerberos Hub, Kerberos Vault and Dropbox. [(WIP: Minio, Storj, Google Drive, FTP etc.)](https://github.com/kerberos-io/agent/issues/95)
-- WIP: Integrations (Webhooks, MQTT, Script, etc).
+- Outputs: trigger an integration (Webhooks, MQTT, Script, etc) when a specific event (motion detection or start recording ) occurs
 - REST API access and documentation through Swagger (trigger recording, update configuration, etc).
 - MIT License
 
@@ -149,20 +156,6 @@ The default username and password for the Kerberos Agent is:
 
 **_Please note that you change the username and password for a final installation, see [Configure with environment variables](#configure-with-environment-variables) below._**
 
-## Encryption
-
-You can encrypt your recordings and outgoing MQTT messages with your own AES and RSA keys by enabling the encryption settings. Once enabled all your recordings will be encrypted using AES-256-CBC and your symmetric key. You can either use the default `openssl` toolchain to decrypt the recordings with your AES key, as following:
-
-    openssl aes-256-cbc -d -md md5 -in encrypted.mp4 -out decrypted.mp4 -k your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
-
-, and additionally you can decrypt a folder of recordings, using the Kerberos Agent binary as following:
-
-    go run main.go -action decrypt ./data/recordings your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
-
-or for a single file:
-
-    go run main.go -action decrypt ./data/recordings/video.mp4 your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
-
 ## Configure and persist with volume mounts
 
 An example of how to mount a host directory is shown below using `docker`, but is applicable for [all the deployment models and tools described above](#running-and-automating-a-kerberos-agent).
@@ -192,6 +185,8 @@ Next to attaching the configuration file, it is also possible to override the co
 
 | Name                                    | Description                                                                                     | Default Value                  |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
+| `LOG_LEVEL`                             | Level for logging, could be "info", "warning", "debug", "error" or "fatal".                     | "info"                         |
+| `LOG_OUTPUT`                            | Logging output format "json" or "text".                                                         | "text"                         |
 | `AGENT_MODE`                            | You can choose to run this in 'release' for production, and or 'demo' for showcasing.           | "release"                      |
 | `AGENT_TLS_INSECURE`                    | Specify if you want to use `InsecureSkipVerify` for the internal HTTP client.                   | "false"                        |
 | `AGENT_USERNAME`                        | The username used to authenticate against the Kerberos Agent login page.                        | "root"                         |
@@ -248,6 +243,43 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_ENCRYPTION_FINGERPRINT`          | The fingerprint of the keypair (public/private keys), so you know which one to use.             | ""                             |
 | `AGENT_ENCRYPTION_PRIVATE_KEY`          | The private key (assymetric/RSA) to decryptand sign requests send over MQTT.                    | ""                             |
 | `AGENT_ENCRYPTION_SYMMETRIC_KEY`        | The symmetric key (AES) to encrypt and decrypt request send over MQTT.                          | ""                             |
+
+## Encryption
+
+You can encrypt your recordings and outgoing MQTT messages with your own AES and RSA keys by enabling the encryption settings. Once enabled all your recordings will be encrypted using AES-256-CBC and your symmetric key. You can either use the default `openssl` toolchain to decrypt the recordings with your AES key, as following:
+
+    openssl aes-256-cbc -d -md md5 -in encrypted.mp4 -out decrypted.mp4 -k your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
+
+, and additionally you can decrypt a folder of recordings, using the Kerberos Agent binary as following:
+
+    go run main.go -action decrypt ./data/recordings your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
+
+or for a single file:
+
+    go run main.go -action decrypt ./data/recordings/video.mp4 your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
+
+## H264 vs H265
+
+If we talk about video encoders and decoders (codecs) there are 2 major video codecs on the market: H264 and H265. Taking into account your use case, you might use one over the other. We will provide an (not complete) overview of the advantages and disadvantages of each codec in the field of video surveillance and video analytics. If you would like to know more, you should look for additional resources on the internet (or if you like to read physical items, books still exists nowadays).
+
+- H264 (also known as AVC or MPEG-4 Part 10)
+  - Is the most common one and most widely supported for IP cameras.
+  - Supported in the majority of browsers, operating system and third-party applications.
+  - Can be embedded in commercial and 3rd party applications.
+  - Different levels of compression (high, medium, low, ..)
+  - Better quality / compression ratio, shows less artifacts at medium compression ratios.
+  - Does support technologies such as WebRTC
+
+- H265 (also known as HEVC)
+  - Is not supported on legacy cameras, though becoming rapidly available on "newer" IP cameras.
+  - Might not always be supported due to licensing. For example not supported in browers on a Linux distro.
+  - Requires licensing when embedding in a commercial product (be careful).
+  - Higher levels of compression (50% more than H264).
+  - H265 shows artifacts in motion based environments (which is less with H264).
+  - Recording the same video (resolution, duration and FPS) in H264 and H265 will result in approx 50% the file size.
+  - Not supported in technologies such as WebRTC
+  
+Conclusion: depending on the use case you might choose one over the other, and you can use both at the same time. For example you can use H264 (main stream) for livestreaming, and H265 (sub stream) for recording. If you wish to play recordings in a cross-platform and cross-browser environment, you might opt for H264 for better support.
 
 ## Contribute with Codespaces
 

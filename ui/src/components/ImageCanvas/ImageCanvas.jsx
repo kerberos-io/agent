@@ -7,6 +7,9 @@ import './ImageCanvas.css';
 
 class ImageCanvas extends React.Component {
   componentDidMount() {
+    this.width = 0;
+    this.height = 0;
+
     this.loadImage = this.loadImage.bind(this);
     this.generateRandomTagsDescriptor =
       this.generateRandomTagsDescriptor.bind(this);
@@ -55,14 +58,27 @@ class ImageCanvas extends React.Component {
 
     const { image } = this.props;
     this.loadImage(image, (img) => {
-      this.loadData(img);
+      if (this.width !== img.width || this.height !== img.height) {
+        this.width = img.width;
+        this.height = img.height;
+        this.loadData(img);
+      } else {
+        this.editor.addContentSource(img);
+      }
     });
   }
 
   componentDidUpdate() {
     const { image } = this.props;
     this.loadImage(image, (img) => {
-      this.loadData(img);
+      if (this.width !== img.width || this.height !== img.height) {
+        this.width = img.width;
+        this.height = img.height;
+        this.loadData(img);
+      } else {
+        // alert('ok');
+        this.editor.addContentSource(img);
+      }
     });
   }
 
