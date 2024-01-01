@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: kerberos/base:0a50dc9
-      options: --user 1001
       
     strategy:
       matrix:
@@ -25,7 +24,7 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
     - name: Check out code into the Go module directory
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Get dependencies
       run: cd machinery && go mod download
     - name: Build
