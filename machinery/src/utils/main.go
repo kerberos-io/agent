@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
@@ -110,15 +111,15 @@ func CountDigits(i int64) (count int) {
 	return count
 }
 
-func CheckDataDirectoryPermissions() error {
-	recordingsDirectory := "./data/recordings"
-	configDirectory := "./data/config"
-	snapshotsDirectory := "./data/snapshots"
-	cloudDirectory := "./data/cloud"
+func CheckDataDirectoryPermissions(configDirectory string) error {
+	recordingsDirectory := configDirectory + "/data/recordings"
+	configurationDirectory := configDirectory + "/data/config"
+	snapshotsDirectory := configDirectory + "/data/snapshots"
+	cloudDirectory := configDirectory + "/data/cloud"
 
 	err := CheckDirectoryPermissions(recordingsDirectory)
 	if err == nil {
-		err = CheckDirectoryPermissions(configDirectory)
+		err = CheckDirectoryPermissions(configurationDirectory)
 		if err == nil {
 			err = CheckDirectoryPermissions(snapshotsDirectory)
 			if err == nil {
@@ -329,4 +330,68 @@ func PrintConfiguration(configuration *models.Configuration) {
 		configurationVariables = configurationVariables + key + ": " + fmt.Sprintf("%v", value) + " "
 	}
 	log.Log.Info("Printing our configuration (config.json): " + configurationVariables)
+}
+
+func Decrypt(directoryOrFile string, symmetricKey []byte) {
+	// Check if file or directory
+	fileInfo, err := os.Stat(directoryOrFile)
+	if err != nil {
+		log.Log.Fatal(err.Error())
+		return
+	}
+
+	var files []string
+	if fileInfo.IsDir() {
+		// Create decrypted directory
+		err = os.MkdirAll(directoryOrFile+"/decrypted", 0755)
+		if err != nil {
+			log.Log.Fatal(err.Error())
+			return
+		}
+		dir, err := os.ReadDir(directoryOrFile)
+		if err != nil {
+			log.Log.Fatal(err.Error())
+			return
+		}
+		for _, file := range dir {
+			// Check if file is not a directory
+			if !file.IsDir() {
+				// Check if an mp4 file
+				if strings.HasSuffix(file.Name(), ".mp4") {
+					files = append(files, directoryOrFile+"/"+file.Name())
+				}
+			}
+		}
+	} else {
+		files = append(files, directoryOrFile)
+	}
+
+	// We'll loop over all files and decrypt them one by one.
+	for _, file := range files {
+
+		// Read file
+		content, err := os.ReadFile(file)
+		if err != nil {
+			log.Log.Fatal(err.Error())
+			return
+		}
+		// Decrypt using AES key
+		decrypted, err := encryption.AesDecrypt(content, string(symmetricKey))
+		if err != nil {
+			log.Log.Fatal("Something went wrong while decrypting: " + err.Error())
+			return
+		}
+
+		// Write decrypted content to file with appended .decrypted
+		// Get filename split by / and get last element.
+		fileParts := strings.Split(file, "/")
+		fileName := fileParts[len(fileParts)-1]
+		pathToFile := strings.Join(fileParts[:len(fileParts)-1], "/")
+
+		err = os.WriteFile(pathToFile+"/decrypted/"+fileName, []byte(decrypted), 0644)
+		if err != nil {
+			log.Log.Fatal(err.Error())
+			return
+		}
+	}
 }

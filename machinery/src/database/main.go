@@ -28,10 +28,10 @@ func New() *mongo.Client {
 	password := os.Getenv("MONGODB_PASSWORD")
 	authentication := "SCRAM-SHA-256"
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
 	_init_ctx.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
 		_instance = new(DB)
 		mongodbURI := fmt.Sprintf("mongodb://%s:%s@%s", username, password, host)
 		if replicaset != "" {

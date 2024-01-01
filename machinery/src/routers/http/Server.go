@@ -1,7 +1,9 @@
 package http
 
 import (
+	"io"
 	"os"
+	"strconv"
 
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-contrib/pprof"
@@ -12,6 +14,7 @@ import (
 	"log"
 
 	_ "github.com/kerberos-io/agent/machinery/docs"
+	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -35,7 +38,7 @@ import (
 // @in header
 // @name Authorization
 
-func StartServer(configuration *models.Configuration, communication *models.Communication) {
+func StartServer(configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 
 	// Initialize REST API
 	r := gin.Default()
@@ -57,12 +60,12 @@ func StartServer(configuration *models.Configuration, communication *models.Comm
 	}
 
 	// Add all routes
-	AddRoutes(r, authMiddleware, configuration, communication)
+	AddRoutes(r, authMiddleware, configDirectory, configuration, communication)
 
 	// Update environment variables
-	environmentVariables := "./www/env.js"
+	environmentVariables := configDirectory + "/www/env.js"
 	if os.Getenv("AGENT_MODE") == "demo" {
-		demoEnvironmentVariables := "./www/env.demo.js"
+		demoEnvironmentVariables := configDirectory + "/www/env.demo.js"
 		// Move demo environment variables to environment variables
 		err := os.Rename(demoEnvironmentVariables, environmentVariables)
 		if err != nil {
@@ -71,12 +74,14 @@ func StartServer(configuration *models.Configuration, communication *models.Comm
 	}
 
 	// Add static routes to UI
-	r.Use(static.Serve("/", static.LocalFile("./www", true)))
-	r.Use(static.Serve("/dashboard", static.LocalFile("./www", true)))
-	r.Use(static.Serve("/media", static.LocalFile("./www", true)))
-	r.Use(static.Serve("/settings", static.LocalFile("./www", true)))
-	r.Use(static.Serve("/login", static.LocalFile("./www", true)))
-	r.Handle("GET", "/file/*filepath", Files)
+	r.Use(static.Serve("/", static.LocalFile(configDirectory+"/www", true)))
+	r.Use(static.Serve("/dashboard", static.LocalFile(configDirectory+"/www", true)))
+	r.Use(static.Serve("/media", static.LocalFile(configDirectory+"/www", true)))
+	r.Use(static.Serve("/settings", static.LocalFile(configDirectory+"/www", true)))
+	r.Use(static.Serve("/login", static.LocalFile(configDirectory+"/www", true)))
+	r.Handle("GET", "/file/*filepath", func(c *gin.Context) {
+		Files(c, configDirectory, configuration)
+	})
 
 	// Run the api on port
 	err = r.Run(":" + configuration.Port)
@@ -85,8 +90,50 @@ func StartServer(configuration *models.Configuration, communication *models.Comm
 	}
 }
 
-func Files(c *gin.Context) {
-	c.Header("Access-Control-Allow-Origin", "*")
-	c.Header("Content-Type", "video/mp4")
-	c.File("./data/recordings" + c.Param("filepath"))
+func Files(c *gin.Context, configDirectory string, configuration *models.Configuration) {
+
+	// Get File
+	filePath := configDirectory + "/data/recordings" + c.Param("filepath")
+	_, err := os.Open(filePath)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "File not found"})
+		return
+	}
+
+	contents, err := os.ReadFile(filePath)
+	if err == nil {
+
+		// Get symmetric key
+		symmetricKey := configuration.Config.Encryption.SymmetricKey
+		// Decrypt file
+		if symmetricKey != "" {
+
+			// Read file
+			if err != nil {
+				c.JSON(404, gin.H{"error": "File not found"})
+				return
+			}
+
+			// Decrypt file
+			contents, err = encryption.AesDecrypt(contents, symmetricKey)
+			if err != nil {
+				c.JSON(404, gin.H{"error": "File not found"})
+				return
+			}
+		}
+
+		// Get fileSize from contents
+		fileSize := len(contents)
+
+		// Send file to gin
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Content-Disposition", "attachment; filename="+filePath)
+		c.Header("Content-Type", "video/mp4")
+		c.Header("Content-Length", strconv.Itoa(fileSize))
+		// Send contents to gin
+		io.WriteString(c.Writer, string(contents))
+	} else {
+		c.JSON(404, gin.H{"error": "File not found"})
+		return
+	}
 }

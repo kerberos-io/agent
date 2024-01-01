@@ -12,12 +12,13 @@ import (
 
 	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/components"
+	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 )
 
-func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuration *models.Configuration, communication *models.Communication) *gin.RouterGroup {
+func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirectory string, configuration *models.Configuration, communication *models.Communication) *gin.RouterGroup {
 
 	r.GET("/ws", func(c *gin.Context) {
 		websocket.WebsocketHandler(c, communication)
@@ -40,7 +41,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 		var config models.Config
 		err := c.BindJSON(&config)
 		if err == nil {
-			err := components.SaveConfig(config, configuration, communication)
+			err := configService.SaveConfig(configDirectory, config, configuration, communication)
 			if err == nil {
 				c.JSON(200, gin.H{
 					"data": "☄ Reconfiguring",
@@ -78,7 +79,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			}
 
 			// The total number of recordings stored in the directory.
-			recordingDirectory := "./data/recordings"
+			recordingDirectory := configDirectory + "/data/recordings"
 			numberOfRecordings := utils.NumberOfMP4sInDirectory(recordingDirectory)
 
 			// All days stored in this agent.
@@ -115,7 +116,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 				if eventFilter.NumberOfElements == 0 {
 					eventFilter.NumberOfElements = 10
 				}
-				recordingDirectory := "./data/recordings"
+				recordingDirectory := configDirectory + "/data/recordings"
 				files, err := utils.ReadDirectory(recordingDirectory)
 				if err == nil {
 					events := utils.GetSortedDirectory(files)
@@ -137,7 +138,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 		})
 
 		api.GET("/days", func(c *gin.Context) {
-			recordingDirectory := "./data/recordings"
+			recordingDirectory := configDirectory + "/data/recordings"
 			files, err := utils.ReadDirectory(recordingDirectory)
 			if err == nil {
 				events := utils.GetSortedDirectory(files)
@@ -165,7 +166,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 			var config models.Config
 			err := c.BindJSON(&config)
 			if err == nil {
-				err := components.SaveConfig(config, configuration, communication)
+				err := configService.SaveConfig(configDirectory, config, configuration, communication)
 				if err == nil {
 					c.JSON(200, gin.H{
 						"data": "☄ Reconfiguring",
@@ -201,7 +202,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 		})
 
 		api.POST("/persistence/verify", func(c *gin.Context) {
-			cloud.VerifyPersistence(c)
+			cloud.VerifyPersistence(c, configDirectory)
 		})
 
 		// Streaming handler
@@ -211,7 +212,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 				// We will only send an image once per second.
 				time.Sleep(time.Second * 1)
 				log.Log.Info("AddRoutes (/stream): reading from MJPEG stream")
-				img, err := components.GetImageFromFilePath()
+				img, err := configService.GetImageFromFilePath(configDirectory)
 				return img, err
 			}
 			h := components.StartMotionJPEG(imageFunction, 80)
@@ -223,6 +224,8 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configuratio
 		// the camera.
 		api.POST("/camera/onvif/login", LoginToOnvif)
 		api.POST("/camera/onvif/capabilities", GetOnvifCapabilities)
+		api.POST("/camera/onvif/presets", GetOnvifPresets)
+		api.POST("/camera/onvif/gotopreset", GoToOnvifPreset)
 		api.POST("/camera/onvif/pantilt", DoOnvifPanTilt)
 		api.POST("/camera/onvif/zoom", DoOnvifZoom)
 		api.POST("/camera/onvif/version", onvif.GetVersionONVIF)

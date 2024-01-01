@@ -729,7 +729,7 @@ class Settings extends React.Component {
           />
         )}
         {verifyOnvifError && (
-          <InfoBar type="alert" message={`${verifyOnvifErrorMessage}`} />
+          <InfoBar type="alert" message={verifyOnvifErrorMessage} />
         )}
 
         {loadingHub && (
@@ -810,6 +810,24 @@ class Settings extends React.Component {
                       this.onUpdateDropdown('', 'timezone', value[0], config)
                     }
                   />
+                  <br />
+                  <hr />
+                  <p>
+                    {t('settings.overview.description_advanced_configuration')}
+                  </p>
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={config.offline === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle('', 'offline', event, config)
+                      }
+                    />
+                    <div>
+                      <span>{t('settings.overview.offline_mode')}</span>
+                      <p>{t('settings.overview.description_offline_mode')}</p>
+                    </div>
+                  </div>
                 </BlockBody>
                 <BlockFooter>
                   <Button
@@ -1239,25 +1257,95 @@ class Settings extends React.Component {
             {showOverviewSection && (
               <Block>
                 <BlockHeader>
-                  <h4>{t('settings.overview.advanced_configuration')}</h4>
+                  <h4>{t('settings.overview.encryption')}</h4>
                 </BlockHeader>
                 <BlockBody>
-                  <p>
-                    {t('settings.overview.description_advanced_configuration')}
-                  </p>
+                  <p>{t('settings.overview.description_encryption')}</p>
                   <div className="toggle-wrapper">
                     <Toggle
-                      on={config.offline === 'true'}
+                      on={config.encryption.enabled === 'true'}
                       disabled={false}
                       onClick={(event) =>
-                        this.onUpdateToggle('', 'offline', event, config)
+                        this.onUpdateToggle(
+                          'encryption',
+                          'enabled',
+                          event,
+                          config.encryption
+                        )
                       }
                     />
                     <div>
-                      <span>{t('settings.overview.offline_mode')}</span>
-                      <p>{t('settings.overview.description_offline_mode')}</p>
+                      <span>{t('settings.overview.encryption_enabled')}</span>
+                      <p>
+                        {t('settings.overview.description_encryption_enabled')}
+                      </p>
                     </div>
                   </div>
+
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={config.encryption.recordings === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle(
+                          'encryption',
+                          'recordings',
+                          event,
+                          config.encryption
+                        )
+                      }
+                    />
+                    <div>
+                      <span>
+                        {t('settings.overview.encryption_recordings_enabled')}
+                      </span>
+                      <p>
+                        {t(
+                          'settings.overview.description_encryption_recordings_enabled'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <Input
+                    noPadding
+                    label={t('settings.overview.encryption_fingerprint')}
+                    value={config.encryption.fingerprint}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'encryption',
+                        'fingerprint',
+                        value,
+                        config.encryption
+                      )
+                    }
+                  />
+                  <Input
+                    noPadding
+                    label={t('settings.overview.encryption_privatekey')}
+                    value={config.encryption.private_key}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'encryption',
+                        'private_key',
+                        value,
+                        config.encryption
+                      )
+                    }
+                  />
+                  <Input
+                    noPadding
+                    label={t('settings.overview.encryption_symmetrickey')}
+                    value={config.encryption.symmetric_key}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'encryption',
+                        'symmetric_key',
+                        value,
+                        config.encryption
+                      )
+                    }
+                  />
                 </BlockBody>
                 <BlockFooter>
                   <Button
@@ -2116,17 +2204,6 @@ class Settings extends React.Component {
                     <>
                       <Input
                         noPadding
-                        label={t('settings.persistence.kerberoshub_proxyurl')}
-                        placeholder={t(
-                          'settings.persistence.kerberoshub_description_proxyurl'
-                        )}
-                        value={config.s3 ? config.s3.proxyuri : ''}
-                        onChange={(value) =>
-                          this.onUpdateField('s3', 'proxyuri', value, config.s3)
-                        }
-                      />
-                      <Input
-                        noPadding
                         label={t('settings.persistence.kerberoshub_region')}
                         placeholder={t(
                           'settings.persistence.kerberoshub_description_region'
@@ -2134,28 +2211,6 @@ class Settings extends React.Component {
                         value={config.s3 ? config.s3.region : ''}
                         onChange={(value) =>
                           this.onUpdateField('s3', 'region', value, config.s3)
-                        }
-                      />
-                      <Input
-                        noPadding
-                        label={t('settings.persistence.kerberoshub_bucket')}
-                        placeholder={t(
-                          'settings.persistence.kerberoshub_description_bucket'
-                        )}
-                        value={config.s3 ? config.s3.bucket : ''}
-                        onChange={(value) =>
-                          this.onUpdateField('s3', 'bucket', value, config.s3)
-                        }
-                      />
-                      <Input
-                        noPadding
-                        label={t('settings.persistence.kerberoshub_username')}
-                        placeholder={t(
-                          'settings.persistence.kerberoshub_description_username'
-                        )}
-                        value={config.s3 ? config.s3.username : ''}
-                        onChange={(value) =>
-                          this.onUpdateField('s3', 'username', value, config.s3)
                         }
                       />
                     </>

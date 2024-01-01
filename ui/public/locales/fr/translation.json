@@ -84,7 +84,16 @@
       "advanced_configuration": "Configuration avancée",
       "description_advanced_configuration": "Les options de configuration détaillées pour activer ou désactiver des composants spécifiques de l'Agent Kerberos",
       "offline_mode": "Mode hors-ligne",
-      "description_offline_mode": "Désactiver tout le trafic sortant"
+      "description_offline_mode": "Désactiver tout le trafic sortant",
+      "encryption": "Encryption",
+      "description_encryption": "Enable encryption for all outgoing traffic. MQTT messages and/or recordings will be encrypted using AES-256. A private key is used for signing.",
+      "encryption_enabled": "Enable MQTT encryption",
+      "description_encryption_enabled": "Enable encryption for all MQTT messages.",
+      "encryption_recordings_enabled": "Enable recording encryption",
+      "description_encryption_recordings_enabled": "Enable encryption for all recordings.",
+      "encryption_fingerprint": "Fingerprint",
+      "encryption_privatekey": "Private key",
+      "encryption_symmetrickey": "Symmetric key"
     },
     "camera": {
       "camera": "Caméra",

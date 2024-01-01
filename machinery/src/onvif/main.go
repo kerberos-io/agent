@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,7 +16,6 @@ import (
 	"github.com/kerberos-io/onvif/media"
 
 	"github.com/kerberos-io/onvif"
-	dev "github.com/kerberos-io/onvif/device"
 	"github.com/kerberos-io/onvif/ptz"
 	xsd "github.com/kerberos-io/onvif/xsd/onvif"
 )
@@ -48,14 +45,74 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 
 				if err == nil {
 
-					if onvifAction.Action == "ptz" {
+					if onvifAction.Action == "absolute-move" {
+
+						// We will move the camera to zero position.
+						x := ptzAction.X
+						y := ptzAction.Y
+						z := ptzAction.Z
+
+						// Check which PTZ Space we need to use
+						functions, _, _ := GetPTZFunctionsFromDevice(configurations)
+
+						// Log functions
+						log.Log.Info("HandleONVIFActions: functions: " + strings.Join(functions, ", "))
+
+						// Check if we need to use absolute or continuous move
+						/*canAbsoluteMove := false
+						canContinuousMove := false
+
+						if len(functions) > 0 {
+							for _, function := range functions {
+								if function == "AbsolutePanTiltMove" || function == "AbsoluteZoomMove" {
+									canAbsoluteMove = true
+								} else if function == "ContinuousPanTiltMove" || function == "ContinuousZoomMove" {
+									canContinuousMove = true
+								}
+							}
+						}*/
+
+						// Ideally we should be able to use the AbsolutePanTiltMove function, but it looks like
+						// the current detection through GetPTZFuntionsFromDevice is not working properly. Therefore we will fallback
+						// on the ContinuousPanTiltMove function which is more compatible with more cameras.
+						err = AbsolutePanTiltMoveFake(device, configurations, token, x, y, z)
+						if err != nil {
+							log.Log.Error("HandleONVIFActions (AbsolutePanTitleMoveFake): " + err.Error())
+						} else {
+							log.Log.Info("HandleONVIFActions (AbsolutePanTitleMoveFake): successfully moved camera")
+						}
+
+						/*if canAbsoluteMove {
+							err = AbsolutePanTiltMove(device, configurations, token, x, y, z)
+							if err != nil {
+								log.Log.Error("HandleONVIFActions (AbsolutePanTitleMove): " + err.Error())
+							}
+						} else if canContinuousMove {
+							err = AbsolutePanTiltMoveFake(device, configurations, token, x, y, z)
+							if err != nil {
+								log.Log.Error("HandleONVIFActions (AbsolutePanTitleMoveFake): " + err.Error())
+							}
+						}*/
+
+					} else if onvifAction.Action == "preset" {
+
+						// Execute the preset
+						preset := ptzAction.Preset
+						err := GoToPresetFromDevice(device, preset)
+						if err != nil {
+							log.Log.Error("HandleONVIFActions (GotoPreset): " + err.Error())
+						} else {
+							log.Log.Info("HandleONVIFActions (GotoPreset): successfully moved camera")
+						}
+
+					} else if onvifAction.Action == "ptz" {
 
 						if err == nil {
 
 							if ptzAction.Center == 1 {
 
 								// We will move the camera to zero position.
-								err := AbsolutePanTiltMove(device, configurations, token, 0, 0)
+								err := AbsolutePanTiltMove(device, configurations, token, 0, 0, 0)
 								if err != nil {
 									log.Log.Error("HandleONVIFActions (AbsolutePanTitleMove): " + err.Error())
 								}
@@ -182,18 +239,83 @@ func GetPTZConfigurationsFromDevice(device *onvif.Device) (ptz.GetConfigurations
 	return configurations, err
 }
 
-func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float32, tilt float32) error {
+func GetPositionFromDevice(configuration models.Configuration) (xsd.PTZVector, error) {
+	var position xsd.PTZVector
+	// Connect to Onvif device
+	cameraConfiguration := configuration.Config.Capture.IPCamera
+	device, err := ConnectToOnvifDevice(&cameraConfiguration)
+	if err == nil {
 
-	absoluteVector := xsd.Vector2D{
-		X:     float64(pan),
-		Y:     float64(tilt),
+		// Get token from the first profile
+		token, err := GetTokenFromProfile(device, 0)
+		if err == nil {
+			// Get the PTZ configurations from the device
+			position, err := GetPosition(device, token)
+			if err == nil {
+				return position, err
+			} else {
+				log.Log.Error("GetPositionFromDevice: " + err.Error())
+				return position, err
+			}
+		} else {
+			log.Log.Error("GetPositionFromDevice: " + err.Error())
+			return position, err
+		}
+	} else {
+		log.Log.Error("GetPositionFromDevice: " + err.Error())
+		return position, err
+	}
+}
+
+func GetPosition(device *onvif.Device, token xsd.ReferenceToken) (xsd.PTZVector, error) {
+	// We'll try to receive the PTZ configurations from the server
+	var status ptz.GetStatusResponse
+	var position xsd.PTZVector
+
+	// Get the PTZ configurations from the device
+	resp, err := device.CallMethod(ptz.GetStatus{
+		ProfileToken: token,
+	})
+
+	if err == nil {
+		defer resp.Body.Close()
+		b, err := io.ReadAll(resp.Body)
+		if err == nil {
+			stringBody := string(b)
+			decodedXML, et, err := getXMLNode(stringBody, "GetStatusResponse")
+			if err != nil {
+				log.Log.Error("GetPositionFromDevice: " + err.Error())
+				return position, err
+			} else {
+				if err := decodedXML.DecodeElement(&status, et); err != nil {
+					log.Log.Error("GetPositionFromDevice: " + err.Error())
+					return position, err
+				}
+			}
+		}
+	}
+	position = status.PTZStatus.Position
+	return position, err
+}
+
+func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float64, tilt float64, zoom float64) error {
+
+	absolutePantiltVector := xsd.Vector2D{
+		X:     pan,
+		Y:     tilt,
 		Space: configuration.PTZConfiguration.DefaultAbsolutePantTiltPositionSpace,
+	}
+
+	absoluteZoomVector := xsd.Vector1D{
+		X:     zoom,
+		Space: configuration.PTZConfiguration.DefaultAbsoluteZoomPositionSpace,
 	}
 
 	res, err := device.CallMethod(ptz.AbsoluteMove{
 		ProfileToken: token,
 		Position: xsd.PTZVector{
-			PanTilt: absoluteVector,
+			PanTilt: absolutePantiltVector,
+			Zoom:    absoluteZoomVector,
 		},
 	})
 
@@ -202,8 +324,252 @@ func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfiguratio
 	}
 
 	bs, _ := ioutil.ReadAll(res.Body)
-	log.Log.Debug("AbsoluteMove: " + string(bs))
+	log.Log.Info("AbsoluteMove: " + string(bs))
 
+	return err
+}
+
+// This function will simulate the AbsolutePanTiltMove function.
+// However the AboslutePanTiltMove function is not working on all cameras.
+// So we'll use the ContinuousMove function to simulate the AbsolutePanTiltMove function using the position polling.
+func AbsolutePanTiltMoveFake(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float64, tilt float64, zoom float64) error {
+	position, err := GetPosition(device, token)
+	if position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01 && position.PanTilt.Y >= tilt-0.01 && position.PanTilt.Y <= tilt+0.01 && position.Zoom.X >= zoom-0.01 && position.Zoom.X <= zoom+0.01 {
+		log.Log.Debug("AbsolutePanTiltMoveFake: already at position")
+	} else {
+
+		// The speed of panning, the higher the faster we'll pan the camera
+		// value is a range between 0 and 1.
+		speed := 0.6
+		wait := 100 * time.Millisecond
+
+		// We'll move quickly to the position (might be inaccurate)
+		err = ZoomOutCompletely(device, configuration, token)
+		err = PanUntilPosition(device, configuration, token, pan, zoom, speed, wait)
+		err = TiltUntilPosition(device, configuration, token, tilt, zoom, speed, wait)
+
+		// Now we'll move a bit slower to make sure we are ok (will be more accurate)
+		speed = 0.1
+		wait = 200 * time.Millisecond
+
+		err = PanUntilPosition(device, configuration, token, pan, zoom, speed, wait)
+		err = TiltUntilPosition(device, configuration, token, tilt, zoom, speed, wait)
+		err = ZoomUntilPosition(device, configuration, token, zoom, speed, wait)
+
+		return err
+	}
+	return err
+}
+
+func ZoomOutCompletely(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken) error {
+	// Zoom out completely!!!
+	zoomOut := xsd.Vector1D{
+		X:     -1,
+		Space: configuration.PTZConfiguration.DefaultContinuousZoomVelocitySpace,
+	}
+	_, err := device.CallMethod(ptz.ContinuousMove{
+		ProfileToken: token,
+		Velocity: xsd.PTZSpeedZoom{
+			Zoom: zoomOut,
+		},
+	})
+	for {
+		position, _ := GetPosition(device, token)
+		if position.Zoom.X == 0 {
+			break
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	device.CallMethod(ptz.Stop{
+		ProfileToken: token,
+		Zoom:         true,
+	})
+	return err
+}
+
+func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, pan float64, zoom float64, speed float64, wait time.Duration) error {
+	position, err := GetPosition(device, token)
+
+	if position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01 {
+
+	} else {
+
+		// We'll need to determine if we need to move CW or CCW.
+		// Check the current position and compare it with the desired position.
+		directionX := speed
+		if position.PanTilt.X > pan {
+			directionX = speed * -1
+		}
+
+		panTiltVector := xsd.Vector2D{
+			X:     directionX,
+			Y:     0,
+			Space: configuration.PTZConfiguration.DefaultContinuousPanTiltVelocitySpace,
+		}
+		res, err := device.CallMethod(ptz.ContinuousMove{
+			ProfileToken: token,
+			Velocity: xsd.PTZSpeedPanTilt{
+				PanTilt: panTiltVector,
+			},
+		})
+
+		if err != nil {
+			log.Log.Error("ContinuousPanTiltMove (Pan): " + err.Error())
+		}
+
+		bs, _ := ioutil.ReadAll(res.Body)
+		log.Log.Debug("ContinuousPanTiltMove (Pan): " + string(bs))
+
+		// While moving we'll check if we reached the desired position.
+		// or if we overshot the desired position.
+
+		// Break after 3seconds
+		now := time.Now()
+		for {
+			position, _ := GetPosition(device, token)
+			if position.PanTilt.X == -1 || position.PanTilt.X == 1 || (directionX > 0 && position.PanTilt.X >= pan) || (directionX < 0 && position.PanTilt.X <= pan) || (position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01) {
+				break
+			}
+			if time.Since(now) > 3*time.Second {
+				break
+			}
+			time.Sleep(wait)
+		}
+
+		_, errStop := device.CallMethod(ptz.Stop{
+			ProfileToken: token,
+			PanTilt:      true,
+			Zoom:         true,
+		})
+
+		if errStop != nil {
+			log.Log.Error("ContinuousPanTiltMove (Pan): " + errStop.Error())
+		}
+	}
+	return err
+}
+
+func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, tilt float64, zoom float64, speed float64, wait time.Duration) error {
+	position, err := GetPosition(device, token)
+
+	if position.PanTilt.Y >= tilt-0.005 && position.PanTilt.Y <= tilt+0.005 {
+
+	} else {
+
+		// We'll need to determine if we need to move CW or CCW.
+		// Check the current position and compare it with the desired position.
+		directionY := speed
+		if position.PanTilt.Y > tilt {
+			directionY = speed * -1
+		}
+
+		panTiltVector := xsd.Vector2D{
+			X:     0,
+			Y:     directionY,
+			Space: configuration.PTZConfiguration.DefaultContinuousPanTiltVelocitySpace,
+		}
+		res, err := device.CallMethod(ptz.ContinuousMove{
+			ProfileToken: token,
+			Velocity: xsd.PTZSpeedPanTilt{
+				PanTilt: panTiltVector,
+			},
+		})
+
+		if err != nil {
+			log.Log.Error("ContinuousPanTiltMove (Tilt): " + err.Error())
+		}
+
+		bs, _ := ioutil.ReadAll(res.Body)
+		log.Log.Debug("ContinuousPanTiltMove (Tilt) " + string(bs))
+
+		// While moving we'll check if we reached the desired position.
+		// or if we overshot the desired position.
+
+		// Break after 3seconds
+		now := time.Now()
+		for {
+			position, _ := GetPosition(device, token)
+			if position.PanTilt.Y == -1 || position.PanTilt.Y == 1 || (directionY > 0 && position.PanTilt.Y >= tilt) || (directionY < 0 && position.PanTilt.Y <= tilt) || (position.PanTilt.Y >= tilt-0.005 && position.PanTilt.Y <= tilt+0.005) {
+				break
+			}
+			if time.Since(now) > 3*time.Second {
+				break
+			}
+			time.Sleep(wait)
+		}
+
+		_, errStop := device.CallMethod(ptz.Stop{
+			ProfileToken: token,
+			PanTilt:      true,
+			Zoom:         true,
+		})
+
+		if errStop != nil {
+			log.Log.Error("ContinuousPanTiltMove (Tilt): " + errStop.Error())
+		}
+	}
+	return err
+}
+
+func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsd.ReferenceToken, zoom float64, speed float64, wait time.Duration) error {
+	position, err := GetPosition(device, token)
+
+	if position.Zoom.X >= zoom-0.005 && position.Zoom.X <= zoom+0.005 {
+
+	} else {
+
+		// We'll need to determine if we need to move CW or CCW.
+		// Check the current position and compare it with the desired position.
+		directionZ := speed
+		if position.Zoom.X > zoom {
+			directionZ = speed * -1
+		}
+
+		zoomVector := xsd.Vector1D{
+			X:     directionZ,
+			Space: configuration.PTZConfiguration.DefaultContinuousZoomVelocitySpace,
+		}
+		res, err := device.CallMethod(ptz.ContinuousMove{
+			ProfileToken: token,
+			Velocity: xsd.PTZSpeedZoom{
+				Zoom: zoomVector,
+			},
+		})
+
+		if err != nil {
+			log.Log.Error("ContinuousPanTiltMove (Zoom): " + err.Error())
+		}
+
+		bs, _ := ioutil.ReadAll(res.Body)
+		log.Log.Debug("ContinuousPanTiltMove (Zoom) " + string(bs))
+
+		// While moving we'll check if we reached the desired position.
+		// or if we overshot the desired position.
+
+		// Break after 3seconds
+		now := time.Now()
+		for {
+			position, _ := GetPosition(device, token)
+			if position.Zoom.X == -1 || position.Zoom.X == 1 || (directionZ > 0 && position.Zoom.X >= zoom) || (directionZ < 0 && position.Zoom.X <= zoom) || (position.Zoom.X >= zoom-0.005 && position.Zoom.X <= zoom+0.005) {
+				break
+			}
+			if time.Since(now) > 3*time.Second {
+				break
+			}
+			time.Sleep(wait)
+		}
+
+		_, errStop := device.CallMethod(ptz.Stop{
+			ProfileToken: token,
+			PanTilt:      true,
+			Zoom:         true,
+		})
+
+		if errStop != nil {
+			log.Log.Error("ContinuousPanTiltMove (Zoom): " + errStop.Error())
+		}
+	}
 	return err
 }
 
@@ -229,7 +595,7 @@ func ContinuousPanTilt(device *onvif.Device, configuration ptz.GetConfigurations
 	bs, _ := ioutil.ReadAll(res.Body)
 	log.Log.Debug("ContinuousPanTiltMove: " + string(bs))
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	res, errStop := device.CallMethod(ptz.Stop{
 		ProfileToken: token,
@@ -302,84 +668,87 @@ func GetCapabilitiesFromDevice(device *onvif.Device) []string {
 	return capabilities
 }
 
-func GetONVIFVersionFromDevice(device *onvif.Device) (string, error) {
-	// Get the ONVIF version from the device
-	resp, err := device.CallMethod(dev.GetServices{IncludeCapability: false})
+func GetPresetsFromDevice(device *onvif.Device) ([]models.OnvifActionPreset, error) {
+	var presets []models.OnvifActionPreset
+	var presetsResponse ptz.GetPresetsResponse
+
+	// Get token from the first profile
+	token, err := GetTokenFromProfile(device, 0)
 	if err == nil {
+		resp, err := device.CallMethod(ptz.GetPresets{
+			ProfileToken: token,
+		})
+
 		defer resp.Body.Close()
 		b, err := io.ReadAll(resp.Body)
 		if err == nil {
 			stringBody := string(b)
-			decodedXML, et, err := getXMLNode(stringBody, "GetServicesResponse")
+			decodedXML, et, err := getXMLNode(stringBody, "GetPresetsResponse")
 			if err != nil {
-				log.Log.Error("GetServicesResponse: " + err.Error())
-				return "", err
+				log.Log.Error("GetPresetsFromDevice: " + err.Error())
+				return presets, err
 			} else {
-				// Decode the profiles from the server
-				var mServiceResp dev.GetServicesResponse
-				if err := decodedXML.DecodeElement(&mServiceResp, et); err != nil {
-					log.Log.Error("GetServicesResponse: " + err.Error())
+				if err := decodedXML.DecodeElement(&presetsResponse, et); err != nil {
+					log.Log.Error("GetPresetsFromDevice: " + err.Error())
+					return presets, err
 				}
 
-				// We'll try to get the version of the ONVIF server
-				version := mServiceResp.Service.Version
+				for _, preset := range presetsResponse.Preset {
+					p := models.OnvifActionPreset{
+						Name:  string(preset.Name),
+						Token: string(preset.Token),
+					}
 
-				// Convert version int to string
-				major := strconv.Itoa(version.Major)
-				minor := strconv.Itoa(version.Minor)
-				return major + "." + minor, nil
+					presets = append(presets, p)
+				}
 
+				return presets, err
 			}
+		} else {
+			log.Log.Error("GetPresetsFromDevice: " + err.Error())
 		}
+	} else {
+		log.Log.Error("GetPresetsFromDevice: " + err.Error())
 	}
-	return "", err
+
+	return presets, err
 }
 
-func GetAudioOutputConfiguration(device *onvif.Device) (media.GetAudioDecoderConfigurationOptionsResponse, error) {
-	// Get the ONVIF version from the device
-	resp, err := device.CallMethod(media.GetAudioDecoderConfigurationOptions{})
-	var mAudioEncoderConfigurationOptionsResponse media.GetAudioDecoderConfigurationOptionsResponse
+func GoToPresetFromDevice(device *onvif.Device, presetName string) error {
+	var goToPresetResponse ptz.GotoPresetResponse
+
+	// Get token from the first profile
+	token, err := GetTokenFromProfile(device, 0)
 	if err == nil {
+
+		resp, err := device.CallMethod(ptz.GotoPreset{
+			ProfileToken: token,
+			PresetToken:  xsd.ReferenceToken(presetName),
+		})
+
 		defer resp.Body.Close()
 		b, err := io.ReadAll(resp.Body)
 		if err == nil {
 			stringBody := string(b)
-			decodedXML, et, err := getXMLNode(stringBody, "GetAudioDecoderConfigurationOptionsResponse")
+			decodedXML, et, err := getXMLNode(stringBody, "GotoPresetResponses")
 			if err != nil {
-				log.Log.Error("GetAudioDecoderConfigurationOptionsResponse: " + err.Error())
-				return mAudioEncoderConfigurationOptionsResponse, err
-
+				log.Log.Error("GoToPresetFromDevice: " + err.Error())
+				return err
 			} else {
-				// Decode the profiles from the server
-				if err := decodedXML.DecodeElement(&mAudioEncoderConfigurationOptionsResponse, et); err != nil {
-					log.Log.Error("GetAudioDecoderConfigurationOptionsResponse: " + err.Error())
+				if err := decodedXML.DecodeElement(&goToPresetResponse, et); err != nil {
+					log.Log.Error("GoToPresetFromDevice: " + err.Error())
+					return err
 				}
-
-				// We'll try to get the version of the ONVIF server
-				audioDecoders := mAudioEncoderConfigurationOptionsResponse
-				return audioDecoders, nil
+				return err
 			}
+		} else {
+			log.Log.Error("GoToPresetFromDevice: " + err.Error())
 		}
+	} else {
+		log.Log.Error("GoToPresetFromDevice: " + err.Error())
 	}
-	return mAudioEncoderConfigurationOptionsResponse, err
-}
 
-func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, error) {
-	xmlBytes := bytes.NewBufferString(xmlBody)
-	decodedXML := xml.NewDecoder(xmlBytes)
-	for {
-		token, err := decodedXML.Token()
-		if err != nil {
-			break
-		}
-		switch et := token.(type) {
-		case xml.StartElement:
-			if et.Name.Local == nodeName {
-				return decodedXML, &et, nil
-			}
-		}
-	}
-	return nil, nil, errors.New("error in NodeName - username and password might be wrong")
+	return err
 }
 
 func GetPTZFunctionsFromDevice(configurations ptz.GetConfigurationsResponse) ([]string, bool, bool) {
@@ -422,13 +791,13 @@ func GetPTZFunctionsFromDevice(configurations ptz.GetConfigurationsResponse) ([]
 }
 
 // VerifyOnvifConnection godoc
-// @Router /api/camera/onvif/verify [post]
+// @Router /api/onvif/verify [post]
 // @ID verify-onvif
 // @Security Bearer
 // @securityDefinitions.apikey Bearer
 // @in header
 // @name Authorization
-// @Tags camera
+// @Tags config
 // @Param cameraConfig body models.IPCamera true "Camera Config"
 // @Summary Will verify the ONVIF connectivity.
 // @Description Will verify the ONVIF connectivity.
@@ -439,15 +808,21 @@ func VerifyOnvifConnection(c *gin.Context) {
 	if err == nil {
 		device, err := ConnectToOnvifDevice(&cameraConfig)
 		if err == nil {
-			version, err := GetONVIFVersionFromDevice(device)
+			// Get the list of configurations
+			configurations, err := GetPTZConfigurationsFromDevice(device)
 			if err == nil {
+
 				// Check if can zoom and/or pan/tilt is supported
+				ptzFunctions, canZoom, canPanTilt := GetPTZFunctionsFromDevice(configurations)
 				c.JSON(200, models.APIResponse{
-					Data: version,
+					Data:         device,
+					PTZFunctions: ptzFunctions,
+					CanZoom:      canZoom,
+					CanPanTilt:   canPanTilt,
 				})
 			} else {
 				c.JSON(400, models.APIResponse{
-					Message: "Something went wrong while getting the ONVIF version " + err.Error(),
+					Message: "Something went wrong while getting the configurations " + err.Error(),
 				})
 			}
 		} else {
@@ -462,101 +837,20 @@ func VerifyOnvifConnection(c *gin.Context) {
 	}
 }
 
-// VerifyOnvifConnection godoc
-// @Router /api/camera/onvif/version [post]
-// @ID version-onvif
-// @Security Bearer
-// @securityDefinitions.apikey Bearer
-// @in header
-// @name Authorization
-// @Tags camera
-// @Param cameraConfig body models.IPCamera true "Camera Config"
-// @Summary Get the ONVIF version installed on the camera.
-// @Description Get the ONVIF version installed on the camera.
-// @Success 200 {object} models.APIResponse
-func GetVersionONVIF(c *gin.Context) {
-	var cameraConfig models.IPCamera
-	err := c.BindJSON(&cameraConfig)
-	if err == nil {
-		device, err := ConnectToOnvifDevice(&cameraConfig)
-		if err == nil {
-			// Get the list of configurations
-			version, err := GetONVIFVersionFromDevice(device)
-			if err == nil {
-				// Check if can zoom and/or pan/tilt is supported
-				c.JSON(200, models.APIResponse{
-					Data: version,
-				})
-			} else {
-				c.JSON(400, models.APIResponse{
-					Message: "Something went wrong while getting the ONVIF version " + err.Error(),
-				})
-			}
-		} else {
-			c.JSON(400, models.APIResponse{
-				Message: "Something went wrong while verifying the ONVIF connection " + err.Error(),
-			})
+func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, error) {
+	xmlBytes := bytes.NewBufferString(xmlBody)
+	decodedXML := xml.NewDecoder(xmlBytes)
+	for {
+		token, err := decodedXML.Token()
+		if err != nil {
+			break
 		}
-	} else {
-		c.JSON(400, models.APIResponse{
-			Message: "Something went wrong while receiving the config " + err.Error(),
-		})
-	}
-}
-
-// GetAudioOutputConfigurationONVIF godoc
-// @Router /api/camera/onvif/audio-backchannel [post]
-// @ID audio-output-onvif
-// @Security Bearer
-// @securityDefinitions.apikey Bearer
-// @in header
-// @name Authorization
-// @Tags camera
-// @Param cameraConfig body models.IPCamera true "Camera Config"
-// @Summary Get the audio decoders for the audio backchannel.
-// @Description Get the audio decoders for the audio backchannel.
-// @Success 200 {object} models.APIResponse
-func GetAudioOutputConfigurationONVIF(c *gin.Context) {
-	var cameraConfig models.IPCamera
-	err := c.BindJSON(&cameraConfig)
-	if err == nil {
-		device, err := ConnectToOnvifDevice(&cameraConfig)
-
-		// Get token from the first profile
-		token, err := GetTokenFromProfile(device, 0)
-		fmt.Println(token)
-		if err == nil {
-			// Get the list of configurations
-			decoders, err := GetAudioOutputConfiguration(device)
-			if err == nil {
-
-				// Filter the available decoders
-				var availableDecoders []string
-				options := decoders.Options
-
-				// Check if G711 is supported
-				if options.G711DecOptions.SampleRateRange.Items != nil && len(options.G711DecOptions.SampleRateRange.Items) > 0 &&
-					options.G711DecOptions.Bitrate.Items != nil && len(options.G711DecOptions.Bitrate.Items) > 0 {
-					availableDecoders = append(availableDecoders, "G711")
-				}
-
-				// Check if can zoom and/or pan/tilt is supported
-				c.JSON(200, models.APIResponse{
-					Data: availableDecoders,
-				})
-			} else {
-				c.JSON(400, models.APIResponse{
-					Message: "Something went wrong while getting the audio output configuration " + err.Error(),
-				})
+		switch et := token.(type) {
+		case xml.StartElement:
+			if et.Name.Local == nodeName {
+				return decodedXML, &et, nil
 			}
-		} else {
-			c.JSON(400, models.APIResponse{
-				Message: "Something went wrong while verifying the ONVIF connection " + err.Error(),
-			})
 		}
-	} else {
-		c.JSON(400, models.APIResponse{
-			Message: "Something went wrong while receiving the config " + err.Error(),
-		})
 	}
+	return nil, nil, errors.New("error in NodeName - username and password might be wrong")
 }

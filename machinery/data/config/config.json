@@ -95,7 +95,7 @@
 	"s3": {
 		"proxyuri": "http://proxy.kerberos.io",
 		"bucket": "kerberosaccept",
-		"region": "eu-west1"
+		"region": "eu-west-1"
 	},
 	"kstorage": {},
 	"dropbox": {},
@@ -111,5 +111,6 @@
 	"hub_key": "",
 	"hub_private_key": "",
 	"hub_site": "",
-	"condition_uri": ""
+	"condition_uri": "",
+	"encryption": {}
 }

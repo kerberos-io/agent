@@ -85,7 +85,16 @@
       "advanced_configuration": "詳細設定",
       "description_advanced_configuration": "Kerberos エージェントの特定の部分を有効または無効にするための詳細な構成オプション",
       "offline_mode": "オフラインモード",
-      "description_offline_mode": "すべての送信トラフィックを無効にする"
+      "description_offline_mode": "すべての送信トラフィックを無効にする",
+      "encryption": "Encryption",
+      "description_encryption": "Enable encryption for all outgoing traffic. MQTT messages and/or recordings will be encrypted using AES-256. A private key is used for signing.",
+      "encryption_enabled": "Enable MQTT encryption",
+      "description_encryption_enabled": "Enable encryption for all MQTT messages.",
+      "encryption_recordings_enabled": "Enable recording encryption",
+      "description_encryption_recordings_enabled": "Enable encryption for all recordings.",
+      "encryption_fingerprint": "Fingerprint",
+      "encryption_privatekey": "Private key",
+      "encryption_symmetrickey": "Symmetric key"
     },
     "camera": {
       "camera": "カメラ",

@@ -25,40 +25,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/camera/onvif/audio-backchannel": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Get the audio decoders for the audio backchannel.",
-                "tags": [
-                    "camera"
-                ],
-                "summary": "Get the audio decoders for the audio backchannel.",
-                "operationId": "audio-output-onvif",
-                "parameters": [
-                    {
-                        "description": "Camera Config",
-                        "name": "cameraConfig",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.IPCamera"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/camera/onvif/capabilities": {
             "post": {
                 "description": "Will return the ONVIF capabilities for the specific camera.",
@@ -75,6 +41,35 @@ const docTemplate = `{
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/models.OnvifCredentials"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/camera/onvif/gotopreset": {
+            "post": {
+                "description": "Will activate the desired ONVIF preset.",
+                "tags": [
+                    "camera"
+                ],
+                "summary": "Will activate the desired ONVIF preset.",
+                "operationId": "camera-onvif-gotopreset",
+                "parameters": [
+                    {
+                        "description": "OnvifPreset",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OnvifPreset"
                         }
                     }
                 ],
@@ -146,61 +141,22 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/camera/onvif/verify": {
+        "/api/camera/onvif/presets": {
             "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Will verify the ONVIF connectivity.",
+                "description": "Will return the ONVIF presets for the specific camera.",
                 "tags": [
                     "camera"
                 ],
-                "summary": "Will verify the ONVIF connectivity.",
-                "operationId": "verify-onvif",
+                "summary": "Will return the ONVIF presets for the specific camera.",
+                "operationId": "camera-onvif-presets",
                 "parameters": [
                     {
-                        "description": "Camera Config",
-                        "name": "cameraConfig",
+                        "description": "OnvifCredentials",
+                        "name": "config",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.IPCamera"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.APIResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/camera/onvif/version": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Get the ONVIF version installed on the camera.",
-                "tags": [
-                    "camera"
-                ],
-                "summary": "Get the ONVIF version installed on the camera.",
-                "operationId": "version-onvif",
-                "parameters": [
-                    {
-                        "description": "Camera Config",
-                        "name": "cameraConfig",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.IPCamera"
+                            "$ref": "#/definitions/models.OnvifCredentials"
                         }
                     }
                 ],
@@ -341,6 +297,40 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.Authorization"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/onvif/verify": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Will verify the ONVIF connectivity.",
+                "tags": [
+                    "config"
+                ],
+                "summary": "Will verify the ONVIF connectivity.",
+                "operationId": "verify-onvif",
+                "parameters": [
+                    {
+                        "description": "Camera Config",
+                        "name": "cameraConfig",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.IPCamera"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
                         }
                     }
                 }
@@ -693,6 +683,17 @@ const docTemplate = `{
                 },
                 "tilt": {
                     "type": "number"
+                }
+            }
+        },
+        "models.OnvifPreset": {
+            "type": "object",
+            "properties": {
+                "onvif_credentials": {
+                    "$ref": "#/definitions/models.OnvifCredentials"
+                },
+                "preset": {
+                    "type": "string"
                 }
             }
         },

@@ -1,4 +1,4 @@
-package components
+package config
 
 import (
 	"context"
@@ -20,14 +20,14 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func GetImageFromFilePath() (image.Image, error) {
-	snapshotDirectory := "./data/snapshots"
+func GetImageFromFilePath(configDirectory string) (image.Image, error) {
+	snapshotDirectory := configDirectory + "/data/snapshots"
 	files, err := ioutil.ReadDir(snapshotDirectory)
 	if err == nil && len(files) > 1 {
 		sort.Slice(files, func(i, j int) bool {
 			return files[i].ModTime().Before(files[j].ModTime())
 		})
-		filePath := "./data/snapshots/" + files[1].Name()
+		filePath := configDirectory + "/data/snapshots/" + files[1].Name()
 		f, err := os.Open(filePath)
 		if err != nil {
 			return nil, err
@@ -42,11 +42,11 @@ func GetImageFromFilePath() (image.Image, error) {
 // ReadUserConfig Reads the user configuration of the Kerberos Open Source instance.
 // This will return a models.User struct including the username, password,
 // selected language, and if the installation was completed or not.
-func ReadUserConfig() (userConfig models.User) {
+func ReadUserConfig(configDirectory string) (userConfig models.User) {
 	for {
-		jsonFile, err := os.Open("./data/config/user.json")
+		jsonFile, err := os.Open(configDirectory + "/data/config/user.json")
 		if err != nil {
-			log.Log.Error("Config file is not found " + "./data/config/user.json, trying again in 5s: " + err.Error())
+			log.Log.Error("Config file is not found " + configDirectory + "/data/config/user.json, trying again in 5s: " + err.Error())
 			time.Sleep(5 * time.Second)
 		} else {
 			log.Log.Info("Successfully Opened user.json")
@@ -66,7 +66,7 @@ func ReadUserConfig() (userConfig models.User) {
 	return
 }
 
-func OpenConfig(configuration *models.Configuration) {
+func OpenConfig(configDirectory string, configuration *models.Configuration) {
 
 	// We are checking which deployment this is running, so we can load
 	// into the configuration as expected.
@@ -84,22 +84,43 @@ func OpenConfig(configuration *models.Configuration) {
 		collection := db.Collection("configuration")
 
 		var globalConfig models.Config
-		err := collection.FindOne(context.Background(), bson.M{
+		res := collection.FindOne(context.Background(), bson.M{
 			"type": "global",
-		}).Decode(&globalConfig)
+		})
+
+		if res.Err() != nil {
+			log.Log.Error("Could not find global configuration, using default configuration.")
+			panic("Could not find global configuration, using default configuration.")
+		}
+		err := res.Decode(&globalConfig)
 		if err != nil {
 			log.Log.Error("Could not find global configuration, using default configuration.")
+			panic("Could not find global configuration, using default configuration.")
 		}
+		if globalConfig.Type != "global" {
+			log.Log.Error("Could not find global configuration, might missed the mongodb connection.")
+			panic("Could not find global configuration, might missed the mongodb connection.")
+		}
+
 		configuration.GlobalConfig = globalConfig
 
 		var customConfig models.Config
 		deploymentName := os.Getenv("DEPLOYMENT_NAME")
-		err = collection.FindOne(context.Background(), bson.M{
+		res = collection.FindOne(context.Background(), bson.M{
 			"type": "config",
 			"name": deploymentName,
-		}).Decode(&customConfig)
+		})
+		if res.Err() != nil {
+			log.Log.Error("Could not find configuration for " + deploymentName + ", using global configuration.")
+		}
+		err = res.Decode(&customConfig)
 		if err != nil {
 			log.Log.Error("Could not find configuration for " + deploymentName + ", using global configuration.")
+		}
+
+		if customConfig.Type != "config" {
+			log.Log.Error("Could not find custom configuration, might missed the mongodb connection.")
+			panic("Could not find custom configuration, might missed the mongodb connection.")
 		}
 		configuration.CustomConfig = customConfig
 
@@ -120,8 +141,13 @@ func OpenConfig(configuration *models.Configuration) {
 			},
 		)
 
-		// Merge Config toplevel
+		// Reset main configuration Config.
+		configuration.Config = models.Config{}
+
+		// Merge the global settings in the main config
 		conjungo.Merge(&configuration.Config, configuration.GlobalConfig, opts)
+
+		// Now we might override some settings with the custom config
 		conjungo.Merge(&configuration.Config, configuration.CustomConfig, opts)
 
 		// Merge Kerberos Vault settings
@@ -136,6 +162,15 @@ func OpenConfig(configuration *models.Configuration) {
 		conjungo.Merge(&s3, configuration.CustomConfig.S3, opts)
 		configuration.Config.S3 = &s3
 
+		// Merge Encryption settings
+		var encryption models.Encryption
+		conjungo.Merge(&encryption, configuration.GlobalConfig.Encryption, opts)
+		conjungo.Merge(&encryption, configuration.CustomConfig.Encryption, opts)
+		configuration.Config.Encryption = &encryption
+
+		// Merge timetable manually because it's an array
+		configuration.Config.Timetable = configuration.CustomConfig.Timetable
+
 		// Cleanup
 		opts = nil
 
@@ -146,9 +181,9 @@ func OpenConfig(configuration *models.Configuration) {
 
 		// Open device config
 		for {
-			jsonFile, err := os.Open("./data/config/config.json")
+			jsonFile, err := os.Open(configDirectory + "/data/config/config.json")
 			if err != nil {
-				log.Log.Error("Config file is not found " + "./data/config/config.json" + ", trying again in 5s.")
+				log.Log.Error("Config file is not found " + configDirectory + "/data/config/config.json" + ", trying again in 5s.")
 				time.Sleep(5 * time.Second)
 			} else {
 				log.Log.Info("Successfully Opened config.json from " + configuration.Name)
@@ -189,7 +224,7 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				configuration.Config.Key = value
 				break
 			case "AGENT_NAME":
-				configuration.Config.Name = value
+				configuration.Config.FriendlyName = value
 				break
 			case "AGENT_TIMEZONE":
 				configuration.Config.Timezone = value
@@ -401,11 +436,11 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 			case "AGENT_HUB_PRIVATE_KEY":
 				configuration.Config.HubPrivateKey = value
 				break
-			case "AGENT_HUB_USERNAME":
-				configuration.Config.S3.Username = value
-				break
 			case "AGENT_HUB_SITE":
 				configuration.Config.HubSite = value
+				break
+			case "AGENT_HUB_REGION":
+				configuration.Config.S3.Region = value
 				break
 
 			/* When storing in a Kerberos Vault */
@@ -432,16 +467,33 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 			case "AGENT_DROPBOX_DIRECTORY":
 				configuration.Config.Dropbox.Directory = value
 				break
+
+			/* When encryption is enabled */
+			case "AGENT_ENCRYPTION":
+				configuration.Config.Encryption.Enabled = value
+				break
+			case "AGENT_ENCRYPTION_RECORDINGS":
+				configuration.Config.Encryption.Recordings = value
+				break
+			case "AGENT_ENCRYPTION_FINGERPRINT":
+				configuration.Config.Encryption.Fingerprint = value
+				break
+			case "AGENT_ENCRYPTION_PRIVATE_KEY":
+				configuration.Config.Encryption.PrivateKey = value
+				break
+			case "AGENT_ENCRYPTION_SYMMETRIC_KEY":
+				configuration.Config.Encryption.SymmetricKey = value
+				break
 			}
 		}
 	}
 }
 
-func SaveConfig(config models.Config, configuration *models.Configuration, communication *models.Communication) error {
+func SaveConfig(configDirectory string, config models.Config, configuration *models.Configuration, communication *models.Communication) error {
 	if !communication.IsConfiguring.IsSet() {
 		communication.IsConfiguring.Set()
 
-		err := StoreConfig(config)
+		err := StoreConfig(configDirectory, config)
 		if err != nil {
 			communication.IsConfiguring.UnSet()
 			return err
@@ -462,7 +514,16 @@ func SaveConfig(config models.Config, configuration *models.Configuration, commu
 	}
 }
 
-func StoreConfig(config models.Config) error {
+func StoreConfig(configDirectory string, config models.Config) error {
+
+	// Encryption key can be set wrong.
+	if config.Encryption != nil {
+		encryptionPrivateKey := config.Encryption.PrivateKey
+		// Replace \\n by \n
+		encryptionPrivateKey = strings.ReplaceAll(encryptionPrivateKey, "\\n", "\n")
+		config.Encryption.PrivateKey = encryptionPrivateKey
+	}
+
 	// Save into database
 	if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
 		// Write to mongodb
@@ -484,7 +545,7 @@ func StoreConfig(config models.Config) error {
 		// Save into file
 	} else if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
 		res, _ := json.MarshalIndent(config, "", "\t")
-		err := ioutil.WriteFile("./data/config/config.json", res, 0644)
+		err := ioutil.WriteFile(configDirectory+"/data/config/config.json", res, 0644)
 		return err
 	}
 

@@ -14,6 +14,7 @@ We will discuss following deployment models.
 - [5. Kerberos Factory](#5-kerberos-factory)
 - [6. Terraform](#6-terraform)
 - [7. Salt](#7-salt)
+- [8. Balena](#8-balena)
 
 ## 0. Static binary
 
@@ -53,8 +54,26 @@ All of the previously deployments, `docker`, `kubernetes` and `openshift` are gr
 
 ## 6. Terraform
 
-To be written
+Terraform is a tool for infrastructure provisioning to build infrastructure through code, often called Infrastructure as Code. So, Terraform allows you to automate and manage your infrastructure, your platform, and the services that run on that platform. By using Terraform you can deploy your Kerberos Agents remotely at scale.
+
+> Learn more [about Kerberos Agent with Terraform](https://github.com/kerberos-io/agent/tree/master/deployments/terraform).
 
 ## 7. Salt
 
 To be written
+
+## 8. Balena
+
+Balena Cloud provide a seamless way of building and deploying applications at scale through the conceps of `blocks`, `apps` and `fleets`. Once you have your `app` deployed, for example our Kerberos Agent, you can benefit from features such as: remote access, over the air updates, an encrypted public `https` endpoint and many more.
+
+Together with the Balena.io team we've build a Balena App, called [`video-surveillance`](https://hub.balena.io/apps/2064752/video-surveillance), which any can use to deploy a video surveillance system in a matter of minutes with all the expected management features you can think of.
+
+> Learn more [about Kerberos Agent with Balena](https://github.com/kerberos-io/agent/tree/master/deployments/balena).
+
+## 9. Snap
+
+The Snap Store, also known as the Ubuntu Store , is a commercial centralized software store operated by Canonical. Similar to AppImage or Flatpak the Snap Store is able to provide up to date software no matter what version of Linux you are running and how old your libraries are.
+
+We have published our own snap `Kerberos Agent` on the Snap Store, allowing you to seamless install a Kerberos Agent on your Linux devive.
+
+> Learn more [about Kerberos Agent with Snap](https://github.com/kerberos-io/agent/tree/master/deployments/snap).

@@ -21,7 +21,7 @@ type Config struct {
 	AutoClean         string       `json:"auto_clean"`
 	RemoveAfterUpload string       `json:"remove_after_upload"`
 	MaxDirectorySize  int64        `json:"max_directory_size"`
-	Timezone          string       `json:"timezone,omitempty" bson:"timezone,omitempty"`
+	Timezone          string       `json:"timezone"`
 	Capture           Capture      `json:"capture"`
 	Timetable         []*Timetable `json:"timetable"`
 	Region            *Region      `json:"region"`
@@ -42,6 +42,7 @@ type Config struct {
 	HubPrivateKey     string       `json:"hub_private_key" bson:"hub_private_key"`
 	HubSite           string       `json:"hub_site" bson:"hub_site"`
 	ConditionURI      string       `json:"condition_uri" bson:"condition_uri"`
+	Encryption        *Encryption  `json:"encryption,omitempty" bson:"encryption,omitempty"`
 }
 
 // Capture defines which camera type (Id) you are using (IP, USB or Raspberry Pi camera),
@@ -70,13 +71,15 @@ type Capture struct {
 // IPCamera configuration, such as the RTSP url of the IPCamera and the FPS.
 // Also includes ONVIF integration
 type IPCamera struct {
+	Width         int    `json:"width"`
+	Height        int    `json:"height"`
+	FPS           string `json:"fps"`
 	RTSP          string `json:"rtsp"`
 	SubRTSP       string `json:"sub_rtsp"`
-	FPS           string `json:"fps"`
 	ONVIF         string `json:"onvif,omitempty" bson:"onvif"`
-	ONVIFXAddr    string `json:"onvif_xaddr,omitempty" bson:"onvif_xaddr"`
-	ONVIFUsername string `json:"onvif_username,omitempty" bson:"onvif_username"`
-	ONVIFPassword string `json:"onvif_password,omitempty" bson:"onvif_password"`
+	ONVIFXAddr    string `json:"onvif_xaddr" bson:"onvif_xaddr"`
+	ONVIFUsername string `json:"onvif_username" bson:"onvif_username"`
+	ONVIFPassword string `json:"onvif_password" bson:"onvif_password"`
 }
 
 // USBCamera configuration, such as the device path (/dev/video*)
@@ -154,4 +157,13 @@ type KStorage struct {
 type Dropbox struct {
 	AccessToken string `json:"access_token,omitempty" bson:"access_token,omitempty"`
 	Directory   string `json:"directory,omitempty" bson:"directory,omitempty"`
+}
+
+// Encryption
+type Encryption struct {
+	Enabled      string `json:"enabled" bson:"enabled"`
+	Recordings   string `json:"recordings" bson:"recordings"`
+	Fingerprint  string `json:"fingerprint" bson:"fingerprint"`
+	PrivateKey   string `json:"private_key" bson:"private_key"`
+	SymmetricKey string `json:"symmetric_key" bson:"symmetric_key"`
 }

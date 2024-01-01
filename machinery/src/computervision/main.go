@@ -41,7 +41,8 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 
 		log.Log.Info("ProcessMotion: Motion detection enabled.")
 
-		key := config.HubKey
+		hubKey := config.HubKey
+		deviceKey := config.Key
 
 		// Allocate a VideoFrame
 		frame := ffmpeg.AllocVideoFrame()
@@ -165,12 +166,26 @@ func ProcessMotion(motionCursor *pubsub.QueueCursor, configuration *models.Confi
 					if detectMotion && isPixelChangeThresholdReached {
 
 						// If offline mode is disabled, send a message to the hub
-						if config.Offline == "false" {
+						if config.Offline != "true" {
 							if mqttClient != nil {
-								if key != "" {
-									mqttClient.Publish("kerberos/"+key+"/device/"+config.Key+"/motion", 2, false, "motion")
+								if hubKey != "" {
+									message := models.Message{
+										Payload: models.Payload{
+											Action:   "motion",
+											DeviceId: configuration.Config.Key,
+											Value: map[string]interface{}{
+												"timestamp": time.Now().Unix(),
+											},
+										},
+									}
+									payload, err := models.PackageMQTTMessage(configuration, message)
+									if err == nil {
+										mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+									} else {
+										log.Log.Info("ProcessMotion: failed to package MQTT message: " + err.Error())
+									}
 								} else {
-									mqttClient.Publish("kerberos/device/"+config.Key+"/motion", 2, false, "motion")
+									mqttClient.Publish("kerberos/agent/"+deviceKey, 2, false, "motion")
 								}
 							}
 						}

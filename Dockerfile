@@ -10,7 +10,7 @@ ENV GOSUMDB=off
 ##########################################
 # Installing some additional dependencies.
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get upgrade -y && apt-get update && apt-get install -y --fix-missing --no-install-recommends \
 	git build-essential cmake pkg-config unzip libgtk2.0-dev \
 	curl ca-certificates libcurl4-openssl-dev libssl-dev libjpeg62-turbo-dev && \
 	rm -rf /var/lib/apt/lists/*
@@ -32,7 +32,7 @@ RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
 
 RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go mod download && \
-	go build -tags timetzdata,netgo --ldflags '-s -w -extldflags "-static -latomic"' main.go && \
+	go build -tags timetzdata,netgo,osusergo --ldflags '-s -w -extldflags "-static -latomic"' main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv version /agent && \
@@ -147,4 +147,4 @@ HEALTHCHECK CMD curl --fail http://localhost:80 || exit 1
 # Leeeeettttt'ssss goooooo!!!
 # Run the shizzle from the right working directory.
 WORKDIR /home/agent
-CMD ["./main", "run", "opensource", "80"]
+CMD ["./main", "-action", "run", "-port", "80"]

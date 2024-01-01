@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"crypto/tls"
 	"errors"
 	"io/ioutil"
 	"net/http"
@@ -43,7 +44,7 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 	if err != nil {
 		err := "UploadKerberosVault: Upload Failed, file doesn't exists anymore."
 		log.Log.Info(err)
-		return false, true, errors.New(err)
+		return false, false, errors.New(err)
 	}
 
 	publicKey := config.KStorage.CloudKey
@@ -67,7 +68,16 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 	req.Header.Set("X-Kerberos-Storage-Device", config.Key)
 	req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
 	req.Header.Set("X-Kerberos-Storage-Directory", config.KStorage.Directory)
-	client := &http.Client{}
+
+	var client *http.Client
+	if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client = &http.Client{Transport: tr}
+	} else {
+		client = &http.Client{}
+	}
 
 	resp, err := client.Do(req)
 	if resp != nil {

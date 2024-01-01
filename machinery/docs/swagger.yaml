@@ -207,6 +207,13 @@ definitions:
       tilt:
         type: number
     type: object
+  models.OnvifPreset:
+    properties:
+      onvif_credentials:
+        $ref: '#/definitions/models.OnvifCredentials'
+      preset:
+        type: string
+    type: object
   models.OnvifZoom:
     properties:
       onvif_credentials:
@@ -296,27 +303,6 @@ info:
   title: Swagger Kerberos Agent API
   version: "1.0"
 paths:
-  /api/camera/onvif/audio-backchannel:
-    post:
-      description: Get the audio decoders for the audio backchannel.
-      operationId: audio-output-onvif
-      parameters:
-      - description: Camera Config
-        in: body
-        name: cameraConfig
-        required: true
-        schema:
-          $ref: '#/definitions/models.IPCamera'
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      security:
-      - Bearer: []
-      summary: Get the audio decoders for the audio backchannel.
-      tags:
-      - camera
   /api/camera/onvif/capabilities:
     post:
       description: Will return the ONVIF capabilities for the specific camera.
@@ -334,6 +320,25 @@ paths:
           schema:
             $ref: '#/definitions/models.APIResponse'
       summary: Will return the ONVIF capabilities for the specific camera.
+      tags:
+      - camera
+  /api/camera/onvif/gotopreset:
+    post:
+      description: Will activate the desired ONVIF preset.
+      operationId: camera-onvif-gotopreset
+      parameters:
+      - description: OnvifPreset
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.OnvifPreset'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Will activate the desired ONVIF preset.
       tags:
       - camera
   /api/camera/onvif/login:
@@ -374,46 +379,23 @@ paths:
       summary: Panning or/and tilting the camera.
       tags:
       - camera
-  /api/camera/onvif/verify:
+  /api/camera/onvif/presets:
     post:
-      description: Will verify the ONVIF connectivity.
-      operationId: verify-onvif
+      description: Will return the ONVIF presets for the specific camera.
+      operationId: camera-onvif-presets
       parameters:
-      - description: Camera Config
+      - description: OnvifCredentials
         in: body
-        name: cameraConfig
+        name: config
         required: true
         schema:
-          $ref: '#/definitions/models.IPCamera'
+          $ref: '#/definitions/models.OnvifCredentials'
       responses:
         "200":
           description: OK
           schema:
             $ref: '#/definitions/models.APIResponse'
-      security:
-      - Bearer: []
-      summary: Will verify the ONVIF connectivity.
-      tags:
-      - camera
-  /api/camera/onvif/version:
-    post:
-      description: Get the ONVIF version installed on the camera.
-      operationId: version-onvif
-      parameters:
-      - description: Camera Config
-        in: body
-        name: cameraConfig
-        required: true
-        schema:
-          $ref: '#/definitions/models.IPCamera'
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      security:
-      - Bearer: []
-      summary: Get the ONVIF version installed on the camera.
+      summary: Will return the ONVIF presets for the specific camera.
       tags:
       - camera
   /api/camera/onvif/zoom:
@@ -503,6 +485,27 @@ paths:
       summary: Get Authorization token.
       tags:
       - authentication
+  /api/onvif/verify:
+    post:
+      description: Will verify the ONVIF connectivity.
+      operationId: verify-onvif
+      parameters:
+      - description: Camera Config
+        in: body
+        name: cameraConfig
+        required: true
+        schema:
+          $ref: '#/definitions/models.IPCamera'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will verify the ONVIF connectivity.
+      tags:
+      - config
   /api/persistence/verify:
     post:
       description: Will verify the persistence.

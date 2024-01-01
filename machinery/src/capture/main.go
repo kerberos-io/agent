@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
@@ -17,7 +18,7 @@ import (
 	"github.com/kerberos-io/joy4/av"
 )
 
-func CleanupRecordingDirectory(configuration *models.Configuration) {
+func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
 	autoClean := configuration.Config.AutoClean
 	if autoClean == "true" {
 		maxSize := configuration.Config.MaxDirectorySize
@@ -25,7 +26,7 @@ func CleanupRecordingDirectory(configuration *models.Configuration) {
 			maxSize = 300
 		}
 		// Total size of the recording directory.
-		recordingsDirectory := "./data/recordings"
+		recordingsDirectory := configDirectory + "/data/recordings"
 		size, err := utils.DirSize(recordingsDirectory)
 		if err == nil {
 			sizeInMB := size / 1000 / 1000
@@ -51,7 +52,7 @@ func CleanupRecordingDirectory(configuration *models.Configuration) {
 	}
 }
 
-func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration, communication *models.Communication, streams []av.CodecData) {
+func HandleRecordStream(queue *pubsub.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, streams []av.CodecData) {
 
 	config := configuration.Config
 
@@ -134,13 +135,13 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					}
 
 					// Create a symbol link.
-					fc, _ := os.Create("./data/cloud/" + name)
+					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
 					fc.Close()
 
 					recordingStatus = "idle"
 
 					// Clean up the recording directory if necessary.
-					CleanupRecordingDirectory(configuration)
+					CleanupRecordingDirectory(configDirectory, configuration)
 				}
 
 				// If not yet started and a keyframe, let's make a recording
@@ -192,7 +193,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 						"769"
 
 					name = s + ".mp4"
-					fullName = "./data/recordings/" + name
+					fullName = configDirectory + "/data/recordings/" + name
 
 					// Running...
 					log.Log.Info("Recording started")
@@ -259,7 +260,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					}
 
 					// Create a symbol link.
-					fc, _ := os.Create("./data/cloud/" + name)
+					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
 					fc.Close()
 
 					recordingStatus = "idle"
@@ -315,7 +316,7 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					"769"
 
 				name := s + ".mp4"
-				fullName := "./data/recordings/" + name
+				fullName := configDirectory + "/data/recordings/" + name
 
 				// Running...
 				log.Log.Info("HandleRecordStream: Recording started")
@@ -405,12 +406,33 @@ func HandleRecordStream(queue *pubsub.Queue, configuration *models.Configuration
 					utils.CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
 				}
 
+				// Check if we need to encrypt the recording.
+				if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
+					// reopen file into memory 'fullName'
+					contents, err := os.ReadFile(fullName)
+					if err == nil {
+						// encrypt
+						encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
+						if err == nil {
+							// write back to file
+							err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
+							if err != nil {
+								log.Log.Error("HandleRecordStream: error writing file: " + err.Error())
+							}
+						} else {
+							log.Log.Error("HandleRecordStream: error encrypting file: " + err.Error())
+						}
+					} else {
+						log.Log.Error("HandleRecordStream: error reading file: " + err.Error())
+					}
+				}
+
 				// Create a symbol linc.
-				fc, _ := os.Create("./data/cloud/" + name)
+				fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
 				fc.Close()
 
 				// Clean up the recording directory if necessary.
-				CleanupRecordingDirectory(configuration)
+				CleanupRecordingDirectory(configDirectory, configuration)
 			}
 		}
 
@@ -447,7 +469,7 @@ func VerifyCamera(c *gin.Context) {
 		if streamType == "secondary" {
 			rtspUrl = cameraStreams.SubRTSP
 		}
-		_, codecs, err := OpenRTSP(ctx, rtspUrl)
+		_, codecs, err := OpenRTSP(ctx, rtspUrl, true)
 		if err == nil {
 
 			videoIdx := -1

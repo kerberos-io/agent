@@ -18,6 +18,7 @@
 [![donate](https://brianmacdonald.github.io/Ethonate/svg/eth-donate-blue.svg)](https://brianmacdonald.github.io/Ethonate/address#0xf4a759C9436E2280Ea9cdd23d3144D95538fF4bE)
 <a target="_blank" href="https://twitter.com/kerberosio?ref_src=twsrc%5Etfw"><img src="https://img.shields.io/twitter/url.svg?label=Follow%20%40kerberosio&style=social&url=https%3A%2F%2Ftwitter.com%2Fkerberosio" alt="Twitter Widget"></a>
 [![Discord Shield](https://discordapp.com/api/guilds/1039619181731135499/widget.png?style=shield)](https://discord.gg/Bj77Vqfp2G)
+[![kerberosio](https://snapcraft.io/kerberosio/badge.svg)](https://snapcraft.io/kerberosio)
 
 [**Docker Hub**](https://hub.docker.com/r/kerberos/agent) | [**Documentation**](https://doc.kerberos.io) | [**Website**](https://kerberos.io) | [**View Demo**](https://demo.kerberos.io)
 
@@ -28,7 +29,7 @@ Kerberos Agent is an isolated and scalable video (surveillance) management agent
 ## :thinking: Prerequisites
 
 - An IP camera which supports a RTSP H264 encoded stream,
-  - (or) a USB camera, Raspberry Pi camera or other camera, that [you can tranform to a valid RTSP H264 stream](https://github.com/kerberos-io/camera-to-rtsp).
+  - (or) a USB camera, Raspberry Pi camera or other camera, that [you can transform to a valid RTSP H264 stream](https://github.com/kerberos-io/camera-to-rtsp).
 - Any hardware (ARMv6, ARMv7, ARM64, AMD) that can run a binary or container, for example: a Raspberry Pi, NVidia Jetson, Intel NUC, a VM, Bare metal machine or a full blown Kubernetes cluster.
 
 ## :video_camera: Is my camera working?
@@ -41,6 +42,7 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 1. [Quickstart - Docker](#quickstart---docker)
 2. [Quickstart - Balena](#quickstart---balena)
+3. [Quickstart - Snap](#quickstart---snap)
 
 ### Introduction
 
@@ -78,12 +80,19 @@ If you want to connect to an USB or Raspberry Pi camera, [you'll need to run our
 
 ## Quickstart - Balena
 
-Run Kerberos Agent with Balena super powers. Monitor your agent with seamless remote access, and an encrypted https endpoint.
-Checkout our fleet on [Balena Hub](https://hub.balena.io/fleets?0%5B0%5D%5Bn%5D=any&0%5B0%5D%5Bo%5D=full_text_search&0%5B0%5D%5Bv%5D=agent), and add your agent.
+Run Kerberos Agent with [Balena Cloud](https://www.balena.io/) super powers. Monitor your Kerberos Agent with seamless remote access, over the air updates, an encrypted public `https` endpoint and many more. Checkout our application `video-surveillance` on [Balena Hub](https://hub.balena.io/apps/2064752/video-surveillance), and create your first or fleet of Kerberos Agent(s).
 
-[![balena deploy button](https://www.balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/agent)
+[![deploy with balena](https://balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/balena-agent)
 
-**_Work In Progress_** - Currently we only support IP and USB Cameras, we have [an approach for leveraging the Raspberry Pi camera](https://github.com/kerberos-io/camera-to-rtsp), but this isn't working as expected with Balena. If you require this, you'll need to use the traditional Docker deployment with sidecar as mentioned above.
+## Quickstart - Snap
+
+Run Kerberos Agent with our [Snapcraft package](https://snapcraft.io/kerberosio).
+
+     snap install kerberosio
+
+Once installed you can find your Kerberos Agent configration at `/var/snap/kerberosio/common`. Run the Kerberos Agent as following
+
+    sudo kerberosio.agent -action=run -port=80
 
 ## A world of Kerberos Agents
 
@@ -100,8 +109,10 @@ This repository contains everything you'll need to know about our core product, 
 - Single camera per instance (e.g. one container per camera).
 - Primary and secondary stream setup (record full-res, stream low-res).
 - Low resolution streaming through MQTT and full resolution streaming through WebRTC.
+- End-to-end encryption through MQTT using RSA and AES.
 - Ability to specifiy conditions: offline mode, motion region, time table, continuous recording, etc.
 - Post- and pre-recording on motion detection.
+- Encryption at rest using AES-256-CBC.
 - Ability to create fragmented recordings, and streaming though HLS fMP4.
 - [Deploy where you want](#how-to-run-and-deploy-a-kerberos-agent) with the tools you use: `docker`, `docker compose`, `ansible`, `terraform`, `kubernetes`, etc.
 - Cloud storage/persistance: Kerberos Hub, Kerberos Vault and Dropbox. [(WIP: Minio, Storj, Google Drive, FTP etc.)](https://github.com/kerberos-io/agent/issues/95)
@@ -122,6 +133,8 @@ We have documented the different deployment models [in the `deployments` directo
 - [Red Hat OpenShift with Ansible](https://github.com/kerberos-io/agent/tree/master/deployments#4-red-hat-ansible-and-openshift)
 - [Terraform](https://github.com/kerberos-io/agent/tree/master/deployments#5-terraform)
 - [Salt](https://github.com/kerberos-io/agent/tree/master/deployments#6-salt)
+- [Balena](https://github.com/kerberos-io/agent/tree/master/deployments#8-balena)
+- [Snap](https://github.com/kerberos-io/agent/tree/master/deployments#9-snap)
 
 By default your Kerberos Agents will store all its configuration and recordings inside the container. To help you automate and have a more consistent data governance, you can attach volumes to configure and persist data of your Kerberos Agents, and/or configure each Kerberos Agent through environment variables.
 
@@ -135,6 +148,20 @@ The default username and password for the Kerberos Agent is:
 - Password: `root`
 
 **_Please note that you change the username and password for a final installation, see [Configure with environment variables](#configure-with-environment-variables) below._**
+
+## Encryption
+
+You can encrypt your recordings and outgoing MQTT messages with your own AES and RSA keys by enabling the encryption settings. Once enabled all your recordings will be encrypted using AES-256-CBC and your symmetric key. You can either use the default `openssl` toolchain to decrypt the recordings with your AES key, as following:
+
+    openssl aes-256-cbc -d -md md5 -in encrypted.mp4 -out decrypted.mp4 -k your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
+
+, and additionally you can decrypt a folder of recordings, using the Kerberos Agent binary as following:
+
+    go run main.go -action decrypt ./data/recordings your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
+
+or for a single file:
+
+    go run main.go -action decrypt ./data/recordings/video.mp4 your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
 
 ## Configure and persist with volume mounts
 
@@ -166,6 +193,7 @@ Next to attaching the configuration file, it is also possible to override the co
 | Name                                    | Description                                                                                     | Default Value                  |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
 | `AGENT_MODE`                            | You can choose to run this in 'release' for production, and or 'demo' for showcasing.           | "release"                      |
+| `AGENT_TLS_INSECURE`                    | Specify if you want to use `InsecureSkipVerify` for the internal HTTP client.                   | "false"                        |
 | `AGENT_USERNAME`                        | The username used to authenticate against the Kerberos Agent login page.                        | "root"                         |
 | `AGENT_PASSWORD`                        | The password used to authenticate against the Kerberos Agent login page.                        | "root"                         |
 | `AGENT_KEY`                             | A unique identifier for your Kerberos Agent, this is auto-generated but can be overriden.       | ""                             |
@@ -184,8 +212,11 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_CAPTURE_IPCAMERA_ONVIF_XADDR`    | ONVIF endpoint/address running on the camera.                                                   | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_ONVIF_USERNAME` | ONVIF username to authenticate against.                                                         | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_ONVIF_PASSWORD` | ONVIF password to authenticate against.                                                         | ""                             |
+| `AGENT_CAPTURE_MOTION`                  | Toggle for enabling or disabling motion.                                                        | "true"                         |
+| `AGENT_CAPTURE_LIVEVIEW`                | Toggle for enabling or disabling liveview.                                                      | "true"                         |
+| `AGENT_CAPTURE_SNAPSHOTS`               | Toggle for enabling or disabling snapshot generation.                                           | "true"                         |
 | `AGENT_CAPTURE_RECORDING`               | Toggle for enabling making recordings.                                                          | "true"                         |
-| `AGENT_CAPTURE_CONTINUOUS`              | Toggle for enabling continuous or motion based recording.                                       | "false"                        |
+| `AGENT_CAPTURE_CONTINUOUS`              | Toggle for enabling continuous "true" or motion "false".                                        | "false"                        |
 | `AGENT_CAPTURE_PRERECORDING`            | If `CONTINUOUS` set to `false`, specify the recording time (seconds) before after motion event. | "10"                           |
 | `AGENT_CAPTURE_POSTRECORDING`           | If `CONTINUOUS` set to `false`, specify the recording time (seconds) after motion event.        | "20"                           |
 | `AGENT_CAPTURE_MAXLENGTH`               | The maximum length of a single recording (seconds).                                             | "30"                           |
@@ -203,7 +234,7 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_HUB_URI`                         | The Kerberos Hub API, defaults to our Kerberos Hub SAAS.                                        | "https://api.hub.domain.com"   |
 | `AGENT_HUB_KEY`                         | The access key linked to your account in Kerberos Hub.                                          | ""                             |
 | `AGENT_HUB_PRIVATE_KEY`                 | The secret access key linked to your account in Kerberos Hub.                                   | ""                             |
-| `AGENT_HUB_USERNAME`                    | Your Kerberos Hub username, which owns the above access and secret keys.                        | ""                             |
+| `AGENT_HUB_REGION`                      | The Kerberos Hub region, to which you want to upload.                                           | ""                             |
 | `AGENT_HUB_SITE`                        | The site ID of a site you've created in your Kerberos Hub account.                              | ""                             |
 | `AGENT_KERBEROSVAULT_URI`               | The Kerberos Vault API url.                                                                     | "https://vault.domain.com/api" |
 | `AGENT_KERBEROSVAULT_ACCESS_KEY`        | The access key of a Kerberos Vault account.                                                     | ""                             |
@@ -212,6 +243,11 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_KERBEROSVAULT_DIRECTORY`         | The directory, in the provider, where the recordings will be stored in.                         | ""                             |
 | `AGENT_DROPBOX_ACCESS_TOKEN`            | The Access Token from your Dropbox app, that is used to leverage the Dropbox SDK.               | ""                             |
 | `AGENT_DROPBOX_DIRECTORY`               | The directory, in the provider, where the recordings will be stored in.                         | ""                             |
+| `AGENT_ENCRYPTION`                      | Enable 'true' or disable 'false' end-to-end encryption for MQTT messages.                       | "false"                        |
+| `AGENT_ENCRYPTION_RECORDINGS`           | Enable 'true' or disable 'false' end-to-end encryption for recordings.                          | "false"                        |
+| `AGENT_ENCRYPTION_FINGERPRINT`          | The fingerprint of the keypair (public/private keys), so you know which one to use.             | ""                             |
+| `AGENT_ENCRYPTION_PRIVATE_KEY`          | The private key (assymetric/RSA) to decryptand sign requests send over MQTT.                    | ""                             |
+| `AGENT_ENCRYPTION_SYMMETRIC_KEY`        | The symmetric key (AES) to encrypt and decrypt request send over MQTT.                          | ""                             |
 
 ## Contribute with Codespaces
 
@@ -234,9 +270,9 @@ On opening of the GitHub Codespace, some dependencies will be installed. Once th
     const dev = {
       ENV: 'dev',
       HOSTNAME: externalHost,
-      //API_URL: `${protocol}//${hostname}:8080/api`,
-      //URL: `${protocol}//${hostname}:8080`,
-      //WS_URL: `${websocketprotocol}//${hostname}:8080/ws`,
+      //API_URL: `${protocol}//${hostname}:80/api`,
+      //URL: `${protocol}//${hostname}:80`,
+      //WS_URL: `${websocketprotocol}//${hostname}:80/ws`,
 
       // Uncomment, and comment the above lines, when using codespaces or other special DNS names (which you can't control)
       API_URL: `${protocol}//${externalHost}/api`,
@@ -249,7 +285,7 @@ Go and open two terminals one for the `ui` project and one for the `machinery` p
 1.  Terminal A:
 
         cd machinery/
-        go run main.go run camera 80
+        go run main.go -action run -port 80
 
 2.  Terminal B:
 
@@ -290,7 +326,7 @@ You can simply run the `machinery` using following commands.
 
     git clone https://github.com/kerberos-io/agent
     cd machinery
-    go run main.go run mycameraname 80
+    go run main.go -action run -port 80
 
 This will launch the Kerberos Agent and run a webserver on port `80`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/) or [Visual Studio Code](https://code.visualstudio.com/), as it comes with all the debugging and linting features builtin.
 

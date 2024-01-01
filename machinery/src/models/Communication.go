@@ -22,11 +22,12 @@ type Communication struct {
 	HandleStream          chan string
 	HandleSubStream       chan string
 	HandleMotion          chan MotionDataPartial
+	HandleAudio           chan AudioDataPartial
 	HandleUpload          chan string
 	HandleHeartBeat       chan string
 	HandleLiveSD          chan int64
 	HandleLiveHDKeepalive chan string
-	HandleLiveHDHandshake chan SDPPayload
+	HandleLiveHDHandshake chan RequestHDStreamPayload
 	HandleLiveHDPeers     chan string
 	HandleONVIF           chan OnvifAction
 	IsConfiguring         *abool.AtomicBool
@@ -38,4 +39,5 @@ type Communication struct {
 	SubDecoder            *ffmpeg.VideoDecoder
 	Image                 string
 	CameraConnected       bool
+	HasBackChannel        bool
 }

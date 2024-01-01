@@ -21,7 +21,7 @@ var Log = Logging{
 
 var gologging = logging.MustGetLogger("gologger")
 
-func ConfigureGoLogging(timezone *time.Location) {
+func ConfigureGoLogging(configDirectory string, timezone *time.Location) {
 	// Logging
 	var format = logging.MustStringFormatter(
 		`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
@@ -32,7 +32,7 @@ func ConfigureGoLogging(timezone *time.Location) {
 	stdBackend := logging.NewLogBackend(os.Stderr, "", 0)
 	stdBackendLeveled := logging.NewBackendFormatter(stdBackend, format)
 	fileBackend := logging.NewLogBackend(&lumberjack.Logger{
-		Filename: "./data/log/machinery.txt",
+		Filename: configDirectory + "/data/log/machinery.txt",
 		MaxSize:  2,    // megabytes
 		Compress: true, // disabled by default
 	}, "", 0)
@@ -75,10 +75,10 @@ type Logging struct {
 	Level  string
 }
 
-func (self *Logging) Init(timezone *time.Location) {
+func (self *Logging) Init(configDirectory string, timezone *time.Location) {
 	switch self.Logger {
 	case "go-logging":
-		ConfigureGoLogging(timezone)
+		ConfigureGoLogging(configDirectory, timezone)
 	case "logrus":
 		ConfigureLogrus(timezone)
 	default:

@@ -10,7 +10,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "main.go",
-            "args": ["run", "cameraname", "8080"],
+            "args": ["-action", "run"],
             "envFile": "${workspaceFolder}/.env",
             "buildFlags": "--tags dynamic",
         },

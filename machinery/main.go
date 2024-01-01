@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+
+	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/routers"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
@@ -49,10 +52,23 @@ func main() {
 	}
 
 	// Start the show ;)
-	action := os.Args[1]
+	// We'll parse the flags (named variables), and start the agent.
+
+	var action string
+	var configDirectory string
+	var name string
+	var port string
+	var timeout string
+
+	flag.StringVar(&action, "action", "version", "Tell us what you want do 'run' or 'version'")
+	flag.StringVar(&configDirectory, "config", ".", "Where is the configuration stored")
+	flag.StringVar(&name, "name", "agent", "Provide a name for the agent")
+	flag.StringVar(&port, "port", "80", "On which port should the agent run")
+	flag.StringVar(&timeout, "timeout", "2000", "Number of milliseconds to wait for the ONVIF discovery to complete")
+	flag.Parse()
 
 	timezone, _ := time.LoadLocation("CET")
-	log.Log.Init(timezone)
+	log.Log.Init(configDirectory, timezone)
 
 	switch action {
 
@@ -60,14 +76,25 @@ func main() {
 		log.Log.Info("You are currrently running Kerberos Agent " + VERSION)
 
 	case "discover":
-		timeout := os.Args[2]
 		log.Log.Info(timeout)
+
+	case "decrypt":
+		log.Log.Info("Decrypting: " + flag.Arg(0) + " with key: " + flag.Arg(1))
+		symmetricKey := []byte(flag.Arg(1))
+
+		if symmetricKey == nil || len(symmetricKey) == 0 {
+			log.Log.Fatal("Main: symmetric key should not be empty")
+			return
+		}
+		if len(symmetricKey) != 32 {
+			log.Log.Fatal("Main: symmetric key should be 32 bytes")
+			return
+		}
+
+		utils.Decrypt(flag.Arg(0), symmetricKey)
 
 	case "run":
 		{
-			name := os.Args[2]
-			port := os.Args[3]
-
 			// Print Kerberos.io ASCII art
 			utils.PrintASCIIArt()
 
@@ -82,28 +109,28 @@ func main() {
 			configuration.Port = port
 
 			// Open this configuration either from Kerberos Agent or Kerberos Factory.
-			components.OpenConfig(&configuration)
+			configService.OpenConfig(configDirectory, &configuration)
 
 			// We will override the configuration with the environment variables
-			components.OverrideWithEnvironmentVariables(&configuration)
+			configService.OverrideWithEnvironmentVariables(&configuration)
 
 			// Printing final configuration
 			utils.PrintConfiguration(&configuration)
 
 			// Check the folder permissions, it might be that we do not have permissions to write
 			// recordings, update the configuration or save snapshots.
-			utils.CheckDataDirectoryPermissions()
+			utils.CheckDataDirectoryPermissions(configDirectory)
 
 			// Set timezone
 			timezone, _ := time.LoadLocation(configuration.Config.Timezone)
-			log.Log.Init(timezone)
+			log.Log.Init(configDirectory, timezone)
 
 			// Check if we have a device Key or not, if not
 			// we will generate one.
 			if configuration.Config.Key == "" {
 				key := utils.RandStringBytesMaskImpr(30)
 				configuration.Config.Key = key
-				err := components.StoreConfig(configuration.Config)
+				err := configService.StoreConfig(configDirectory, configuration.Config)
 				if err == nil {
 					log.Log.Info("Main: updated unique key for agent to: " + key)
 				} else {
@@ -121,10 +148,10 @@ func main() {
 				CancelContext:   &cancel,
 				HandleBootstrap: make(chan string, 1),
 			}
-			go components.Bootstrap(&configuration, &communication)
+			go components.Bootstrap(configDirectory, &configuration, &communication)
 
 			// Start the REST API.
-			routers.StartWebserver(&configuration, &communication)
+			routers.StartWebserver(configDirectory, &configuration, &communication)
 		}
 	default:
 		log.Log.Error("Main: Sorry I don't understand :(")

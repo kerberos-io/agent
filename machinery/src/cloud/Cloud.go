@@ -15,14 +15,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-module/carbon/v2"
 	"github.com/kerberos-io/joy4/av/pubsub"
-	"github.com/minio/minio-go/v6"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	av "github.com/kerberos-io/joy4/av"
 	"github.com/kerberos-io/joy4/cgo/ffmpeg"
 
 	"net/http"
-	"net/url"
 	"strconv"
 	"time"
 
@@ -34,8 +32,8 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
 )
 
-func PendingUpload() {
-	ff, err := utils.ReadDirectory("./data/cloud/")
+func PendingUpload(configDirectory string) {
+	ff, err := utils.ReadDirectory(configDirectory + "/data/cloud/")
 	if err == nil {
 		for _, f := range ff {
 			log.Log.Info(f.Name())
@@ -43,12 +41,12 @@ func PendingUpload() {
 	}
 }
 
-func HandleUpload(configuration *models.Configuration, communication *models.Communication) {
+func HandleUpload(configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 
 	log.Log.Debug("HandleUpload: started")
 
 	config := configuration.Config
-	watchDirectory := "./data/cloud/"
+	watchDirectory := configDirectory + "/data/cloud/"
 
 	if config.Offline == "true" {
 		log.Log.Debug("HandleUpload: stopping as Offline is enabled.")
@@ -85,9 +83,9 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 					uploaded := false
 					configured := false
 					err = nil
-					if config.Cloud == "s3" {
-						uploaded, configured, err = UploadS3(configuration, fileName)
-					} else if config.Cloud == "kstorage" {
+					if config.Cloud == "s3" || config.Cloud == "kerberoshub" {
+						uploaded, configured, err = UploadKerberosHub(configuration, fileName)
+					} else if config.Cloud == "kstorage" || config.Cloud == "kerberosvault" {
 						uploaded, configured, err = UploadKerberosVault(configuration, fileName)
 					} else if config.Cloud == "dropbox" {
 						uploaded, configured, err = UploadDropbox(configuration, fileName)
@@ -103,6 +101,13 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 						// Todo: implement ftp upload
 					} else if config.Cloud == "sftp" {
 						// Todo: implement sftp upload
+					} else if config.Cloud == "aws" {
+						// Todo: need to be updated, was previously used for hub.
+						uploaded, configured, err = UploadS3(configuration, fileName)
+					} else if config.Cloud == "azure" {
+						// Todo: implement azure upload
+					} else if config.Cloud == "google" {
+						// Todo: implement google upload
 					}
 					// And so on... (have a look here -> https://github.com/kerberos-io/agent/issues/95)
 
@@ -116,8 +121,8 @@ func HandleUpload(configuration *models.Configuration, communication *models.Com
 
 						// Check if we need to remove the original recording
 						// removeAfterUpload is set to false by default
-						if config.RemoveAfterUpload == "true" {
-							err := os.Remove("./data/recordings/" + fileName)
+						if config.RemoveAfterUpload != "false" {
+							err := os.Remove(configDirectory + "/data/recordings/" + fileName)
 							if err != nil {
 								log.Log.Error("HandleUpload: " + err.Error())
 							}
@@ -226,7 +231,7 @@ loop:
 			log.Log.Debug("HandleHeartBeat: stopping as Offline is enabled.")
 		} else {
 
-			url := config.HeartbeatURI
+			hubURI := config.HeartbeatURI
 			key := ""
 			username := ""
 			vaultURI := ""
@@ -242,74 +247,115 @@ loop:
 
 			// This is the new way ;)
 			if config.HubURI != "" {
-				url = config.HubURI + "/devices/heartbeat"
+				hubURI = config.HubURI + "/devices/heartbeat"
 			}
 			if config.HubKey != "" {
 				key = config.HubKey
 			}
 
-			if key != "" {
-				// Check if we have a friendly name or not.
-				name := config.Name
-				if config.FriendlyName != "" {
-					name = config.FriendlyName
-				}
+			// Check if we have a friendly name or not.
+			name := config.Name
+			if config.FriendlyName != "" {
+				name = config.FriendlyName
+			}
 
-				// Get some system information
-				// like the uptime, hostname, memory usage, etc.
-				system, _ := GetSystemInfo()
+			// Get some system information
+			// like the uptime, hostname, memory usage, etc.
+			system, _ := GetSystemInfo()
 
-				// We will formated the uptime to a human readable format
-				// this will be used on Kerberos Hub: Uptime -> 1 day and 2 hours.
-				uptimeFormatted := uptimeStart.Format("2006-01-02 15:04:05")
-				uptimeString := carbon.Parse(uptimeFormatted).DiffForHumans()
-				uptimeString = strings.ReplaceAll(uptimeString, "ago", "")
+			// Check if the agent is running inside a cluster (Kerberos Factory) or as
+			// an open source agent
+			isEnterprise := false
+			if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
+				isEnterprise = true
+			}
 
-				// Do the same for boottime
-				bootTimeFormatted := time.Unix(int64(system.BootTime), 0).Format("2006-01-02 15:04:05")
-				boottimeString := carbon.Parse(bootTimeFormatted).DiffForHumans()
-				boottimeString = strings.ReplaceAll(boottimeString, "ago", "")
+			// Congert to string
+			macs, _ := json.Marshal(system.MACs)
+			ips, _ := json.Marshal(system.IPs)
+			cameraConnected := "true"
+			if !communication.CameraConnected {
+				cameraConnected = "false"
+			}
 
-				// We'll check which mode is enabled for the camera.
-				onvifEnabled := "false"
-				onvifZoom := "false"
-				onvifPanTilt := "false"
-				onvifVersion := "unknown"
+			hasBackChannel := "false"
+			if communication.HasBackChannel {
+				hasBackChannel = "true"
+			}
 
-				if config.Capture.IPCamera.ONVIFXAddr != "" {
-					cameraConfiguration := configuration.Config.Capture.IPCamera
-					device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+			// We will formated the uptime to a human readable format
+			// this will be used on Kerberos Hub: Uptime -> 1 day and 2 hours.
+			uptimeFormatted := uptimeStart.Format("2006-01-02 15:04:05")
+			uptimeString := carbon.Parse(uptimeFormatted).DiffForHumans()
+			uptimeString = strings.ReplaceAll(uptimeString, "ago", "")
+
+			// Do the same for boottime
+			bootTimeFormatted := time.Unix(int64(system.BootTime), 0).Format("2006-01-02 15:04:05")
+			boottimeString := carbon.Parse(bootTimeFormatted).DiffForHumans()
+			boottimeString = strings.ReplaceAll(boottimeString, "ago", "")
+
+			// We'll check which mode is enabled for the camera.
+			onvifEnabled := "false"
+			onvifZoom := "false"
+			onvifPanTilt := "false"
+			onvifPresets := "false"
+			var onvifPresetsList []byte
+			if config.Capture.IPCamera.ONVIFXAddr != "" {
+				cameraConfiguration := configuration.Config.Capture.IPCamera
+				device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+				if err == nil {
+					configurations, err := onvif.GetPTZConfigurationsFromDevice(device)
 					if err == nil {
-						configurations, err := onvif.GetPTZConfigurationsFromDevice(device)
-						if err == nil {
-							onvifEnabled = "true"
-							_, canZoom, canPanTilt := onvif.GetPTZFunctionsFromDevice(configurations)
-							if canZoom {
-								onvifZoom = "true"
-							}
-							if canPanTilt {
-								onvifPanTilt = "true"
-							}
+						onvifEnabled = "true"
+						_, canZoom, canPanTilt := onvif.GetPTZFunctionsFromDevice(configurations)
+						if canZoom {
+							onvifZoom = "true"
 						}
-						// Get the ONVIF version from the device.
-						onvifVersion, err = onvif.GetONVIFVersionFromDevice(device)
+						if canPanTilt {
+							onvifPanTilt = "true"
+						}
+						// Try to read out presets
+						presets, err := onvif.GetPresetsFromDevice(device)
+						if err == nil && len(presets) > 0 {
+							onvifPresets = "true"
+							onvifPresetsList, err = json.Marshal(presets)
+							if err != nil {
+								log.Log.Error("HandleHeartBeat: error while marshalling presets: " + err.Error())
+								onvifPresetsList = []byte("[]")
+							}
+						} else {
+							if err != nil {
+								log.Log.Error("HandleHeartBeat: error while getting presets: " + err.Error())
+							} else {
+								log.Log.Debug("HandleHeartBeat: no presets found.")
+							}
+							onvifPresetsList = []byte("[]")
+						}
+					} else {
+						log.Log.Error("HandleHeartBeat: error while getting PTZ configurations: " + err.Error())
+						onvifPresetsList = []byte("[]")
 					}
+				} else {
+					log.Log.Error("HandleHeartBeat: error while connecting to ONVIF device: " + err.Error())
+					onvifPresetsList = []byte("[]")
 				}
+			} else {
+				log.Log.Debug("HandleHeartBeat: ONVIF is not enabled.")
+				onvifPresetsList = []byte("[]")
+			}
 
-				// Check if the agent is running inside a cluster (Kerberos Factory) or as
-				// an open source agent
-				isEnterprise := false
-				if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
-					isEnterprise = true
+			var client *http.Client
+			if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+				tr := &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 				}
+				client = &http.Client{Transport: tr}
+			} else {
+				client = &http.Client{}
+			}
 
-				// Congert to string
-				macs, _ := json.Marshal(system.MACs)
-				ips, _ := json.Marshal(system.IPs)
-				cameraConnected := "true"
-				if communication.CameraConnected == false {
-					cameraConnected = "false"
-				}
+			// We need a hub URI and hub public key before we will send a heartbeat
+			if hubURI != "" && key != "" {
 
 				var object = fmt.Sprintf(`{
 						"key" : "%s",
@@ -338,22 +384,22 @@ loop:
 						"onvif" : "%s",
 						"onvif_zoom" : "%s",
 						"onvif_pantilt" : "%s",
-						"onvif_version" : "%s",
+						"onvif_presets": "%s",
+						"onvif_presets_list": %s,
 						"cameraConnected": "%s",
+						"hasBackChannel": "%s",
 						"numberoffiles" : "33",
 						"timestamp" : 1564747908,
 						"cameratype" : "IPCamera",
 						"docker" : true,
 						"kios" : false,
 						"raspberrypi" : false
-					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifVersion, cameraConnected)
+					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, cameraConnected, hasBackChannel)
 
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)
-				req, _ := http.NewRequest("POST", url, buffy)
+				req, _ := http.NewRequest("POST", hubURI, buffy)
 				req.Header.Set("Content-Type", "application/json")
-
-				client := &http.Client{}
 				resp, err := client.Do(req)
 				if resp != nil {
 					resp.Body.Close()
@@ -362,31 +408,72 @@ loop:
 					communication.CloudTimestamp.Store(time.Now().Unix())
 					log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Hub.")
 				} else {
-					communication.CloudTimestamp.Store(0)
+					if communication.CloudTimestamp != nil && communication.CloudTimestamp.Load() != nil {
+						communication.CloudTimestamp.Store(int64(0))
+					}
 					log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Hub.")
-				}
-
-				// If we have a Kerberos Vault connected, we will also send some analytics
-				// to that service.
-				vaultURI = config.KStorage.URI
-				if vaultURI != "" {
-					buffy = bytes.NewBuffer(jsonStr)
-					req, _ = http.NewRequest("POST", vaultURI+"/devices/heartbeat", buffy)
-					req.Header.Set("Content-Type", "application/json")
-
-					client = &http.Client{}
-					resp, err = client.Do(req)
-					if resp != nil {
-						resp.Body.Close()
-					}
-					if err == nil && resp.StatusCode == 200 {
-						log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Vault.")
-					} else {
-						log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Vault.")
-					}
 				}
 			} else {
 				log.Log.Error("HandleHeartBeat: Disabled as we do not have a public key defined.")
+			}
+
+			// If we have a Kerberos Vault connected, we will also send some analytics
+			// to that service.
+			vaultURI = config.KStorage.URI
+			if vaultURI != "" {
+
+				var object = fmt.Sprintf(`{
+					"key" : "%s",
+					"version" : "3.0.0",
+					"release" : "%s",
+					"cpuid" : "%s",
+					"clouduser" : "%s",
+					"cloudpublickey" : "%s",
+					"cameraname" : "%s",
+					"enterprise" : %t,
+					"hostname" : "%s",
+					"architecture" : "%s",
+					"totalMemory" : "%d",
+					"usedMemory" : "%d",
+					"freeMemory" : "%d",
+					"processMemory" : "%d",
+					"mac_list" : %s,
+					"ip_list" : %s,
+					"board" : "",
+					"disk1size" : "%s",
+					"disk3size" : "%s",
+					"diskvdasize" :  "%s",
+					"uptime" : "%s",
+					"boot_time" : "%s",
+					"siteID" : "%s",
+					"onvif" : "%s",
+					"onvif_zoom" : "%s",
+					"onvif_pantilt" : "%s",
+					"onvif_presets": "%s",
+					"onvif_presets_list": %s,
+					"cameraConnected": "%s",
+					"numberoffiles" : "33",
+					"timestamp" : 1564747908,
+					"cameratype" : "IPCamera",
+					"docker" : true,
+					"kios" : false,
+					"raspberrypi" : false
+				}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, cameraConnected)
+
+				var jsonStr = []byte(object)
+				buffy := bytes.NewBuffer(jsonStr)
+				req, _ := http.NewRequest("POST", vaultURI+"/devices/heartbeat", buffy)
+				req.Header.Set("Content-Type", "application/json")
+
+				resp, err := client.Do(req)
+				if resp != nil {
+					resp.Body.Close()
+				}
+				if err == nil && resp.StatusCode == 200 {
+					log.Log.Info("HandleHeartBeat: (200) Heartbeat received by Kerberos Vault.")
+				} else {
+					log.Log.Error("HandleHeartBeat: (400) Something went wrong while sending to Kerberos Vault.")
+				}
 			}
 		}
 
@@ -419,18 +506,16 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 			// Allocate frame
 			frame := ffmpeg.AllocVideoFrame()
 
-			key := ""
+			hubKey := ""
 			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
-				key = config.S3.Publickey
+				hubKey = config.S3.Publickey
 			} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
-				key = config.KStorage.CloudKey
+				hubKey = config.KStorage.CloudKey
 			}
 			// This is the new way ;)
 			if config.HubKey != "" {
-				key = config.HubKey
+				hubKey = config.HubKey
 			}
-
-			topic := "kerberos/" + key + "/device/" + config.Key + "/live"
 
 			lastLivestreamRequest := int64(0)
 
@@ -452,7 +537,27 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 					continue
 				}
 				log.Log.Info("HandleLiveStreamSD: Sending base64 encoded images to MQTT.")
-				sendImage(frame, topic, mqttClient, pkt, decoder, decoderMutex)
+				_, err := computervision.GetRawImage(frame, pkt, decoder, decoderMutex)
+				if err == nil {
+					bytes, _ := computervision.ImageToBytes(&frame.Image)
+					encoded := base64.StdEncoding.EncodeToString(bytes)
+
+					valueMap := make(map[string]interface{})
+					valueMap["image"] = encoded
+					message := models.Message{
+						Payload: models.Payload{
+							Action:   "receive-sd-stream",
+							DeviceId: configuration.Config.Key,
+							Value:    valueMap,
+						},
+					}
+					payload, err := models.PackageMQTTMessage(configuration, message)
+					if err == nil {
+						mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+					} else {
+						log.Log.Info("HandleRequestConfig: something went wrong while sending acknowledge config to hub: " + string(payload))
+					}
+				}
 			}
 
 			// Cleanup the frame.
@@ -464,15 +569,6 @@ func HandleLiveStreamSD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 	}
 
 	log.Log.Debug("HandleLiveStreamSD: finished")
-}
-
-func sendImage(frame *ffmpeg.VideoFrame, topic string, mqttClient mqtt.Client, pkt av.Packet, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
-	_, err := computervision.GetRawImage(frame, pkt, decoder, decoderMutex)
-	if err == nil {
-		bytes, _ := computervision.ImageToBytes(&frame.Image)
-		encoded := base64.StdEncoding.EncodeToString(bytes)
-		mqttClient.Publish(topic, 0, false, encoded)
-	}
 }
 
 func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, codecs []av.CodecData, decoder *ffmpeg.VideoDecoder, decoderMutex *sync.Mutex) {
@@ -493,26 +589,19 @@ func HandleLiveStreamHD(livestreamCursor *pubsub.QueueCursor, configuration *mod
 
 			if config.Capture.ForwardWebRTC == "true" {
 				// We get a request with an offer, but we'll forward it.
-				for m := range communication.HandleLiveHDHandshake {
+				/*for m := range communication.HandleLiveHDHandshake {
 					// Forward SDP
 					m.CloudKey = config.Key
 					request, err := json.Marshal(m)
 					if err == nil {
 						mqttClient.Publish("kerberos/webrtc/request", 2, false, request)
 					}
-				}
+				}*/
 			} else {
 				log.Log.Info("HandleLiveStreamHD: Waiting for peer connections.")
 				for handshake := range communication.HandleLiveHDHandshake {
 					log.Log.Info("HandleLiveStreamHD: setting up a peer connection.")
-					key := config.Key + "/" + handshake.Cuuid
-					webrtc.CandidatesMutex.Lock()
-					_, ok := webrtc.CandidateArrays[key]
-					if !ok {
-						webrtc.CandidateArrays[key] = make(chan string, 30)
-					}
-					webrtc.CandidatesMutex.Unlock()
-					webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, videoTrack, audioTrack, handshake, webrtc.CandidateArrays[key])
+					go webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, videoTrack, audioTrack, handshake)
 
 				}
 			}
@@ -541,15 +630,23 @@ func VerifyHub(c *gin.Context) {
 	err := c.BindJSON(&config)
 
 	if err == nil {
-		hubKey := config.HubKey
 		hubURI := config.HubURI
+		publicKey := config.HubKey
+		privateKey := config.HubPrivateKey
 
-		content := []byte(`{"message": "fake-message"}`)
-		body := bytes.NewReader(content)
-		req, err := http.NewRequest("POST", hubURI+"/queue/test", body)
+		req, err := http.NewRequest("POST", hubURI+"/subscription/verify", nil)
 		if err == nil {
-			req.Header.Set("X-Kerberos-Cloud-Key", hubKey)
-			client := &http.Client{}
+			req.Header.Set("X-Kerberos-Hub-PublicKey", publicKey)
+			req.Header.Set("X-Kerberos-Hub-PrivateKey", privateKey)
+			var client *http.Client
+			if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+				tr := &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				}
+				client = &http.Client{Transport: tr}
+			} else {
+				client = &http.Client{}
+			}
 
 			resp, err := client.Do(req)
 			if err == nil {
@@ -597,7 +694,7 @@ func VerifyHub(c *gin.Context) {
 // @Summary Will verify the persistence.
 // @Description Will verify the persistence.
 // @Success 200 {object} models.APIResponse
-func VerifyPersistence(c *gin.Context) {
+func VerifyPersistence(c *gin.Context, configDirectory string) {
 
 	var config models.Config
 	err := c.BindJSON(&config)
@@ -605,88 +702,88 @@ func VerifyPersistence(c *gin.Context) {
 
 		if config.Cloud == "dropbox" {
 			VerifyDropbox(config, c)
-		} else if config.Cloud == "s3" {
+		} else if config.Cloud == "s3" || config.Cloud == "kerberoshub" {
 
-			// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
-			// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
-			// - Timestamp
-			// - Size + - + microseconds
-			// - device
-			// - Region
-			// - Number of changes
-			// - Token
-
-			aws_access_key_id := config.S3.Publickey
-			aws_secret_access_key := config.S3.Secretkey
-			aws_region := config.S3.Region
-
-			// This is the new way ;)
-			if config.HubKey != "" {
-				aws_access_key_id = config.HubKey
-			}
-			if config.HubPrivateKey != "" {
-				aws_secret_access_key = config.HubPrivateKey
-			}
-
-			s3Client, err := minio.NewWithRegion("s3.amazonaws.com", aws_access_key_id, aws_secret_access_key, true, aws_region)
-			if err != nil {
+			if config.HubURI == "" ||
+				config.HubKey == "" ||
+				config.HubPrivateKey == "" ||
+				config.S3.Region == "" {
+				msg := "VerifyPersistence: Kerberos Hub not properly configured."
+				log.Log.Info(msg)
 				c.JSON(400, models.APIResponse{
-					Data: "Creation of Kerberos Hub connection failed: " + err.Error(),
+					Data: msg,
 				})
 			} else {
 
-				// Check if we need to use the proxy.
-				if config.S3.ProxyURI != "" {
-					var transport http.RoundTripper = &http.Transport{
-						Proxy: func(*http.Request) (*url.URL, error) {
-							return url.Parse(config.S3.ProxyURI)
-						},
-						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-					}
-					s3Client.SetCustomTransport(transport)
+				// Open test-480p.mp4
+				file, err := os.Open(configDirectory + "/data/test-480p.mp4")
+				if err != nil {
+					msg := "VerifyPersistence: error reading test-480p.mp4: " + err.Error()
+					log.Log.Error(msg)
+					c.JSON(400, models.APIResponse{
+						Data: msg,
+					})
+				}
+				defer file.Close()
+
+				req, err := http.NewRequest("POST", config.HubURI+"/storage/upload", file)
+				if err != nil {
+					msg := "VerifyPersistence: error reading Kerberos Hub HEAD request, " + config.HubURI + "/storage: " + err.Error()
+					log.Log.Error(msg)
+					c.JSON(400, models.APIResponse{
+						Data: msg,
+					})
 				}
 
-				deviceKey := "fake-key"
-				devicename := "justatest"
-				coordinates := "200-200-400-400"
-				eventToken := "769"
-
 				timestamp := time.Now().Unix()
-				fileName := strconv.FormatInt(timestamp, 10) + "_6-967003_justatest_200-200-400-400_24_769.mp4"
-				content := []byte("test-file")
-				body := bytes.NewReader(content)
+				fileName := strconv.FormatInt(timestamp, 10) +
+					"_6-967003_" + config.Name + "_200-200-400-400_24_769.mp4"
+				req.Header.Set("X-Kerberos-Storage-FileName", fileName)
+				req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
+				req.Header.Set("X-Kerberos-Storage-Device", config.Key)
+				req.Header.Set("X-Kerberos-Hub-PublicKey", config.HubKey)
+				req.Header.Set("X-Kerberos-Hub-PrivateKey", config.HubPrivateKey)
+				req.Header.Set("X-Kerberos-Hub-Region", config.S3.Region)
 
-				n, err := s3Client.PutObject(config.S3.Bucket,
-					config.S3.Username+"/"+fileName,
-					body,
-					body.Size(),
-					minio.PutObjectOptions{
-						ContentType:  "video/mp4",
-						StorageClass: "ONEZONE_IA",
-						UserMetadata: map[string]string{
-							"event-timestamp":         strconv.FormatInt(timestamp, 10),
-							"event-microseconds":      deviceKey,
-							"event-instancename":      devicename,
-							"event-regioncoordinates": coordinates,
-							"event-numberofchanges":   deviceKey,
-							"event-token":             eventToken,
-							"productid":               deviceKey,
-							"publickey":               aws_access_key_id,
-							"uploadtime":              "now",
-						},
-					})
-
-				if err != nil {
-					c.JSON(400, models.APIResponse{
-						Data: "Upload of fake recording failed: " + err.Error(),
-					})
+				var client *http.Client
+				if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+					tr := &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					}
+					client = &http.Client{Transport: tr}
 				} else {
-					c.JSON(200, models.APIResponse{
-						Data: "Upload Finished: file has been uploaded to bucket: " + strconv.FormatInt(n, 10),
+					client = &http.Client{}
+				}
+
+				resp, err := client.Do(req)
+				if resp != nil {
+					defer resp.Body.Close()
+				}
+
+				if err == nil && resp != nil {
+					if resp.StatusCode == 200 {
+						msg := "VerifyPersistence: Upload allowed using the credentials provided (" + config.HubKey + ", " + config.HubPrivateKey + ")"
+						log.Log.Info(msg)
+						c.JSON(200, models.APIResponse{
+							Data: msg,
+						})
+					} else {
+						msg := "VerifyPersistence: Upload NOT allowed using the credentials provided (" + config.HubKey + ", " + config.HubPrivateKey + ")"
+						log.Log.Info(msg)
+						c.JSON(400, models.APIResponse{
+							Data: msg,
+						})
+					}
+				} else {
+					msg := "VerifyPersistence: Error creating Kerberos Hub request"
+					log.Log.Info(msg)
+					c.JSON(400, models.APIResponse{
+						Data: msg,
 					})
 				}
 			}
-		} else if config.Cloud == "kstorage" {
+
+		} else if config.Cloud == "kstorage" || config.Cloud == "kerberosvault" {
 
 			uri := config.KStorage.URI
 			accessKey := config.KStorage.AccessKey
@@ -695,10 +792,18 @@ func VerifyPersistence(c *gin.Context) {
 			provider := config.KStorage.Provider
 
 			if err == nil && uri != "" && accessKey != "" && secretAccessKey != "" {
-				var postData = []byte(`{"title":"Buy cheese and bread for breakfast."}`)
-				client := &http.Client{}
-				req, err := http.NewRequest("POST", uri+"/ping", bytes.NewReader(postData))
 
+				var client *http.Client
+				if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+					tr := &http.Transport{
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					}
+					client = &http.Client{Transport: tr}
+				} else {
+					client = &http.Client{}
+				}
+
+				req, err := http.NewRequest("POST", uri+"/ping", nil)
 				req.Header.Add("X-Kerberos-Storage-AccessKey", accessKey)
 				req.Header.Add("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
 				resp, err := client.Do(req)
@@ -710,33 +815,44 @@ func VerifyPersistence(c *gin.Context) {
 
 						if provider != "" || directory != "" {
 
-							hubKey := config.KStorage.CloudKey
-							// This is the new way ;)
-							if config.HubKey != "" {
-								hubKey = config.HubKey
-							}
-
 							// Generate a random name.
 							timestamp := time.Now().Unix()
 							fileName := strconv.FormatInt(timestamp, 10) +
-								"_6-967003_justatest_200-200-400-400_24_769.mp4"
-							content := []byte("test-file")
-							body := bytes.NewReader(content)
-							//fileSize := int64(len(content))
+								"_6-967003_" + config.Name + "_200-200-400-400_24_769.mp4"
 
-							req, err := http.NewRequest("POST", uri+"/storage", body)
+							// Open test-480p.mp4
+							file, err := os.Open(configDirectory + "/data/test-480p.mp4")
+							if err != nil {
+								msg := "VerifyPersistence: error reading test-480p.mp4: " + err.Error()
+								log.Log.Error(msg)
+								c.JSON(400, models.APIResponse{
+									Data: msg,
+								})
+							}
+							defer file.Close()
+
+							req, err := http.NewRequest("POST", uri+"/storage", file)
 							if err == nil {
 
 								req.Header.Set("Content-Type", "video/mp4")
-								req.Header.Set("X-Kerberos-Storage-CloudKey", hubKey)
+								req.Header.Set("X-Kerberos-Storage-CloudKey", config.HubKey)
 								req.Header.Set("X-Kerberos-Storage-AccessKey", accessKey)
 								req.Header.Set("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
 								req.Header.Set("X-Kerberos-Storage-Provider", provider)
 								req.Header.Set("X-Kerberos-Storage-FileName", fileName)
-								req.Header.Set("X-Kerberos-Storage-Device", "test")
+								req.Header.Set("X-Kerberos-Storage-Device", config.Key)
 								req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
 								req.Header.Set("X-Kerberos-Storage-Directory", directory)
-								client := &http.Client{}
+
+								var client *http.Client
+								if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+									tr := &http.Transport{
+										TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+									}
+									client = &http.Client{Transport: tr}
+								} else {
+									client = &http.Client{}
+								}
 
 								resp, err := client.Do(req)
 
@@ -749,41 +865,45 @@ func VerifyPersistence(c *gin.Context) {
 												c.JSON(200, body)
 											} else {
 												c.JSON(400, models.APIResponse{
-													Data: "Something went wrong while verifying your persistence settings. Make sure your provider is the same as the storage provider in your Kerberos Vault, and the relevant storage provider is configured properly.",
+													Data: "VerifyPersistence: Something went wrong while verifying your persistence settings. Make sure your provider is the same as the storage provider in your Kerberos Vault, and the relevant storage provider is configured properly.",
 												})
 											}
 										}
 									}
 								} else {
 									c.JSON(400, models.APIResponse{
-										Data: "Upload of fake recording failed: " + err.Error(),
+										Data: "VerifyPersistence: Upload of fake recording failed: " + err.Error(),
 									})
 								}
 							} else {
 								c.JSON(400, models.APIResponse{
-									Data: "Something went wrong while creating /storage POST request." + err.Error(),
+									Data: "VerifyPersistence: Something went wrong while creating /storage POST request." + err.Error(),
 								})
 							}
 						} else {
 							c.JSON(400, models.APIResponse{
-								Data: "Provider and/or directory is missing from the request.",
+								Data: "VerifyPersistence: Provider and/or directory is missing from the request.",
 							})
 						}
 					} else {
 						c.JSON(400, models.APIResponse{
-							Data: "Something went wrong while verifying storage credentials: " + string(body),
+							Data: "VerifyPersistence: Something went wrong while verifying storage credentials: " + string(body),
 						})
 					}
 				} else {
 					c.JSON(400, models.APIResponse{
-						Data: "Something went wrong while verifying storage credentials:" + err.Error(),
+						Data: "VerifyPersistence: Something went wrong while verifying storage credentials:" + err.Error(),
 					})
 				}
+			} else {
+				c.JSON(400, models.APIResponse{
+					Data: "VerifyPersistence: please fill-in the required Kerberos Vault credentials.",
+				})
 			}
 		}
 	} else {
 		c.JSON(400, models.APIResponse{
-			Data: "No persistence was specified, so do not know what to verify:" + err.Error(),
+			Data: "VerifyPersistence: No persistence was specified, so do not know what to verify:" + err.Error(),
 		})
 	}
 }

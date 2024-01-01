@@ -23,7 +23,7 @@
   },
   "dashboard": {
     "title": "Dashboard",
-    "heading": "Overview of your video surveilance",
+    "heading": "Overview of your video surveillance",
     "number_of_days": "Number of days",
     "total_recordings": "Total recordings",
     "connected": "Connected",
@@ -85,7 +85,16 @@
       "advanced_configuration": "Advanced configuration",
       "description_advanced_configuration": "Detailed configuration options to enable or disable specific parts of the Kerberos Agent",
       "offline_mode": "Offline mode",
-      "description_offline_mode": "Disable all outgoing traffic"
+      "description_offline_mode": "Disable all outgoing traffic",
+      "encryption": "Encryption",
+      "description_encryption": "Enable encryption for all outgoing traffic. MQTT messages and/or recordings will be encrypted using AES-256. A private key is used for signing.",
+      "encryption_enabled": "Enable MQTT encryption",
+      "description_encryption_enabled": "Enable encryption for all MQTT messages.",
+      "encryption_recordings_enabled": "Enable recording encryption",
+      "description_encryption_recordings_enabled": "Enable encryption for all recordings.",
+      "encryption_fingerprint": "Fingerprint",
+      "encryption_privatekey": "Private key",
+      "encryption_symmetrickey": "Symmetric key"
     },
     "camera": {
       "camera": "Camera",
@@ -142,7 +151,7 @@
       "stun_turn_description_webrtc": "Forward h264 stream through MQTT",
       "stun_turn_transcode": "Transcode stream",
       "stun_turn_description_transcode": "Convert stream to a lower resolution",
-      "stun_turn_downscale": "Downscale resolution (in % or original resolution)",
+      "stun_turn_downscale": "Downscale resolution (in % of original resolution)",
       "mqtt": "MQTT",
       "description_mqtt": "A MQTT broker is used to communicate from",
       "description2_mqtt": "to the Kerberos Agent, to achieve for example livestreaming or ONVIF (PTZ) capabilities.",

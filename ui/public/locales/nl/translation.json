@@ -85,7 +85,16 @@
       "advanced_configuration": "Geavanceerde instellingen",
       "description_advanced_configuration": "Detail instellingen om bepaalde functionaliteiten van je Kerberos Agent aan en uit te zetten",
       "offline_mode": "Offline modus",
-      "description_offline_mode": "Uitzetten van uitgaande connectiviteit"
+      "description_offline_mode": "Uitzetten van uitgaande connectiviteit",
+      "encryption": "Encrypteer",
+      "description_encryption": "Activeer encryptie voor alle uitgaande verkeer. MQTT berichten en/of opnames worden geencrypteerd met AES-256. Een private sleutel wordt gebruikt voor het ondertekenen.",
+      "encryption_enabled": "Activeer MQTT encryptie",
+      "description_encryption_enabled": "Activeer encryptie voor alle MQTT berichten.",
+      "encryption_recordings_enabled": "Activeer opname encryptie",
+      "description_encryption_recordings_enabled": "Activeer encryptie voor alle opnames.",
+      "encryption_fingerprint": "Vingerafdruk",
+      "encryption_privatekey": "Private sleutel",
+      "encryption_symmetrickey": "Symmetrische sleutel"
     },
     "camera": {
       "camera": "Camera",
