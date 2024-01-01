@@ -99,9 +99,9 @@
     "camera": {
       "camera": "相机",
       "description_camera": "需要相机设置才能连接到您选择的相机。",
-      "only_h264": "目前仅支持 H264 RTSP 流。",
+      "only_h264": "目前仅支持 H264/H265 RTSP 流。",
       "rtsp_url": "RTSP 网址",
-      "rtsp_h264": "与摄像机的 H264 RTSP 连接。",
+      "rtsp_h264": "与摄像机的 H264/H265 RTSP 连接。",
       "sub_rtsp_url": "子 RTSP 网址（用于直播）",
       "sub_rtsp_h264": "与低分辨率相机的辅助 RTSP 连接。",
       "onvif": "ONVIF",

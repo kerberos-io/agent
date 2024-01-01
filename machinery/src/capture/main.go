@@ -557,7 +557,7 @@ func VerifyCamera(c *gin.Context) {
 			videoIdx := -1
 			audioIdx := -1
 			for i, stream := range streams {
-				if stream.Name == "H264" && videoIdx < 0 {
+				if (stream.Name == "H264" || stream.Name == "H265") && videoIdx < 0 {
 					videoIdx = i
 				} else if stream.Name == "PCM_MULAW" && audioIdx < 0 {
 					audioIdx = i
