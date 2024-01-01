@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: kerberos/base:0a50dc9
-
-
+      options: --user 1001
+      
     strategy:
       matrix:
         go-version: ['1.17', '1.18', '1.19', '1.20', '1.21']
