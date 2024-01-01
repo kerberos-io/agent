@@ -7,7 +7,11 @@ on:
     branches: [ develop, master ]
 
 jobs:
-
+  setup:
+    runs-on: int-runner-set
+    container:
+      image: ci-image:v1.0.0
+      options: --user 1001
   build:
     name: Build
     runs-on: ubuntu-latest
