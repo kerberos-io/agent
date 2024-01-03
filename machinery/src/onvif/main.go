@@ -311,13 +311,18 @@ func GetPositionFromDevice(configuration models.Configuration) (xsdonvif.PTZVect
 		if err == nil {
 			// Get the PTZ configurations from the device
 			position, err := GetPosition(device, token)
-			if err == nil && position.PanTilt != nil && position.Zoom != nil {
-				// float to string
-				x := strconv.FormatFloat(position.PanTilt.X, 'f', 6, 64)
-				y := strconv.FormatFloat(position.PanTilt.Y, 'f', 6, 64)
-				z := strconv.FormatFloat(position.Zoom.X, 'f', 6, 64)
-				log.Log.Info("onvif.GetPositionFromDevice(): successfully got position (" + x + ", " + y + ", " + z + ")")
-				return position, err
+			if err == nil {
+				if position.PanTilt != nil && position.Zoom != nil {
+					// float to string
+					x := strconv.FormatFloat(position.PanTilt.X, 'f', 6, 64)
+					y := strconv.FormatFloat(position.PanTilt.Y, 'f', 6, 64)
+					z := strconv.FormatFloat(position.Zoom.X, 'f', 6, 64)
+					log.Log.Info("onvif.GetPositionFromDevice(): successfully got position (" + x + ", " + y + ", " + z + ")")
+					return position, err
+				} else {
+					log.Log.Debug("onvif.GetPositionFromDevice(): position is nil")
+					return position, errors.New("position is nil")
+				}
 			} else {
 				log.Log.Debug("onvif.GetPositionFromDevice(): " + err.Error())
 				return position, err
