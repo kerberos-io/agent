@@ -360,7 +360,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 			// decode timestamp
 			pts, ok := g.Client.PacketPTS(g.AudioG711Media, rtppkt)
 			if !ok {
-				log.Log.Warning("capture.golibrtsp.Start(): " + "unable to get PTS")
+				log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 				return
 			}
 
@@ -443,7 +443,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 				// decode timestamp
 				pts, ok := g.Client.PacketPTS(g.VideoH264Media, rtppkt)
 				if !ok {
-					log.Log.Warning("capture.golibrtsp.Start(): " + "unable to get PTS")
+					log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 					return
 				}
 
@@ -554,7 +554,7 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 				// decode timestamp
 				pts, ok := g.Client.PacketPTS(g.VideoH265Media, rtppkt)
 				if !ok {
-					log.Log.Warning("capture.golibrtsp.Start(): " + "unable to get PTS")
+					log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 					return
 				}
 

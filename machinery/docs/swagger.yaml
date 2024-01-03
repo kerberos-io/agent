@@ -494,6 +494,27 @@ paths:
       summary: Will return the ONVIF presets for the specific camera.
       tags:
       - onvif
+  /api/camera/onvif/verify:
+    post:
+      description: Will verify the ONVIF connectivity.
+      operationId: verify-onvif
+      parameters:
+      - description: OnvifCredentials
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.OnvifCredentials'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will verify the ONVIF connectivity.
+      tags:
+      - onvif
   /api/camera/onvif/zoom:
     post:
       description: Zooming in or out the camera.
@@ -700,27 +721,6 @@ paths:
       summary: Get Authorization token.
       tags:
       - authentication
-  /api/onvif/verify:
-    post:
-      description: Will verify the ONVIF connectivity.
-      operationId: verify-onvif
-      parameters:
-      - description: OnvifCredentials
-        in: body
-        name: config
-        required: true
-        schema:
-          $ref: '#/definitions/models.OnvifCredentials'
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.APIResponse'
-      security:
-      - Bearer: []
-      summary: Will verify the ONVIF connectivity.
-      tags:
-      - onvif
   /api/persistence/verify:
     post:
       description: Will verify the persistence.

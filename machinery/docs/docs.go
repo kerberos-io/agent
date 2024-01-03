@@ -279,6 +279,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/camera/onvif/verify": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Will verify the ONVIF connectivity.",
+                "tags": [
+                    "onvif"
+                ],
+                "summary": "Will verify the ONVIF connectivity.",
+                "operationId": "verify-onvif",
+                "parameters": [
+                    {
+                        "description": "OnvifCredentials",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.OnvifCredentials"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/camera/onvif/zoom": {
             "post": {
                 "description": "Zooming in or out the camera.",
@@ -585,40 +619,6 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/models.Authorization"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/onvif/verify": {
-            "post": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Will verify the ONVIF connectivity.",
-                "tags": [
-                    "onvif"
-                ],
-                "summary": "Will verify the ONVIF connectivity.",
-                "operationId": "verify-onvif",
-                "parameters": [
-                    {
-                        "description": "OnvifCredentials",
-                        "name": "config",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.OnvifCredentials"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.APIResponse"
                         }
                     }
                 }

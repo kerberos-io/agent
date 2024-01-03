@@ -54,11 +54,6 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 			components.UpdateConfig(c, configDirectory, configuration, communication)
 		})
 
-		// Will verify the current onvif settings.
-		api.POST("/onvif/verify", func(c *gin.Context) {
-			onvif.VerifyOnvifConnection(c)
-		})
-
 		// Will verify the current hub settings.
 		api.POST("/hub/verify", func(c *gin.Context) {
 			cloud.VerifyHub(c)
@@ -94,7 +89,8 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 		})
 
 		// Onvif specific methods. Doesn't require any authorization.
-
+		// Will verify the current onvif settings.
+		api.POST("/camera/onvif/verify", onvif.VerifyOnvifConnection)
 		api.POST("/camera/onvif/login", LoginToOnvif)
 		api.POST("/camera/onvif/capabilities", GetOnvifCapabilities)
 		api.POST("/camera/onvif/presets", GetOnvifPresets)
