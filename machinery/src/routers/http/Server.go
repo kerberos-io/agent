@@ -41,6 +41,9 @@ import (
 
 func StartServer(configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
 
+	// Set release mode
+	gin.SetMode(gin.ReleaseMode)
+
 	// Initialize REST API
 	r := gin.Default()
 
