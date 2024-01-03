@@ -115,14 +115,22 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Establishing the camera connection without backchannel if no substream
 	rtspUrl := config.Capture.IPCamera.RTSP
 	rtspClient := captureDevice.SetMainClient(rtspUrl)
-
-	err := rtspClient.Connect(context.Background())
-	if err != nil {
-		log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP stream: " + err.Error())
-		rtspClient.Close()
+	if rtspUrl != "" {
+		err := rtspClient.Connect(context.Background())
+		if err != nil {
+			log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP stream: " + err.Error())
+			rtspClient.Close()
+			rtspClient = nil
+			time.Sleep(time.Second * 3)
+			return status
+		}
+	} else {
+		log.Log.Error("components.Kerberos.RunAgent(): no rtsp url found in config, please provide one.")
+		rtspClient = nil
 		time.Sleep(time.Second * 3)
 		return status
 	}
+
 	log.Log.Info("components.Kerberos.RunAgent(): opened RTSP stream: " + rtspUrl)
 
 	// Get the video streams from the RTSP server.
