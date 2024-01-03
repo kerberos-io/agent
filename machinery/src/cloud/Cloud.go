@@ -290,7 +290,7 @@ loop:
 						onvifPresetsList = []byte("[]")
 					}
 				} else {
-					log.Log.Error("cloud.HandleHeartBeat(): error while getting PTZ configurations: " + err.Error())
+					log.Log.Debug("cloud.HandleHeartBeat(): error while getting PTZ configurations: " + err.Error())
 					onvifPresetsList = []byte("[]")
 				}
 
