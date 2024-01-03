@@ -111,7 +111,7 @@ This repository contains everything you'll need to know about our core product, 
 - Simplified and modern user interface.
 - Multi architecture (ARMv7, ARMv8, amd64, etc).).
 - Multi stream, for example recording in H265, live streaming and motion detection in H264.
-- Multi camera support: IP Cameras (H264 and H265), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp
+- Multi camera support: IP Cameras (H264 and H265), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp).
 - Single camera per instance (e.g. one container per camera).
 - Low resolution streaming through MQTT and high resolution streaming through WebRTC (only supports H264/PCM).
 - Backchannel audio from Kerberos Hub to IP camera (requires PCM ULAW codec)
