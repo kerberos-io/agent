@@ -893,7 +893,7 @@ func GetPTZFunctionsFromDevice(configurations ptz.GetConfigurationsResponse) ([]
 }
 
 // VerifyOnvifConnection godoc
-// @Router /api/onvif/verify [post]
+// @Router /api/camera/onvif/verify [post]
 // @ID verify-onvif
 // @Security Bearer
 // @securityDefinitions.apikey Bearer
