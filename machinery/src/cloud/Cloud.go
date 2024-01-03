@@ -320,6 +320,12 @@ loop:
 				} else {
 					log.Log.Debug("cloud.HandleHeartBeat(): no pull point address found.")
 					onvifEventsList = []byte("[]")
+
+					// Try again
+					pullPointAddress, err = onvif.CreatePullPointSubscription(device)
+					if err != nil {
+						log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
+					}
 				}
 
 			} else {
