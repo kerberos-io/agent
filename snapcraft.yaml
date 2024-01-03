@@ -19,5 +19,5 @@ apps:
     plugs: [ network, network-bind ]
 parts:
   agent:
-    source: https://github.com/kerberos-io/agent/releases/download/f739d52/agent-$SNAP_ARCH.tar
+    source: https://github.com/kerberos-io/agent/releases/download/21c0e01/agent-amd64.tar
     plugin: dump
