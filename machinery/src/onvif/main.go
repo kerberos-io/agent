@@ -311,7 +311,7 @@ func GetPositionFromDevice(configuration models.Configuration) (xsdonvif.PTZVect
 		if err == nil {
 			// Get the PTZ configurations from the device
 			position, err := GetPosition(device, token)
-			if err == nil {
+			if err == nil && position.PanTilt != nil && position.Zoom != nil {
 				// float to string
 				x := strconv.FormatFloat(position.PanTilt.X, 'f', 6, 64)
 				y := strconv.FormatFloat(position.PanTilt.Y, 'f', 6, 64)
