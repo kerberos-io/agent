@@ -9,7 +9,7 @@ Kerberos Agents are now also shipped as static binaries. Within the Docker image
 
 You can run the binary as following on port `8080`:
 
-    main run cameraname 8080
+    main -action=run -port=80
 
 ## Systemd
 
@@ -18,7 +18,7 @@ When running on a Linux OS you might consider to auto-start the Kerberos Agent u
     [Unit]
     Wants=network.target
     [Service]
-    ExecStart=/home/pi/agent/main run camera 80
+    ExecStart=/home/pi/agent/main -action=run -port=80
     WorkingDirectory=/home/pi/agent/
     [Install]
     WantedBy=multi-user.target
