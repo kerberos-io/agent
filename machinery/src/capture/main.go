@@ -564,17 +564,23 @@ func VerifyCamera(c *gin.Context) {
 				}
 			}
 
-			if videoIdx > -1 {
-				c.JSON(200, models.APIResponse{
-					Message: "All good, detected a H264 codec.",
-					Data:    streams,
-				})
+			err := rtspClient.Close()
+			if err == nil {
+				if videoIdx > -1 {
+					c.JSON(200, models.APIResponse{
+						Message: "All good, detected a H264 codec.",
+						Data:    streams,
+					})
+				} else {
+					c.JSON(400, models.APIResponse{
+						Message: "Stream doesn't have a H264 codec, we only support H264 so far.",
+					})
+				}
 			} else {
 				c.JSON(400, models.APIResponse{
-					Message: "Stream doesn't have a H264 codec, we only support H264 so far.",
+					Message: "Something went wrong while closing the connection " + err.Error(),
 				})
 			}
-
 		} else {
 			c.JSON(400, models.APIResponse{
 				Message: err.Error(),
