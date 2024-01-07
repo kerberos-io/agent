@@ -36,11 +36,19 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 	packageCounter.Store(int64(0))
 	communication.PackageCounter = &packageCounter
 
+	var packageCounterSub atomic.Value
+	packageCounterSub.Store(int64(0))
+	communication.PackageCounterSub = &packageCounterSub
+
 	// This is used when the last packet was received (timestamp),
 	// this metric is used to determine if the camera is still online/connected.
 	var lastPacketTimer atomic.Value
 	packageCounter.Store(int64(0))
 	communication.LastPacketTimer = &lastPacketTimer
+
+	var lastPacketTimerSub atomic.Value
+	packageCounterSub.Store(int64(0))
+	communication.LastPacketTimerSub = &lastPacketTimerSub
 
 	// This is used to understand if we have a working Kerberos Hub connection
 	// cloudTimestamp will be updated when successfully sending heartbeats.
@@ -245,7 +253,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	log.Log.Info("components.Kerberos.RunAgent(): SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
 	queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
 	queue.WriteHeader(videoStreams)
-	go rtspClient.Start(context.Background(), queue, configuration, communication)
+	go rtspClient.Start(context.Background(), "main", queue, configuration, communication)
+
+	// Main stream is connected and ready to go.
+	communication.MainStreamConnected = true
 
 	// Try to create backchannel
 	rtspBackChannelClient := captureDevice.SetBackChannelClient(rtspUrl)
@@ -261,7 +272,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		communication.SubQueue = subQueue
 		subQueue.SetMaxGopCount(1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
 		subQueue.WriteHeader(videoSubStreams)
-		go rtspSubClient.Start(context.Background(), subQueue, configuration, communication)
+		go rtspSubClient.Start(context.Background(), "sub", subQueue, configuration, communication)
+
+		// Sub stream is connected and ready to go.
+		communication.SubStreamConnected = true
 	}
 
 	// Handle livestream SD (low resolution over MQTT)
@@ -320,6 +334,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	// If we reach this point, we are stopping the stream.
 	communication.CameraConnected = false
+	communication.MainStreamConnected = false
+	communication.SubStreamConnected = false
 
 	// Cancel the main context, this will stop all the other goroutines.
 	(*communication.CancelContext)()
@@ -397,14 +413,19 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 func ControlAgent(communication *models.Communication) {
 	log.Log.Debug("components.Kerberos.ControlAgent(): started")
 	packageCounter := communication.PackageCounter
+	packageSubCounter := communication.PackageCounterSub
 	go func() {
 		// A channel to check the camera activity
 		var previousPacket int64 = 0
+		var previousPacketSub int64 = 0
 		var occurence = 0
+		var occurenceSub = 0
 		for {
 
 			// If camera is connected, we'll check if we are still receiving packets.
 			if communication.CameraConnected {
+
+				// First we'll check the main stream.
 				packetsR := packageCounter.Load().(int64)
 				if packetsR == previousPacket {
 					// If we are already reconfiguring,
@@ -416,16 +437,42 @@ func ControlAgent(communication *models.Communication) {
 					occurence = 0
 				}
 
-				log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read " + strconv.FormatInt(packetsR, 10))
+				log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from main stream: " + strconv.FormatInt(packetsR, 10))
 
 				// After 15 seconds without activity this is thrown..
 				if occurence == 3 {
-					log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery.")
+					log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking main stream.")
 					communication.HandleBootstrap <- "restart"
 					time.Sleep(2 * time.Second)
 					occurence = 0
 				}
+
+				// Now we'll check the sub stream.
+				packetsSubR := packageSubCounter.Load().(int64)
+				if communication.SubStreamConnected {
+					if packetsSubR == previousPacketSub {
+						// If we are already reconfiguring,
+						// we dont need to check if the stream is blocking.
+						if !communication.IsConfiguring.IsSet() {
+							occurenceSub = occurenceSub + 1
+						}
+					} else {
+						occurenceSub = 0
+					}
+
+					log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from sub stream: " + strconv.FormatInt(packetsSubR, 10))
+
+					// After 15 seconds without activity this is thrown..
+					if occurenceSub == 3 {
+						log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking sub stream.")
+						communication.HandleBootstrap <- "restart"
+						time.Sleep(2 * time.Second)
+						occurenceSub = 0
+					}
+				}
+
 				previousPacket = packageCounter.Load().(int64)
+				previousPacketSub = packageSubCounter.Load().(int64)
 			}
 
 			time.Sleep(5 * time.Second)

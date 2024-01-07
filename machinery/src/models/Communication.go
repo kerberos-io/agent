@@ -15,6 +15,8 @@ type Communication struct {
 	CancelContext         *context.CancelFunc
 	PackageCounter        *atomic.Value
 	LastPacketTimer       *atomic.Value
+	PackageCounterSub     *atomic.Value
+	LastPacketTimerSub    *atomic.Value
 	CloudTimestamp        *atomic.Value
 	HandleBootstrap       chan string
 	HandleStream          chan string
@@ -33,5 +35,7 @@ type Communication struct {
 	SubQueue              *packets.Queue
 	Image                 string
 	CameraConnected       bool
+	MainStreamConnected   bool
+	SubStreamConnected    bool
 	HasBackChannel        bool
 }

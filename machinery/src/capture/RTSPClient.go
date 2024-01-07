@@ -44,7 +44,7 @@ type RTSPClient interface {
 	ConnectBackChannel(ctx context.Context) error
 
 	// Start the RTSP client, and start reading packets.
-	Start(ctx context.Context, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) error
+	Start(ctx context.Context, streamType string, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) error
 
 	// Start the RTSP client, and start reading packets.
 	StartBackChannel(ctx context.Context) (err error)

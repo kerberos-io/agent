@@ -351,7 +351,7 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 }
 
 // Start the RTSP client, and start reading packets.
-func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) (err error) {
+func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) (err error) {
 	log.Log.Debug("capture.golibrtsp.Start(): started")
 
 	// called when a MULAW audio RTP packet arrives
@@ -527,10 +527,17 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 				if idrPresent {
 					// Increment packets, so we know the device
 					// is not blocking.
-					r := communication.PackageCounter.Load().(int64)
-					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
-					communication.PackageCounter.Store((r + 1) % 1000)
-					communication.LastPacketTimer.Store(time.Now().Unix())
+					if streamType == "main" {
+						r := communication.PackageCounter.Load().(int64)
+						log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+						communication.PackageCounter.Store((r + 1) % 1000)
+						communication.LastPacketTimer.Store(time.Now().Unix())
+					} else if streamType == "sub" {
+						r := communication.PackageCounterSub.Load().(int64)
+						log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+						communication.PackageCounterSub.Store((r + 1) % 1000)
+						communication.LastPacketTimerSub.Store(time.Now().Unix())
+					}
 				}
 			}
 
@@ -637,10 +644,17 @@ func (g *Golibrtsp) Start(ctx context.Context, queue *packets.Queue, configurati
 				if isRandomAccess {
 					// Increment packets, so we know the device
 					// is not blocking.
-					r := communication.PackageCounter.Load().(int64)
-					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
-					communication.PackageCounter.Store((r + 1) % 1000)
-					communication.LastPacketTimer.Store(time.Now().Unix())
+					if streamType == "main" {
+						r := communication.PackageCounter.Load().(int64)
+						log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+						communication.PackageCounter.Store((r + 1) % 1000)
+						communication.LastPacketTimer.Store(time.Now().Unix())
+					} else if streamType == "sub" {
+						r := communication.PackageCounterSub.Load().(int64)
+						log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+						communication.PackageCounterSub.Store((r + 1) % 1000)
+						communication.LastPacketTimerSub.Store(time.Now().Unix())
+					}
 				}
 			}
 

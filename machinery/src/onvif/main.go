@@ -992,7 +992,7 @@ func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
 			stringBody := string(b2)
 			decodedXML, et, err := getXMLNode(stringBody, "CreatePullPointSubscriptionResponse")
 			if err != nil {
-				log.Log.Error("onvif.main.CreatePullPointSubscription(): " + err.Error())
+				log.Log.Debug("onvif.main.CreatePullPointSubscription(): " + err.Error())
 			} else {
 				if err := decodedXML.DecodeElement(&createPullPointSubscriptionResponse, et); err != nil {
 					log.Log.Error("onvif.main.CreatePullPointSubscription(): " + err.Error())

@@ -324,7 +324,7 @@ loop:
 					// Try again
 					pullPointAddress, err = onvif.CreatePullPointSubscription(device)
 					if err != nil {
-						log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
+						log.Log.Debug("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 					}
 				}
 
