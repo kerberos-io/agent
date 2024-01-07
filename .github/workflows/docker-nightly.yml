@@ -7,6 +7,8 @@ on:
 
 jobs:
   build-amd64:
+      # If contains the keyword "[release]" in the commit message.
+      if: "contains(github.event.head_commit.message, '[release]')"
       runs-on: ubuntu-latest
       strategy:
         matrix:
@@ -30,6 +32,8 @@ jobs:
       - name: Create new and append to manifest
         run: cd agent && docker buildx imagetools create -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
   build-other:
+    # If contains the keyword "[release]" in the commit message.
+    if: "contains(github.event.head_commit.message, '[release]')"
     runs-on: ubuntu-latest
     strategy:
       matrix:
