@@ -26,9 +26,9 @@ jobs:
       - name: Available platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
       - name: Run Buildx
-        run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
+        run: cd agent && docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
       - name: Create new and append to manifest
-        run: docker buildx imagetools create -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+        run: cd agent && docker buildx imagetools create -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
   build-other:
     runs-on: ubuntu-latest
     strategy:
@@ -49,6 +49,6 @@ jobs:
     - name: Available platforms
       run: echo ${{ steps.buildx.outputs.platforms }}
     - name: Run Buildx
-      run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
+      run: cd agent && docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
     - name: Create new and append to manifest
-      run: docker buildx imagetools create --append -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+      run: cd agent && docker buildx imagetools create --append -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
