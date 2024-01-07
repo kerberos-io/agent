@@ -450,9 +450,9 @@ loop:
 					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, onvifEventsList, cameraConnected, hasBackChannel)
 
 				// Get the private key to encrypt the data using symmetric encryption: AES.
-				HubEncrypted := config.HubEncrypted
+				HubEncryption := config.HubEncryption
 				privateKey := config.HubPrivateKey
-				if HubEncrypted == "true" && privateKey != "" {
+				if HubEncryption == "true" && privateKey != "" {
 					// Encrypt the data using AES.
 					encrypted, err := encryption.AesEncrypt([]byte(object), privateKey)
 					if err != nil {
