@@ -7,6 +7,8 @@ on:
 jobs:
   build-amd64:
     runs-on: ubuntu-latest
+    # If contains the keyword "[release]" in the commit message.
+    if: "contains(github.event.head_commit.message, '[release]')"
     strategy:
       matrix:
         architecture: [amd64]
@@ -32,6 +34,8 @@ jobs:
       run: docker buildx imagetools create -t kerberos/agent-dev:latest kerberos/agent-dev:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
   build-other:
     runs-on: ubuntu-latest
+    # If contains the keyword "[release]" in the commit message.
+    if: "contains(github.event.head_commit.message, '[release]')"
     strategy:
       matrix:
         #architecture: [arm64, arm/v7, arm/v6]

@@ -2,6 +2,7 @@ name: Docker master build
 
 on:
   push:
+    # If pushed to master branch.
     branches: [ master ]
 
 env:
@@ -10,6 +11,8 @@ env:
 jobs:
   build-amd64:
     runs-on: ubuntu-latest
+    # If contains the keyword "[release]" in the commit message.
+    if: "contains(github.event.head_commit.message, '[release]')"
     permissions:
       contents: write
     strategy:
@@ -68,6 +71,8 @@ jobs:
       #  run: tar -xf agent-${{matrix.architecture}}.tar && snapcraft 
   build-other:
     runs-on: ubuntu-latest
+    # If contains the keyword "[release]" in the commit message.
+    if: "contains(github.event.head_commit.message, '[release]')"
     permissions:
       contents: write
     needs: build-amd64
