@@ -107,6 +107,7 @@
 	"turn_username": "username1",
 	"turn_password": "password1",
 	"heartbeaturi": "",
+	"hub_encrypted": "true",
 	"hub_uri": "https://api.cloud.kerberos.io",
 	"hub_key": "",
 	"hub_private_key": "",

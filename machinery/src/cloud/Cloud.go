@@ -450,8 +450,9 @@ loop:
 					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, onvifEventsList, cameraConnected, hasBackChannel)
 
 				// Get the private key to encrypt the data using symmetric encryption: AES.
+				HubEncrypted := config.HubEncrypted
 				privateKey := config.HubPrivateKey
-				if privateKey != "" {
+				if HubEncrypted == "true" && privateKey != "" {
 					// Encrypt the data using AES.
 					encrypted, err := encryption.AesEncrypt([]byte(object), privateKey)
 					if err != nil {
@@ -492,7 +493,9 @@ loop:
 			// If we have a Kerberos Vault connected, we will also send some analytics
 			// to that service.
 			vaultURI = config.KStorage.URI
-			if vaultURI != "" {
+			accessKey := config.KStorage.AccessKey
+			secretAccessKey := config.KStorage.SecretAccessKey
+			if vaultURI != "" && accessKey != "" && secretAccessKey != "" {
 
 				var object = fmt.Sprintf(`{
 					"key" : "%s",

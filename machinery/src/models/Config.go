@@ -37,6 +37,7 @@ type Config struct {
 	TURNUsername      string       `json:"turn_username" bson:"turn_username"`
 	TURNPassword      string       `json:"turn_password" bson:"turn_password"`
 	HeartbeatURI      string       `json:"heartbeaturi" bson:"heartbeaturi"` /*obsolete*/
+	HubEncrypted      string       `json:"hub_encrypted" bson:"hub_encrypted"`
 	HubURI            string       `json:"hub_uri" bson:"hub_uri"`
 	HubKey            string       `json:"hub_key" bson:"hub_key"`
 	HubPrivateKey     string       `json:"hub_private_key" bson:"hub_private_key"`

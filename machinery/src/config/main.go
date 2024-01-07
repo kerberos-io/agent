@@ -406,6 +406,9 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				break
 
 			/* When connected and storing in Kerberos Hub (SAAS) */
+			case "AGENT_HUB_ENCRYPTED":
+				configuration.Config.HubEncrypted = value
+				break
 			case "AGENT_HUB_URI":
 				configuration.Config.HubURI = value
 				break

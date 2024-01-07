@@ -437,11 +437,11 @@ func ControlAgent(communication *models.Communication) {
 					occurence = 0
 				}
 
-				log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from main stream: " + strconv.FormatInt(packetsR, 10))
+				log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from mainstream: " + strconv.FormatInt(packetsR, 10))
 
 				// After 15 seconds without activity this is thrown..
 				if occurence == 3 {
-					log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking main stream.")
+					log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking mainstream.")
 					communication.HandleBootstrap <- "restart"
 					time.Sleep(2 * time.Second)
 					occurence = 0
@@ -460,11 +460,11 @@ func ControlAgent(communication *models.Communication) {
 						occurenceSub = 0
 					}
 
-					log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from sub stream: " + strconv.FormatInt(packetsSubR, 10))
+					log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from substream: " + strconv.FormatInt(packetsSubR, 10))
 
 					// After 15 seconds without activity this is thrown..
 					if occurenceSub == 3 {
-						log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking sub stream.")
+						log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream.")
 						communication.HandleBootstrap <- "restart"
 						time.Sleep(2 * time.Second)
 						occurenceSub = 0
