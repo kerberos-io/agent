@@ -124,26 +124,38 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			// Something went wrong .. Do something
 			log.Log.Error("capture.golibrtsp.Connect(H264): " + err.Error())
 		} else {
-			// Get SPS from the SDP
+			// Get SPS and PPS from the SDP
 			// Calculate the width and height of the video
 			var sps h264.SPS
-			err = sps.Unmarshal(formaH264.SPS)
-			if err != nil {
+			errSPS := sps.Unmarshal(formaH264.SPS)
+			// It might be that the SPS is not available yet, so we'll proceed,
+			// but try to fetch it later on.
+			if errSPS != nil {
 				log.Log.Debug("capture.golibrtsp.Connect(H264): " + err.Error())
-				return
+				g.Streams = append(g.Streams, packets.Stream{
+					Name:          formaH264.Codec(),
+					IsVideo:       true,
+					IsAudio:       false,
+					SPS:           []byte{},
+					PPS:           []byte{},
+					Width:         0,
+					Height:        0,
+					FPS:           0,
+					IsBackChannel: false,
+				})
+			} else {
+				g.Streams = append(g.Streams, packets.Stream{
+					Name:          formaH264.Codec(),
+					IsVideo:       true,
+					IsAudio:       false,
+					SPS:           formaH264.SPS,
+					PPS:           formaH264.PPS,
+					Width:         sps.Width(),
+					Height:        sps.Height(),
+					FPS:           sps.FPS(),
+					IsBackChannel: false,
+				})
 			}
-
-			g.Streams = append(g.Streams, packets.Stream{
-				Name:          formaH264.Codec(),
-				IsVideo:       true,
-				IsAudio:       false,
-				SPS:           formaH264.SPS,
-				PPS:           formaH264.PPS,
-				Width:         sps.Width(),
-				Height:        sps.Height(),
-				FPS:           sps.FPS(),
-				IsBackChannel: false,
-			})
 
 			// Set the index for the video
 			g.VideoH264Index = int8(len(g.Streams)) - 1
@@ -151,14 +163,14 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			// setup RTP/H264 -> H264 decoder
 			rtpDec, err := formaH264.CreateDecoder()
 			if err != nil {
-				// Something went wrong .. Do something
+				log.Log.Error("capture.golibrtsp.Connect(H264): " + err.Error())
 			}
 			g.VideoH264Decoder = rtpDec
 
 			// setup H264 -> raw frames decoder
 			frameDec, err := newDecoder("H264")
 			if err != nil {
-				// Something went wrong .. Do something
+				log.Log.Error("capture.golibrtsp.Connect(H264): " + err.Error())
 			}
 			g.VideoH264FrameDecoder = frameDec
 		}
@@ -206,14 +218,14 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			// setup RTP/H265 -> H265 decoder
 			rtpDec, err := formaH265.CreateDecoder()
 			if err != nil {
-				// Something went wrong .. Do something
+				log.Log.Error("capture.golibrtsp.Connect(H265): " + err.Error())
 			}
 			g.VideoH265Decoder = rtpDec
 
 			// setup H265 -> raw frames decoder
 			frameDec, err := newDecoder("H265")
 			if err != nil {
-				// Something went wrong .. Do something
+				log.Log.Error("capture.golibrtsp.Connect(H265): " + err.Error())
 			}
 			g.VideoH265FrameDecoder = frameDec
 		}
@@ -468,6 +480,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				// Check if we have a keyframe.
 				nonIDRPresent := false
 				idrPresent := false
+
 				for _, nalu := range au {
 					typ := h264.NALUType(nalu[0] & 0x1F)
 					switch typ {
@@ -477,6 +490,24 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 						idrPresent = true
 					case h264.NALUTypeNonIDR:
 						nonIDRPresent = true
+					case h264.NALUTypeSPS:
+						// Read out sps
+						var sps h264.SPS
+						errSPS := sps.Unmarshal(nalu)
+						if errSPS == nil {
+							// Get width
+							g.Streams[g.VideoH264Index].Width = sps.Width()
+							configuration.Config.Capture.IPCamera.Width = sps.Width()
+							// Get height
+							g.Streams[g.VideoH264Index].Height = sps.Height()
+							configuration.Config.Capture.IPCamera.Height = sps.Height()
+							// Get FPS
+							g.Streams[g.VideoH264Index].FPS = sps.FPS()
+							g.VideoH264Forma.SPS = nalu
+						}
+					case h264.NALUTypePPS:
+						// Read out pps
+						g.VideoH264Forma.PPS = nalu
 					}
 					filteredAU = append(filteredAU, nalu)
 				}
@@ -506,6 +537,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 				pkt.Data = pkt.Data[4:]
 				if pkt.IsKeyFrame {
+
 					annexbNALUStartCode := func() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
 					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
 					pkt.Data = append(g.VideoH264Forma.PPS, pkt.Data...)
