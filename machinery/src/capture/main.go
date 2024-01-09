@@ -223,10 +223,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						//cws = newCacheWriterSeeker(4096)
 						myMuxer, _ = mp4.CreateMp4Muxer(file)
 						// We choose between H264 and H265
+						width := configuration.Config.Capture.IPCamera.Width
+						height := configuration.Config.Capture.IPCamera.Height
+						widthOption := mp4.WithVideoWidth(uint32(width))
+						heightOption := mp4.WithVideoHeight(uint32(height))
 						if pkt.Codec == "H264" {
-							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264)
+							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264, widthOption, heightOption)
 						} else if pkt.Codec == "H265" {
-							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265)
+							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265, widthOption, heightOption)
 						}
 						// For an MP4 container, AAC is the only audio codec supported.
 						audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
@@ -386,10 +390,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// Check which video codec we need to use.
 				videoSteams, _ := rtspClient.GetVideoStreams()
 				for _, stream := range videoSteams {
+					width := configuration.Config.Capture.IPCamera.Width
+					height := configuration.Config.Capture.IPCamera.Height
+					widthOption := mp4.WithVideoWidth(uint32(width))
+					heightOption := mp4.WithVideoHeight(uint32(height))
 					if stream.Name == "H264" {
-						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264)
+						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264, widthOption, heightOption)
 					} else if stream.Name == "H265" {
-						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265)
+						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265, widthOption, heightOption)
 					}
 				}
 				// For an MP4 container, AAC is the only audio codec supported.

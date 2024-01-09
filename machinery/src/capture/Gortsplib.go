@@ -131,7 +131,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			// It might be that the SPS is not available yet, so we'll proceed,
 			// but try to fetch it later on.
 			if errSPS != nil {
-				log.Log.Debug("capture.golibrtsp.Connect(H264): " + err.Error())
+				log.Log.Debug("capture.golibrtsp.Connect(H264): " + errSPS.Error())
 				g.Streams = append(g.Streams, packets.Stream{
 					Name:          formaH264.Codec(),
 					IsVideo:       true,
@@ -537,7 +537,6 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 				pkt.Data = pkt.Data[4:]
 				if pkt.IsKeyFrame {
-
 					annexbNALUStartCode := func() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
 					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
 					pkt.Data = append(g.VideoH264Forma.PPS, pkt.Data...)
