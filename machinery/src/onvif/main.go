@@ -1104,7 +1104,9 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 
 			for _, message := range pullMessagesResponse.NotificationMessage {
 				log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Topic.TopicKinds))
-				log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Message.Message.Data.SimpleItem[0].Name) + " " + string(message.Message.Message.Data.SimpleItem[0].Value))
+				if len(message.Message.Message.Data.SimpleItem) > 0 {
+					log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Message.Message.Data.SimpleItem[0].Name) + " " + string(message.Message.Message.Data.SimpleItem[0].Value))
+				}
 				if message.Topic.TopicKinds == "tns1:Device/Trigger/Relay" {
 					if len(message.Message.Message.Data.SimpleItem) > 0 {
 						if message.Message.Message.Data.SimpleItem[0].Name == "LogicalState" {
