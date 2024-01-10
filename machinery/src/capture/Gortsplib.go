@@ -497,10 +497,18 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 						if errSPS == nil {
 							// Get width
 							g.Streams[g.VideoH264Index].Width = sps.Width()
-							configuration.Config.Capture.IPCamera.Width = sps.Width()
+							if streamType == "main" {
+								configuration.Config.Capture.IPCamera.Width = sps.Width()
+							} else if streamType == "sub" {
+								configuration.Config.Capture.IPCamera.SubWidth = sps.Width()
+							}
 							// Get height
 							g.Streams[g.VideoH264Index].Height = sps.Height()
-							configuration.Config.Capture.IPCamera.Height = sps.Height()
+							if streamType == "main" {
+								configuration.Config.Capture.IPCamera.Height = sps.Height()
+							} else if streamType == "sub" {
+								configuration.Config.Capture.IPCamera.SubHeight = sps.Height()
+							}
 							// Get FPS
 							g.Streams[g.VideoH264Index].FPS = sps.FPS()
 							g.VideoH264Forma.SPS = nalu

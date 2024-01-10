@@ -206,42 +206,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		height := videoSubStream.Height
 
 		// Set config values as well
-		configuration.Config.Capture.IPCamera.Width = width
-		configuration.Config.Capture.IPCamera.Height = height
-	}
-
-	if cameraSettings.RTSP != rtspUrl ||
-		cameraSettings.SubRTSP != subRtspUrl ||
-		cameraSettings.Width != width ||
-		cameraSettings.Height != height {
-
-		// TODO: this condition is used to reset the decoder when the camera settings change.
-		// The main idea is that you only set the decoder once, and then reuse it on each restart (no new memory allocation).
-		// However the stream settings of the camera might have been changed, and so the decoder might need to be reloaded.
-		// .... Not used for the moment ....
-
-		if cameraSettings.RTSP != "" && cameraSettings.SubRTSP != "" && cameraSettings.Initialized {
-			//decoder.Close()
-			//if subStreamEnabled {
-			//	subDecoder.Close()
-			//}
-		}
-
-		// At some routines we will need to decode the image.
-		// Make sure its properly locked as we only have a single decoder.
-		log.Log.Info("components.Kerberos.RunAgent(): camera settings changed, reloading decoder")
-		//capture.GetVideoDecoder(decoder, streams)
-		//if subStreamEnabled {
-		//	capture.GetVideoDecoder(subDecoder, subStreams)
-		//}
-
-		cameraSettings.RTSP = rtspUrl
-		cameraSettings.SubRTSP = subRtspUrl
-		cameraSettings.Width = width
-		cameraSettings.Height = height
-		cameraSettings.Initialized = true
-	} else {
-		log.Log.Info("components.Kerberos.RunAgent(): camera settings did not change, keeping decoder")
+		configuration.Config.Capture.IPCamera.SubWidth = width
+		configuration.Config.Capture.IPCamera.SubHeight = height
 	}
 
 	// We are creating a queue to store the RTSP frames in, these frames will be

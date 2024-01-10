@@ -72,11 +72,14 @@ type Capture struct {
 // IPCamera configuration, such as the RTSP url of the IPCamera and the FPS.
 // Also includes ONVIF integration
 type IPCamera struct {
+	RTSP          string `json:"rtsp"`
 	Width         int    `json:"width"`
 	Height        int    `json:"height"`
 	FPS           string `json:"fps"`
-	RTSP          string `json:"rtsp"`
 	SubRTSP       string `json:"sub_rtsp"`
+	SubWidth      int    `json:"sub_width"`
+	SubHeight     int    `json:"sub_height"`
+	SubFPS        string `json:"sub_fps"`
 	ONVIF         string `json:"onvif,omitempty" bson:"onvif"`
 	ONVIFXAddr    string `json:"onvif_xaddr" bson:"onvif_xaddr"`
 	ONVIFUsername string `json:"onvif_username" bson:"onvif_username"`
