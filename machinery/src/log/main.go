@@ -76,7 +76,6 @@ func ConfigureLogrus(level string, output string, timezone *time.Location) {
 		logLevel = logrus.ErrorLevel
 	} else if level == "debug" {
 		logLevel = logrus.DebugLevel
-		logrus.SetReportCaller(true)
 	} else if level == "fatal" {
 		logLevel = logrus.FatalLevel
 	} else if level == "warning" {
