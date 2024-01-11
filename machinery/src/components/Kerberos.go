@@ -425,7 +425,6 @@ func ControlAgent(communication *models.Communication) {
 					case <-time.After(1 * time.Second):
 						log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream timed out")
 					}
-					time.Sleep(2 * time.Second)
 					occurence = 0
 				}
 
@@ -452,7 +451,6 @@ func ControlAgent(communication *models.Communication) {
 						case <-time.After(1 * time.Second):
 							log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream timed out")
 						}
-						time.Sleep(2 * time.Second)
 						occurenceSub = 0
 					}
 				}
@@ -589,7 +587,12 @@ func GetDays(c *gin.Context, configDirectory string, configuration *models.Confi
 // @Success 200 {object} models.APIResponse
 func StopAgent(c *gin.Context, communication *models.Communication) {
 	log.Log.Info("components.Kerberos.StopAgent(): sending signal to stop agent, this will os.Exit(0).")
-	communication.HandleBootstrap <- "stop"
+	select {
+	case communication.HandleBootstrap <- "stop":
+		log.Log.Info("components.Kerberos.StopAgent(): Stopping machinery.")
+	case <-time.After(1 * time.Second):
+		log.Log.Info("components.Kerberos.StopAgent(): Stopping machinery timed out")
+	}
 	c.JSON(200, gin.H{
 		"stopped": true,
 	})
@@ -604,7 +607,12 @@ func StopAgent(c *gin.Context, communication *models.Communication) {
 // @Success 200 {object} models.APIResponse
 func RestartAgent(c *gin.Context, communication *models.Communication) {
 	log.Log.Info("components.Kerberos.RestartAgent(): sending signal to restart agent.")
-	communication.HandleBootstrap <- "restart"
+	select {
+	case communication.HandleBootstrap <- "restart":
+		log.Log.Info("components.Kerberos.RestartAgent(): Restarting machinery.")
+	case <-time.After(1 * time.Second):
+		log.Log.Info("components.Kerberos.RestartAgent(): Restarting machinery timed out")
+	}
 	c.JSON(200, gin.H{
 		"restarted": true,
 	})
