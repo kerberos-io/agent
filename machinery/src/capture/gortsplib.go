@@ -25,6 +25,7 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtplpcm"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpmpeg4audio"
+	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpsimpleaudio"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
 	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4audio"
@@ -62,7 +63,7 @@ type Golibrtsp struct {
 	AudioG711Index   int8
 	AudioG711Media   *description.Media
 	AudioG711Forma   *format.G711
-	AudioG711Decoder *rtplpcm.Decoder
+	AudioG711Decoder *rtpsimpleaudio.Decoder
 
 	HasBackChannel            bool
 	AudioG711IndexBackChannel int8
