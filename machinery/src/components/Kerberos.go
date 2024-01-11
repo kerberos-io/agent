@@ -314,9 +314,20 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	// Here we are cleaning up everything!
 	if configuration.Config.Offline != "true" {
-		communication.HandleUpload <- "stop"
+		select {
+		case communication.HandleUpload <- "stop":
+			log.Log.Info("components.Kerberos.RunAgent(): stopping upload")
+		case <-time.After(1 * time.Second):
+			log.Log.Info("components.Kerberos.RunAgent(): stopping upload timed out")
+		}
 	}
-	communication.HandleStream <- "stop"
+
+	select {
+	case communication.HandleStream <- "stop":
+		log.Log.Info("components.Kerberos.RunAgent(): stopping stream")
+	case <-time.After(1 * time.Second):
+		log.Log.Info("components.Kerberos.RunAgent(): stopping stream timed out")
+	}
 	// We use the steam channel to stop both main and sub stream.
 	//if subStreamEnabled {
 	//	communication.HandleSubStream <- "stop"
@@ -408,7 +419,12 @@ func ControlAgent(communication *models.Communication) {
 				// After 15 seconds without activity this is thrown..
 				if occurence == 3 {
 					log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking mainstream.")
-					communication.HandleBootstrap <- "restart"
+					select {
+					case communication.HandleBootstrap <- "restart":
+						log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream.")
+					case <-time.After(1 * time.Second):
+						log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream timed out")
+					}
 					time.Sleep(2 * time.Second)
 					occurence = 0
 				}
@@ -430,8 +446,12 @@ func ControlAgent(communication *models.Communication) {
 
 					// After 15 seconds without activity this is thrown..
 					if occurenceSub == 3 {
-						log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream.")
-						communication.HandleBootstrap <- "restart"
+						select {
+						case communication.HandleBootstrap <- "restart":
+							log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream.")
+						case <-time.After(1 * time.Second):
+							log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream timed out")
+						}
 						time.Sleep(2 * time.Second)
 						occurenceSub = 0
 					}
