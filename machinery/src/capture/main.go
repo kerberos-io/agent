@@ -619,7 +619,9 @@ func Base64Image(captureDevice *Capture, communication *models.Communication) st
 
 	// We'll try to have a keyframe, if not we'll return an empty string.
 	var encodedImage string
-	for {
+	// Try for 3 times in a row.
+	count := 0
+	for count < 3 {
 		if queue != nil && cursor != nil && rtspClient != nil {
 			pkt, err := cursor.ReadPacket()
 			if err == nil {
@@ -632,8 +634,10 @@ func Base64Image(captureDevice *Capture, communication *models.Communication) st
 					bytes, _ := utils.ImageToBytes(&img)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 					break
+				} else {
+					count++
+					continue
 				}
-				break
 			}
 		} else {
 			break
@@ -660,6 +664,8 @@ func JpegImage(captureDevice *Capture, communication *models.Communication) imag
 
 	// We'll try to have a keyframe, if not we'll return an empty string.
 	var image image.YCbCr
+	// Try for 3 times in a row.
+	count := 0
 	for {
 		if queue != nil && cursor != nil && rtspClient != nil {
 			pkt, err := cursor.ReadPacket()
@@ -667,8 +673,13 @@ func JpegImage(captureDevice *Capture, communication *models.Communication) imag
 				if !pkt.IsKeyFrame {
 					continue
 				}
-				image, _ = (*rtspClient).DecodePacket(pkt)
-				break
+				image, err = (*rtspClient).DecodePacket(pkt)
+				if err != nil {
+					count++
+					continue
+				} else {
+					break
+				}
 			}
 		} else {
 			break

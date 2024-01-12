@@ -161,6 +161,8 @@ logreader:
 				if err == nil {
 					bytes, _ := utils.ImageToBytes(&img)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
+				} else {
+					continue
 				}
 			} else {
 				log.Log.Error("routers.websocket.main.ForwardSDStream():" + err.Error())

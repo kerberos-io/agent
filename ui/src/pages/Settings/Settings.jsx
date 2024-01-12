@@ -1129,7 +1129,8 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
-                    noPadding
+                    type="password"
+                    iconright="activity"
                     label={t('settings.persistence.kerberoshub_publickey')}
                     placeholder={t(
                       'settings.persistence.kerberoshub_description_publickey'
@@ -1140,7 +1141,8 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
-                    noPadding
+                    type="password"
+                    iconright="activity"
                     label={t('settings.persistence.kerberoshub_privatekey')}
                     placeholder={t(
                       'settings.persistence.kerberoshub_description_privatekey'
@@ -1336,7 +1338,8 @@ class Settings extends React.Component {
                   </div>
 
                   <Input
-                    noPadding
+                    type="password"
+                    iconright="activity"
                     label={t('settings.overview.encryption_fingerprint')}
                     value={config.encryption.fingerprint}
                     onChange={(value) =>
@@ -1349,7 +1352,8 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
-                    noPadding
+                    type="password"
+                    iconright="activity"
                     label={t('settings.overview.encryption_privatekey')}
                     value={config.encryption.private_key}
                     onChange={(value) =>
@@ -1362,7 +1366,8 @@ class Settings extends React.Component {
                     }
                   />
                   <Input
-                    noPadding
+                    type="password"
+                    iconright="activity"
                     label={t('settings.overview.encryption_symmetrickey')}
                     value={config.encryption.symmetric_key}
                     onChange={(value) =>
@@ -2296,7 +2301,8 @@ class Settings extends React.Component {
                         }
                       />
                       <Input
-                        noPadding
+                        type="password"
+                        iconright="activity"
                         label={t(
                           'settings.persistence.kerberosvault_accesskey'
                         )}
@@ -2316,7 +2322,8 @@ class Settings extends React.Component {
                         }
                       />
                       <Input
-                        noPadding
+                        type="password"
+                        iconright="activity"
                         label={t(
                           'settings.persistence.kerberosvault_secretkey'
                         )}
