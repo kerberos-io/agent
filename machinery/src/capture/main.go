@@ -666,7 +666,7 @@ func JpegImage(captureDevice *Capture, communication *models.Communication) imag
 	var image image.YCbCr
 	// Try for 3 times in a row.
 	count := 0
-	for {
+	for count < 3 {
 		if queue != nil && cursor != nil && rtspClient != nil {
 			pkt, err := cursor.ReadPacket()
 			if err == nil {
