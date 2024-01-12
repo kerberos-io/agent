@@ -109,7 +109,7 @@ This repository contains everything you'll need to know about our core product, 
 
 - Low memory and CPU usage.
 - Simplified and modern user interface.
-- Multi architecture (ARMv7, ARMv8, amd64, etc).).
+- Multi architecture (ARMv6, ARMv7, ARM64, AMD64)
 - Multi stream, for example recording in H265, live streaming and motion detection in H264.
 - Multi camera support: IP Cameras (H264 and H265), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp).
 - Single camera per instance (e.g. one container per camera).
