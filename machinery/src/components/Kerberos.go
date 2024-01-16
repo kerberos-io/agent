@@ -188,7 +188,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 			time.Sleep(time.Second * 3)
 			return status
 		}
-		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP sub stream: " + rtspUrl)
+		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP sub stream: " + subRtspUrl)
 
 		// Get the video streams from the RTSP server.
 		videoSubStreams, err = rtspSubClient.GetVideoStreams()
