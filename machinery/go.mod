@@ -9,7 +9,7 @@ go 1.20
 require (
 	github.com/InVisionApp/conjungo v1.1.0
 	github.com/appleboy/gin-jwt/v2 v2.9.1
-	github.com/bluenviron/gortsplib/v4 v4.6.3
+	github.com/bluenviron/gortsplib/v4 v4.7.1
 	github.com/bluenviron/mediacommon v1.7.1
 	github.com/cedricve/go-onvif v0.0.0-20200222191200-567e8ce298f6
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5

@@ -64,8 +64,8 @@ github.com/appleboy/gofight/v2 v2.1.2 h1:VOy3jow4vIK8BRQJoC/I9muxyYlJ2yb9ht2hZoS
 github.com/appleboy/gofight/v2 v2.1.2/go.mod h1:frW+U1QZEdDgixycTj4CygQ48yLTUhplt43+Wczp3rw=
 github.com/beevik/etree v1.3.0 h1:hQTc+pylzIKDb23yYprodCWWTt+ojFfUZyzU09a/hmU=
 github.com/beevik/etree v1.3.0/go.mod h1:aiPf89g/1k3AShMVAzriilpcE4R/Vuor90y83zVZWFc=
-github.com/bluenviron/gortsplib/v4 v4.6.3 h1:/FgUhxe/DGFkmwHNGNnw7NhcuZeSwnxCzYHDbyAtMjo=
-github.com/bluenviron/gortsplib/v4 v4.6.3/go.mod h1:UqdkRR5YvKHP/wHEQQySJFKJm6tIZcftdP7cNszIZ1g=
+github.com/bluenviron/gortsplib/v4 v4.7.1 h1:ZiPHjnIsdPDfPGZgfBr2n2xCFZlvmc/5zEqdoJUa1vU=
+github.com/bluenviron/gortsplib/v4 v4.7.1/go.mod h1:3+IYh85PgIPLHr4D5z7GnRvpu/ogSHMDhsYW/CjrD8E=
 github.com/bluenviron/mediacommon v1.7.1 h1:7Lm2b8M9gUk3Ben1w+OPwadAeYseIBscwgdiL+aLtfw=
 github.com/bluenviron/mediacommon v1.7.1/go.mod h1:Ij/kE1LEucSjryNBVTyPL/gBI0d6/Css3f5PyrM957w=
 github.com/bytedance/sonic v1.5.0/go.mod h1:ED5hyg4y6t3/9Ku1R6dU/4KyJ48DZ4jPhfY1O2AihPM=
