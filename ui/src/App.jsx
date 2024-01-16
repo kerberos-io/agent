@@ -100,7 +100,7 @@ class App extends React.Component {
           </div>
         )}
         <div id="page-root">
-          <Sidebar logo={logo} title="Kerberos Agent" version="v3.1.5" mobile>
+          <Sidebar logo={logo} title="Kerberos Agent" version="v3.1.6" mobile>
             <Profilebar
               username={username}
               email="support@kerberos.io"
