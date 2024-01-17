@@ -386,6 +386,9 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 			case "AGENT_STUN_URI":
 				configuration.Config.STUNURI = value
 				break
+			case "AGENT_FORCE_TURN":
+				configuration.Config.ForceTurn = value
+				break
 			case "AGENT_TURN_URI":
 				configuration.Config.TURNURI = value
 				break

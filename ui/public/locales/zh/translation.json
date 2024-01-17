@@ -145,6 +145,8 @@
       "turn_server": "TURN 服务",
       "turn_username": "账户",
       "turn_password": "密码",
+      "force_turn": "Force TURN",
+      "force_turn_description": "Force TURN usage, even when STUN is available.",
       "stun_turn_forward": "转发和转码",
       "stun_turn_description_forward": "TURN/STUN 通信的优化和增强。",
       "stun_turn_webrtc": "转发到 WebRTC 代理",

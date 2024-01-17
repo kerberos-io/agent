@@ -1088,6 +1088,20 @@ class Settings extends React.Component {
                       this.onUpdateField('', 'turn_password', value, config)
                     }
                   />
+                  <br />
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={config.turn_force === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle('', 'turn_force', event, config)
+                      }
+                    />
+                    <div>
+                      <span>{t('settings.streaming.force_turn')}</span>
+                      <p>{t('settings.streaming.force_turn_description')}</p>
+                    </div>
+                  </div>
                 </BlockBody>
                 <BlockFooter>
                   <Button

@@ -145,6 +145,8 @@
       "turn_server": "TURN server",
       "turn_username": "उपयोगकर्ता नाम",
       "turn_password": "पासवर्ड",
+      "force_turn": "Force TURN",
+      "force_turn_description": "Force TURN usage, even when STUN is available.",
       "stun_turn_forward": "फोरवर्डींग और ट्रांसकोडिंग",
       "stun_turn_description_forward": "TURN/STUN संचार के लिए अनुकूलन और संवर्द्धन।",
       "stun_turn_webrtc": "WebRTC ब्रोकर को फोरवर्डींग किया जा रहा है",

@@ -145,6 +145,8 @@
       "turn_server": "TURN server",
       "turn_username": "Username",
       "turn_password": "Password",
+      "force_turn": "Forza TURN",
+      "force_turn_description": "Forza l'uso di TURN per lo streaming in diretta.",
       "stun_turn_forward": "Inoltro e transcodifica",
       "stun_turn_description_forward": "Ottimizzazioni e miglioramenti per la comunicazione TURN/STUN.",
       "stun_turn_webrtc": "Inoltro al broker WebRTC",

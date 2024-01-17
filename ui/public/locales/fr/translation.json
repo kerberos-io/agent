@@ -144,6 +144,8 @@
       "turn_server": "Serveur TURN",
       "turn_username": "Nom d'utilisateur",
       "turn_password": "Mot de passe",
+      "force_turn": "Forcer l'utilisation de TURN",
+      "force_turn_description": "Forcer l'utilisation de TURN au lieu de STUN",
       "stun_turn_forward": "Redirection et transcodage",
       "stun_turn_description_forward": "Optimisations et améliorations pour la communication TURN/STUN.",
       "stun_turn_webrtc": "Redirection pour l'agent WebRTC",

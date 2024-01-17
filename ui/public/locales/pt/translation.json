@@ -145,6 +145,8 @@
       "turn_server": "Servidor TURN",
       "turn_username": "Usuario",
       "turn_password": "Senha",
+      "force_turn": "Forçar TURN",
+      "force_turn_description": "Forçar o uso de TURN em vez de STUN.",
       "stun_turn_forward": "Encaminhamento e transcodificação",
       "stun_turn_description_forward": "Otimizações e melhorias para a comunicação TURN/STUN.",
       "stun_turn_webrtc": "Encaminhamento para broker WebRTC",

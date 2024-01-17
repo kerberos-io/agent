@@ -135,6 +135,11 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 		api := pionWebRTC.NewAPI(pionWebRTC.WithMediaEngine(mediaEngine))
 
+		policy := pionWebRTC.ICETransportPolicyAll
+		if config.ForceTurn == "true" {
+			policy = pionWebRTC.ICETransportPolicyRelay
+		}
+
 		peerConnection, err := api.NewPeerConnection(
 			pionWebRTC.Configuration{
 				ICEServers: []pionWebRTC.ICEServer{
@@ -147,7 +152,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 						Credential: w.TurnServersCredential,
 					},
 				},
-				//ICETransportPolicy: pionWebRTC.ICETransportPolicyRelay, // This will force a relay server, we might make this configurable.
+				ICETransportPolicy: policy,
 			},
 		)
 

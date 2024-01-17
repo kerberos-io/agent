@@ -145,6 +145,8 @@
       "turn_server": "TURNサーバー",
       "turn_username": "ユーザー名",
       "turn_password": "パスワード",
+      "force_turn": "Force TURN",
+      "force_turn_description": "Force TURN usage, even when STUN is available.",
       "stun_turn_forward": "転送とトランスコーディング",
       "stun_turn_description_forward": "TURN/STUN 通信の最適化と機能強化。",
       "stun_turn_webrtc": "WebRTC ブローカーへの転送",

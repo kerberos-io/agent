@@ -222,6 +222,7 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_MQTT_USERNAME`                   | Username of the MQTT broker.                                                                    | ""                             |
 | `AGENT_MQTT_PASSWORD`                   | Password of the MQTT broker.                                                                    | ""                             |
 | `AGENT_STUN_URI`                        | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn.kerberos.io:8443"   |
+| `AGENT_FORCE_TURN`                      | Force using a TURN server, by generating relay candidates only.                                 | "false"   |
 | `AGENT_TURN_URI`                        | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn.kerberos.io:8443"   |
 | `AGENT_TURN_USERNAME`                   | TURN username used for WebRTC.                                                                  | "username1"                    |
 | `AGENT_TURN_PASSWORD`                   | TURN password used for WebRTC.                                                                  | "password1"                    |

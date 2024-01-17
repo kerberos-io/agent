@@ -103,6 +103,7 @@
 	"mqtt_username": "",
 	"mqtt_password": "",
 	"stunuri": "stun:turn.kerberos.io:8443",
+	"turn_force": "false",
 	"turnuri": "turn:turn.kerberos.io:8443",
 	"turn_username": "username1",
 	"turn_password": "password1",

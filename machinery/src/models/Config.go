@@ -33,6 +33,7 @@ type Config struct {
 	MQTTUsername      string       `json:"mqtt_username" bson:"mqtt_username"`
 	MQTTPassword      string       `json:"mqtt_password" bson:"mqtt_password"`
 	STUNURI           string       `json:"stunuri" bson:"stunuri"`
+	ForceTurn         string       `json:"turn_force" bson:"turn_force"`
 	TURNURI           string       `json:"turnuri" bson:"turnuri"`
 	TURNUsername      string       `json:"turn_username" bson:"turn_username"`
 	TURNPassword      string       `json:"turn_password" bson:"turn_password"`

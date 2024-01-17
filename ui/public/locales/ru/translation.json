@@ -145,6 +145,8 @@
       "turn_server": "TURN сервер",
       "turn_username": "Имя пользователя",
       "turn_password": "Пароль",
+      "force_turn": "Force TURN",
+      "force_turn_description": "Force TURN usage, even when STUN is available.",
       "stun_turn_forward": "Переадресация и транскодирование",
       "stun_turn_description_forward": "Оптимизация и усовершенствование связи TURN/STUN.",
       "stun_turn_webrtc": "Переадресация на WebRTC-брокера",

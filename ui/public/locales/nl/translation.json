@@ -146,6 +146,8 @@
       "turn_server": "TURN server",
       "turn_username": "Gebruikersnaam",
       "turn_password": "Wachtwoord",
+      "force_turn": "Verplicht TURN",
+      "force_turn_description": "Verplicht TURN connectie, ook al is er een STUN connectie mogelijk.",
       "stun_turn_forward": "Doorsturen en transcoden",
       "stun_turn_description_forward": "Optimalisatie en verbetering voor TURN/STUN communicatie.",
       "stun_turn_webrtc": "Doorsturen naar een WebRTC broker",

@@ -145,6 +145,8 @@
       "turn_server": "TURN Server",
       "turn_username": "Benutzername",
       "turn_password": "Passwort",
+      "force_turn": "Erzwinge TURN",
+      "force_turn_description": "Erzwinge die Verwendung von TURN",
       "stun_turn_forward": "Weiterleiten und transkodieren",
       "stun_turn_description_forward": "Optiemierungen und Verbesserungen der TURN/STUN Kommunikation.",
       "stun_turn_webrtc": "Weiterleiten an WebRTC Schnittstelle",
