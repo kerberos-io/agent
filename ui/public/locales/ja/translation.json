@@ -187,6 +187,8 @@
       "description_persistence": "録音を保存する機能を持つことは、すべての始まりです。",
       "description2_persistence": "、またはサードパーティのプロバイダ",
       "select_persistence": "永続性を選択",
+      "kerberoshub_encryption": "Encryption",
+      "kerberoshub_encryption_description": "All traffic from/to Kerberos Hub will encrypted using AES-256.",
       "kerberoshub_proxyurl": "Kerberos ハブ プロキシ URL",
       "kerberoshub_description_proxyurl": "記録をアップロードするためのプロキシ エンドポイント。",
       "kerberoshub_apiurl": "ケルベロス ハブ API URL",

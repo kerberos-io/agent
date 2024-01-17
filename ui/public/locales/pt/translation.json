@@ -187,6 +187,8 @@
       "description_persistence": "Ter a capacidade de armazenar suas gravações é o começo de tudo. Você pode escolher entre nossos",
       "description2_persistence": ", ou um provedor terceirizado",
       "select_persistence": "Selecione um provedor de armazenamento",
+      "kerberoshub_encryption": "Encryption",
+      "kerberoshub_encryption_description": "All traffic from/to Kerberos Hub will encrypted using AES-256.",
       "kerberoshub_proxyurl": "Url proxy para Kerberos Hub",
       "kerberoshub_description_proxyurl": "O endpoint Proxy para enviar suas gravações.",
       "kerberoshub_apiurl": "Url de API do Kerberos Hub",

@@ -187,6 +187,8 @@
       "description_persistence": "Возможность хранения записей - это начало всего. Вы можете выбрать один из наших вариантов",
       "description2_persistence": ", или стороннего провайдера",
       "select_persistence": "Выберите хранилище",
+      "kerberoshub_encryption": "Encryption",
+      "kerberoshub_encryption_description": "All traffic from/to Kerberos Hub will encrypted using AES-256.",
       "kerberoshub_proxyurl": "Kerberos Hub Proxy URL",
       "kerberoshub_description_proxyurl": "Конечная точка Proxy для загрузки записей.",
       "kerberoshub_apiurl": "Kerberos Hub API URL",

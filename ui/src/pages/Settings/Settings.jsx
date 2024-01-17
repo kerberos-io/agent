@@ -1177,6 +1177,27 @@ class Settings extends React.Component {
                       this.onUpdateField('', 'hub_site', value, config)
                     }
                   />
+
+                  <br />
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={config.hub_encryption === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle('', 'hub_encryption', event, config)
+                      }
+                    />
+                    <div>
+                      <span>
+                        {t('settings.persistence.kerberoshub_encryption')}
+                      </span>
+                      <p>
+                        {t(
+                          'settings.persistence.kerberoshub_encryption_description'
+                        )}
+                      </p>
+                    </div>
+                  </div>
                 </BlockBody>
                 <BlockFooter>
                   <Button

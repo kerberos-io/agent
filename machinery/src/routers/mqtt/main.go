@@ -166,9 +166,33 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 
 			// We will receive all messages from our hub, so we'll need to filter to the relevant device.
 			if message.Mid != "" && message.Timestamp != 0 && message.DeviceId == configuration.Config.Key {
-				// Messages might be encrypted, if so we'll
-				// need to decrypt them.
 				var payload models.Payload
+
+				// Messages might be hidden, if so we'll need to decrypt them using the Kerberos Hub private key.
+				if message.Hidden && configuration.Config.HubEncryption == "true" {
+					hiddenValue := message.Payload.HiddenValue
+					if len(hiddenValue) > 0 {
+						privateKey := configuration.Config.HubPrivateKey
+						if privateKey != "" {
+							data, err := base64.StdEncoding.DecodeString(hiddenValue)
+							if err != nil {
+								return
+							}
+							visibleValue, err := encryption.AesDecrypt(data, privateKey)
+							if err != nil {
+								log.Log.Error("routers.mqtt.main.MQTTListenerHandler(): error decrypting message: " + err.Error())
+								return
+							}
+							json.Unmarshal(visibleValue, &payload)
+							message.Payload = payload
+						} else {
+							log.Log.Error("routers.mqtt.main.MQTTListenerHandler(): error decrypting message, no private key provided.")
+						}
+					}
+				}
+
+				// Messages might be end-to-end encrypted, if so we'll need to decrypt them,
+				// using our own keys.
 				if message.Encrypted && configuration.Config.Encryption != nil && configuration.Config.Encryption.Enabled == "true" {
 					encryptedValue := message.Payload.EncryptedValue
 					if len(encryptedValue) > 0 {

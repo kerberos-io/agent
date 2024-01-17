@@ -27,31 +27,13 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 	msg.DeviceId = msg.Payload.DeviceId
 	msg.Timestamp = time.Now().Unix()
 
-	// We'll hide the message (by default in latest version)
-	// We will encrypt using the Kerberos Hub private key if set.
-	/*msg.Hidden = false
-	if configuration.Config.HubPrivateKey != "" {
-		msg.Hidden = true
-		pload := msg.Payload
-		// Pload to base64
-		data, err := json.Marshal(pload)
-		if err != nil {
-			msg.Hidden = false
-		} else {
-			k := configuration.Config.Encryption.SymmetricKey
-			encryptedValue, err := encryption.AesEncrypt(data, k)
-			if err == nil {
-				data := base64.StdEncoding.EncodeToString(encryptedValue)
-				msg.Payload.HiddenValue = data
-				msg.Payload.Value = make(map[string]interface{})
-			}
-		}
-	}*/
+	// Configuration
+	config := configuration.Config
 
 	// Next to hiding the message, we can also encrypt it using your own private key.
 	// Which is not stored in a remote environment (hence you are the only one owning it).
 	msg.Encrypted = false
-	if configuration.Config.Encryption != nil && configuration.Config.Encryption.Enabled == "true" {
+	if config.Encryption != nil && config.Encryption.Enabled == "true" {
 		msg.Encrypted = true
 	}
 	msg.PublicKey = ""
@@ -85,19 +67,47 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 			rsaKey, _ := key.(*rsa.PrivateKey)
 
 			// Create a 16bit key random
-			k := configuration.Config.Encryption.SymmetricKey
+			if config.Encryption != nil && config.Encryption.SymmetricKey != "" {
+				k := config.Encryption.SymmetricKey
+				encryptedValue, err := encryption.AesEncrypt(data, k)
+				if err == nil {
+
+					data := base64.StdEncoding.EncodeToString(encryptedValue)
+					// Sign the encrypted value
+					signature, err := encryption.SignWithPrivateKey([]byte(data), rsaKey)
+					if err == nil {
+						base64Signature := base64.StdEncoding.EncodeToString(signature)
+						msg.Payload.EncryptedValue = data
+						msg.Payload.Signature = base64Signature
+						msg.Payload.Value = make(map[string]interface{})
+					}
+				}
+			}
+		}
+	}
+
+	// We'll hide the message (by default in latest version)
+	// We will encrypt using the Kerberos Hub private key if set.
+	msg.Hidden = false
+	if config.HubEncryption == "true" && config.HubPrivateKey != "" {
+		msg.Hidden = true
+	}
+
+	if msg.Hidden {
+		pload := msg.Payload
+		// Pload to base64
+		data, err := json.Marshal(pload)
+		if err != nil {
+			msg.Hidden = false
+		} else {
+			k := config.HubPrivateKey
 			encryptedValue, err := encryption.AesEncrypt(data, k)
 			if err == nil {
-
 				data := base64.StdEncoding.EncodeToString(encryptedValue)
-				// Sign the encrypted value
-				signature, err := encryption.SignWithPrivateKey([]byte(data), rsaKey)
-				if err == nil {
-					base64Signature := base64.StdEncoding.EncodeToString(signature)
-					msg.Payload.EncryptedValue = data
-					msg.Payload.Signature = base64Signature
-					msg.Payload.Value = make(map[string]interface{})
-				}
+				msg.Payload.HiddenValue = data
+				msg.Payload.EncryptedValue = ""
+				msg.Payload.Signature = ""
+				msg.Payload.Value = make(map[string]interface{})
 			}
 		}
 	}

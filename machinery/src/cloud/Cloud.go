@@ -395,6 +395,16 @@ loop:
 				hasBackChannel = "true"
 			}
 
+			hub_encryption := "false"
+			if config.HubEncryption == "true" {
+				hub_encryption = "true"
+			}
+
+			e2e_encryption := "false"
+			if config.Encryption != nil && config.Encryption.Enabled == "true" {
+				e2e_encryption = "true"
+			}
+
 			// We will formated the uptime to a human readable format
 			// this will be used on Kerberos Hub: Uptime -> 1 day and 2 hours.
 			uptimeFormatted := uptimeStart.Format("2006-01-02 15:04:05")
@@ -411,6 +421,8 @@ loop:
 
 				var object = fmt.Sprintf(`{
 						"key" : "%s",
+						"hub_encryption": "%s",
+						"e2e_encryption": "%s",
 						"version" : "3.0.0",
 						"release" : "%s",
 						"cpuid" : "%s",
@@ -447,12 +459,11 @@ loop:
 						"docker" : true,
 						"kios" : false,
 						"raspberrypi" : false
-					}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, onvifEventsList, cameraConnected, hasBackChannel)
+					}`, config.Key, hub_encryption, e2e_encryption, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, onvifEventsList, cameraConnected, hasBackChannel)
 
 				// Get the private key to encrypt the data using symmetric encryption: AES.
-				HubEncryption := config.HubEncryption
 				privateKey := config.HubPrivateKey
-				if HubEncryption == "true" && privateKey != "" {
+				if hub_encryption == "true" && privateKey != "" {
 					// Encrypt the data using AES.
 					encrypted, err := encryption.AesEncrypt([]byte(object), privateKey)
 					if err != nil {

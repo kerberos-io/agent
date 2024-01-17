@@ -186,6 +186,8 @@
       "description_persistence": "Avoir la possibilité de stocker vos enregistrements est le commencement de tout. Vous pouvez choisir entre notre",
       "description2_persistence": " ou auprès d'un fournisseur tiers",
       "select_persistence": "Sélectionner une persistance",
+      "kerberoshub_encryption": "Encryption",
+      "kerberoshub_encryption_description": "All traffic from/to Kerberos Hub will encrypted using AES-256.",
       "kerberoshub_proxyurl": "URL du proxy Kerberos Hub",
       "kerberoshub_description_proxyurl": "Le point de terminaison du proxy pour téléverser vos enregistrements.",
       "kerberoshub_apiurl": "URL de l'API Kerberos Hub",

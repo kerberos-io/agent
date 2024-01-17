@@ -188,6 +188,8 @@
       "description_persistence": "De mogelijkheid om jouw opnames op te slaan is het begin van alles. Je kan kiezen tussen ons",
       "description2_persistence": ", of een 3rd party provider",
       "select_persistence": "Selecteer een opslagmethode",
+      "kerberoshub_encryption": "Encryption",
+      "kerberoshub_encryption_description": "All traffic from/to Kerberos Hub will encrypted using AES-256.",
       "kerberoshub_proxyurl": "Kerberos Hub Proxy URL",
       "kerberoshub_description_proxyurl": "De Proxy url voor het opladen van jouw opnames.",
       "kerberoshub_apiurl": "Kerberos Hub API URL",

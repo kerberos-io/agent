@@ -187,6 +187,8 @@
       "description_persistence": "能够存储您的录像是一切的开始。您可以在我们的",
       "description2_persistence": ", 或第三方提供商之间进行选择。",
       "select_persistence": "选择持久化存储",
+      "kerberoshub_encryption": "Encryption",
+      "kerberoshub_encryption_description": "All traffic from/to Kerberos Hub will encrypted using AES-256.",
       "kerberoshub_proxyurl": "Kerberos Hub 代理 URL",
       "kerberoshub_description_proxyurl": "用于上传您录像的代理端点",
       "kerberoshub_apiurl": "Kerberos Hub API URL",

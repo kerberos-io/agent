@@ -187,6 +187,8 @@
       "description_persistence": "Die möglichkeit zur Speicherung der Daten an einem Zentralen Ort ist der Beginn einer effektiven Videoüberwachung. Es kann zwischen",
       "description2_persistence": ", oder einem Drittanbieter gewählt werden.",
       "select_persistence": "Speicherort auswählen",
+      "kerberoshub_encryption": "Encryption",
+      "kerberoshub_encryption_description": "All traffic from/to Kerberos Hub will encrypted using AES-256.",
       "kerberoshub_proxyurl": "Kerberos Hub Proxy URL",
       "kerberoshub_description_proxyurl": "Der Proxy Endpunkt zum hochladen der Aufnahmen.",
       "kerberoshub_apiurl": "Kerberos Hub API URL",

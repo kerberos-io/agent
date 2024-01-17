@@ -187,6 +187,8 @@
       "description_persistence": "La possibilità di poter salvare le tue registrazioni rappresenta l'inizio di tutto. Puoi scegliere tra il nostro",
       "description2_persistence": ", oppure un provider di terze parti",
       "select_persistence": "Seleziona una persistenza",
+      "kerberoshub_encryption": "Encryption",
+      "kerberoshub_encryption_description": "All traffic from/to Kerberos Hub will encrypted using AES-256.",
       "kerberoshub_proxyurl": "URL Proxy Kerberos Hub",
       "kerberoshub_description_proxyurl": "Endpoint del Proxy per l'upload delle registrazioni.",
       "kerberoshub_apiurl": "API URL Kerberos Hub",
