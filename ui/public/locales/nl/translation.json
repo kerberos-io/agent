@@ -80,6 +80,7 @@
       "description_general": "Algemene instellingen voor jouw Kerberos Agent",
       "key": "Key",
       "camera_name": "Camera naam",
+      "camera_friendly_name": "Camera vriendelijke naam",
       "timezone": "Tijdzone",
       "select_timezone": "Selecteer uw tijdzone",
       "advanced_configuration": "Geavanceerde instellingen",

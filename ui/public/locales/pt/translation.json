@@ -80,6 +80,7 @@
       "description_general": "Configurações gerais para seu agente Kerberos",
       "key": "Chave",
       "camera_name": "Nome da câmera",
+      "camera_friendly_name": "Nome amigável da câmera",
       "timezone": "Fuso horário",
       "select_timezone": "Selecione a timezone",
       "advanced_configuration": "Configurações avançadas",

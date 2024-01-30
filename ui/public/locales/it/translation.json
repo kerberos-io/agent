@@ -80,6 +80,7 @@
       "description_general": "Impostazioni generali del Kerberos Agent",
       "key": "Chiave",
       "camera_name": "Nome videocamera",
+      "camera_friendly_name": "Nome amichevole videocamera",
       "timezone": "Fuso orario",
       "select_timezone": "Seleziona un fuso orario",
       "advanced_configuration": "Configurazione avanzata",

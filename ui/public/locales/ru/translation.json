@@ -80,6 +80,7 @@
       "description_general": "Общие настройки Kerberos Agent",
       "key": "Ключ",
       "camera_name": "Название камеры",
+      "camera_friendly_name": "Дружественное название камеры",
       "timezone": "Часовой пояс",
       "select_timezone": "Выберите часовой пояс",
       "advanced_configuration": "Расширенные настройки",

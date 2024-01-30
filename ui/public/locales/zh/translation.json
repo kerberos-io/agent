@@ -80,6 +80,7 @@
       "description_general": "Kerberos Agent 常规设置",
       "key": "Key",
       "camera_name": "相机名称",
+      "camera_friendly_name": "相机友好名称",
       "timezone": "时区",
       "select_timezone": "选择时区",
       "advanced_configuration": "高级配置",

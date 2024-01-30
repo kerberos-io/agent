@@ -376,10 +376,13 @@ func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload models.P
 	json.Unmarshal(jsonData, &configPayload)
 
 	if configPayload.Timestamp != 0 {
-		// Get Config from the device
 
+		// Get Config from the device
 		key := configuration.Config.Key
 		name := configuration.Config.Name
+		if configuration.Config.FriendlyName != "" {
+			name = configuration.Config.FriendlyName
+		}
 
 		if key != "" && name != "" {
 

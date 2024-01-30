@@ -824,6 +824,15 @@ class Settings extends React.Component {
                     }
                   />
 
+                  <Input
+                    noPadding
+                    label={t('settings.overview.camera_friendly_name')}
+                    defaultValue={config.friendly_name}
+                    onChange={(value) =>
+                      this.onUpdateField('', 'friendly_name', value, config)
+                    }
+                  />
+
                   <Dropdown
                     isRadio
                     icon="world"

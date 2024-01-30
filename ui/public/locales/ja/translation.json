@@ -80,6 +80,7 @@
       "description_general": "Kerberos エージェントの一般設定",
       "key": "鍵",
       "camera_name": "カメラ名",
+      "camera_friendly_name": "カメラのフレンドリー名",
       "timezone": "タイムゾーン",
       "select_timezone": "タイムゾーンを選択",
       "advanced_configuration": "詳細設定",

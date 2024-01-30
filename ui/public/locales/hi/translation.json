@@ -80,6 +80,7 @@
       "description_general": "आपके Kerberos एजेंट के लिए सामान्य सेटिंग्स",
       "key": "की",
       "camera_name": "कैमरे का नाम",
+      "camera_friendly_name": "कैमरे का नाम",
       "timezone": "समय क्षेत्र",
       "select_timezone": "समयक्षेत्र चुनें",
       "advanced_configuration": "एडवांस कॉन्फ़िगरेशन",
