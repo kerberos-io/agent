@@ -71,6 +71,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 		startRecording := now
 		timestamp := now
 
+		if config.FriendlyName != "" {
+			config.Name = config.FriendlyName
+		}
+
 		// For continuous and motion based recording we will use a single file.
 		var file *os.File
 
