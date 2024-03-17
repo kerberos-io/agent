@@ -231,6 +231,8 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 	}
 	config := configuration.Config
 
+	kerberosAgentVersion := "3.1.8"
+
 	// Get a pull point address
 	var pullPointAddress string
 	if config.Capture.IPCamera.ONVIFXAddr != "" {
@@ -421,9 +423,9 @@ loop:
 
 				var object = fmt.Sprintf(`{
 						"key" : "%s",
+						"version" : "%s",
 						"hub_encryption": "%s",
 						"e2e_encryption": "%s",
-						"version" : "3.0.0",
 						"release" : "%s",
 						"cpuid" : "%s",
 						"clouduser" : "%s",
@@ -459,7 +461,7 @@ loop:
 						"docker" : true,
 						"kios" : false,
 						"raspberrypi" : false
-					}`, config.Key, hub_encryption, e2e_encryption, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, onvifEventsList, cameraConnected, hasBackChannel)
+					}`, config.Key, kerberosAgentVersion, hub_encryption, e2e_encryption, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, onvifEventsList, cameraConnected, hasBackChannel)
 
 				// Get the private key to encrypt the data using symmetric encryption: AES.
 				privateKey := config.HubPrivateKey
@@ -510,7 +512,7 @@ loop:
 
 				var object = fmt.Sprintf(`{
 					"key" : "%s",
-					"version" : "3.0.0",
+					"version" : "%s",
 					"release" : "%s",
 					"cpuid" : "%s",
 					"clouduser" : "%s",
@@ -544,7 +546,7 @@ loop:
 					"docker" : true,
 					"kios" : false,
 					"raspberrypi" : false
-				}`, config.Key, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, cameraConnected)
+				}`, config.Key, kerberosAgentVersion, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, cameraConnected)
 
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)
