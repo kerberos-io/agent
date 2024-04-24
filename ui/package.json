@@ -7,6 +7,7 @@
     "@kerberos-io/ui": "^1.76.0",
     "@material-ui/core": "^4.12.4",
     "@material-ui/icons": "^4.11.3",
+    "@syncfusion/ej2-react-calendars": "^25.1.40",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^11.2.7",
     "@testing-library/user-event": "^12.8.3",

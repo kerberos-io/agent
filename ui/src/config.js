@@ -9,8 +9,8 @@ const dev = {
   ENV: 'dev',
   // Comment the below lines, when using codespaces or other special DNS names (which you can't control)
   HOSTNAME: hostname,
-  API_URL: `${protocol}//${hostname}:80/api`,
-  URL: `${protocol}//${hostname}:80`,
+  API_URL: `https://demo.kerberos.io/api`,
+  URL: `https://demo.kerberos.io/`,
   WS_URL: `${websocketprotocol}//${hostname}:80/ws`,
   MODE: window['env']['mode'],
   // Uncomment, and comment the above lines, when using codespaces or other special DNS names (which you can't control)

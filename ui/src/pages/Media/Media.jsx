@@ -12,6 +12,7 @@ import {
 } from '@kerberos-io/ui';
 import { Link, withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
+import { DateTimePickerComponent } from '@syncfusion/ej2-react-calendars';
 import { getEvents } from '../../actions/agent';
 import config from '../../config';
 import './Media.scss';
@@ -93,6 +94,9 @@ class Media extends React.Component {
           level1={t('recordings.heading')}
           level1Link=""
         >
+          <DateTimePickerComponent placeholder="Choose a date and time">
+            {' '}
+          </DateTimePickerComponent>
           <Link to="/settings">
             <Button
               label={t('breadcrumb.configure')}
