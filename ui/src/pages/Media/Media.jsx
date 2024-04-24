@@ -9,13 +9,17 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
+  ControlBar,
+  Tabs,
+  Tab,
+  Icon,
 } from '@kerberos-io/ui';
 import { Link, withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
-import { DateTimePickerComponent } from '@syncfusion/ej2-react-calendars';
 import { getEvents } from '../../actions/agent';
 import config from '../../config';
 import './Media.scss';
+import TimePicker from '../../components/TimePicker/TimePicker';
 
 // eslint-disable-next-line react/prefer-stateless-function
 class Media extends React.Component {
@@ -94,9 +98,6 @@ class Media extends React.Component {
           level1={t('recordings.heading')}
           level1Link=""
         >
-          <DateTimePickerComponent placeholder="Choose a date and time">
-            {' '}
-          </DateTimePickerComponent>
           <Link to="/settings">
             <Button
               label={t('breadcrumb.configure')}
@@ -105,6 +106,17 @@ class Media extends React.Component {
             />
           </Link>
         </Breadcrumb>
+        <TimePicker> </TimePicker>
+        <ControlBar type="row">
+          <Tabs>
+            <Tab
+              label={t('settings.submenu.all')}
+              value="all"
+              onClick={() => this.changeTab('https://twitter.com')}
+              icon={<Icon label="twitter" />}
+            />
+          </Tabs>
+        </ControlBar>
 
         <div className="stats grid-container --four-columns">
           {events.map((event) => (
