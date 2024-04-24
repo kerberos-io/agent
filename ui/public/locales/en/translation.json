@@ -3,6 +3,9 @@
     "watch_recordings": "Watch recordings",
     "configure": "Configure"
   },
+  "timepicker": {
+    "placeholder": "Choose a date and time"
+  },
   "buttons": {
     "save": "Save",
     "verify_connection": "Verify Connection"

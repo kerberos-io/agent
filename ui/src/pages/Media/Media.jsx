@@ -106,9 +106,9 @@ class Media extends React.Component {
             />
           </Link>
         </Breadcrumb>
-        <TimePicker> </TimePicker>
         <ControlBar type="row">
           <Tabs>
+            <TimePicker />
             <Tab
               label={t('settings.submenu.all')}
               value="all"
