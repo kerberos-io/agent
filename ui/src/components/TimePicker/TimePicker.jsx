@@ -4,8 +4,14 @@ import './TimePicker.scss';
 import { t } from 'i18next';
 
 class TimePicker extends React.PureComponent {
+  maxDate = new Date( new Date())
   render() {
-    return <DateTimePickerComponent placeholder ={t('timepicker.placeholder')} id="datetimepicker" />;
+    return <DateTimePickerComponent placeholder ={t('timepicker.placeholder')} 
+    id="datetimepicker" 
+    strictMode={true} 
+    max={this.maxDate} 
+    onChange={(date) =>console.log(date)}
+    />;
   }
 }
 export default TimePicker;
