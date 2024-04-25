@@ -6,6 +6,9 @@
   "buttons": {
     "save": "Enregistrer"
   },
+  "timepicker": {
+    "placeholder": "Choisissez une date et une heure"
+  },
   "navigation": {
     "profile": "Profil",
     "admin": "admin",
