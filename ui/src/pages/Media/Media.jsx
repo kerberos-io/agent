@@ -51,7 +51,7 @@ class Media extends React.Component {
       currentRecording: '',
     });
   }
-
+  
   trackScrolling = () => {
     const { events, dispatchGetEvents } = this.props;
     const { isScrolling } = this.state;
@@ -80,7 +80,9 @@ class Media extends React.Component {
   isBottom(el) {
     return el.getBoundingClientRect().bottom + 50 <= window.innerHeight;
   }
-
+  handleChange(){
+  
+  }
   openModal(file) {
     this.setState({
       open: true,
@@ -108,7 +110,9 @@ class Media extends React.Component {
         </Breadcrumb>
         <ControlBar type="row">
           <Tabs>
-            <TimePicker />
+            <TimePicker>
+              onClick ={()=>console.log(this.state.date)};
+            </TimePicker>
             <Tab
               label={t('settings.submenu.all')}
               value="all"

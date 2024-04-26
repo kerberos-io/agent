@@ -5,12 +5,22 @@ import { t } from 'i18next';
 
 class TimePicker extends React.PureComponent {
   maxDate = new Date( new Date())
+  constructor(props){
+    super(props)
+    this.state = {
+      date: new Date()
+    }
+  }
+  handleChange = (date) => {
+    this.setState({ date }); 
+  };
   render() {
     return <DateTimePickerComponent placeholder ={t('timepicker.placeholder')} 
     id="datetimepicker" 
-    strictMode={true} 
+    strictMode="true" 
     max={this.maxDate} 
-    onChange={(date) =>console.log(date)}
+    onChange={this.handleChange} 
+    value={this.state.date}
     />;
   }
 }
