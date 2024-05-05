@@ -2,37 +2,37 @@ name: Go
 
 on:
   push:
-    branches: [ develop, master ]
+    branches: [develop, master]
   pull_request:
-    branches: [ develop, master ]
+    branches: [develop, master]
 
 jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
     container:
-      image: kerberos/base:0a50dc9
-      
+      image: kerberos/base:eb6b088
+
     strategy:
       matrix:
         #No longer supported Go versions.
         #go-version: ['1.17', '1.18', '1.19']
-        go-version: ['1.20', '1.21']
+        go-version: ["1.20", "1.21", "1.22"]
 
     steps:
-    - name: Set up Go ${{ matrix.go-version }}
-      uses: actions/setup-go@v2
-      with:
-        go-version: ${{ matrix.go-version }}
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@v4
-    - name: Set up git ownershi
-      run: git config --system --add safe.directory /__w/agent/agent
-    - name: Get dependencies
-      run: cd machinery && go mod download
-    - name: Build
-      run: cd machinery && go build -v ./...
-    - name: Vet
-      run: cd machinery && go vet -v ./...
-    - name: Test
-      run: cd machinery && go test -v ./...
+      - name: Set up Go ${{ matrix.go-version }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
+      - name: Set up git ownershi
+        run: git config --system --add safe.directory /__w/agent/agent
+      - name: Get dependencies
+        run: cd machinery && go mod download
+      - name: Build
+        run: cd machinery && go build -v ./...
+      - name: Vet
+        run: cd machinery && go vet -v ./...
+      - name: Test
+        run: cd machinery && go test -v ./...
