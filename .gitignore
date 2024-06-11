@@ -11,4 +11,5 @@ machinery/data/snapshots
 machinery/test*
 machinery/init-dev.sh
 machinery/.env
+machinery/vendor
 deployments/docker/private-docker-compose.yaml

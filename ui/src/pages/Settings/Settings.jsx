@@ -1123,6 +1123,87 @@ class Settings extends React.Component {
               </Block>
             )}
 
+            {/* STUN/TURN block */}
+            {showStreamingSection && config.offline !== 'true' && (
+              <Block>
+                <BlockHeader>
+                  <h4>{t('settings.streaming.stun_turn_forward')}</h4>
+                </BlockHeader>
+                <BlockBody>
+                  <p>{t('settings.streaming.stun_turn_description_forward')}</p>
+
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={config.capture.forwardwebrtc === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle(
+                          'capture',
+                          'forwardwebrtc',
+                          event,
+                          config.capture
+                        )
+                      }
+                    />
+                    <div>
+                      <span>{t('settings.streaming.stun_turn_webrtc')}</span>
+                      <p>
+                        {t('settings.streaming.stun_turn_description_webrtc')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="toggle-wrapper">
+                    <Toggle
+                      on={config.capture.transcodingwebrtc === 'true'}
+                      disabled={false}
+                      onClick={(event) =>
+                        this.onUpdateToggle(
+                          'capture',
+                          'transcodingwebrtc',
+                          event,
+                          config.capture
+                        )
+                      }
+                    />
+                    <div>
+                      <span>{t('settings.streaming.stun_turn_transcode')}</span>
+                      <p>
+                        {t(
+                          'settings.streaming.stun_turn_description_transcode'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {config.capture.transcodingwebrtc === 'true' && (
+                    <Input
+                      noPadding
+                      label={t('settings.streaming.stun_turn_downscale')}
+                      value={config.capture.transcodingresolution}
+                      placeholder="The % of the original resolution."
+                      onChange={(value) =>
+                        this.onUpdateNumberField(
+                          'capture',
+                          'transcodingresolution',
+                          value,
+                          config.capture
+                        )
+                      }
+                    />
+                  )}
+                </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label={t('buttons.save')}
+                    onClick={this.saveConfig}
+                    type="default"
+                    icon="pencil"
+                  />
+                </BlockFooter>
+              </Block>
+            )}
+
             {showPersistenceSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
@@ -1488,75 +1569,55 @@ class Settings extends React.Component {
               </Block>
             )}
 
-            {/* STUN/TURN block */}
             {showStreamingSection && config.offline !== 'true' && (
               <Block>
                 <BlockHeader>
-                  <h4>{t('settings.streaming.stun_turn_forward')}</h4>
+                  <h4>{t('settings.streaming.realtimeprocessing')}</h4>
                 </BlockHeader>
                 <BlockBody>
-                  <p>{t('settings.streaming.stun_turn_description_forward')}</p>
+                  <p>
+                    {t('settings.streaming.description_realtimeprocessing')}
+                  </p>
 
                   <div className="toggle-wrapper">
                     <Toggle
-                      on={config.capture.forwardwebrtc === 'true'}
+                      on={config.realtimeprocessing === 'true'}
                       disabled={false}
                       onClick={(event) =>
                         this.onUpdateToggle(
-                          'capture',
-                          'forwardwebrtc',
+                          '',
+                          'realtimeprocessing',
                           event,
-                          config.capture
+                          config
                         )
                       }
                     />
                     <div>
-                      <span>{t('settings.streaming.stun_turn_webrtc')}</span>
-                      <p>
-                        {t('settings.streaming.stun_turn_description_webrtc')}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="toggle-wrapper">
-                    <Toggle
-                      on={config.capture.transcodingwebrtc === 'true'}
-                      disabled={false}
-                      onClick={(event) =>
-                        this.onUpdateToggle(
-                          'capture',
-                          'transcodingwebrtc',
-                          event,
-                          config.capture
-                        )
-                      }
-                    />
-                    <div>
-                      <span>{t('settings.streaming.stun_turn_transcode')}</span>
+                      <span>
+                        {t('settings.streaming.realtimeprocessing_enabled')}
+                      </span>
                       <p>
                         {t(
-                          'settings.streaming.stun_turn_description_transcode'
+                          'settings.streaming.description_realtimeprocessing_enabled'
                         )}
                       </p>
                     </div>
                   </div>
 
-                  {config.capture.transcodingwebrtc === 'true' && (
-                    <Input
-                      noPadding
-                      label={t('settings.streaming.stun_turn_downscale')}
-                      value={config.capture.transcodingresolution}
-                      placeholder="The % of the original resolution."
-                      onChange={(value) =>
-                        this.onUpdateNumberField(
-                          'capture',
-                          'transcodingresolution',
-                          value,
-                          config.capture
-                        )
-                      }
-                    />
-                  )}
+                  <Input
+                    noPadding
+                    label={t('settings.streaming.realtimeprocessing_topic')}
+                    value={config.realtimeprocessing_topic}
+                    placeholder="kerberos/keyframes/key"
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        '',
+                        'realtimeprocessing_topic',
+                        value,
+                        config
+                      )
+                    }
+                  />
                 </BlockBody>
                 <BlockFooter>
                   <Button

@@ -276,6 +276,15 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspClient)
 	}
 
+	// Handle realtime processing if enabled.
+	if subStreamEnabled {
+		realtimeProcessingCursor := subQueue.Latest()
+		go cloud.HandleRealtimeProcessing(realtimeProcessingCursor, configuration, communication, mqttClient, rtspClient)
+	} else {
+		realtimeProcessingCursor := queue.Latest()
+		go cloud.HandleRealtimeProcessing(realtimeProcessingCursor, configuration, communication, mqttClient, rtspClient)
+	}
+
 	// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)
 	go cloud.HandleUpload(configDirectory, configuration, communication)
 

@@ -160,7 +160,12 @@
       "description2_mqtt": "to the Kerberos Agent, to achieve for example livestreaming or ONVIF (PTZ) capabilities.",
       "mqtt_brokeruri": "Broker Uri",
       "mqtt_username": "Username",
-      "mqtt_password": "Password"
+      "mqtt_password": "Password",
+      "realtimeprocessing": "Realtime Processing",
+      "description_realtimeprocessing": "By enabling realtime processing, you will receive realtime video keyframes through the MQTT connection specified above.",
+      "realtimeprocessing_topic": "Topic to publish",
+      "realtimeprocessing_enabled": "Enable realtime processing",
+      "description_realtimeprocessing_enabled": "Send realtime video keyframes through MQTT."
     },
     "conditions": {
       "timeofinterest": "Time Of Interest",

@@ -328,6 +328,12 @@ loop:
 					if err != nil {
 						log.Log.Debug("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 					}
+
+					/*outputs, err := onvif.GetRelayOutputs(device)
+					fmt.Println(outputs)
+					if err != nil {
+						log.Log.Debug("cloud.HandleHeartBeat(): error while getting relay outputs: " + err.Error())
+					}*/
 				}
 
 			} else {
@@ -692,6 +698,79 @@ func HandleLiveStreamHD(livestreamCursor *packets.QueueCursor, configuration *mo
 			log.Log.Debug("cloud.HandleLiveStreamHD(): stopping as Liveview is disabled.")
 		}
 	}
+}
+
+func HandleRealtimeProcessing(processingCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
+
+	log.Log.Debug("cloud.RealtimeProcessing(): started")
+
+	config := configuration.Config
+
+	// If offline made is enabled, we will stop the thread.
+	if config.Offline == "true" {
+		log.Log.Debug("cloud.RealtimeProcessing(): stopping as Offline is enabled.")
+	} else {
+
+		// Check if we need to enable the realtime processing
+		if config.RealtimeProcessing == "true" {
+
+			hubKey := ""
+			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
+				hubKey = config.S3.Publickey
+			} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
+				hubKey = config.KStorage.CloudKey
+			}
+			// This is the new way ;)
+			if config.HubKey != "" {
+				hubKey = config.HubKey
+			}
+
+			// We will publish the keyframes to the MQTT topic.
+			realtimeProcessingTopic := "kerberos/keyframes/" + hubKey
+			if config.RealtimeProcessingTopic != "" {
+				realtimeProcessingTopic = config.RealtimeProcessingTopic
+			}
+
+			var cursorError error
+			var pkt packets.Packet
+
+			for cursorError == nil {
+				pkt, cursorError = processingCursor.ReadPacket()
+				if len(pkt.Data) == 0 || !pkt.IsKeyFrame {
+					continue
+				}
+
+				log.Log.Info("cloud.RealtimeProcessing(): Sending base64 encoded images to MQTT.")
+				img, err := rtspClient.DecodePacket(pkt)
+				if err == nil {
+					bytes, _ := utils.ImageToBytes(&img)
+					encoded := base64.StdEncoding.EncodeToString(bytes)
+
+					valueMap := make(map[string]interface{})
+					valueMap["image"] = encoded
+					message := models.Message{
+						Payload: models.Payload{
+							Action:   "receive-keyframe",
+							DeviceId: configuration.Config.Key,
+							Value:    valueMap,
+						},
+					}
+					payload, err := models.PackageMQTTMessage(configuration, message)
+					if err == nil {
+
+						mqttClient.Publish(realtimeProcessingTopic, 0, false, payload)
+					} else {
+						log.Log.Info("cloud.RealtimeProcessing(): something went wrong while sending acknowledge config to hub: " + string(payload))
+					}
+				}
+			}
+
+		} else {
+			log.Log.Debug("cloud.RealtimeProcessing(): stopping as Liveview is disabled.")
+		}
+	}
+
+	log.Log.Debug("cloud.HandleLiveStreamSD(): finished")
 }
 
 // VerifyHub godoc

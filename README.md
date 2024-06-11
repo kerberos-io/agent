@@ -221,6 +221,8 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_MQTT_URI`                        | A MQTT broker endpoint that is used for bi-directional communication (live view, onvif, etc)    | "tcp://mqtt.kerberos.io:1883"  |
 | `AGENT_MQTT_USERNAME`                   | Username of the MQTT broker.                                                                    | ""                             |
 | `AGENT_MQTT_PASSWORD`                   | Password of the MQTT broker.                                                                    | ""                             |
+| `AGENT_REALTIME_PROCESSING`             | If `AGENT_REALTIME_PROCESSING` set to `true`, the agent will send key frames to the topic       | ""                             |
+| `AGENT_REALTIME_PROCESSING_TOPIC`       | The topic to which keyframes will be send in base64 encoded format.                             | ""                             |
 | `AGENT_STUN_URI`                        | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn.kerberos.io:8443"   |
 | `AGENT_FORCE_TURN`                      | Force using a TURN server, by generating relay candidates only.                                 | "false"   |
 | `AGENT_TURN_URI`                        | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn.kerberos.io:8443"   |

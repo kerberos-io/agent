@@ -114,5 +114,7 @@
 	"hub_private_key": "",
 	"hub_site": "",
 	"condition_uri": "",
-	"encryption": {}
+	"encryption": {},
+	"realtimeprocessing": "true",
+	"realtimeprocessing_topic": ""
 }

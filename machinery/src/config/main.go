@@ -382,6 +382,14 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				configuration.Config.MQTTPassword = value
 				break
 
+			/* Real-time streaming of keyframes to a MQTT topic */
+			case "AGENT_REALTIME_PROCESSING":
+				configuration.Config.RealtimeProcessing = value
+				break
+			case "AGENT_REALTIME_PROCESSING_TOPIC":
+				configuration.Config.RealtimeProcessingTopic = value
+				break
+
 			/* WebRTC settings for live-streaming (remote) */
 			case "AGENT_STUN_URI":
 				configuration.Config.STUNURI = value
