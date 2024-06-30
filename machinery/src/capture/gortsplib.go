@@ -25,6 +25,7 @@ import (
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtplpcm"
 	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpmpeg4audio"
+	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpsimpleaudio"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
 	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4audio"
@@ -63,6 +64,11 @@ type Golibrtsp struct {
 	AudioG711Media   *description.Media
 	AudioG711Forma   *format.G711
 	AudioG711Decoder *rtplpcm.Decoder
+
+	AudioOpusIndex   int8
+	AudioOpusMedia   *description.Media
+	AudioOpusForma   *format.Opus
+	AudioOpusDecoder *rtpsimpleaudio.Decoder
 
 	HasBackChannel            bool
 	AudioG711IndexBackChannel int8
@@ -261,6 +267,41 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 
 				// Set the index for the audio
 				g.AudioG711Index = int8(len(g.Streams)) - 1
+			}
+		}
+	}
+
+	// Look for audio stream.
+	// find the Opus media and format
+	audioFormaOpus, audioMediOpus := FindOPUS(desc, false)
+	g.AudioOpusMedia = audioMediOpus
+	g.AudioOpusForma = audioFormaOpus
+	if audioMediOpus == nil {
+		log.Log.Debug("capture.golibrtsp.Connect(Opus): " + "audio media not found")
+	} else {
+		// setup a audio media
+		_, err = g.Client.Setup(desc.BaseURL, audioMediOpus, 0, 0)
+		if err != nil {
+			// Something went wrong .. Do something
+			log.Log.Error("capture.golibrtsp.Connect(Opus): " + err.Error())
+		} else {
+			// create decoder
+			audiortpDec, err := audioFormaOpus.CreateDecoder()
+			if err != nil {
+				// Something went wrong .. Do something
+				log.Log.Error("capture.golibrtsp.Connect(Opus): " + err.Error())
+			} else {
+				g.AudioOpusDecoder = audiortpDec
+
+				g.Streams = append(g.Streams, packets.Stream{
+					Name:          "OPUS",
+					IsVideo:       false,
+					IsAudio:       true,
+					IsBackChannel: false,
+				})
+
+				// Set the index for the audio
+				g.AudioOpusIndex = int8(len(g.Streams)) - 1
 			}
 		}
 	}
@@ -978,6 +1019,21 @@ func FindPCMU(desc *description.Session, isBackChannel bool) (*format.G711, *des
 				if g711, ok := forma.(*format.G711); ok {
 					if g711.MULaw {
 						return g711, media
+					}
+				}
+			}
+		}
+	}
+	return nil, nil
+}
+
+func FindOPUS(desc *description.Session, isBackChannel bool) (*format.Opus, *description.Media) {
+	for _, media := range desc.Medias {
+		if media.IsBackChannel == isBackChannel {
+			for _, forma := range media.Formats {
+				if opus, ok := forma.(*format.Opus); ok {
+					if opus.ChannelCount > 0 {
+						return opus, media
 					}
 				}
 			}

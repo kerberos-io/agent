@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	//"github.com/izern/go-fdkaac/fdkaac"
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -314,16 +315,22 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 	// Later when we read a packet we need to figure out which track to send it to.
 	hasH264 := false
 	hasPCM_MULAW := false
+	hasAAC := false
+	hasOpus := false
 	streams, _ := rtspClient.GetStreams()
 	for _, stream := range streams {
 		if stream.Name == "H264" {
 			hasH264 = true
 		} else if stream.Name == "PCM_MULAW" {
 			hasPCM_MULAW = true
+		} else if stream.Name == "AAC" {
+			hasAAC = true
+		} else if stream.Name == "OPUS" {
+			hasOpus = true
 		}
 	}
 
-	if !hasH264 && !hasPCM_MULAW {
+	if !hasH264 && !hasPCM_MULAW && !hasAAC && !hasOpus {
 		log.Log.Error("webrtc.main.WriteToTrack(): no valid video codec and audio codec found.")
 	} else {
 		if config.Capture.TranscodingWebRTC == "true" {
@@ -413,6 +420,16 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 					}
 				}
 			} else if pkt.IsAudio {
+
+				// @TODO: We need to check if the audio is PCM_MULAW or AAC
+				// If AAC we need to transcode it to PCM_MULAW
+				// If PCM_MULAW we can send it directly.
+
+				if hasAAC {
+					// We will transcode the audio
+					// TODO..
+					//d := fdkaac.NewAacDecoder()
+				}
 
 				// Calculate the difference
 				bufferDuration := pkt.Time - previousTimeAudio
