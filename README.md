@@ -75,17 +75,17 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 ## Quickstart - Docker
 
-The easiest to get your Kerberos Agent up and running is to use our public image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you have selected a specific tag, run below `docker` command, which will open the web interface of your Kerberos agent on port `80`, and off you go. For a more configurable and persistent deployment have a look at [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent).
+The easiest way to get your Kerberos Agent up and running is to use our public image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you have selected a specific tag, run `docker` command below, which will open the web interface of your Kerberos agent on port `80`, and off you go. For a more configurable and persistent deployment have a look at [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent).
 
     docker run -p 80:80 --name mycamera -d --restart=always kerberos/agent:latest
 
-If you want to connect to an USB or Raspberry Pi camera, [you'll need to run our side car container](https://github.com/kerberos-io/camera-to-rtsp) which proxy the camera to an RTSP stream. In that case you'll want to configure the Kerberos Agent container to run in the host network, so it can connect directly to the RTSP sidecar.
+If you want to connect to a USB or Raspberry Pi camera, [you'll need to run our side car container](https://github.com/kerberos-io/camera-to-rtsp) which proxies the camera to an RTSP stream. In that case you'll want to configure the Kerberos Agent container to run in the host network, so it can connect directly to the RTSP sidecar.
 
     docker run --network=host --name mycamera -d --restart=always kerberos/agent:latest
 
 ## Quickstart - Balena
 
-Run Kerberos Agent with [Balena Cloud](https://www.balena.io/) super powers. Monitor your Kerberos Agent with seamless remote access, over the air updates, an encrypted public `https` endpoint and many more. Checkout our application `video-surveillance` on [Balena Hub](https://hub.balena.io/apps/2064752/video-surveillance), and create your first or fleet of Kerberos Agent(s).
+Run Kerberos Agent with [Balena Cloud](https://www.balena.io/) super powers. Monitor your Kerberos Agent with seamless remote access, over the air updates, an encrypted public `https` endpoint and much more. Checkout our application `video-surveillance` on [Balena Hub](https://hub.balena.io/apps/2064752/video-surveillance), and create your first or fleet of Kerberos Agent(s).
 
 [![deploy with balena](https://balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/kerberos-io/balena-agent)
 
@@ -101,9 +101,9 @@ Once installed you can find your Kerberos Agent configration at `/var/snap/kerbe
 
 ## A world of Kerberos Agents
 
-The Kerberos Agent is an isolated and scalable video (surveillance) management agent with a strong focus on user experience, scalability, resilience, extension and integration. Next to the Kerberos Agent, Kerberos.io provides many other tools such as [Kerberos Factory](https://github.com/kerberos-io/factory), [Kerberos Vault](https://github.com/kerberos-io/vault) and [Kerberos Hub](https://github.com/kerberos-io/hub) to provide additional capabilities: bring your own cloud, bring your own storage, central overview, live streaming, machine learning etc.
+The Kerberos Agent is an isolated and scalable video (surveillance) management agent with a strong focus on user experience, scalability, resilience, extension and integration. Next to the Kerberos Agent, Kerberos.io provides many other tools such as [Kerberos Factory](https://github.com/kerberos-io/factory), [Kerberos Vault](https://github.com/kerberos-io/vault), and [Kerberos Hub](https://github.com/kerberos-io/hub) to provide additional capabilities: bring your own cloud, bring your own storage, central overview, live streaming, machine learning, etc.
 
-As mentioned above Kerberos.io applies the concept of agents. An agent is running next to (or on) your camera, and is processing a single camera feed. It applies motion based or continuous recording and make those recordings available through a user friendly web interface. A Kerberos Agent allows you to connect to other cloud services or integrates with custom applications. Kerberos Agent is used for personal usage and scales to enterprise production level deployments.
+As mentioned above Kerberos.io applies the concept of agents. An agent is running next to (or on) your camera, and is processing a single camera feed. It applies motion based or continuous recording and makes those recordings available through a user friendly web interface. A Kerberos Agent allows you to connect to other cloud services or integrate with custom applications. Kerberos Agent is used for personal applications and scales to enterprise production level deployments.
 
 This repository contains everything you'll need to know about our core product, Kerberos Agent. Below you'll find a brief list of features and functions.
 
@@ -129,7 +129,7 @@ This repository contains everything you'll need to know about our core product, 
 
 ## How to run and deploy a Kerberos Agent
 
-As described before a Kerberos Agent is a container, which can be deployed through various ways and automation tools such as `docker`, `docker compose`, `kubernetes` and the list goes on. To simplify your life we have come with concrete and working examples of deployments to help you speed up your Kerberos.io journey.
+A Kerberos Agent, as previously mentioned, is a container. You can deploy it using various methods and automation tools, including `docker`, `docker compose`, `kubernetes` and more. To streamline your Kerberos.io experience, we provide concrete deployment examples to speed up your Kerberos.io journey”
 
 We have documented the different deployment models [in the `deployments` directory](https://github.com/kerberos-io/agent/tree/master/deployments) of this repository. There you'll learn and find how to deploy using:
 
@@ -143,7 +143,7 @@ We have documented the different deployment models [in the `deployments` directo
 - [Balena](https://github.com/kerberos-io/agent/tree/master/deployments#8-balena)
 - [Snap](https://github.com/kerberos-io/agent/tree/master/deployments#9-snap)
 
-By default your Kerberos Agents will store all its configuration and recordings inside the container. To help you automate and have a more consistent data governance, you can attach volumes to configure and persist data of your Kerberos Agents, and/or configure each Kerberos Agent through environment variables.
+By default, your Kerberos Agents store all configuration and recordings within the container. To help you automate and have a more consistent data governance, you can attach volumes to configure and persist data of your Kerberos Agents and/or configure each Kerberos Agent through environment variables.
 
 ## Access the Kerberos Agent
 
@@ -158,23 +158,23 @@ The default username and password for the Kerberos Agent is:
 
 ## Configure and persist with volume mounts
 
-An example of how to mount a host directory is shown below using `docker`, but is applicable for [all the deployment models and tools described above](#running-and-automating-a-kerberos-agent).
+An example of how to mount a host directory is shown below using `docker`, but is applicable for [all of the deployment models and tools described above](#running-and-automating-a-kerberos-agent).
 
-You attach a volume to your container by leveraging the `-v` option. To mount your own configuration file and recordings folder, execute as following:
+You attach a volume to your container by leveraging the `-v` option. To mount your own configuration file and recordings folder, run the following commands:
 
     docker run -p 80:80 --name mycamera \
     -v $(pwd)/agent/config:/home/agent/data/config \
     -v $(pwd)/agent/recordings:/home/agent/data/recordings \
     -d --restart=always kerberos/agent:latest
 
-More example [can be found in the deployment section](https://github.com/kerberos-io/agent/tree/master/deployments) for each deployment and automation tool. Please note to verify the permissions of the directory/volume you are attaching. More information in [this issue](https://github.com/kerberos-io/agent/issues/80).
+More examples for each deployment and automation tool [can be found in the deployment section](https://github.com/kerberos-io/agent/tree/master/deployments). Be sure to verify the permissions of the directory/volume you are attaching. More information in [this issue](https://github.com/kerberos-io/agent/issues/80).
 
     chmod -R 755 kerberos-agent/
     chown 100:101 kerberos-agent/ -R
 
 ## Configure with environment variables
 
-Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments easier when leveraging `docker compose` or `kubernetes` deployments much easier and scalable. Using this approach we simplify automation through `ansible` and `terraform`.
+Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deploying with `docker compose` or `kubernetes` much easier and more scalable. Using this approach, we simplify automation through `ansible` and `terraform`.
 
     docker run -p 80:80 --name mycamera \
     -e AGENT_NAME=mycamera \
@@ -197,7 +197,7 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_REMOVE_AFTER_UPLOAD`             | When enabled, recordings uploaded successfully to a storage will be removed from disk.          | "true"                         |
 | `AGENT_OFFLINE`                         | Makes sure no external connection is made.                                                      | "false"                        |
 | `AGENT_AUTO_CLEAN`                      | Cleans up the recordings directory.                                                             | "true"                         |
-| `AGENT_AUTO_CLEAN_MAX_SIZE`             | If `AUTO_CLEAN` enabled, set the max size of the recordings directory in (MB).                  | "100"                          |
+| `AGENT_AUTO_CLEAN_MAX_SIZE`             | If `AUTO_CLEAN` enabled, set the max size of the recordings directory (in MB).                  | "100"                          |
 | `AGENT_TIME`                            | Enable the timetable for Kerberos Agent                                                         | "false"                        |
 | `AGENT_TIMETABLE`                       | A (weekly) time table to specify when to make recordings "start1,end1,start2,end2;start1..      | ""                             |
 | `AGENT_REGION_POLYGON`                  | A single polygon set for motion detection: "x1,y1;x2,y2;x3,y3;...                               | ""                             |
@@ -212,23 +212,23 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_CAPTURE_SNAPSHOTS`               | Toggle for enabling or disabling snapshot generation.                                           | "true"                         |
 | `AGENT_CAPTURE_RECORDING`               | Toggle for enabling making recordings.                                                          | "true"                         |
 | `AGENT_CAPTURE_CONTINUOUS`              | Toggle for enabling continuous "true" or motion "false".                                        | "false"                        |
-| `AGENT_CAPTURE_PRERECORDING`            | If `CONTINUOUS` set to `false`, specify the recording time (seconds) before after motion event. | "10"                           |
+| `AGENT_CAPTURE_PRERECORDING`            | If `CONTINUOUS` set to `false`, specify the recording time (seconds) before/after motion event. | "10"                           |
 | `AGENT_CAPTURE_POSTRECORDING`           | If `CONTINUOUS` set to `false`, specify the recording time (seconds) after motion event.        | "20"                           |
 | `AGENT_CAPTURE_MAXLENGTH`               | The maximum length of a single recording (seconds).                                             | "30"                           |
 | `AGENT_CAPTURE_PIXEL_CHANGE`            | If `CONTINUOUS` set to `false`, the number of pixel require to change before motion triggers.   | "150"                          |
 | `AGENT_CAPTURE_FRAGMENTED`              | Set the format of the recorded MP4 to fragmented (suitable for HLS).                            | "false"                        |
 | `AGENT_CAPTURE_FRAGMENTED_DURATION`     | If `AGENT_CAPTURE_FRAGMENTED` set to `true`, define the duration (seconds) of a fragment.       | "8"                            |
-| `AGENT_MQTT_URI`                        | A MQTT broker endpoint that is used for bi-directional communication (live view, onvif, etc)    | "tcp://mqtt.kerberos.io:1883"  |
+| `AGENT_MQTT_URI`                        | An MQTT broker endpoint that is used for bi-directional communication (live view, onvif, etc)   | "tcp://mqtt.kerberos.io:1883"  |
 | `AGENT_MQTT_USERNAME`                   | Username of the MQTT broker.                                                                    | ""                             |
 | `AGENT_MQTT_PASSWORD`                   | Password of the MQTT broker.                                                                    | ""                             |
 | `AGENT_REALTIME_PROCESSING`             | If `AGENT_REALTIME_PROCESSING` set to `true`, the agent will send key frames to the topic       | ""                             |
-| `AGENT_REALTIME_PROCESSING_TOPIC`       | The topic to which keyframes will be send in base64 encoded format.                             | ""                             |
+| `AGENT_REALTIME_PROCESSING_TOPIC`       | The topic to which keyframes will be sent in base64 encoded format.                             | ""                             |
 | `AGENT_STUN_URI`                        | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn.kerberos.io:8443"   |
 | `AGENT_FORCE_TURN`                      | Force using a TURN server, by generating relay candidates only.                                 | "false"   |
 | `AGENT_TURN_URI`                        | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn.kerberos.io:8443"   |
 | `AGENT_TURN_USERNAME`                   | TURN username used for WebRTC.                                                                  | "username1"                    |
 | `AGENT_TURN_PASSWORD`                   | TURN password used for WebRTC.                                                                  | "password1"                    |
-| `AGENT_CLOUD`                           | Store recordings in Kerberos Hub (s3), Kerberos Vault (kstorage) or Dropbox (dropbox).          | "s3"                           |
+| `AGENT_CLOUD`                           | Store recordings in Kerberos Hub (s3), Kerberos Vault (kstorage), or Dropbox (dropbox).          | "s3"                           |
 | `AGENT_HUB_ENCRYPTION`                  | Turning on/off encryption of traffic from your Kerberos Agent to Kerberos Hub.                  | "true"                         |
 | `AGENT_HUB_URI`                         | The Kerberos Hub API, defaults to our Kerberos Hub SAAS.                                        | "https://api.hub.domain.com"   |
 | `AGENT_HUB_KEY`                         | The access key linked to your account in Kerberos Hub.                                          | ""                             |
@@ -239,26 +239,26 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_KERBEROSVAULT_ACCESS_KEY`        | The access key of a Kerberos Vault account.                                                     | ""                             |
 | `AGENT_KERBEROSVAULT_SECRET_KEY`        | The secret key of a Kerberos Vault account.                                                     | ""                             |
 | `AGENT_KERBEROSVAULT_PROVIDER`          | A Kerberos Vault provider you have created (optional).                                          | ""                             |
-| `AGENT_KERBEROSVAULT_DIRECTORY`         | The directory, in the provider, where the recordings will be stored in.                         | ""                             |
+| `AGENT_KERBEROSVAULT_DIRECTORY`         | The directory, in the Kerberos vault, where the recordings will be stored.                      | ""                             |
 | `AGENT_DROPBOX_ACCESS_TOKEN`            | The Access Token from your Dropbox app, that is used to leverage the Dropbox SDK.               | ""                             |
-| `AGENT_DROPBOX_DIRECTORY`               | The directory, in the provider, where the recordings will be stored in.                         | ""                             |
+| `AGENT_DROPBOX_DIRECTORY`               | The directory, in Dropbox, where the recordings will be stored.                                 | ""                             |
 | `AGENT_ENCRYPTION`                      | Enable 'true' or disable 'false' end-to-end encryption for MQTT messages.                       | "false"                        |
 | `AGENT_ENCRYPTION_RECORDINGS`           | Enable 'true' or disable 'false' end-to-end encryption for recordings.                          | "false"                        |
 | `AGENT_ENCRYPTION_FINGERPRINT`          | The fingerprint of the keypair (public/private keys), so you know which one to use.             | ""                             |
-| `AGENT_ENCRYPTION_PRIVATE_KEY`          | The private key (assymetric/RSA) to decryptand sign requests send over MQTT.                    | ""                             |
-| `AGENT_ENCRYPTION_SYMMETRIC_KEY`        | The symmetric key (AES) to encrypt and decrypt request send over MQTT.                          | ""                             |
+| `AGENT_ENCRYPTION_PRIVATE_KEY`          | The private key (assymetric/RSA) to decrypt and sign requests send over MQTT.                   | ""                             |
+| `AGENT_ENCRYPTION_SYMMETRIC_KEY`        | The symmetric key (AES) to encrypt and decrypt requests sent over MQTT.                         | ""                             |
 
 ## Encryption
 
-You can encrypt your recordings and outgoing MQTT messages with your own AES and RSA keys by enabling the encryption settings. Once enabled all your recordings will be encrypted using AES-256-CBC and your symmetric key. You can either use the default `openssl` toolchain to decrypt the recordings with your AES key, as following:
+You can encrypt your recordings and outgoing MQTT messages with your own AES and RSA keys by enabling the encryption settings. Once enabled, all your recordings will be encrypted using AES-256-CBC and your symmetric key. You can use the default `openssl` toolchain to decrypt the recordings with your AES key, as following:
 
     openssl aes-256-cbc -d -md md5 -in encrypted.mp4 -out decrypted.mp4 -k your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
 
-, and additionally you can decrypt a folder of recordings, using the Kerberos Agent binary as following:
+Or you can decrypt a folder of recordings, using the Kerberos Agent binary as following:
 
     go run main.go -action decrypt ./data/recordings your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
 
-or for a single file:
+Or for a single file:
 
     go run main.go -action decrypt ./data/recordings/video.mp4 your-key-96ab185xxxxxxxcxxxxxxxx6a59c62e8
 
@@ -268,7 +268,7 @@ If we talk about video encoders and decoders (codecs) there are 2 major video co
 
 - H264 (also known as AVC or MPEG-4 Part 10)
   - Is the most common one and most widely supported for IP cameras.
-  - Supported in the majority of browsers, operating system and third-party applications.
+  - Supported in the majority of browsers, operating system, and third-party applications.
   - Can be embedded in commercial and 3rd party applications.
   - Different levels of compression (high, medium, low, ..)
   - Better quality / compression ratio, shows less artifacts at medium compression ratios.
@@ -287,9 +287,9 @@ Conclusion: depending on the use case you might choose one over the other, and y
 
 ## Contribute with Codespaces
 
-One of the major blockers for letting you contribute to an Open Source project is to setup your local development machine. Why? Because you might have already some tools and libraries installed that are used for other projects, and the libraries you would need for Kerberos Agent, for example FFmpeg, might require a different version. Welcome to the dependency hell..
+One of the major blockers for letting you contribute to an Open Source project is to set up your local development machine. Why? Because you might already have some tools and libraries installed that are used for other projects, and the libraries you would need for Kerberos Agent, for example FFmpeg, might require a different version. Welcome to dependency hell...
 
-By leveraging codespaces, which the Kerberos Agent repo supports, you will be able to setup the required development environment in a few minutes. By opening the `<> Code` tab on the top of the page, you will be able to create a codespace, [using the Kerberos Devcontainer](https://github.com/kerberos-io/devcontainer) base image. This image requires all the relevant dependencies: FFmpeg, OpenCV, Golang, Node, Yarn, etc.
+By leveraging codespaces, which the Kerberos Agent repo supports, you will be able to set up the required development environment in a few minutes. By opening the `<> Code` tab on the top of the page, you will be able to create a codespace, [using the Kerberos Devcontainer](https://github.com/kerberos-io/devcontainer) base image. This image requires all the relevant dependencies: FFmpeg, OpenCV, Golang, Node, Yarn, etc.
 
 ![Kerberos Agent codespace](assets/img/codespace.png)
 
@@ -316,7 +316,7 @@ On opening of the GitHub Codespace, some dependencies will be installed. Once th
       WS_URL: `${websocketprotocol}//${externalHost}/ws`,
     };
 
-Go and open two terminals one for the `ui` project and one for the `machinery` project.
+Go and open two terminals: one for the `ui` project and one for the `machinery` project.
 
 1.  Terminal A:
 
@@ -332,11 +332,11 @@ Once executed, a popup will show up mentioning `portforwarding`. You should see 
 
 ![Codespace make public](./assets/img/codespace-make-public.png)
 
-As mentioned above, copy the hostname of the `machinery` DNS name, and past it in the `ui/src/config.json` file. Once done reload, the `ui` page in your browser, and you should be able to access the login page with the default credentials `root` and `root`.
+As mentioned above, copy the hostname of the `machinery` DNS name, and paste it in the `ui/src/config.json` file. Once done, reload the `ui` page in your browser, and you should be able to access the login page with the default credentials `root` and `root`.
 
 ## Develop and build
 
-Kerberos Agent is divided in two parts a `machinery` and `web`. Both parts live in this repository in their relative folders. For development or running the application on your local machine, you have to run both the `machinery` and the `web` as described below. When running in production everything is shipped as only one artifact, read more about this at [Building for production](#building-for-production).
+The Kerberos Agent is divided in two parts: a `machinery` and `web` part. Both parts live in this repository in their relative folders. For development or running the application on your local machine, you have to run both the `machinery` and the `web` as described below. When running in production everything is shipped as only one artifact, read more about this at [Building for production](#building-for-production).
 
 ### UI
 
@@ -350,13 +350,13 @@ This will start a webserver and launches the web app on port `3000`.
 
 ![login-agent](./assets/img/agent-login.gif)
 
-Once signed in you'll see the dashboard page showing up. After successfull configuration of your agent, you'll should see a live view and possible events recorded to disk.
+Once signed in you'll see the dashboard page. After successfull configuration of your agent, you'll should see a live view and possible events recorded to disk.
 
 ![dashboard-agent](./assets/img/agent-dashboard.png)
 
 ### Machinery
 
-The `machinery` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent which is doing all the heavy lifting with camera processing and other kinds of logic, on the other hand it acts as a webserver (Rest API) that allows communication from the web (React) or any other custom application. The API is documented using `swagger`.
+The `machinery` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent which is doing all the heavy lifting with camera processing and other kinds of logic and on the other hand it acts as a webserver (Rest API) that allows communication from the web (React) or any other custom application. The API is documented using `swagger`.
 
 You can simply run the `machinery` using following commands.
 
@@ -364,13 +364,13 @@ You can simply run the `machinery` using following commands.
     cd machinery
     go run main.go -action run -port 80
 
-This will launch the Kerberos Agent and run a webserver on port `80`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/) or [Visual Studio Code](https://code.visualstudio.com/), as it comes with all the debugging and linting features builtin.
+This will launch the Kerberos Agent and run a webserver on port `80`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/) or [Visual Studio Code](https://code.visualstudio.com/), as it comes with all the debugging and linting features built in.
 
 ![VSCode desktop](./assets/img/vscode-desktop.png)
 
 ## Building from source
 
-Running Kerberos Agent in production only require a single binary to run. Nevertheless, we have two parts, the `machinery` and the `web`, we merge them during build time. So this is what happens.
+Running Kerberos Agent in production only requires a single binary to run. Nevertheless, we have two parts: the `machinery` and the `web`, we merge them during build time. So this is what happens.
 
 ### UI
 
@@ -381,7 +381,7 @@ To build the Kerberos Agent web app, you simply have to run the `build` command 
 
 ### Machinery
 
-Building the `machinery` is also super easy 🚀, by using `go build` you can create a single binary which ships it all; thank you Golang. After building you will endup with a binary called `main`, this is what contains everything you need to run Kerberos Agent.
+Building the `machinery` is also super easy 🚀, by using `go build` you can create a single binary which ships it all; thank you Golang. After building you will end up with a binary called `main`, this is what contains everything you need to run Kerberos Agent.
 
 Remember the build step of the `web` part, during build time we move the build directory to the `machinery` directory. Inside the `machinery` web server [we reference the](https://github.com/kerberos-io/agent/blob/master/machinery/src/routers/http/Server.go#L44) `build` directory. This makes it possible to just a have single web server that runs it all.
 
@@ -390,8 +390,8 @@ Remember the build step of the `web` part, during build time we move the build d
 
 ## Building for Docker
 
-Inside the root of this `agent` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping **Kerberos Agent**. Important to note is that start from a prebuild base image, `kerberos/base:xxx`.
-This base image contains already a couple of tools, such as Golang, FFmpeg and OpenCV. We do this for faster compilation times.
+Inside the root of this `agent` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping a **Kerberos Agent**. Important to note is that you start from a prebuilt base image, `kerberos/base:xxx`.
+This base image already contains a couple of tools, such as Golang, FFmpeg and OpenCV. We do this for faster compilation times.
 
 By running the `docker build` command, you will create the Kerberos Agent Docker image. After building you can simply run the image as a Docker container.
 
