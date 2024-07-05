@@ -19,7 +19,6 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang-module/carbon/v2 v2.3.12
 	github.com/gorilla/websocket v1.5.3
-	github.com/izern/go-fdkaac v0.0.0-20191009124408-238be56e79c0
 	github.com/kellydunn/golang-geo v0.7.0
 	github.com/kerberos-io/joy4 v1.0.64
 	github.com/kerberos-io/onvif v0.0.14

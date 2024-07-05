@@ -1,33 +1,21 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
-// https://github.com/microsoft/vscode-dev-containers/tree/v0.245.2/containers/docker-existing-dockerfile
 {
 	"name": "A Dockerfile containing FFmpeg, OpenCV, Go and Yarn",
-	// Sets the run context to one level up instead of the .devcontainer folder.
 	"context": "..",
-	// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
 	"dockerFile": "./Dockerfile",
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	"forwardPorts": [
 		3000,
 		80
 	],
-	// Uncomment the next line to run commands after the container is created - for example installing curl.
 	"postCreateCommand": "cd ui && yarn install && yarn build && cd ../machinery && go mod download",
-	"features": {
-		"ghcr.io/devcontainers-contrib/features/ansible:1": {}
-	},
 	"customizations": {
 		"vscode": {
 			"extensions": [
 				"ms-kubernetes-tools.vscode-kubernetes-tools",
-				"GitHub.copilot"
+				"ms-azuretools.vscode-docker",
+				"GitHub.copilot",
+				"golang.go",
+				"ms-vscode.vscode-typescript-next"
 			]
 		}
-	},
-	// Uncomment when using a ptrace-based debugger like C++, Go, and Rust
-	// "runArgs": [ "--cap-add=SYS_PTRACE", "--security-opt", "seccomp=unconfined" ],
-	// Uncomment to use the Docker CLI from inside the container. See https://aka.ms/vscode-remote/samples/docker-from-docker.
-	// "mounts": [ "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind" ],
-	// Uncomment to connect as a non-root user if you've added one. See https://aka.ms/vscode-remote/containers/non-root.
-	// "remoteUser": "vscode"
+	}
 }
