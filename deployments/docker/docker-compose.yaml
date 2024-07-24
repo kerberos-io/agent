@@ -32,3 +32,7 @@ services:
       AGENT_NAME: agent3
       AGENT_CAPTURE_IPCAMERA_RTSP: rtsp://username:password@x.x.x.x/cam/realmonitor?channel=1&subtype=1 # Dahua camera RTSP url example
       AGENT_KEY: "3"
+networks:
+  default:
+    name: cluster-net
+    external: true
