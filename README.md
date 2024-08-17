@@ -65,8 +65,8 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 1. [Contribute with Codespaces](#contribute-with-codespaces)
 2. [Develop and build](#develop-and-build)
-3.  [Building from source](#building-from-source)
-4.  [Building for Docker](#building-for-docker)
+3. [Building from source](#building-from-source)
+4. [Building for Docker](#building-for-docker)
 
 ### Varia
 
@@ -104,7 +104,9 @@ Once installed you can find your Kerberos Agent configration at `/var/snap/kerbe
 
 The Kerberos Agent is an isolated and scalable video (surveillance) management agent with a strong focus on user experience, scalability, resilience, extension and integration. Next to the Kerberos Agent, Kerberos.io provides many other tools such as [Kerberos Factory](https://github.com/kerberos-io/factory), [Kerberos Vault](https://github.com/kerberos-io/vault), and [Kerberos Hub](https://github.com/kerberos-io/hub) to provide additional capabilities: bring your own cloud, bring your own storage, central overview, live streaming, machine learning, etc.
 
-As mentioned above Kerberos.io applies the concept of agents. An agent is running next to (or on) your camera, and is processing a single camera feed. It applies motion based or continuous recording and makes those recordings available through a user friendly web interface. A Kerberos Agent allows you to connect to other cloud services or integrate with custom applications. Kerberos Agent is used for personal applications and scales to enterprise production level deployments.
+[![Deployment Agent](./assets/img/edge-deployment-agent.svg)](https://github.com/kerberos-io/deployment)
+
+As mentioned above Kerberos.io applies the concept of agents. An agent is running next to (or on) your camera, and is processing a single camera feed. It applies motion based or continuous recording and makes those recordings available through a user friendly web interface. A Kerberos Agent allows you to connect to other cloud services or integrate with custom applications. Kerberos Agent is used for personal applications and scales to enterprise production level deployments. Learn more about the [deployment strategies here](<(https://github.com/kerberos-io/deployment)>).
 
 This repository contains everything you'll need to know about our core product, Kerberos Agent. Below you'll find a brief list of features and functions.
 
@@ -225,11 +227,11 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_REALTIME_PROCESSING`             | If `AGENT_REALTIME_PROCESSING` set to `true`, the agent will send key frames to the topic       | ""                             |
 | `AGENT_REALTIME_PROCESSING_TOPIC`       | The topic to which keyframes will be sent in base64 encoded format.                             | ""                             |
 | `AGENT_STUN_URI`                        | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn.kerberos.io:8443"   |
-| `AGENT_FORCE_TURN`                      | Force using a TURN server, by generating relay candidates only.                                 | "false"   |
+| `AGENT_FORCE_TURN`                      | Force using a TURN server, by generating relay candidates only.                                 | "false"                        |
 | `AGENT_TURN_URI`                        | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn.kerberos.io:8443"   |
 | `AGENT_TURN_USERNAME`                   | TURN username used for WebRTC.                                                                  | "username1"                    |
 | `AGENT_TURN_PASSWORD`                   | TURN password used for WebRTC.                                                                  | "password1"                    |
-| `AGENT_CLOUD`                           | Store recordings in Kerberos Hub (s3), Kerberos Vault (kstorage), or Dropbox (dropbox).          | "s3"                           |
+| `AGENT_CLOUD`                           | Store recordings in Kerberos Hub (s3), Kerberos Vault (kstorage), or Dropbox (dropbox).         | "s3"                           |
 | `AGENT_HUB_ENCRYPTION`                  | Turning on/off encryption of traffic from your Kerberos Agent to Kerberos Hub.                  | "true"                         |
 | `AGENT_HUB_URI`                         | The Kerberos Hub API, defaults to our Kerberos Hub SAAS.                                        | "https://api.hub.domain.com"   |
 | `AGENT_HUB_KEY`                         | The access key linked to your account in Kerberos Hub.                                          | ""                             |
@@ -268,6 +270,7 @@ Or for a single file:
 If we talk about video encoders and decoders (codecs) there are 2 major video codecs on the market: H264 and H265. Taking into account your use case, you might use one over the other. We will provide an (not complete) overview of the advantages and disadvantages of each codec in the field of video surveillance and video analytics. If you would like to know more, you should look for additional resources on the internet (or if you like to read physical items, books still exists nowadays).
 
 - H264 (also known as AVC or MPEG-4 Part 10)
+
   - Is the most common one and most widely supported for IP cameras.
   - Supported in the majority of browsers, operating system, and third-party applications.
   - Can be embedded in commercial and 3rd party applications.
@@ -283,7 +286,7 @@ If we talk about video encoders and decoders (codecs) there are 2 major video co
   - H265 shows artifacts in motion based environments (which is less with H264).
   - Recording the same video (resolution, duration and FPS) in H264 and H265 will result in approx 50% the file size.
   - Not supported in technologies such as WebRTC
-  
+
 Conclusion: depending on the use case you might choose one over the other, and you can use both at the same time. For example you can use H264 (main stream) for livestreaming, and H265 (sub stream) for recording. If you wish to play recordings in a cross-platform and cross-browser environment, you might opt for H264 for better support.
 
 ## Contribute with Codespaces
