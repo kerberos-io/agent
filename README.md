@@ -23,6 +23,8 @@
 
 [**Docker Hub**](https://hub.docker.com/r/kerberos/agent) | [**Documentation**](https://doc.kerberos.io) | [**Website**](https://kerberos.io) | [**View Demo**](https://demo.kerberos.io)
 
+> Before you continue, this repository discusses one of the components of the Kerberos.io stack, the Kerberos Agent, in depth. If you are [looking for an end-to-end deployment guide have a look here](https://github.com/kerberos-io/deployment).
+
 Kerberos Agent is an isolated and scalable video (surveillance) management agent made available as Open Source under the MIT License. This means that all the source code is available for you or your company, and you can use, transform and distribute the source code; as long you keep a reference of the original license. Kerberos Agent can be used for commercial usage (which was not the case for v2). Read more [about the license here](LICENSE).
 
 ![Kerberos Agent go through UI](./assets/img/kerberos-agent-overview.gif)
