@@ -7,13 +7,11 @@ on:
 
 jobs:
   build-amd64:
-      # If contains the keyword "[release]" in the commit message.
-      if: "contains(github.event.head_commit.message, '[release]')"
-      runs-on: ubuntu-latest
-      strategy:
-        matrix:
-          architecture: [amd64]
-      steps:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        architecture: [amd64]
+    steps:
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
@@ -28,31 +26,29 @@ jobs:
       - name: Available platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
       - name: Run Buildx
-        run: cd agent && docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
+        run: cd agent && docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push .
       - name: Create new and append to manifest
         run: cd agent && docker buildx imagetools create -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
   build-other:
-    # If contains the keyword "[release]" in the commit message.
-    if: "contains(github.event.head_commit.message, '[release]')"
     runs-on: ubuntu-latest
     strategy:
       matrix:
         architecture: [arm64, arm/v7, arm/v6]
     steps:
-    - name: Login to DockerHub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Checkout
-      run: git clone https://github.com/kerberos-io/agent && cd agent
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    - name: Available platforms
-      run: echo ${{ steps.buildx.outputs.platforms }}
-    - name: Run Buildx
-      run: cd agent && docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push . 
-    - name: Create new and append to manifest
-      run: cd agent && docker buildx imagetools create --append -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Checkout
+        run: git clone https://github.com/kerberos-io/agent && cd agent
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Available platforms
+        run: echo ${{ steps.buildx.outputs.platforms }}
+      - name: Run Buildx
+        run: cd agent && docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push .
+      - name: Create new and append to manifest
+        run: cd agent && docker buildx imagetools create --append -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
