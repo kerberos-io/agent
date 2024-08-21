@@ -2,7 +2,7 @@ name: Docker master build
 
 on:
   release:
-    types: [created]
+    types: [created, edited]
 
 env:
   REPO: kerberos/agent
