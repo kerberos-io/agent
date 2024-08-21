@@ -1,13 +1,12 @@
 name: Docker master build
 
 on:
-  push:
-    # If pushed to master branch.
-    branches: [ master ]
+  release:
+    types: [created]
 
 env:
   REPO: kerberos/agent
-  
+
 jobs:
   build-amd64:
     # If contains the keyword "[release]" in the commit message.
@@ -37,26 +36,26 @@ jobs:
       - name: Available platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
       - name: Run Buildx
-        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}} --push . 
+        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}} --push .
       - name: Create new and append to manifest
-        run: docker buildx imagetools create -t $REPO:${{ steps.short-sha.outputs.sha }} $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}}
+        run: docker buildx imagetools create -t $REPO:${{ github.ref_name }} $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}}
       - name: Create new and append to manifest latest
-        run: docker buildx imagetools create -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}}
+        run: docker buildx imagetools create -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}}
       - name: Run Buildx with output
-        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{steps.short-sha.outputs.sha}} --output type=tar,dest=output-${{matrix.architecture}}.tar . 
+        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{github.ref_name}} --output type=tar,dest=output-${{matrix.architecture}}.tar .
       - name: Strip binary
         run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
       # We'll make a GitHub release and push the build (tar) as an artifact
       - uses: rickstaa/action-create-tag@v1
         with:
-          tag: ${{ steps.short-sha.outputs.sha }}
-          message: "Release ${{ steps.short-sha.outputs.sha }}"
-      - name: Create a release  
+          tag: ${{ github.ref_name }}
+          message: "Release ${{ github.ref_name }}"
+      - name: Create a release
         uses: ncipollo/release-action@v1
         with:
           latest: true
-          name: ${{ steps.short-sha.outputs.sha }}
-          tag: ${{ steps.short-sha.outputs.sha }}
+          name: ${{ github.ref_name }}
+          tag: ${{ github.ref_name }}
           artifacts: "agent-${{matrix.architecture}}.tar"
       # Taken from GoReleaser's own release workflow.
       # The available Snapcraft Action has some bugs described in the issue below.
@@ -68,7 +67,7 @@ jobs:
       #    mkdir -p $HOME/.cache/snapcraft/download
       #    mkdir -p $HOME/.cache/snapcraft/stage-packages
       #- name: Use Snapcraft
-      #  run: tar -xf agent-${{matrix.architecture}}.tar && snapcraft 
+      #  run: tar -xf agent-${{matrix.architecture}}.tar && snapcraft
   build-other:
     # If contains the keyword "[release]" in the commit message.
     if: "contains(github.event.head_commit.message, '[release]')"
@@ -81,39 +80,38 @@ jobs:
         architecture: [arm64, arm-v7, arm-v6]
         #architecture: [arm64, arm-v7]
     steps:
-    - name: Login to DockerHub
-      uses: docker/login-action@v2
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - name: Checkout
-      uses: actions/checkout@v3
-    - uses: benjlevesque/short-sha@v2.1
-      id: short-sha
-      with:
-        length: 7
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    - name: Available platforms
-      run: echo ${{ steps.buildx.outputs.platforms }}
-    - name: Run Buildx
-      run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}} --push . 
-    - name: Create new and append to manifest
-      run: docker buildx imagetools create --append -t $REPO:${{ steps.short-sha.outputs.sha }} $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}}
-    - name: Create new and append to manifest latest
-      run: docker buildx imagetools create --append -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{steps.short-sha.outputs.sha}}
-    - name: Run Buildx with output
-      run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{steps.short-sha.outputs.sha}} --output type=tar,dest=output-${{matrix.architecture}}.tar . 
-    - name: Strip binary
-      run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
-    - name: Create a release  
-      uses: ncipollo/release-action@v1
-      with:
-        latest: true
-        allowUpdates: true
-        name: ${{ steps.short-sha.outputs.sha }}
-        tag: ${{ steps.short-sha.outputs.sha }}
-        artifacts: "agent-${{matrix.architecture}}.tar"
-  
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: benjlevesque/short-sha@v2.1
+        id: short-sha
+        with:
+          length: 7
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Available platforms
+        run: echo ${{ steps.buildx.outputs.platforms }}
+      - name: Run Buildx
+        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}} --push .
+      - name: Create new and append to manifest
+        run: docker buildx imagetools create --append -t $REPO:${{ github.ref_name }} $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}}
+      - name: Create new and append to manifest latest
+        run: docker buildx imagetools create --append -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}}
+      - name: Run Buildx with output
+        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{github.ref_name}} --output type=tar,dest=output-${{matrix.architecture}}.tar .
+      - name: Strip binary
+        run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
+      - name: Create a release
+        uses: ncipollo/release-action@v1
+        with:
+          latest: true
+          allowUpdates: true
+          name: ${{ github.ref_name }}
+          tag: ${{ github.ref_name }}
+          artifacts: "agent-${{matrix.architecture}}.tar"
