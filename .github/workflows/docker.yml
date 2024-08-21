@@ -50,6 +50,8 @@ jobs:
           allowUpdates: true
           name: ${{ github.ref_name }}
           tag: ${{ github.ref_name }}
+          generateReleaseNotes: false
+          omitBodyDuringUpdate: true
           artifacts: "agent-${{matrix.architecture}}.tar"
       # Taken from GoReleaser's own release workflow.
       # The available Snapcraft Action has some bugs described in the issue below.
@@ -106,4 +108,6 @@ jobs:
           allowUpdates: true
           name: ${{ github.ref_name }}
           tag: ${{ github.ref_name }}
+          generateReleaseNotes: false
+          omitBodyDuringUpdate: true
           artifacts: "agent-${{matrix.architecture}}.tar"
