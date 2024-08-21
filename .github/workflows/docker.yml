@@ -45,11 +45,6 @@ jobs:
         run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{github.ref_name}} --output type=tar,dest=output-${{matrix.architecture}}.tar .
       - name: Strip binary
         run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
-      # We'll make a GitHub release and push the build (tar) as an artifact
-      - uses: rickstaa/action-create-tag@v1
-        with:
-          tag: ${{ github.ref_name }}
-          message: "Release ${{ github.ref_name }}"
       - name: Create a release
         uses: ncipollo/release-action@v1
         with:
