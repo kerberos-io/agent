@@ -2,7 +2,7 @@ name: Docker release build
 
 on:
   release:
-    types: [created, edited]
+    types: [created]
 
 env:
   REPO: kerberos/agent
