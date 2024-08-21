@@ -395,7 +395,9 @@ func DoGetDigitalInputs(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		_, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+
+		onvifInputs, _ := onvif.GetDigitalInputs(device)
 		if err == nil {
 			// Get the digital inputs and outputs from the device
 			inputOutputs, err := onvif.GetInputOutputs()
@@ -406,6 +408,24 @@ func DoGetDigitalInputs(c *gin.Context) {
 					for _, event := range inputOutputs {
 						if event.Type == "input" {
 							inputs = append(inputs, event)
+						}
+					}
+					// Iterate over inputs from onvif and compare
+
+					for _, input := range onvifInputs.DigitalInputs {
+						find := false
+						for _, event := range inputs {
+							key := string(input.Token)
+							if key == event.Key {
+								find = true
+							}
+						}
+						if !find {
+							key := string(input.Token)
+							inputs = append(inputs, onvif.ONVIFEvents{
+								Key:  key,
+								Type: "input",
+							})
 						}
 					}
 					c.JSON(200, gin.H{

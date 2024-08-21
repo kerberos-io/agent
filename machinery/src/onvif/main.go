@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -1079,8 +1080,8 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 		} else {
 			// Pull message
 			pullMessage := event.PullMessages{
-				Timeout:      xsd.Duration("PT5S"),
-				MessageLimit: 100,
+				Timeout:      xsd.Duration("PT30S"),
+				MessageLimit: 10,
 			}
 			requestBody, err := xml.Marshal(pullMessage)
 			if err != nil {
@@ -1099,6 +1100,7 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 				res.Body.Close()
 				if err == nil {
 					stringBody := string(bs)
+					fmt.Println(stringBody)
 					decodedXML, et, err := getXMLNode(stringBody, "PullMessagesResponse")
 					if err != nil {
 						log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
@@ -1117,9 +1119,11 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 				if len(message.Message.Message.Data.SimpleItem) > 0 {
 					log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Message.Message.Data.SimpleItem[0].Name) + " " + string(message.Message.Message.Data.SimpleItem[0].Value))
 				}
-				if message.Topic.TopicKinds == "tns1:Device/Trigger/Relay" {
+				if message.Topic.TopicKinds == "tns1:Device/Trigger/Relay" ||
+					message.Topic.TopicKinds == "tns1:Device/tns1:Trigger/tns1:Relay" { // This is for avigilon cameras
 					if len(message.Message.Message.Data.SimpleItem) > 0 {
-						if message.Message.Message.Data.SimpleItem[0].Name == "LogicalState" {
+						if message.Message.Message.Data.SimpleItem[0].Name == "LogicalState" ||
+							message.Message.Message.Data.SimpleItem[0].Name == "RelayLogicalState" { // On avigilon it's called RelayLogicalState
 							key := string(message.Message.Message.Source.SimpleItem[0].Value)
 							value := string(message.Message.Message.Data.SimpleItem[0].Value)
 							log.Log.Debug("onvif.main.GetEventMessages(pullMessages) output: " + key + " " + value)
@@ -1147,9 +1151,11 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 							}
 						}
 					}
-				} else if message.Topic.TopicKinds == "tns1:Device/Trigger/DigitalInput" {
+				} else if message.Topic.TopicKinds == "tns1:Device/Trigger/DigitalInput" ||
+					message.Topic.TopicKinds == "tns1:Device/tns1:Trigger/tnssamsung:DigitalInput" { // This is for avigilon's camera
 					if len(message.Message.Message.Data.SimpleItem) > 0 {
-						if message.Message.Message.Data.SimpleItem[0].Name == "LogicalState" {
+						if message.Message.Message.Data.SimpleItem[0].Name == "LogicalState" ||
+							message.Message.Message.Data.SimpleItem[0].Name == "Level" { // On avigilon it's called level
 							key := string(message.Message.Message.Source.SimpleItem[0].Value)
 							value := string(message.Message.Message.Data.SimpleItem[0].Value)
 							log.Log.Debug("onvif.main.GetEventMessages(pullMessages) input: " + key + " " + value)
@@ -1261,7 +1267,7 @@ func TriggerRelayOutput(dev *onvif.Device, output string) (err error) {
 	// However in theory there might be multiple outputs. We might need to change
 	// this in the future "kerberos-io/onvif" library.
 	if err == nil {
-		token := relayoutputs.RelayOutputs.Token
+		token := relayoutputs.RelayOutputs[0].Token
 		if output == string(token) {
 			outputState := device.SetRelayOutputState{
 				RelayOutputToken: token,

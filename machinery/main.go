@@ -19,7 +19,7 @@ import (
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 )
 
-var VERSION = "3.1.9"
+var VERSION = "3.2.0"
 
 func main() {
 	// You might be interested in debugging the agent.

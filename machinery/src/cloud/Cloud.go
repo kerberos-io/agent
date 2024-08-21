@@ -253,7 +253,6 @@ loop:
 
 		// We'll check ONVIF capabilitites anyhow.. Verify if we have PTZ, presets and inputs/outputs.
 		// For the inputs we will keep track of a the inputs and outputs state.
-
 		onvifEnabled := "false"
 		onvifZoom := "false"
 		onvifPanTilt := "false"
@@ -299,6 +298,7 @@ loop:
 				// We will also fetch some events, to know the status of the inputs and outputs.
 				// More event types might be added.
 				if pullPointAddress != "" {
+
 					events, err := onvif.GetEventMessages(device, pullPointAddress)
 					if err == nil && len(events) > 0 {
 						onvifEventsList, err = json.Marshal(events)
@@ -329,11 +329,43 @@ loop:
 						log.Log.Debug("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 					}
 
-					/*outputs, err := onvif.GetRelayOutputs(device)
-					fmt.Println(outputs)
+					var events []onvif.ONVIFEvents
+					outputs, err := onvif.GetRelayOutputs(device)
 					if err != nil {
 						log.Log.Debug("cloud.HandleHeartBeat(): error while getting relay outputs: " + err.Error())
-					}*/
+					} else {
+						for _, output := range outputs.RelayOutputs {
+							event := onvif.ONVIFEvents{
+								Key:       string(output.Token),
+								Value:     "false",
+								Type:      "output",
+								Timestamp: time.Now().Unix(),
+							}
+							events = append(events, event)
+						}
+					}
+
+					inputs, err := onvif.GetDigitalInputs(device)
+					if err != nil {
+						log.Log.Debug("cloud.HandleHeartBeat(): error while getting digital inputs: " + err.Error())
+					} else {
+						for _, input := range inputs.DigitalInputs {
+							event := onvif.ONVIFEvents{
+								Key:       string(input.Token),
+								Value:     "false",
+								Type:      "input",
+								Timestamp: time.Now().Unix(),
+							}
+							events = append(events, event)
+						}
+					}
+
+					// Marshal the events
+					onvifEventsList, err = json.Marshal(events)
+					if err != nil {
+						log.Log.Error("cloud.HandleHeartBeat(): error while marshalling events: " + err.Error())
+						onvifEventsList = []byte("[]")
+					}
 				}
 
 			} else {
