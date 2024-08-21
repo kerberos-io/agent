@@ -9,8 +9,6 @@ env:
 
 jobs:
   build-amd64:
-    # If contains the keyword "[release]" in the commit message.
-    if: "contains(github.event.head_commit.message, '[release]')"
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -64,8 +62,6 @@ jobs:
       #- name: Use Snapcraft
       #  run: tar -xf agent-${{matrix.architecture}}.tar && snapcraft
   build-other:
-    # If contains the keyword "[release]" in the commit message.
-    if: "contains(github.event.head_commit.message, '[release]')"
     runs-on: ubuntu-latest
     permissions:
       contents: write
