@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -809,14 +808,16 @@ func GetPresetsFromDevice(device *onvif.Device) ([]models.OnvifActionPreset, err
 					return presets, err
 				}
 
+				presetsList := ""
 				for _, preset := range presetsResponse.Preset {
-					log.Log.Debug("onvif.main.GetPresetsFromDevice(): " + string(preset.Name) + " (" + string(preset.Token) + ")")
 					p := models.OnvifActionPreset{
 						Name:  string(preset.Name),
 						Token: string(preset.Token),
 					}
+					presetsList += string(preset.Name) + " (" + string(preset.Token) + "), "
 					presets = append(presets, p)
 				}
+				log.Log.Debug("onvif.main.GetPresetsFromDevice(): " + presetsList)
 
 				return presets, err
 			}
@@ -991,7 +992,8 @@ func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
 		Filter: &event.FilterType{
 			TopicExpression: &event.TopicExpressionType{
 				Dialect:    xsd.String("http://www.onvif.org/ver10/tev/topicExpression/ConcreteSet"),
-				TopicKinds: "tns1:Device/Trigger//.",
+				TopicKinds: "tns1:Device/Trigger//.", // -> This works for Avigilon, Hanwa, Hikvision
+				// TopicKinds: "//.", -> This works for Axis, but throws other errors.
 			},
 		},
 	})
@@ -1048,14 +1050,10 @@ func GetInputOutputs() ([]ONVIFEvents, error) {
 	// We have some odd behaviour for inputs: the logical state is set to false even if circuit is closed. However we do see repeated events (looks like heartbeats).
 	// We are assuming that if we do not receive an event for 15 seconds the input is inactive, otherwise we set to active.
 	for key, value := range inputOutputDeviceMap {
-		if value.Type == "input" {
-			if time.Now().Unix()-value.Timestamp > 15 {
-				value.Value = "false"
-			} else {
-				value.Value = "true"
-			}
-			inputOutputDeviceMap[key] = value
+		if time.Now().Unix()-value.Timestamp < 15 && value.Value == "false" {
+			value.Value = "true"
 		}
+		inputOutputDeviceMap[key] = value
 		eventsArray = append(eventsArray, *value)
 	}
 	for _, value := range eventsArray {
@@ -1080,7 +1078,7 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 		} else {
 			// Pull message
 			pullMessage := event.PullMessages{
-				Timeout:      xsd.Duration("PT30S"),
+				Timeout:      xsd.Duration("PT5S"),
 				MessageLimit: 10,
 			}
 			requestBody, err := xml.Marshal(pullMessage)
@@ -1100,7 +1098,6 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 				res.Body.Close()
 				if err == nil {
 					stringBody := string(bs)
-					fmt.Println(stringBody)
 					decodedXML, et, err := getXMLNode(stringBody, "PullMessagesResponse")
 					if err != nil {
 						log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
@@ -1116,9 +1113,9 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 
 			for _, message := range pullMessagesResponse.NotificationMessage {
 				log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Topic.TopicKinds))
-				if len(message.Message.Message.Data.SimpleItem) > 0 {
-					log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Message.Message.Data.SimpleItem[0].Name) + " " + string(message.Message.Message.Data.SimpleItem[0].Value))
-				}
+				//if len(message.Message.Message.Data.SimpleItem) > 0 {
+				//	log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Message.Message.Data.SimpleItem[0].Name) + " " + string(message.Message.Message.Data.SimpleItem[0].Value))
+				//}
 				if message.Topic.TopicKinds == "tns1:Device/Trigger/Relay" ||
 					message.Topic.TopicKinds == "tns1:Device/tns1:Trigger/tns1:Relay" { // This is for avigilon cameras
 					if len(message.Message.Message.Data.SimpleItem) > 0 {
@@ -1126,7 +1123,8 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 							message.Message.Message.Data.SimpleItem[0].Name == "RelayLogicalState" { // On avigilon it's called RelayLogicalState
 							key := string(message.Message.Message.Source.SimpleItem[0].Value)
 							value := string(message.Message.Message.Data.SimpleItem[0].Value)
-							log.Log.Debug("onvif.main.GetEventMessages(pullMessages) output: " + key + " " + value)
+							propertyOperation := string(message.Message.Message.PropertyOperation)
+							log.Log.Debug("onvif.main.GetEventMessages(pullMessages) output: " + key + " " + value + " (" + propertyOperation + ")")
 
 							// Depending on the onvif library they might use different values for active and inactive.
 							if value == "active" || value == "1" {
@@ -1137,17 +1135,18 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 
 							// Check if key exists in map
 							// If it does not exist we'll add it to the map otherwise we'll update the value.
-							if _, ok := inputOutputDeviceMap[key]; !ok {
-								inputOutputDeviceMap[key] = &ONVIFEvents{
-									Key:       key,
+							if _, ok := inputOutputDeviceMap[key+"-output"]; !ok {
+								inputOutputDeviceMap[key+"-output"] = &ONVIFEvents{
+									Key:       key + "-output",
 									Type:      "output",
 									Value:     value,
 									Timestamp: 0,
 								}
-							} else {
-								log.Log.Debug("onvif.main.GetEventMessages(pullMessages) output: " + key + " " + value)
-								inputOutputDeviceMap[key].Value = value
-								inputOutputDeviceMap[key].Timestamp = time.Now().Unix()
+							} else if propertyOperation == "Changed" {
+								inputOutputDeviceMap[key+"-output"].Value = value
+								inputOutputDeviceMap[key+"-output"].Timestamp = time.Now().Unix()
+							} else if propertyOperation == "Initialized" {
+								inputOutputDeviceMap[key+"-output"].Value = value
 							}
 						}
 					}
@@ -1158,7 +1157,8 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 							message.Message.Message.Data.SimpleItem[0].Name == "Level" { // On avigilon it's called level
 							key := string(message.Message.Message.Source.SimpleItem[0].Value)
 							value := string(message.Message.Message.Data.SimpleItem[0].Value)
-							log.Log.Debug("onvif.main.GetEventMessages(pullMessages) input: " + key + " " + value)
+							propertyOperation := string(message.Message.Message.PropertyOperation)
+							log.Log.Debug("onvif.main.GetEventMessages(pullMessages) input: " + key + " " + value + " (" + propertyOperation + ")")
 
 							// Depending on the onvif library they might use different values for active and inactive.
 							if value == "active" || value == "1" {
@@ -1169,17 +1169,18 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 
 							// Check if key exists in map
 							// If it does not exist we'll add it to the map otherwise we'll update the value.
-							if _, ok := inputOutputDeviceMap[key]; !ok {
-								inputOutputDeviceMap[key] = &ONVIFEvents{
-									Key:       key,
+							if _, ok := inputOutputDeviceMap[key+"-input"]; !ok {
+								inputOutputDeviceMap[key+"-input"] = &ONVIFEvents{
+									Key:       key + "-input",
 									Type:      "input",
 									Value:     value,
 									Timestamp: 0,
 								}
-							} else {
-								log.Log.Debug("onvif.main.GetEventMessages(pullMessages) input: " + key + " " + value)
-								inputOutputDeviceMap[key].Value = value
-								inputOutputDeviceMap[key].Timestamp = time.Now().Unix()
+							} else if propertyOperation == "Changed" {
+								inputOutputDeviceMap[key+"-input"].Value = value
+								inputOutputDeviceMap[key+"-input"].Timestamp = time.Now().Unix()
+							} else if propertyOperation == "Initialized" {
+								inputOutputDeviceMap[key+"-input"].Value = value
 							}
 						}
 					}
@@ -1268,7 +1269,7 @@ func TriggerRelayOutput(dev *onvif.Device, output string) (err error) {
 	// this in the future "kerberos-io/onvif" library.
 	if err == nil {
 		token := relayoutputs.RelayOutputs[0].Token
-		if output == string(token) {
+		if output == string(token+"-output") {
 			outputState := device.SetRelayOutputState{
 				RelayOutputToken: token,
 				LogicalState:     "active",

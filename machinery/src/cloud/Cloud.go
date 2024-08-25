@@ -229,17 +229,17 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 	} else {
 		client = &http.Client{}
 	}
-	config := configuration.Config
 
-	kerberosAgentVersion := "3.1.8"
+	kerberosAgentVersion := utils.VERSION
 
-	// Get a pull point address
-	var pullPointAddress string
-	if config.Capture.IPCamera.ONVIFXAddr != "" {
+	// Create a loop pull point address, which we will use to retrieve async events
+	// As you'll read below camera manufactures are having different implementations of events.
+	var pullPointAddressLoopState string
+	if configuration.Config.Capture.IPCamera.ONVIFXAddr != "" {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
-		if err == nil {
-			pullPointAddress, err = onvif.CreatePullPointSubscription(device)
+		if err != nil {
+			pullPointAddressLoopState, err = onvif.CreatePullPointSubscription(device)
 			if err != nil {
 				log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 			}
@@ -263,6 +263,7 @@ loop:
 			cameraConfiguration := configuration.Config.Capture.IPCamera
 			device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 			if err == nil {
+				// We will try to retrieve the PTZ configurations from the device.
 				onvifEnabled = "true"
 				configurations, err := onvif.GetPTZConfigurationsFromDevice(device)
 				if err == nil {
@@ -297,9 +298,22 @@ loop:
 
 				// We will also fetch some events, to know the status of the inputs and outputs.
 				// More event types might be added.
-				if pullPointAddress != "" {
+				// -- We have two differen pull point subscriptions, one for the initials events and one for the loop.
+				// -- Some cameras do send recurrent events, others don't.
+				//   a. For some older Hikvision models, events are send repeatedly (if input is high) with the strong state (set to false).
+				//      - In this scenarion we are using a polling mechanism and set a timestamp to understand if the input is still active.
+				//   b. For some newer Hikvision models, Avigilon, events are send only once (if state is set active).
+				//      - In this scenario we are creating a new subscription to retrieve the initial (current) state of the inputs and outputs.
 
-					events, err := onvif.GetEventMessages(device, pullPointAddress)
+				// Get a new pull point address, to get the initiatal state of the inputs and outputs.
+				pullPointAddressInitialState, err := onvif.CreatePullPointSubscription(device)
+				if err != nil {
+					log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
+				}
+				if pullPointAddressInitialState != "" {
+					log.Log.Debug("cloud.HandleHeartBeat(): Fetching events from pullPointAddressInitialState")
+					events, err := onvif.GetEventMessages(device, pullPointAddressInitialState)
+					log.Log.Debug("cloud.HandleHeartBeat(): Completed fetching events from pullPointAddressInitialState")
 					if err == nil && len(events) > 0 {
 						onvifEventsList, err = json.Marshal(events)
 						if err != nil {
@@ -309,9 +323,28 @@ loop:
 					} else if err != nil {
 						log.Log.Error("cloud.HandleHeartBeat(): error while getting events: " + err.Error())
 						onvifEventsList = []byte("[]")
-						// Try to unsubscribe and subscribe again.
-						onvif.UnsubscribePullPoint(device, pullPointAddress)
-						pullPointAddress, err = onvif.CreatePullPointSubscription(device)
+					} else if len(events) == 0 {
+						log.Log.Debug("cloud.HandleHeartBeat(): no events found.")
+						onvifEventsList = []byte("[]")
+					}
+					onvif.UnsubscribePullPoint(device, pullPointAddressInitialState)
+				}
+
+				// We do a second run an a long-living subscription to get the events asynchronously.
+				if pullPointAddressLoopState != "" {
+					log.Log.Debug("cloud.HandleHeartBeat(): Fetching events from pullPointAddressLoopState")
+					events, err := onvif.GetEventMessages(device, pullPointAddressLoopState)
+					log.Log.Debug("cloud.HandleHeartBeat(): Completed fetching events from pullPointAddressLoopState")
+					if err == nil && len(events) > 0 {
+						onvifEventsList, err = json.Marshal(events)
+						if err != nil {
+							log.Log.Error("cloud.HandleHeartBeat(): error while marshalling events: " + err.Error())
+							onvifEventsList = []byte("[]")
+						}
+					} else if err != nil {
+						log.Log.Error("cloud.HandleHeartBeat(): error while getting events: " + err.Error())
+						onvifEventsList = []byte("[]")
+						pullPointAddressLoopState, err = onvif.CreatePullPointSubscription(device)
 						if err != nil {
 							log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 						}
@@ -321,14 +354,17 @@ loop:
 					}
 				} else {
 					log.Log.Debug("cloud.HandleHeartBeat(): no pull point address found.")
-					onvifEventsList = []byte("[]")
-
-					// Try again
-					pullPointAddress, err = onvif.CreatePullPointSubscription(device)
+					pullPointAddressLoopState, err = onvif.CreatePullPointSubscription(device)
 					if err != nil {
-						log.Log.Debug("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
+						log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 					}
+				}
 
+				// It also might be that events are not supported by the camera, in that case we will try to get the digital inputs and outputs.
+				// Through the `device` API, the `GetDigitalInputs` and `GetDigitalOutputs` functions are called.
+				// The disadvantage of this approach is that we don't have the state of the inputs and outputs (which is crazy..)
+
+				if pullPointAddressInitialState == "" && pullPointAddressLoopState == "" {
 					var events []onvif.ONVIFEvents
 					outputs, err := onvif.GetRelayOutputs(device)
 					if err != nil {
@@ -367,7 +403,6 @@ loop:
 						onvifEventsList = []byte("[]")
 					}
 				}
-
 			} else {
 				log.Log.Error("cloud.HandleHeartBeat(): error while connecting to ONVIF device: " + err.Error())
 				onvifPresetsList = []byte("[]")
@@ -612,11 +647,11 @@ loop:
 		}
 	}
 
-	if pullPointAddress != "" {
+	if pullPointAddressLoopState != "" {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
-		if err == nil {
-			onvif.UnsubscribePullPoint(device, pullPointAddress)
+		if err != nil {
+			onvif.UnsubscribePullPoint(device, pullPointAddressLoopState)
 		}
 	}
 

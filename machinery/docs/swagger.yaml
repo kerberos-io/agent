@@ -95,6 +95,8 @@ definitions:
       heartbeaturi:
         description: obsolete
         type: string
+      hub_encryption:
+        type: string
       hub_key:
         type: string
       hub_private_key:
@@ -119,6 +121,10 @@ definitions:
         type: string
       offline:
         type: string
+      realtimeprocessing:
+        type: string
+      realtimeprocessing_topic:
+        type: string
       region:
         $ref: '#/definitions/models.Region'
       remove_after_upload:
@@ -134,6 +140,8 @@ definitions:
           $ref: '#/definitions/models.Timetable'
         type: array
       timezone:
+        type: string
+      turn_force:
         type: string
       turn_password:
         type: string
@@ -196,8 +204,14 @@ definitions:
         type: string
       rtsp:
         type: string
+      sub_fps:
+        type: string
+      sub_height:
+        type: integer
       sub_rtsp:
         type: string
+      sub_width:
+        type: integer
       width:
         type: integer
     type: object
@@ -564,7 +578,7 @@ paths:
       operationId: snapshot-base64
       responses:
         "200":
-          description: ""
+          description: OK
       summary: Get a snapshot from the camera in base64.
       tags:
       - camera
@@ -574,7 +588,7 @@ paths:
       operationId: snapshot-jpeg
       responses:
         "200":
-          description: ""
+          description: OK
       summary: Get a snapshot from the camera in jpeg format.
       tags:
       - camera
@@ -624,7 +638,7 @@ paths:
       operationId: config
       responses:
         "200":
-          description: ""
+          description: OK
       summary: Get the current configuration.
       tags:
       - config
@@ -640,7 +654,7 @@ paths:
           $ref: '#/definitions/models.Config'
       responses:
         "200":
-          description: ""
+          description: OK
       summary: Update the current configuration.
       tags:
       - config
@@ -650,7 +664,7 @@ paths:
       operationId: dashboard
       responses:
         "200":
-          description: ""
+          description: OK
       summary: Get all information showed on the dashboard.
       tags:
       - general
@@ -660,7 +674,7 @@ paths:
       operationId: days
       responses:
         "200":
-          description: ""
+          description: OK
       summary: Get all days stored in the recordings directory.
       tags:
       - general
@@ -698,7 +712,7 @@ paths:
           $ref: '#/definitions/models.EventFilter'
       responses:
         "200":
-          description: ""
+          description: OK
       summary: Get the latest recordings (events) from the recordings directory.
       tags:
       - general

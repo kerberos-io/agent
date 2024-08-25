@@ -380,7 +380,7 @@
                 "operationId": "snapshot-base64",
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK"
                     }
                 }
             }
@@ -395,7 +395,7 @@
                 "operationId": "snapshot-jpeg",
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK"
                     }
                 }
             }
@@ -468,7 +468,7 @@
                 "operationId": "config",
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK"
                     }
                 }
             },
@@ -492,7 +492,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK"
                     }
                 }
             }
@@ -507,7 +507,7 @@
                 "operationId": "dashboard",
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK"
                     }
                 }
             }
@@ -522,7 +522,7 @@
                 "operationId": "days",
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK"
                     }
                 }
             }
@@ -582,7 +582,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": ""
+                        "description": "OK"
                     }
                 }
             }
@@ -795,6 +795,9 @@
                     "description": "obsolete",
                     "type": "string"
                 },
+                "hub_encryption": {
+                    "type": "string"
+                },
                 "hub_key": {
                     "type": "string"
                 },
@@ -831,6 +834,12 @@
                 "offline": {
                     "type": "string"
                 },
+                "realtimeprocessing": {
+                    "type": "string"
+                },
+                "realtimeprocessing_topic": {
+                    "type": "string"
+                },
                 "region": {
                     "$ref": "#/definitions/models.Region"
                 },
@@ -853,6 +862,9 @@
                     }
                 },
                 "timezone": {
+                    "type": "string"
+                },
+                "turn_force": {
                     "type": "string"
                 },
                 "turn_password": {
@@ -949,8 +961,17 @@
                 "rtsp": {
                     "type": "string"
                 },
+                "sub_fps": {
+                    "type": "string"
+                },
+                "sub_height": {
+                    "type": "integer"
+                },
                 "sub_rtsp": {
                     "type": "string"
+                },
+                "sub_width": {
+                    "type": "integer"
                 },
                 "width": {
                     "type": "integer"

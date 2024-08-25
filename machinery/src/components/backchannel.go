@@ -87,7 +87,6 @@ func WriteFileToBackChannel(infile av.DemuxCloser) {
 			break
 		}
 		// Send to backchannel
-		fmt.Println(buffer)
 		infile.Write(buffer, 2, uint32(count))
 
 		count = count + 1024
