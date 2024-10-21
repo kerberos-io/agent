@@ -19,7 +19,7 @@ var TIMEOUT = 10 * time.Second
 var _init_ctx sync.Once
 var _instance *DB
 
-var DatabaseName = os.Getenv("MONGODB_DATABASE_STORAGE")
+var DatabaseName = os.Getenv("MONGODB_DATABASE_FACTORY")
 
 func New() *DB {
 

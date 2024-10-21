@@ -59,7 +59,7 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 		// Write to mongodb
 		client := database.New()
 
-		db := client.Database(database.DatabaseName)
+		db := client.Client.Database(database.DatabaseName)
 		collection := db.Collection("configuration")
 
 		var globalConfig models.Config
