@@ -525,7 +525,7 @@ func StoreConfig(configDirectory string, config models.Config) error {
 		// Write to mongodb
 		client := database.New()
 
-		db := client.Database(database.DatabaseName)
+		db := client.Client.Database(database.DatabaseName)
 		collection := db.Collection("configuration")
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
