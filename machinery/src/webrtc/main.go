@@ -16,8 +16,8 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/packets"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	pionWebRTC "github.com/pion/webrtc/v3"
-	pionMedia "github.com/pion/webrtc/v3/pkg/media"
+	pionWebRTC "github.com/pion/webrtc/v4"
+	pionMedia "github.com/pion/webrtc/v4/pkg/media"
 )
 
 var (
@@ -353,11 +353,11 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 
 			pkt, cursorError = livestreamCursor.ReadPacket()
 
-			if config.Capture.ForwardWebRTC != "true" && peerConnectionCount == 0 {
-				start = false
-				receivedKeyFrame = false
-				continue
-			}
+			//if config.Capture.ForwardWebRTC != "true" && peerConnectionCount == 0 {
+			//	start = false
+			//	receivedKeyFrame = false
+			//	continue
+			//}
 
 			select {
 			case lastKeepAlive = <-communication.HandleLiveHDKeepalive:
