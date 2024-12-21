@@ -172,6 +172,11 @@ type RequestSDStreamPayload struct {
 	Timestamp int64 `json:"timestamp"` // timestamp
 }
 
+// We received a request HLS stream request
+type RequestHLSStreamPayload struct {
+	Timestamp int64 `json:"timestamp"` // timestamp
+}
+
 // We received a request HD stream request
 type RequestHDStreamPayload struct {
 	Timestamp          int64  `json:"timestamp"`           // timestamp

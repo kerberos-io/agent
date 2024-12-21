@@ -410,7 +410,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	if g.AudioG711Media != nil && g.AudioG711Forma != nil {
 		g.Client.OnPacketRTP(g.AudioG711Media, g.AudioG711Forma, func(rtppkt *rtp.Packet) {
 			// decode timestamp
-			pts, ok := g.Client.PacketPTS(g.AudioG711Media, rtppkt)
+			pts, ok := g.Client.PacketPTS2(g.AudioG711Media, rtppkt)
 			if !ok {
 				log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 				return
@@ -442,7 +442,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	if g.AudioMPEG4Media != nil && g.AudioMPEG4Forma != nil {
 		g.Client.OnPacketRTP(g.AudioMPEG4Media, g.AudioMPEG4Forma, func(rtppkt *rtp.Packet) {
 			// decode timestamp
-			pts, ok := g.Client.PacketPTS(g.AudioMPEG4Media, rtppkt)
+			pts, ok := g.Client.PacketPTS2(g.AudioMPEG4Media, rtppkt)
 			if !ok {
 				log.Log.Error("capture.golibrtsp.Start(): " + "unable to get PTS")
 				return
@@ -493,7 +493,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 			if len(rtppkt.Payload) > 0 {
 
 				// decode timestamp
-				pts, ok := g.Client.PacketPTS(g.VideoH264Media, rtppkt)
+				pts, ok := g.Client.PacketPTS2(g.VideoH264Media, rtppkt)
 				if !ok {
 					log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 					return
@@ -578,6 +578,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					Time:            pts,
 					CompositionTime: pts,
 					Idx:             g.VideoH264Index,
+					AU:              filteredAU,
 					IsVideo:         true,
 					IsAudio:         false,
 					Codec:           "H264",
@@ -638,7 +639,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 			if len(rtppkt.Payload) > 0 {
 
 				// decode timestamp
-				pts, ok := g.Client.PacketPTS(g.VideoH265Media, rtppkt)
+				pts, ok := g.Client.PacketPTS2(g.VideoH265Media, rtppkt)
 				if !ok {
 					log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 					return
@@ -705,6 +706,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					Time:            pts,
 					CompositionTime: pts,
 					Idx:             g.VideoH265Index,
+					AU:              au,
 					IsVideo:         true,
 					IsAudio:         false,
 					Codec:           "H265",

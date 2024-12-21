@@ -734,6 +734,63 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 	log.Log.Debug("cloud.HandleLiveStreamSD(): finished")
 }
 
+func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
+
+	log.Log.Debug("cloud.HandleLiveStreamHLS(): started")
+
+	config := configuration.Config
+
+	// If offline made is enabled, we will stop the thread.
+	if config.Offline == "true" {
+		log.Log.Debug("cloud.HandleLiveStreamHLS(): stopping as Offline is enabled.")
+	} else {
+
+		// Check if we need to enable the live stream
+		if config.Capture.Liveview != "false" {
+
+			hubKey := ""
+			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
+				hubKey = config.S3.Publickey
+			} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
+				hubKey = config.KStorage.CloudKey
+			}
+			// This is the new way ;)
+			if config.HubKey != "" {
+				hubKey = config.HubKey
+			}
+			fmt.Println("hubKey: ", hubKey)
+
+			lastLivestreamRequest := int64(0)
+
+			var cursorError error
+			var pkt packets.Packet
+
+			for cursorError == nil {
+				pkt, cursorError = livestreamCursor.ReadPacket()
+				if len(pkt.Data) == 0 || !pkt.IsKeyFrame {
+					continue
+				}
+				now := time.Now().Unix()
+				select {
+				case <-communication.HandleLiveHLS:
+					lastLivestreamRequest = now
+				default:
+				}
+				if now-lastLivestreamRequest > 3 {
+					continue
+				}
+				log.Log.Info("cloud.HandleLiveStreamHLS(): Creating .ts recording for HLS live stream.")
+				// ..
+			}
+
+		} else {
+			log.Log.Debug("cloud.HandleLiveStreamHLS(): stopping as Liveview is disabled.")
+		}
+	}
+
+	log.Log.Debug("cloud.HandleLiveStreamHLS(): finished")
+}
+
 func HandleLiveStreamHD(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
 
 	config := configuration.Config

@@ -267,6 +267,8 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 					go HandleUpdateConfig(mqttClient, hubKey, payload, configDirectory, configuration, communication)
 				case "request-sd-stream":
 					go HandleRequestSDStream(mqttClient, hubKey, payload, configuration, communication)
+				case "request-hls-stream":
+					go HandleRequestHLSStream(mqttClient, hubKey, payload, configuration, communication)
 				case "request-hd-stream":
 					go HandleRequestHDStream(mqttClient, hubKey, payload, configuration, communication)
 				case "receive-hd-candidates":
@@ -477,6 +479,26 @@ func HandleRequestSDStream(mqttClient mqtt.Client, hubKey string, payload models
 			log.Log.Info("routers.mqtt.main.HandleRequestSDStream(): received request to livestream.")
 		} else {
 			log.Log.Info("routers.mqtt.main.HandleRequestSDStream(): received request to livestream, but camera is not connected.")
+		}
+	}
+}
+
+func HandleRequestHLSStream(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
+	value := payload.Value
+	// Convert map[string]interface{} to RequestSDStreamPayload
+	jsonData, _ := json.Marshal(value)
+	var requestHLSStreamPayload models.RequestHLSStreamPayload
+	json.Unmarshal(jsonData, &requestHLSStreamPayload)
+
+	if requestHLSStreamPayload.Timestamp != 0 {
+		if communication.CameraConnected {
+			select {
+			case communication.HandleLiveHLS <- time.Now().Unix():
+			default:
+			}
+			log.Log.Info("routers.mqtt.main.HandleRequestHLSStream(): received request to livestream.")
+		} else {
+			log.Log.Info("routers.mqtt.main.HandleRequestHLSStream(): received request to livestream, but camera is not connected.")
 		}
 	}
 }
