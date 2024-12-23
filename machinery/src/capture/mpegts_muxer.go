@@ -124,7 +124,7 @@ func (e *MpegtsMuxer) WriteH264(pkt packets.Packet) error {
 	dts, err := e.dtsExtractor.Extract(au, pkt.Time)
 	if err != nil {
 		fmt.Println("Error extracting DTS: ", err)
-		//return err
+		return err
 	}
 	return e.w.WriteH264(e.H264Track, pkt.Time, dts, pkt.IsKeyFrame, au)
 }
