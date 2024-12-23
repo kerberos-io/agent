@@ -480,6 +480,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	// called when a video RTP packet arrives for H264
 	var filteredAU [][]byte
 	if g.VideoH264Media != nil && g.VideoH264Forma != nil {
+
 		g.Client.OnPacketRTP(g.VideoH264Media, g.VideoH264Forma, func(rtppkt *rtp.Packet) {
 
 			// This will check if we need to stop the thread,
@@ -504,6 +505,14 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				// access unit. Once we have a full access unit, we can
 				// decode it, and know if it's a keyframe or not.
 				au, errDecode := g.VideoH264Decoder.Decode(rtppkt)
+				//originalAU := au
+				// Deep copy the AU, so we can use it later on.
+				originalAU := make([][]byte, len(au))
+				for i, v := range au {
+					originalAU[i] = make([]byte, len(v))
+					copy(originalAU[i], v)
+				}
+
 				if errDecode != nil {
 					if errDecode != rtph264.ErrNonStartingPacketAndNoPrevious && errDecode != rtph264.ErrMorePacketsNeeded {
 						log.Log.Error("capture.golibrtsp.Start(): " + errDecode.Error())
@@ -579,6 +588,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					CompositionTime: pts,
 					Idx:             g.VideoH264Index,
 					AU:              filteredAU,
+					OrginialAU:      originalAU,
 					IsVideo:         true,
 					IsAudio:         false,
 					Codec:           "H264",
@@ -650,6 +660,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				// access unit. Once we have a full access unit, we can
 				// decode it, and know if it's a keyframe or not.
 				au, errDecode := g.VideoH265Decoder.Decode(rtppkt)
+				originalAU := au
 				if errDecode != nil {
 					if errDecode != rtph265.ErrNonStartingPacketAndNoPrevious && errDecode != rtph265.ErrMorePacketsNeeded {
 						log.Log.Error("capture.golibrtsp.Start(): " + errDecode.Error())
@@ -707,6 +718,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					CompositionTime: pts,
 					Idx:             g.VideoH265Index,
 					AU:              au,
+					OrginialAU:      originalAU,
 					IsVideo:         true,
 					IsAudio:         false,
 					Codec:           "H265",

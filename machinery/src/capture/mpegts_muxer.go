@@ -2,6 +2,7 @@ package capture
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"sync"
 
@@ -20,6 +21,7 @@ func multiplyAndDivide(v, m, d int64) int64 {
 // mpegtsMuxer allows to save a H264 / MPEG-4 audio stream into a MPEG-TS file.
 type MpegtsMuxer struct {
 	FileName         string
+	IsOpen           bool
 	H264Format       *format.H264
 	Mpeg4AudioFormat *format.MPEG4Audio
 
@@ -39,11 +41,14 @@ func (e *MpegtsMuxer) Initialize() error {
 	if err != nil {
 		return err
 	}
+	e.IsOpen = true
 	e.b = bufio.NewWriter(e.f)
 
 	e.H264Track = &mpegts.Track{
 		Codec: &mpegts.CodecH264{},
 	}
+
+	e.dtsExtractor = h264.NewDTSExtractor2()
 
 	/*e.Mpeg4AudioTrack = &mpegts.Track{
 		Codec: &mpegts.CodecMPEG4Audio{
@@ -58,21 +63,70 @@ func (e *MpegtsMuxer) Initialize() error {
 
 // close closes all the mpegtsMuxer resources.
 func (e *MpegtsMuxer) Close() {
+	e.IsOpen = false
 	e.b.Flush()
 	e.f.Close()
 }
 
 // writeH264 writes a H264 access unit into MPEG-TS.
-func (e *MpegtsMuxer) WriteH264(pkt packets.Packet, pts int64) error {
+func (e *MpegtsMuxer) WriteH264(pkt packets.Packet) error {
 	e.mutex.Lock()
 	defer e.mutex.Unlock()
 
-	dts, err := e.dtsExtractor.Extract(pkt.AU, pkt.Time)
-	if err != nil {
-		return err
+	au := pkt.OrginialAU
+
+	if au == nil || pkt.IsAudio {
+		return nil
 	}
 
-	return e.w.WriteH264(e.H264Track, pkt.Time, dts, pkt.IsKeyFrame, pkt.AU)
+	var filteredAU [][]byte
+
+	nonIDRPresent := false
+	idrPresent := false
+
+	var SPS []byte
+	var PPS []byte
+	for _, nalu := range au {
+		typ := h264.NALUType(nalu[0] & 0x1F)
+		switch typ {
+		case h264.NALUTypeSPS:
+			SPS = nalu
+			continue
+
+		case h264.NALUTypePPS:
+			PPS = nalu
+			continue
+
+		case h264.NALUTypeAccessUnitDelimiter:
+			continue
+
+		case h264.NALUTypeIDR:
+			idrPresent = true
+
+		case h264.NALUTypeNonIDR:
+			nonIDRPresent = true
+		}
+
+		filteredAU = append(filteredAU, nalu)
+	}
+
+	au = filteredAU
+
+	if au == nil || (!nonIDRPresent && !idrPresent) {
+		return nil
+	}
+
+	// add SPS and PPS before access unit that contains an IDR
+	if idrPresent {
+		au = append([][]byte{SPS, PPS}, au...)
+	}
+
+	dts, err := e.dtsExtractor.Extract(au, pkt.Time)
+	if err != nil {
+		fmt.Println("Error extracting DTS: ", err)
+		//return err
+	}
+	return e.w.WriteH264(e.H264Track, pkt.Time, dts, pkt.IsKeyFrame, au)
 }
 
 // writeMPEG4Audio writes MPEG-4 audio access units into MPEG-TS.

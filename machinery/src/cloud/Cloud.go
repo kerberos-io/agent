@@ -748,26 +748,16 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 		// Check if we need to enable the live stream
 		if config.Capture.Liveview != "false" {
 
-			hubKey := ""
-			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
-				hubKey = config.S3.Publickey
-			} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
-				hubKey = config.KStorage.CloudKey
-			}
-			// This is the new way ;)
-			if config.HubKey != "" {
-				hubKey = config.HubKey
-			}
-			fmt.Println("hubKey: ", hubKey)
-
 			lastLivestreamRequest := int64(0)
-
 			var cursorError error
 			var pkt packets.Packet
+			segmentDuration := 10 // 4 seconds
+			var muxer capture.MpegtsMuxer
+			var firstPTS = time.Now().Unix()
 
 			for cursorError == nil {
 				pkt, cursorError = livestreamCursor.ReadPacket()
-				if len(pkt.Data) == 0 || !pkt.IsKeyFrame {
+				if len(pkt.Data) == 0 {
 					continue
 				}
 				now := time.Now().Unix()
@@ -776,13 +766,31 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 					lastLivestreamRequest = now
 				default:
 				}
-				if now-lastLivestreamRequest > 3 {
+
+				if now-lastLivestreamRequest > 10 {
+					if muxer.IsOpen {
+						muxer.Close()
+					}
 					continue
 				}
-				log.Log.Info("cloud.HandleLiveStreamHLS(): Creating .ts recording for HLS live stream.")
-				// ..
-			}
 
+				if pkt.IsKeyFrame {
+					if muxer.IsOpen && time.Now().Unix()-firstPTS > int64(segmentDuration) {
+						muxer.Close()
+					}
+					if !muxer.IsOpen {
+						muxer = capture.MpegtsMuxer{
+							FileName: fmt.Sprintf("data/live/live-%d.ts", time.Now().Unix()),
+						}
+						muxer.Initialize()
+						firstPTS = time.Now().Unix()
+					}
+				}
+
+				if muxer.IsOpen {
+					muxer.WriteH264(pkt)
+				}
+			}
 		} else {
 			log.Log.Debug("cloud.HandleLiveStreamHLS(): stopping as Liveview is disabled.")
 		}

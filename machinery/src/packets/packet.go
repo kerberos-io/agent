@@ -16,5 +16,6 @@ type Packet struct {
 	Time            int64    // packet decode time
 	DTS             int64    // packet presentation time
 	AU              [][]byte // access unit
+	OrginialAU      [][]byte // original access unit
 	Data            []byte   // packet data
 }
