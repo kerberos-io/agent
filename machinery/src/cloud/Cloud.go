@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -776,7 +777,47 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 
 				if pkt.IsKeyFrame {
 					if muxer.IsOpen && time.Now().Unix()-firstPTS > int64(segmentDuration) {
+
 						muxer.Close()
+						fileName := muxer.FileName
+						fmt.Println("We'll upload the file: " + fileName)
+
+						// Load the file into a reader
+						file, err := os.Open(fileName)
+
+						req, err := http.NewRequest("POST", config.HubURI+"/hls/segment", file)
+
+						req.Header.Set("Content-Type", "video/mp4")
+						req.Header.Set("X-Kerberos-Hub-PublicKey", config.HubKey)
+						req.Header.Set("X-Kerberos-Hub-PrivateKey", config.HubPrivateKey)
+						req.Header.Set("X-Kerberos-Storage-Device", config.Key)
+
+						var client *http.Client
+						if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+							tr := &http.Transport{
+								TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+							}
+							client = &http.Client{Transport: tr}
+						} else {
+							client = &http.Client{}
+						}
+
+						resp, err := client.Do(req)
+						if resp != nil {
+							defer resp.Body.Close()
+						}
+
+						if err == nil {
+							if resp != nil {
+								body, err := ioutil.ReadAll(resp.Body)
+								if err == nil {
+									if resp.StatusCode == 200 {
+										fmt.Println(body)
+									}
+								}
+							}
+						}
+
 					}
 					if !muxer.IsOpen {
 						muxer = capture.MpegtsMuxer{
