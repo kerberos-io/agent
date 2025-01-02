@@ -244,7 +244,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					ttime := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, dts); err != nil {
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
