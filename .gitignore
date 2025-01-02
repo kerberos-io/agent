@@ -8,8 +8,11 @@ machinery/data/config
 machinery/data/cloud
 machinery/data/recordings
 machinery/data/snapshots
+machinery/data/live
 machinery/test*
 machinery/init-dev.sh
 machinery/.env
 machinery/vendor
+machinery/__debug*
 deployments/docker/private-docker-compose.yaml
+.DS_Store
