@@ -409,8 +409,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	// called when a MULAW audio RTP packet arrives
 	if g.AudioG711Media != nil && g.AudioG711Forma != nil {
 		g.Client.OnPacketRTP(g.AudioG711Media, g.AudioG711Forma, func(rtppkt *rtp.Packet) {
+			pts, ok := g.Client.PacketPTS(g.AudioG711Media, rtppkt)
 			// decode timestamp
-			pts, ok := g.Client.PacketPTS2(g.AudioG711Media, rtppkt)
+			pts2, ok := g.Client.PacketPTS2(g.AudioG711Media, rtppkt)
 			if !ok {
 				log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 				return
@@ -427,8 +428,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				IsKeyFrame:      false,
 				Packet:          rtppkt,
 				Data:            op,
-				Time:            pts,
-				CompositionTime: pts,
+				Time:            pts2,
+				TimeLegacy:      pts,
+				CompositionTime: pts2,
 				Idx:             g.AudioG711Index,
 				IsVideo:         false,
 				IsAudio:         true,
@@ -442,7 +444,8 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	if g.AudioMPEG4Media != nil && g.AudioMPEG4Forma != nil {
 		g.Client.OnPacketRTP(g.AudioMPEG4Media, g.AudioMPEG4Forma, func(rtppkt *rtp.Packet) {
 			// decode timestamp
-			pts, ok := g.Client.PacketPTS2(g.AudioMPEG4Media, rtppkt)
+			pts, ok := g.Client.PacketPTS(g.AudioMPEG4Media, rtppkt)
+			pts2, ok := g.Client.PacketPTS2(g.AudioMPEG4Media, rtppkt)
 			if !ok {
 				log.Log.Error("capture.golibrtsp.Start(): " + "unable to get PTS")
 				return
@@ -466,8 +469,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				IsKeyFrame:      false,
 				Packet:          rtppkt,
 				Data:            enc,
-				Time:            pts,
-				CompositionTime: pts,
+				Time:            pts2,
+				TimeLegacy:      pts,
+				CompositionTime: pts2,
 				Idx:             g.AudioG711Index,
 				IsVideo:         false,
 				IsAudio:         true,
@@ -480,6 +484,8 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	// called when a video RTP packet arrives for H264
 	var filteredAU [][]byte
 	if g.VideoH264Media != nil && g.VideoH264Forma != nil {
+
+		dtsExtractor := h264.NewDTSExtractor2()
 
 		g.Client.OnPacketRTP(g.VideoH264Media, g.VideoH264Forma, func(rtppkt *rtp.Packet) {
 
@@ -494,7 +500,8 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 			if len(rtppkt.Payload) > 0 {
 
 				// decode timestamp
-				pts, ok := g.Client.PacketPTS2(g.VideoH264Media, rtppkt)
+				pts, ok := g.Client.PacketPTS(g.VideoH264Media, rtppkt)
+				pts2, ok := g.Client.PacketPTS2(g.VideoH264Media, rtppkt)
 				if !ok {
 					log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 					return
@@ -580,12 +587,20 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					return
 				}
 
+				// Extract DTS from RTP packets
+				dts2, err := dtsExtractor.Extract(filteredAU, pts2)
+				if err != nil {
+					log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
+					return
+				}
+
 				pkt := packets.Packet{
 					IsKeyFrame:      idrPresent,
 					Packet:          rtppkt,
 					Data:            enc,
-					Time:            pts,
-					CompositionTime: pts,
+					Time:            pts2,
+					TimeLegacy:      pts,
+					CompositionTime: dts2,
 					Idx:             g.VideoH264Index,
 					AU:              filteredAU,
 					OrginialAU:      originalAU,
@@ -649,7 +664,8 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 			if len(rtppkt.Payload) > 0 {
 
 				// decode timestamp
-				pts, ok := g.Client.PacketPTS2(g.VideoH265Media, rtppkt)
+				pts, ok := g.Client.PacketPTS(g.VideoH265Media, rtppkt)
+				pts2, ok := g.Client.PacketPTS2(g.VideoH265Media, rtppkt)
 				if !ok {
 					log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 					return
@@ -714,8 +730,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					IsKeyFrame:      isRandomAccess,
 					Packet:          rtppkt,
 					Data:            enc,
-					Time:            pts,
-					CompositionTime: pts,
+					Time:            pts2,
+					TimeLegacy:      pts,
+					CompositionTime: pts2,
 					Idx:             g.VideoH265Index,
 					AU:              au,
 					OrginialAU:      originalAU,
