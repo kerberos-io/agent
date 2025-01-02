@@ -480,6 +480,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	// called when a video RTP packet arrives for H264
 	var filteredAU [][]byte
 	if g.VideoH264Media != nil && g.VideoH264Forma != nil {
+
+		dtsExtractor := h264.NewDTSExtractor2()
+
 		g.Client.OnPacketRTP(g.VideoH264Media, g.VideoH264Forma, func(rtppkt *rtp.Packet) {
 
 			// This will check if we need to stop the thread,
@@ -493,7 +496,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 			if len(rtppkt.Payload) > 0 {
 
 				// decode timestamp
+				pts2, ok := g.Client.PacketPTS2(g.VideoH264Media, rtppkt)
 				pts, ok := g.Client.PacketPTS(g.VideoH264Media, rtppkt)
+				fmt.Println(convertPTS(pts), convertPTS2(pts2))
 				if !ok {
 					log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 					return
@@ -571,12 +576,19 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					return
 				}
 
+				// Extract DTS from RTP packets
+				dts2, err := dtsExtractor.Extract(originalAU, pts2)
+				if err != nil {
+					log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
+					return
+				}
+
 				pkt := packets.Packet{
 					IsKeyFrame:      idrPresent,
 					Packet:          rtppkt,
 					Data:            enc,
-					Time:            pts,
-					CompositionTime: pts,
+					Time:            pts2,
+					CompositionTime: dts2,
 					Idx:             g.VideoH264Index,
 					IsVideo:         true,
 					IsAudio:         false,
