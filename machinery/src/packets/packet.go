@@ -18,4 +18,6 @@ type Packet struct {
 	Time            int64  // packet decode time
 	TimeLegacy      time.Duration
 	Data            []byte // packet data
+	AU              [][]byte
+	OrginialAU      [][]byte
 }
