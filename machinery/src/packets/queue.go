@@ -4,7 +4,6 @@ package packets
 import (
 	"io"
 	"sync"
-	"time"
 )
 
 //        time
@@ -145,7 +144,7 @@ func (self *Queue) Oldest() *QueueCursor {
 }
 
 // Create cursor position at specific time in buffered packets.
-func (self *Queue) DelayedTime(dur time.Duration) *QueueCursor {
+func (self *Queue) DelayedTime(dur int64) *QueueCursor {
 	cursor := self.newCursor()
 	cursor.init = func(buf *Buf, videoidx int) BufPos {
 		i := buf.Tail - 1

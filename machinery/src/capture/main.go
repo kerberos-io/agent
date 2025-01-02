@@ -120,7 +120,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
 					// Write the last packet
-					ttime := convertPTS(pkt.Time)
+					ttime := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -242,7 +242,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 					}
 
-					ttime := convertPTS(pkt.Time)
+					ttime := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -261,7 +261,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					recordingStatus = "started"
 
 				} else if start {
-					ttime := convertPTS(pkt.Time)
+					ttime := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -337,7 +337,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 			log.Log.Info("capture.main.HandleRecordStream(motiondetection): Start motion based recording ")
 
-			var lastDuration time.Duration
+			var lastDuration int64
 			var lastRecordingTime int64
 
 			//var cws *cacheWriterSeeker
@@ -444,8 +444,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						start = true
 					}
 					if start {
-
-						ttime := convertPTS(pkt.Time)
+						ttime := convertPTS(pkt.TimeLegacy)
 						if pkt.IsVideo {
 							if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
@@ -694,4 +693,8 @@ func JpegImage(captureDevice *Capture, communication *models.Communication) imag
 
 func convertPTS(v time.Duration) uint64 {
 	return uint64(v.Milliseconds())
+}
+
+func convertPTS2(v int64) uint64 {
+	return uint64(v) / 100
 }

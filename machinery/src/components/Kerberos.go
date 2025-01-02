@@ -236,7 +236,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	if subStreamEnabled && rtspSubClient != nil {
 		subQueue = packets.NewQueue()
 		communication.SubQueue = subQueue
-		subQueue.SetMaxGopCount(1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
+		subQueue.SetMaxGopCount(3) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
 		subQueue.WriteHeader(videoSubStreams)
 		go rtspSubClient.Start(context.Background(), "sub", subQueue, configuration, communication)
 
