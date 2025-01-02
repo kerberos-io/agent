@@ -1,6 +1,8 @@
 package packets
 
 import (
+	"time"
+
 	"github.com/pion/rtp"
 )
 
@@ -14,5 +16,6 @@ type Packet struct {
 	Codec           string // codec name
 	CompositionTime int64  // packet presentation time minus decode time for H264 B-Frame
 	Time            int64  // packet decode time
+	TimeLegacy      time.Duration
 	Data            []byte // packet data
 }

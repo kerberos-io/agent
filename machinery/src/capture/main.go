@@ -120,7 +120,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
 					// Write the last packet
-					ttime := convertPTS2(pkt.Time)
+					ttime := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -242,10 +242,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 					}
 
-					ttime := convertPTS2(pkt.Time)
-					dts := convertPTS2(pkt.CompositionTime)
+					ttime := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, dts); err != nil {
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
@@ -262,10 +262,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					recordingStatus = "started"
 
 				} else if start {
-					ttime := convertPTS2(pkt.Time)
-					dts := convertPTS2(pkt.CompositionTime)
+					ttime := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, dts); err != nil {
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
@@ -446,8 +445,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						start = true
 					}
 					if start {
-
-						ttime := convertPTS2(pkt.Time)
+						ttime := convertPTS(pkt.TimeLegacy)
 						if pkt.IsVideo {
 							if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
