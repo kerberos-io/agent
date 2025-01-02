@@ -410,7 +410,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	if g.AudioG711Media != nil && g.AudioG711Forma != nil {
 		g.Client.OnPacketRTP(g.AudioG711Media, g.AudioG711Forma, func(rtppkt *rtp.Packet) {
 			// decode timestamp
-			pts, ok := g.Client.PacketPTS(g.AudioG711Media, rtppkt)
+			pts, ok := g.Client.PacketPTS2(g.AudioG711Media, rtppkt)
 			if !ok {
 				log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 				return
@@ -442,7 +442,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	if g.AudioMPEG4Media != nil && g.AudioMPEG4Forma != nil {
 		g.Client.OnPacketRTP(g.AudioMPEG4Media, g.AudioMPEG4Forma, func(rtppkt *rtp.Packet) {
 			// decode timestamp
-			pts, ok := g.Client.PacketPTS(g.AudioMPEG4Media, rtppkt)
+			pts, ok := g.Client.PacketPTS2(g.AudioMPEG4Media, rtppkt)
 			if !ok {
 				log.Log.Error("capture.golibrtsp.Start(): " + "unable to get PTS")
 				return
@@ -577,7 +577,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				}
 
 				// Extract DTS from RTP packets
-				dts2, err := dtsExtractor.Extract(originalAU, pts2)
+				dts2, err := dtsExtractor.Extract(filteredAU, pts2)
 				if err != nil {
 					log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
 					return
@@ -650,7 +650,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 			if len(rtppkt.Payload) > 0 {
 
 				// decode timestamp
-				pts, ok := g.Client.PacketPTS(g.VideoH265Media, rtppkt)
+				pts, ok := g.Client.PacketPTS2(g.VideoH265Media, rtppkt)
 				if !ok {
 					log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 					return
