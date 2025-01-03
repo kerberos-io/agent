@@ -80,14 +80,13 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 
 	if err == nil {
 		if resp != nil {
-			if err == nil {
-				if resp.StatusCode == 200 {
-					log.Log.Info("UploadKerberosHub: Upload allowed using the credentials provided (" + config.HubKey + ", " + config.HubPrivateKey + ")")
-				} else {
-					log.Log.Info("UploadKerberosHub: Upload NOT allowed using the credentials provided (" + config.HubKey + ", " + config.HubPrivateKey + ")")
-					return false, true, nil
-				}
+			if resp.StatusCode == 200 {
+				log.Log.Info("UploadKerberosHub: Upload allowed using the credentials provided (" + config.HubKey + ", " + config.HubPrivateKey + ")")
+			} else {
+				log.Log.Info("UploadKerberosHub: Upload NOT allowed using the credentials provided (" + config.HubKey + ", " + config.HubPrivateKey + ")")
+				return false, true, nil
 			}
+
 		}
 	}
 

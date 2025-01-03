@@ -16,8 +16,8 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/packets"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	pionWebRTC "github.com/pion/webrtc/v4"
-	pionMedia "github.com/pion/webrtc/v4/pkg/media"
+	pionWebRTC "github.com/pion/webrtc/v3"
+	pionMedia "github.com/pion/webrtc/v3/pkg/media"
 )
 
 var (
