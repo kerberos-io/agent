@@ -580,11 +580,11 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				}
 
 				// Extract DTS from RTP packets
-				dts2, err := dtsExtractor.Extract(filteredAU, pts2)
-				if err != nil {
-					log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
-					return
-				}
+				//dts2, err := dtsExtractor.Extract(filteredAU, pts2)
+				//if err != nil {
+				// log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
+				// return
+				//}
 
 				pkt := packets.Packet{
 					IsKeyFrame:      idrPresent,
@@ -592,7 +592,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					Data:            enc,
 					Time:            pts2,
 					TimeLegacy:      pts,
-					CompositionTime: dts2,
+					CompositionTime: pts2,
 					Idx:             g.VideoH264Index,
 					IsVideo:         true,
 					IsAudio:         false,
