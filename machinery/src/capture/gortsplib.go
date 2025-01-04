@@ -485,7 +485,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	var filteredAU [][]byte
 	if g.VideoH264Media != nil && g.VideoH264Forma != nil {
 
-		dtsExtractor := h264.NewDTSExtractor2()
+		//dtsExtractor := h264.NewDTSExtractor2()
 
 		g.Client.OnPacketRTP(g.VideoH264Media, g.VideoH264Forma, func(rtppkt *rtp.Packet) {
 
