@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
+	"google.golang.org/protobuf/proto"
 
 	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/routers"
@@ -84,6 +86,25 @@ func main() {
 	log.Log.Init(logLevel, logOutput, configDirectory, timezone)
 
 	switch action {
+
+	case "protobuf":
+
+		exampleMessage := models.ExampleMessage{}
+		exampleMessage.Id = "123"
+		exampleMessage.Content = "Hello World"
+		exampleMessage.Tags = []string{"test", "test2"}
+
+		log.Log.Info("main.Main(): Protobuf: " + exampleMessage.String())
+		// Printout Content
+		log.Log.Info("main.Main(): Protobuf: " + exampleMessage.GetContent())
+		// Serialize
+		marsh, err := proto.Marshal(&exampleMessage)
+		if err != nil {
+			log.Log.Fatal("main.Main(): could not serialize: " + err.Error())
+		} else {
+			log.Log.Info("main.Main(): Protobuf: " + string(marsh))
+			fmt.Println(marsh)
+		}
 
 	case "version":
 		log.Log.Info("main.Main(): You are currrently running Kerberos Agent " + VERSION)
