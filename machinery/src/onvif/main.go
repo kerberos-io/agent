@@ -986,6 +986,10 @@ func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
 	// For the time being we are just interested in the digital inputs and outputs, therefore
 	// we have set the topic to the followin filter.
 	terminate := xsd.String("PT60S")
+	if dev == nil {
+		return pullPointAdress, errors.New("dev is nil, ONVIF was not able to connect to the device")
+	}
+
 	resp, err := dev.CallMethod(event.CreatePullPointSubscription{
 		InitialTerminationTime: &terminate,
 
