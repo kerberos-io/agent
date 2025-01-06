@@ -112,6 +112,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				pkt, cursorError = recordingCursor.ReadPacket()
 			}
 
+			fragmentSeqNr := 0
+			var seg *mp4ff.MediaSegment
+			var frag *mp4ff.Fragment
+
 			for cursorError == nil {
 
 				nextPkt, cursorError = recordingCursor.ReadPacket()
@@ -142,6 +146,39 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					if err := myMuxer.WriteTrailer(); err != nil {
 						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 					}
+
+					/*fragmentSeqNr++
+					frag, _ := mp4ff.CreateFragment(uint32(fragmentSeqNr), mp4ff.DefaultTrakID)
+					seg.AddFragment(frag)
+					frag.AddFullSample(mp4ff.FullSample{
+						Sample: mp4ff.Sample{
+							Dur:  pkt.Packet.Timestamp,
+							Size: uint32(len(pkt.Data)),
+						},
+						DecodeTime: uint64(pkt.Packet.Timestamp),
+						Data:       pkt.Data,
+					})
+
+					outPath := configDirectory + "/data/test/" + name
+					appendToFile(seg, outPath)
+
+					ifd, err := os.Open(outPath)
+					if err != nil {
+						//return fmt.Errorf("could not open input file: %w", err)
+					}
+					defer ifd.Close()
+					parsedMp4, err := mp4ff.DecodeFile(ifd, mp4ff.WithDecodeMode(mp4ff.DecModeNormal))
+					fmt.Printf("parsedMp4: %+v\n", parsedMp4)
+					if err != nil {
+						fmt.Errorf("could not parse input file: %w", err)
+					}
+
+					w := os.Stdout
+					err = parsedMp4.Info(w, "udta", "", "  ")
+					if err != nil {
+						fmt.Errorf("could not print info: %w", err)
+					}
+					fragmentSeqNr = 0*/
 
 					log.Log.Info("capture.main.HandleRecordStream(continuous): recording finished: file save: " + name)
 
@@ -231,7 +268,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						spsNALUs := [][]byte{streams[0].SPS}
 						ppsNALUs := [][]byte{streams[0].PPS}
 
-						videoTimescale := uint32(180000)
+						videoTimescale := uint32(90000)
 						init := mp4ff.CreateEmptyInit()
 						init.AddEmptyTrack(videoTimescale, "video", "und")
 
@@ -241,24 +278,45 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						if err != nil {
 							//return err
 						}
+
+						// Set duration
+						init.Moov.Mvhd.Duration = uint64(20)
+						init.Moov.Trak.Tkhd.Duration = uint64(20)
+						init.Moov.Mvhd.CreationTime = uint64(time.Now().Unix())
+						init.Moov.Trak.Tkhd.CreationTime = uint64(time.Now().Unix())
+
 						width2 := trak.Mdia.Minf.Stbl.Stsd.AvcX.Width
 						height2 := trak.Mdia.Minf.Stbl.Stsd.AvcX.Height
 						fmt.Println("width: " + strconv.Itoa(int(width2)) + ", height: " + strconv.Itoa(int(height2)))
 
 						// Add user data box
 						udtaBox := mp4ff.UdtaBox{}
-						freeBox := mp4ff.FreeBox{
-							Name: "fingerprint",
+						freeBox := mp4ff.DataBox{
+							Data: []byte("Fingerprint: xcxxx"),
 						}
 						udtaBox.AddChild(&freeBox)
-						//moov := init.Moov
-						trak.AddChild(&udtaBox)
+						init.Moov.AddChild(&udtaBox)
 
 						// Write to file
 						outPath := configDirectory + "/data/test/" + name
 						err = writeToFile(init, outPath)
 						if err != nil {
 						}
+
+						seg = mp4ff.NewMediaSegment()
+
+						fragmentSeqNr++
+						frag, _ = mp4ff.CreateFragment(uint32(fragmentSeqNr), mp4ff.DefaultTrakID)
+						seg.AddFragment(frag)
+						frag.AddFullSample(mp4ff.FullSample{
+							Sample: mp4ff.Sample{
+								Dur:  uint32(pkt.TimeLegacy),
+								Size: uint32(len(pkt.Data)),
+							},
+							DecodeTime: uint64(pkt.TimeLegacy),
+							Data:       pkt.Data,
+						})
+						appendToFile(seg, outPath)
 
 						//cws = newCacheWriterSeeker(4096)
 						myMuxer, _ = mp4.CreateMp4Muxer(file)
@@ -283,6 +341,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
+
+						/*fragmentSeqNr++
+						frag, _ = mp4ff.CreateFragment(uint32(fragmentSeqNr), mp4ff.DefaultTrakID)
+						seg.AddFragment(frag)
+						frag.AddFullSample(mp4ff.FullSample{
+							Sample: mp4ff.Sample{
+								Dur:  pkt.Packet.Timestamp,
+								Size: uint32(len(pkt.Data)),
+							},
+							DecodeTime: uint64(pkt.Packet.Timestamp),
+							Data:       pkt.Data,
+						})*/
+
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
 							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
@@ -302,6 +373,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
+
+						/*fragmentSeqNr++
+						frag, _ := mp4ff.CreateFragment(uint32(fragmentSeqNr), mp4ff.DefaultTrakID)
+						seg.AddFragment(frag)
+						frag.AddFullSample(mp4ff.FullSample{
+							Sample: mp4ff.Sample{
+								Dur:  pkt.Packet.Timestamp,
+								Size: uint32(len(pkt.Data)),
+							},
+							DecodeTime: uint64(pkt.Packet.Timestamp),
+							Data:       pkt.Data,
+						})*/
+
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
 							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
@@ -332,6 +416,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					start = false
 					file.Close()
 					file = nil
+
+					fragmentSeqNr = 0
 
 					// Check if need to convert to fragmented using bento
 					if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
@@ -738,6 +824,17 @@ func convertPTS2(v int64) uint64 {
 func writeToFile(init *mp4ff.InitSegment, filePath string) error {
 	// Next write to a file
 	ofd, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer ofd.Close()
+	err = init.Encode(ofd)
+	return err
+}
+
+func appendToFile(init *mp4ff.MediaSegment, filePath string) error {
+	// Next write to a file
+	ofd, err := os.OpenFile(filePath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}

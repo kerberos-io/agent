@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
+	"github.com/Eyevinn/mp4ff/mp4"
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -84,6 +86,25 @@ func main() {
 	log.Log.Init(logLevel, logOutput, configDirectory, timezone)
 
 	switch action {
+
+	case "decode":
+		inFilePath := "./data/inspect/1736171023_6-967003_agent_200-200-400-400_0_769.mp4"
+		ifd, err := os.Open(inFilePath)
+		if err != nil {
+			//return fmt.Errorf("could not open input file: %w", err)
+		}
+		defer ifd.Close()
+		parsedMp4, err := mp4.DecodeFile(ifd, mp4.WithDecodeMode(mp4.DecModeNormal))
+		fmt.Printf("parsedMp4: %+v\n", parsedMp4)
+		if err != nil {
+			fmt.Errorf("could not parse input file: %w", err)
+		}
+
+		w := os.Stdout
+		err = parsedMp4.Info(w, "", "", "  ")
+		if err != nil {
+			fmt.Errorf("could not print info: %w", err)
+		}
 
 	case "version":
 		log.Log.Info("main.Main(): You are currrently running Kerberos Agent " + VERSION)
