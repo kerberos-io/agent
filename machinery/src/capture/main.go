@@ -4,11 +4,13 @@ package capture
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"image"
 	"os"
 	"strconv"
 	"time"
 
+	mp4ff "github.com/Eyevinn/mp4ff/mp4"
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/conditions"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
@@ -224,6 +226,40 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					file, err = os.Create(fullName)
 					if err == nil {
+
+						streams, _ := rtspClient.GetVideoStreams()
+						spsNALUs := [][]byte{streams[0].SPS}
+						ppsNALUs := [][]byte{streams[0].PPS}
+
+						videoTimescale := uint32(180000)
+						init := mp4ff.CreateEmptyInit()
+						init.AddEmptyTrack(videoTimescale, "video", "und")
+
+						trak := init.Moov.Trak
+						includePS := true
+						err := trak.SetAVCDescriptor("avc1", spsNALUs, ppsNALUs, includePS)
+						if err != nil {
+							//return err
+						}
+						width2 := trak.Mdia.Minf.Stbl.Stsd.AvcX.Width
+						height2 := trak.Mdia.Minf.Stbl.Stsd.AvcX.Height
+						fmt.Println("width: " + strconv.Itoa(int(width2)) + ", height: " + strconv.Itoa(int(height2)))
+
+						// Add user data box
+						udtaBox := mp4ff.UdtaBox{}
+						freeBox := mp4ff.FreeBox{
+							Name: "fingerprint",
+						}
+						udtaBox.AddChild(&freeBox)
+						//moov := init.Moov
+						trak.AddChild(&udtaBox)
+
+						// Write to file
+						outPath := configDirectory + "/data/test/" + name
+						err = writeToFile(init, outPath)
+						if err != nil {
+						}
+
 						//cws = newCacheWriterSeeker(4096)
 						myMuxer, _ = mp4.CreateMp4Muxer(file)
 						// We choose between H264 and H265
@@ -697,4 +733,15 @@ func convertPTS(v time.Duration) uint64 {
 
 func convertPTS2(v int64) uint64 {
 	return uint64(v) / 100
+}
+
+func writeToFile(init *mp4ff.InitSegment, filePath string) error {
+	// Next write to a file
+	ofd, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer ofd.Close()
+	err = init.Encode(ofd)
+	return err
 }
