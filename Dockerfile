@@ -1,5 +1,5 @@
 
-FROM kerberos/base:eb6b088 AS build-machinery
+FROM kerberos/base:5d5e86b AS build-machinery
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go

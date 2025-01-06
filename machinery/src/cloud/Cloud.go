@@ -10,9 +10,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dromara/carbon/v2"
 	"github.com/elastic/go-sysinfo"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-module/carbon/v2"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 
