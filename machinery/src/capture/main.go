@@ -115,6 +115,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			fragmentSeqNr := 0
 			var seg *mp4ff.MediaSegment
 			var frag *mp4ff.Fragment
+			var duration int64
 
 			for cursorError == nil {
 
@@ -146,6 +147,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					if err := myMuxer.WriteTrailer(); err != nil {
 						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 					}
+
+					outPath := configDirectory + "/data/test/" + name
+					appendToFile(seg, outPath)
 
 					/*fragmentSeqNr++
 					frag, _ := mp4ff.CreateFragment(uint32(fragmentSeqNr), mp4ff.DefaultTrakID)
@@ -264,11 +268,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					file, err = os.Create(fullName)
 					if err == nil {
 
+						duration = 0
 						streams, _ := rtspClient.GetVideoStreams()
 						spsNALUs := [][]byte{streams[0].SPS}
 						ppsNALUs := [][]byte{streams[0].PPS}
 
-						videoTimescale := uint32(90000)
+						videoTimescale := uint32(1000)
 						init := mp4ff.CreateEmptyInit()
 						init.AddEmptyTrack(videoTimescale, "video", "und")
 
@@ -305,18 +310,18 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 						seg = mp4ff.NewMediaSegment()
 
-						fragmentSeqNr++
+						//fragmentSeqNr++
+						duration = 0
 						frag, _ = mp4ff.CreateFragment(uint32(fragmentSeqNr), mp4ff.DefaultTrakID)
 						seg.AddFragment(frag)
 						frag.AddFullSample(mp4ff.FullSample{
 							Sample: mp4ff.Sample{
-								Dur:  uint32(pkt.TimeLegacy),
+								Dur:  uint32(30),
 								Size: uint32(len(pkt.Data)),
 							},
-							DecodeTime: uint64(pkt.TimeLegacy),
+							DecodeTime: uint64(duration),
 							Data:       pkt.Data,
 						})
-						appendToFile(seg, outPath)
 
 						//cws = newCacheWriterSeeker(4096)
 						myMuxer, _ = mp4.CreateMp4Muxer(file)
@@ -374,6 +379,18 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 
+						/*if pkt.IsKeyFrame {
+							duration = duration + 30
+							frag.AddFullSample(mp4ff.FullSample{
+								Sample: mp4ff.Sample{
+									Dur:  uint32(30),
+									Size: uint32(len(pkt.Data)),
+								},
+								DecodeTime: uint64(duration),
+								Data:       pkt.Data,
+							})
+						}*/
+
 						/*fragmentSeqNr++
 						frag, _ := mp4ff.CreateFragment(uint32(fragmentSeqNr), mp4ff.DefaultTrakID)
 						seg.AddFragment(frag)
@@ -385,7 +402,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							DecodeTime: uint64(pkt.Packet.Timestamp),
 							Data:       pkt.Data,
 						})*/
-
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
 							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
