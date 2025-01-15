@@ -47,7 +47,7 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	// Initialize REST API
 	r := gin.Default()
 
-	// Profileerggerg
+	// Profiler
 	pprof.Register(r)
 
 	// Setup CORS
