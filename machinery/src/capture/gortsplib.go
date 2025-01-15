@@ -83,6 +83,25 @@ type Golibrtsp struct {
 	Streams []packets.Stream
 }
 
+// Init function
+var H264FrameDecoder *Decoder
+var H265FrameDecoder *Decoder
+
+func init() {
+	var err error
+	// setup H264 -> raw frames decoder
+	H264FrameDecoder, err = newDecoder("H264")
+	if err != nil {
+		log.Log.Error("capture.golibrtsp.init(): " + err.Error())
+	}
+
+	// setup H265 -> raw frames decoder
+	H265FrameDecoder, err = newDecoder("H265")
+	if err != nil {
+		log.Log.Error("capture.golibrtsp.Connect(H265): " + err.Error())
+	}
+}
+
 // Connect to the RTSP server.
 func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 
@@ -171,13 +190,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 				log.Log.Error("capture.golibrtsp.Connect(H264): " + err.Error())
 			}
 			g.VideoH264Decoder = rtpDec
-
-			// setup H264 -> raw frames decoder
-			frameDec, err := newDecoder("H264")
-			if err != nil {
-				log.Log.Error("capture.golibrtsp.Connect(H264): " + err.Error())
-			}
-			g.VideoH264FrameDecoder = frameDec
+			g.VideoH264FrameDecoder = H264FrameDecoder
 		}
 	}
 
@@ -227,12 +240,7 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			}
 			g.VideoH265Decoder = rtpDec
 
-			// setup H265 -> raw frames decoder
-			frameDec, err := newDecoder("H265")
-			if err != nil {
-				log.Log.Error("capture.golibrtsp.Connect(H265): " + err.Error())
-			}
-			g.VideoH265FrameDecoder = frameDec
+			g.VideoH265FrameDecoder = H265FrameDecoder
 		}
 	}
 
@@ -882,12 +890,15 @@ func (g *Golibrtsp) GetAudioStreams() ([]packets.Stream, error) {
 func (g *Golibrtsp) Close() error {
 	// Close the demuxer.
 	g.Client.Close()
-	if g.VideoH264Decoder != nil {
-		g.VideoH264FrameDecoder.Close()
-	}
-	if g.VideoH265FrameDecoder != nil {
-		g.VideoH265FrameDecoder.Close()
-	}
+
+	// We will have created the decoders globally, so we don't need to close them here.
+
+	//if g.VideoH264Decoder != nil {
+	//	g.VideoH264FrameDecoder.Close()
+	//}
+	//if g.VideoH265FrameDecoder != nil {
+	//	g.VideoH265FrameDecoder.Close()
+	//}
 	return nil
 }
 
