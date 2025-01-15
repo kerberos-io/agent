@@ -98,7 +98,7 @@ func init() {
 	// setup H265 -> raw frames decoder
 	H265FrameDecoder, err = newDecoder("H265")
 	if err != nil {
-		log.Log.Error("capture.golibrtsp.Connect(H265): " + err.Error())
+		log.Log.Error("capture.golibrtsp.init(): " + err.Error())
 	}
 }
 
