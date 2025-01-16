@@ -1,0 +1,19 @@
+name: Autofill PR description
+
+on: pull_request
+
+jobs:
+  openai-pr-description:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Autofill PR description if empty using OpenAI
+        uses: cedricve/azureopenai-pr-description@master
+        with:
+          github_token: ${{ secrets.TOKEN }}
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          azure_openai_version: ${{ secrets.AZURE_OPENAI_VERSION }}
+          overwrite_description: true
