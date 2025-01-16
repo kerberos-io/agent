@@ -222,10 +222,10 @@ func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, 
 		var b []byte
 		if resp != nil {
 			b, err = io.ReadAll(resp.Body)
+			resp.Body.Close() // Ensure the response body is closed
 			if err != nil {
 				log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
 			}
-			resp.Body.Close()
 		}
 		stringBody := string(b)
 		decodedXML, et, err := getXMLNode(stringBody, "GetCapabilitiesResponse")
@@ -252,10 +252,10 @@ func GetTokenFromProfile(device *onvif.Device, profileId int) (xsdonvif.Referenc
 	// Get Profiles
 	resp, err := device.CallMethod(media.GetProfiles{})
 	if err == nil {
-		defer resp.Body.Close()
 		b, err := io.ReadAll(resp.Body)
 		if err == nil {
 			stringBody := string(b)
+			resp.Body.Close() // Ensure the response body is closed
 			decodedXML, et, err := getXMLNode(stringBody, "GetProfilesResponse")
 			if err != nil {
 				log.Log.Debug("onvif.GetTokenFromProfile(): " + err.Error())
@@ -288,21 +288,19 @@ func GetPTZConfigurationsFromDevice(device *onvif.Device) (ptz.GetConfigurations
 	var b []byte
 	if resp != nil {
 		b, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
+		resp.Body.Close() // Ensure the response body is closed
 	}
 
 	if err == nil {
-		if err == nil {
-			stringBody := string(b)
-			decodedXML, et, err := getXMLNode(stringBody, "GetConfigurationsResponse")
-			if err != nil {
+		stringBody := string(b)
+		decodedXML, et, err := getXMLNode(stringBody, "GetConfigurationsResponse")
+		if err != nil {
+			log.Log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
+			return configurations, err
+		} else {
+			if err := decodedXML.DecodeElement(&configurations, et); err != nil {
 				log.Log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
 				return configurations, err
-			} else {
-				if err := decodedXML.DecodeElement(&configurations, et); err != nil {
-					log.Log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
-					return configurations, err
-				}
 			}
 		}
 	}
@@ -360,7 +358,7 @@ func GetPosition(device *onvif.Device, token xsdonvif.ReferenceToken) (xsdonvif.
 	var b []byte
 	if resp != nil {
 		b, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
+		resp.Body.Close() // Ensure the response body is closed
 	}
 
 	if err == nil {
@@ -794,7 +792,7 @@ func GetPresetsFromDevice(device *onvif.Device) ([]models.OnvifActionPreset, err
 		var b []byte
 		if resp != nil {
 			b, err = io.ReadAll(resp.Body)
-			resp.Body.Close()
+			resp.Body.Close() // Ensure the response body is closed
 		}
 		if err == nil {
 			stringBody := string(b)
@@ -845,7 +843,7 @@ func GoToPresetFromDevice(device *onvif.Device, presetName string) error {
 		var b []byte
 		if resp != nil {
 			b, err = io.ReadAll(resp.Body)
-			resp.Body.Close()
+			resp.Body.Close() // Ensure the response body is closed
 		}
 		if err == nil {
 			stringBody := string(b)
@@ -1004,7 +1002,7 @@ func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
 	var b2 []byte
 	if resp != nil {
 		b2, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
+		resp.Body.Close() // Ensure the response body is closed
 		if err == nil {
 			stringBody := string(b2)
 			decodedXML, et, err := getXMLNode(stringBody, "CreatePullPointSubscriptionResponse")
@@ -1023,19 +1021,25 @@ func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
 }
 
 func UnsubscribePullPoint(dev *onvif.Device, pullPointAddress string) error {
+
 	// Unsubscribe from the device
 	unsubscribe := event.Unsubscribe{}
 	requestBody, err := xml.Marshal(unsubscribe)
 	if err != nil {
 		log.Log.Error("onvif.main.UnsubscribePullPoint(): " + err.Error())
 	}
+
 	res, err := dev.SendSoap(pullPointAddress, string(requestBody))
 	if err != nil {
 		log.Log.Error("onvif.main.UnsubscribePullPoint(): " + err.Error())
 	}
 	if res != nil {
-		_, err := io.ReadAll(res.Body)
-		res.Body.Close()
+		b, err := io.ReadAll(res.Body)
+		res.Body.Close() // Ensure the response body is closed
+		if err == nil {
+			stringBody := string(b)
+			log.Log.Debug("onvif.main.UnsubscribePullPoint(): " + stringBody)
+		}
 		if err != nil {
 			log.Log.Error("onvif.main.UnsubscribePullPoint(): " + err.Error())
 		}
@@ -1099,7 +1103,7 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 			var pullMessagesResponse event.PullMessagesResponse
 			if res != nil {
 				bs, err := io.ReadAll(res.Body)
-				res.Body.Close()
+				res.Body.Close() // Ensure the response body is closed
 				if err == nil {
 					stringBody := string(bs)
 					decodedXML, et, err := getXMLNode(stringBody, "PullMessagesResponse")
@@ -1208,7 +1212,7 @@ func GetDigitalInputs(dev *onvif.Device) (device.GetDigitalInputsResponse, error
 	resp, err := dev.CallMethod(deviceio.GetDigitalInputs{})
 	if resp != nil {
 		b, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
+		resp.Body.Close() // Ensure the response body is closed
 	}
 
 	if err == nil {
@@ -1240,21 +1244,19 @@ func GetRelayOutputs(dev *onvif.Device) (device.GetRelayOutputsResponse, error) 
 	var b []byte
 	if resp != nil {
 		b, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
+		resp.Body.Close() // Ensure the response body is closed
 	}
 
 	if err == nil {
-		if err == nil {
-			stringBody := string(b)
-			decodedXML, et, err := getXMLNode(stringBody, "GetRelayOutputsResponse")
-			if err != nil {
-				log.Log.Error("onvif.main.GetRelayOutputs(): " + err.Error())
+		stringBody := string(b)
+		decodedXML, et, err := getXMLNode(stringBody, "GetRelayOutputsResponse")
+		if err != nil {
+			log.Log.Error("onvif.main.GetRelayOutputs(): " + err.Error())
+			return relayoutputs, err
+		} else {
+			if err := decodedXML.DecodeElement(&relayoutputs, et); err != nil {
+				log.Log.Debug("onvif.main.GetRelayOutputs(): " + err.Error())
 				return relayoutputs, err
-			} else {
-				if err := decodedXML.DecodeElement(&relayoutputs, et); err != nil {
-					log.Log.Debug("onvif.main.GetRelayOutputs(): " + err.Error())
-					return relayoutputs, err
-				}
 			}
 		}
 	}
@@ -1283,7 +1285,7 @@ func TriggerRelayOutput(dev *onvif.Device, output string) (err error) {
 			var b []byte
 			if errResp != nil {
 				b, err = io.ReadAll(resp.Body)
-				resp.Body.Close()
+				resp.Body.Close() // Ensure the response body is closed
 			}
 			stringBody := string(b)
 			if err == nil && resp.StatusCode == 200 {
