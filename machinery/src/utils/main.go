@@ -23,7 +23,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
-const VERSION = "3.2.6"
+const VERSION = "3.3.1"
 
 const letterBytes = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
