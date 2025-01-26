@@ -341,7 +341,7 @@ func HandleGetPTZPosition(mqttClient mqtt.Client, hubKey string, payload models.
 			}
 			payload, err := models.PackageMQTTMessage(configuration, message)
 			if err == nil {
-				mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+				mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 			} else {
 				log.Log.Info("routers.mqtt.main.HandlePTZPosition(): something went wrong while sending position to hub: " + string(payload))
 			}
@@ -412,7 +412,7 @@ func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload models.P
 			}
 			payload, err := models.PackageMQTTMessage(configuration, message)
 			if err == nil {
-				mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+				mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 			} else {
 				log.Log.Info("routers.mqtt.main.HandleRequestConfig(): something went wrong while sending config to hub: " + string(payload))
 			}
@@ -451,7 +451,7 @@ func HandleUpdateConfig(mqttClient mqtt.Client, hubKey string, payload models.Pa
 			}
 			payload, err := models.PackageMQTTMessage(configuration, message)
 			if err == nil {
-				mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+				mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 			} else {
 				log.Log.Info("routers.mqtt.main.HandleUpdateConfig(): something went wrong while sending acknowledge config to hub: " + string(payload))
 			}
