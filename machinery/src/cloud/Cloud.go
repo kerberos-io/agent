@@ -824,7 +824,6 @@ func HandleRealtimeProcessing(processingCursor *packets.QueueCursor, configurati
 					}
 					payload, err := models.PackageMQTTMessage(configuration, message)
 					if err == nil {
-
 						mqttClient.Publish(realtimeProcessingTopic, 0, false, payload)
 					} else {
 						log.Log.Info("cloud.RealtimeProcessing(): something went wrong while sending acknowledge config to hub: " + string(payload))

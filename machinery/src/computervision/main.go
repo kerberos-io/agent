@@ -150,7 +150,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 										}
 										payload, err := models.PackageMQTTMessage(configuration, message)
 										if err == nil {
-											mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+											mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 										} else {
 											log.Log.Info("computervision.main.ProcessMotion(): failed to package MQTT message: " + err.Error())
 										}

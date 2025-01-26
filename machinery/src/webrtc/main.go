@@ -25,7 +25,6 @@ var (
 	CandidateArrays     map[string](chan string)
 	peerConnectionCount int64
 	peerConnections     map[string]*pionWebRTC.PeerConnection
-	//encoder             *ffmpeg.VideoEncoder
 )
 
 type WebRTC struct {
@@ -101,6 +100,19 @@ func RegisterCandidates(key string, candidate models.ReceiveHDCandidatesPayload)
 	CandidatesMutex.Unlock()
 }
 
+func cleanupPeerConnection(sessionID string) {
+	CandidatesMutex.Lock()
+	defer CandidatesMutex.Unlock()
+	if peerConnections[sessionID] != nil {
+		peerConnections[sessionID].Close()
+		peerConnections[sessionID] = nil
+	}
+	if _, ok := CandidateArrays[sessionID]; ok {
+		close(CandidateArrays[sessionID])
+		delete(CandidateArrays, sessionID)
+	}
+}
+
 func InitializeWebRTCConnection(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, handshake models.RequestHDStreamPayload) {
 
 	config := configuration.Config
@@ -170,16 +182,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			peerConnection.OnICEConnectionStateChange(func(connectionState pionWebRTC.ICEConnectionState) {
 				if connectionState == pionWebRTC.ICEConnectionStateDisconnected {
 					atomic.AddInt64(&peerConnectionCount, -1)
-
-					// Set lock
-					CandidatesMutex.Lock()
-					peerConnections[handshake.SessionID] = nil
-					_, ok := CandidateArrays[sessionKey]
-					if ok {
-						close(CandidateArrays[sessionKey])
-					}
-					CandidatesMutex.Unlock()
-
+					cleanupPeerConnection(handshake.SessionID)
 					close(w.PacketsCount)
 					if err := peerConnection.Close(); err != nil {
 						log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while closing peer connection: " + err.Error())
@@ -333,6 +336,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 	if !hasH264 && !hasPCM_MULAW && !hasAAC && !hasOpus {
 		log.Log.Error("webrtc.main.WriteToTrack(): no valid video codec and audio codec found.")
 	} else {
+
 		if config.Capture.TranscodingWebRTC == "true" {
 			// Todo..
 		} else {
@@ -341,44 +345,21 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 
 		var cursorError error
 		var pkt packets.Packet
-		//var previousTimeVideo int64
-		//var previousTimeAudio int64
-
 		start := false
 		receivedKeyFrame := false
-		lastKeepAlive := "0"
-		peerCount := "0"
 
 		for cursorError == nil {
 
-			pkt, cursorError = livestreamCursor.ReadPacket()
-
-			//if config.Capture.ForwardWebRTC != "true" && peerConnectionCount == 0 {
-			//	start = false
-			//	receivedKeyFrame = false
-			//	continue
-			//}
-
-			select {
-			case lastKeepAlive = <-communication.HandleLiveHDKeepalive:
-			default:
-			}
-
-			select {
-			case peerCount = <-communication.HandleLiveHDPeers:
-			default:
-			}
-
-			now := time.Now().Unix()
-			lastKeepAliveN, _ := strconv.ParseInt(lastKeepAlive, 10, 64)
-			hasTimedOut := (now - lastKeepAliveN) > 15 // if longer then no response in 15 sec.
-			hasNoPeers := peerCount == "0"
-
-			if config.Capture.ForwardWebRTC == "true" && (hasTimedOut || hasNoPeers) {
-				start = false
-				receivedKeyFrame = false
+			/*hasNoPeers := peerConnectionCount == 0
+			if hasNoPeers {
+				if config.Capture.ForwardWebRTC == "true" {
+					start = false
+					receivedKeyFrame = false
+				}
 				continue
-			}
+			}*/
+
+			pkt, cursorError = livestreamCursor.ReadPacket()
 
 			if len(pkt.Data) == 0 || pkt.Data == nil {
 				receivedKeyFrame = false
@@ -393,17 +374,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 				}
 			}
 
-			//if config.Capture.TranscodingWebRTC == "true" {
-			// We will transcode the video
-			// TODO..
-			//}
-
 			if pkt.IsVideo {
-
-				// Calculate the difference
-				//bufferDuration := pkt.Time - previousTimeVideo
-				//previousTimeVideo = pkt.Time
-
 				// Start at the first keyframe
 				if pkt.IsKeyFrame {
 					start = true
@@ -445,6 +416,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 			}
 		}
 	}
+
 	for _, p := range peerConnections {
 		if p != nil {
 			p.Close()
