@@ -413,7 +413,7 @@ Read more about this [at the FAQ](#faq) below.
 
 ## Contributors
 
-This project exists thanks to all the people who contribute.
+This project exists thanks to all the people who contribute. Bravo!
 
 <a href="https://github.com/kerberos-io/agent/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=kerberos-io/agent" />
