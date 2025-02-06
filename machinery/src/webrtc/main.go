@@ -401,7 +401,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 			if pkt.IsVideo {
 
 				// Calculate the difference
-				bufferDuration := pkt.Time - previousTimeVideo
+				bufferDuration := int64(pkt.TimeLegacy) - previousTimeVideo
 				previousTimeVideo = pkt.Time
 
 				// Start at the first keyframe
@@ -434,7 +434,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 				}
 
 				// Calculate the difference
-				bufferDuration := pkt.Time - previousTimeAudio
+				bufferDuration := int64(pkt.TimeLegacy) - previousTimeAudio
 				previousTimeAudio = pkt.Time
 
 				// We will send the audio
