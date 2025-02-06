@@ -401,7 +401,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 			if pkt.IsVideo {
 
 				// Calculate the difference
-				bufferDuration := int64(pkt.TimeLegacy) - previousTimeVideo
+				bufferDuration := pkt.Time - previousTimeVideo
 				previousTimeVideo = pkt.Time
 
 				// Start at the first keyframe
@@ -410,7 +410,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 				}
 				if start {
 					bufferDurationCasted := time.Duration(bufferDuration) * time.Millisecond
-					sample := pionMedia.Sample{Data: pkt.Data, Duration: bufferDurationCasted}
+					sample := pionMedia.Sample{Data: pkt.Data, Duration: bufferDurationCasted, PacketTimestamp: uint32(pkt.Time)}
 					//sample = pionMedia.Sample{Data: pkt.Data, Duration: time.Second}
 					if config.Capture.ForwardWebRTC == "true" {
 						// We will send the video to a remote peer
@@ -431,15 +431,16 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 					// We will transcode the audio
 					// TODO..
 					//d := fdkaac.NewAacDecoder()
+					continue
 				}
 
 				// Calculate the difference
-				bufferDuration := int64(pkt.TimeLegacy) - previousTimeAudio
+				bufferDuration := pkt.Time - previousTimeAudio
 				previousTimeAudio = pkt.Time
 
 				// We will send the audio
 				bufferDurationCasted := time.Duration(bufferDuration) * time.Millisecond
-				sample := pionMedia.Sample{Data: pkt.Data, Duration: bufferDurationCasted}
+				sample := pionMedia.Sample{Data: pkt.Data, Duration: bufferDurationCasted, PacketTimestamp: uint32(pkt.Time)}
 				//sample = pionMedia.Sample{Data: pkt.Data, Duration: time.Second}
 				if err := audioTrack.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
 					log.Log.Error("webrtc.main.WriteToTrack(): something went wrong while writing sample: " + err.Error())
