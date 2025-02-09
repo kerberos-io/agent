@@ -64,7 +64,6 @@ func CreateWebRTC(name string, stunServers []string, turnServers []string, turnS
 		TurnServersUsername:   turnServersUsername,
 		TurnServersCredential: turnServersCredential,
 		Timer:                 time.NewTimer(time.Second * 10),
-		PacketsCount:          make(chan int),
 	}
 }
 
@@ -167,35 +166,37 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while adding audio track: " + err.Error())
 			}
 
-			peerConnection.OnICEConnectionStateChange(func(connectionState pionWebRTC.ICEConnectionState) {
-				if connectionState == pionWebRTC.ICEConnectionStateDisconnected {
-					atomic.AddInt64(&peerConnectionCount, -1)
-
+			peerConnection.OnConnectionStateChange(func(connectionState pionWebRTC.PeerConnectionState) {
+				if connectionState == pionWebRTC.PeerConnectionStateDisconnected || connectionState == pionWebRTC.PeerConnectionStateClosed {
 					// Set lock
 					CandidatesMutex.Lock()
+					atomic.AddInt64(&peerConnectionCount, -1)
 					peerConnections[handshake.SessionID] = nil
 					_, ok := CandidateArrays[sessionKey]
 					if ok {
 						close(CandidateArrays[sessionKey])
+						delete(CandidateArrays, sessionKey)
 					}
-					CandidatesMutex.Unlock()
-
-					close(w.PacketsCount)
 					if err := peerConnection.Close(); err != nil {
 						log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while closing peer connection: " + err.Error())
 					}
-				} else if connectionState == pionWebRTC.ICEConnectionStateConnected {
+					CandidatesMutex.Unlock()
+				} else if connectionState == pionWebRTC.PeerConnectionStateConnected {
+					CandidatesMutex.Lock()
 					atomic.AddInt64(&peerConnectionCount, 1)
-				} else if connectionState == pionWebRTC.ICEConnectionStateChecking {
+					CandidatesMutex.Unlock()
+				} else if connectionState == pionWebRTC.PeerConnectionStateConnecting {
 					// Iterate over the candidates and send them to the remote client
-					// Non blocking channel
+					// Non blocking channe
 					for candidate := range CandidateArrays[sessionKey] {
+						CandidatesMutex.Lock()
 						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Received candidate from channel: " + candidate)
 						if candidateErr := peerConnection.AddICECandidate(pionWebRTC.ICECandidateInit{Candidate: string(candidate)}); candidateErr != nil {
 							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while adding candidate: " + candidateErr.Error())
 						}
+						CandidatesMutex.Unlock()
 					}
-				} else if connectionState == pionWebRTC.ICEConnectionStateFailed {
+				} else if connectionState == pionWebRTC.PeerConnectionStateFailed {
 					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): ICEConnectionStateFailed")
 				}
 				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): connection state changed to: " + connectionState.String())
@@ -217,9 +218,10 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			// When an ICE candidate is available send to the other peer using the signaling server (MQTT).
 			// The other peer will add this candidate by calling AddICECandidate
 			peerConnection.OnICECandidate(func(candidate *pionWebRTC.ICECandidate) {
-				if candidate == nil {
+				if candidate == nil || peerConnection.ICEConnectionState() == pionWebRTC.ICEConnectionStateConnected {
 					return
 				}
+
 				//  Create a config map
 				valueMap := make(map[string]interface{})
 				candateJSON := candidate.ToJSON()
