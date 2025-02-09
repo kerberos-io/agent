@@ -271,6 +271,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				}
 				payload, err := models.PackageMQTTMessage(configuration, message)
 				if err == nil {
+					time.Sleep(1000 * time.Millisecond)
 					token := mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 					token.Wait()
 				} else {
