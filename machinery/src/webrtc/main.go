@@ -25,7 +25,6 @@ var (
 	CandidateArrays     map[string](chan string)
 	peerConnectionCount int64
 	peerConnections     map[string]*pionWebRTC.PeerConnection
-	//encoder             *ffmpeg.VideoEncoder
 )
 
 type WebRTC struct {
@@ -37,24 +36,6 @@ type WebRTC struct {
 	Timer                 *time.Timer
 	PacketsCount          chan int
 }
-
-// No longer used, is for transcoding, might comeback on this!
-/*func init() {
-	// Encoder is created for once and for all.
-	var err error
-	encoder, err = ffmpeg.NewVideoEncoderByCodecType(av.H264)
-	if err != nil {
-		return
-	}
-	if encoder == nil {
-		err = fmt.Errorf("Video encoder not found")
-		return
-	}
-	encoder.SetFramerate(30, 1)
-	encoder.SetPixelFormat(av.I420)
-	encoder.SetBitrate(1000000) // 1MB
-	encoder.SetGopSize(30 / 1)  // 1s
-}*/
 
 func CreateWebRTC(name string, stunServers []string, turnServers []string, turnServersUsername string, turnServersCredential string) *WebRTC {
 	return &WebRTC{
@@ -171,7 +152,6 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 					// Set lock
 					CandidatesMutex.Lock()
 					atomic.AddInt64(&peerConnectionCount, -1)
-					peerConnections[handshake.SessionID] = nil
 					_, ok := CandidateArrays[sessionKey]
 					if ok {
 						close(CandidateArrays[sessionKey])
@@ -180,6 +160,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 					if err := peerConnection.Close(); err != nil {
 						log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while closing peer connection: " + err.Error())
 					}
+					peerConnections[handshake.SessionID] = nil
 					CandidatesMutex.Unlock()
 				} else if connectionState == pionWebRTC.PeerConnectionStateConnected {
 					CandidatesMutex.Lock()
@@ -218,15 +199,13 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			// When an ICE candidate is available send to the other peer using the signaling server (MQTT).
 			// The other peer will add this candidate by calling AddICECandidate
 			peerConnection.OnICECandidate(func(candidate *pionWebRTC.ICECandidate) {
-				if candidate == nil || peerConnection.ICEConnectionState() == pionWebRTC.ICEConnectionStateConnected {
+				if candidate == nil {
 					return
 				}
 
 				//  Create a config map
 				valueMap := make(map[string]interface{})
 				candateJSON := candidate.ToJSON()
-				sdpmid := "0"
-				candateJSON.SDPMid = &sdpmid
 				candateBinary, err := json.Marshal(candateJSON)
 				if err == nil {
 					valueMap["candidate"] = string(candateBinary)
@@ -273,7 +252,6 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				}
 				payload, err := models.PackageMQTTMessage(configuration, message)
 				if err == nil {
-					time.Sleep(1000 * time.Millisecond)
 					token := mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 					token.Wait()
 				} else {
