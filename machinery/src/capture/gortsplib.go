@@ -104,11 +104,8 @@ func init() {
 
 // Connect to the RTSP server.
 func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
-
-	transport := gortsplib.TransportTCP
 	g.Client = gortsplib.Client{
 		RequestBackChannels: false,
-		Transport:           &transport,
 	}
 
 	// parse URL
