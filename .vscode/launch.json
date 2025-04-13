@@ -12,7 +12,9 @@
             "program": "${workspaceFolder}/machinery/main.go",
             "args": [
                 "-action",
-                "run"
+                "run",
+                "-port",
+                "8080"
             ],
             "envFile": "${workspaceFolder}/machinery/.env",
             "buildFlags": "--tags dynamic",
