@@ -1,21 +1,20 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/python
 {
-	"name": "A Dockerfile containing FFmpeg, OpenCV, Go and Yarn",
-	"context": "..",
-	"dockerFile": "./Dockerfile",
-	"forwardPorts": [
-		3000,
-		80
-	],
-	"postCreateCommand": "cd ui && yarn install && yarn build && cd ../machinery && go mod download",
+	"name": "go:1.24-bookworm",
+	"dockerFile": "Dockerfile",
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"ms-kubernetes-tools.vscode-kubernetes-tools",
-				"ms-azuretools.vscode-docker",
 				"GitHub.copilot",
-				"golang.go",
-				"ms-vscode.vscode-typescript-next"
+				"ms-azuretools.vscode-docker",
+				"mongodb.mongodb-vscode"
 			]
 		}
-	}
+	},
+	"forwardPorts": [
+		3000,
+		8080
+	],
+	"postCreateCommand": "cd ui && yarn install && yarn build && cd ../machinery && go mod download"
 }
