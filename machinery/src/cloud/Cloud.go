@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"strings"
 
@@ -732,6 +733,111 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 	}
 
 	log.Log.Debug("cloud.HandleLiveStreamSD(): finished")
+}
+
+func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
+
+	log.Log.Debug("cloud.HandleLiveStreamHLS(): started")
+
+	config := configuration.Config
+
+	// If offline made is enabled, we will stop the thread.
+	if config.Offline == "true" {
+		log.Log.Debug("cloud.HandleLiveStreamHLS(): stopping as Offline is enabled.")
+	} else {
+
+		// Check if we need to enable the live stream
+		if config.Capture.Liveview != "false" {
+
+			lastLivestreamRequest := int64(0)
+			var cursorError error
+			var pkt packets.Packet
+			segmentDuration := 10 // 4 seconds
+			var muxer capture.MpegtsMuxer
+			var firstPTS = time.Now().Unix()
+
+			for cursorError == nil {
+				pkt, cursorError = livestreamCursor.ReadPacket()
+				if len(pkt.Data) == 0 {
+					continue
+				}
+				now := time.Now().Unix()
+				select {
+				case <-communication.HandleLiveHLS:
+					lastLivestreamRequest = now
+				default:
+				}
+
+				if now-lastLivestreamRequest > 10 {
+					if muxer.IsOpen {
+						muxer.Close()
+					}
+					continue
+				}
+
+				if pkt.IsKeyFrame {
+					if muxer.IsOpen && time.Now().Unix()-firstPTS > int64(segmentDuration) {
+
+						muxer.Close()
+						fileName := muxer.FileName
+						fmt.Println("We'll upload the file: " + fileName)
+
+						// Load the file into a reader
+						file, err := os.Open(fileName)
+
+						req, err := http.NewRequest("POST", config.HubURI+"/hls/segment", file)
+
+						req.Header.Set("Content-Type", "video/mp4")
+						req.Header.Set("X-Kerberos-Hub-PublicKey", config.HubKey)
+						req.Header.Set("X-Kerberos-Hub-PrivateKey", config.HubPrivateKey)
+						req.Header.Set("X-Kerberos-Storage-Device", config.Key)
+
+						var client *http.Client
+						if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+							tr := &http.Transport{
+								TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+							}
+							client = &http.Client{Transport: tr}
+						} else {
+							client = &http.Client{}
+						}
+
+						resp, err := client.Do(req)
+						if resp != nil {
+							defer resp.Body.Close()
+						}
+
+						if err == nil {
+							if resp != nil {
+								body, err := ioutil.ReadAll(resp.Body)
+								if err == nil {
+									if resp.StatusCode == 200 {
+										fmt.Println(body)
+									}
+								}
+							}
+						}
+
+					}
+					if !muxer.IsOpen {
+						muxer = capture.MpegtsMuxer{
+							FileName: fmt.Sprintf("data/live/live-%d.ts", time.Now().Unix()),
+						}
+						muxer.Initialize()
+						firstPTS = time.Now().Unix()
+					}
+				}
+
+				if muxer.IsOpen {
+					muxer.WriteH264(pkt)
+				}
+			}
+		} else {
+			log.Log.Debug("cloud.HandleLiveStreamHLS(): stopping as Liveview is disabled.")
+		}
+	}
+
+	log.Log.Debug("cloud.HandleLiveStreamHLS(): finished")
 }
 
 func HandleLiveStreamHD(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {

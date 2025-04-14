@@ -344,6 +344,9 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 
 			pkt, cursorError = livestreamCursor.ReadPacket()
 
+			// We had to disable this because webrtc the ice connection state is not getting into connected state.
+			// WORKAROUND TO BE FIXED!
+
 			//if config.Capture.ForwardWebRTC != "true" && peerConnectionCount == 0 {
 			//	start = false
 			//	receivedKeyFrame = false

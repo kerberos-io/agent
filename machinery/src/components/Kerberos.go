@@ -61,6 +61,7 @@ func Bootstrap(configDirectory string, configuration *models.Configuration, comm
 	communication.HandleUpload = make(chan string, 1)
 	communication.HandleHeartBeat = make(chan string, 1)
 	communication.HandleLiveSD = make(chan int64, 1)
+	communication.HandleLiveHLS = make(chan int64, 1)
 	communication.HandleLiveHDKeepalive = make(chan string, 1)
 	communication.HandleLiveHDPeers = make(chan string, 1)
 	communication.IsConfiguring = abool.New()
@@ -253,14 +254,23 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspClient)
 	}
 
+	// Handle livestream HLS
+	if subStreamEnabled {
+		livestreamCursor := subQueue.Latest()
+		go cloud.HandleLiveStreamHLS(livestreamCursor, configuration, communication, mqttClient, rtspSubClient)
+	} else {
+		livestreamCursor := queue.Latest()
+		go cloud.HandleLiveStreamHLS(livestreamCursor, configuration, communication, mqttClient, rtspClient)
+	}
+
 	// Handle livestream HD (high resolution over WEBRTC)
 	communication.HandleLiveHDHandshake = make(chan models.RequestHDStreamPayload, 1)
 	if subStreamEnabled {
-		livestreamHDCursor := subQueue.Latest()
-		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspSubClient)
+		livestreamCursor := subQueue.Latest()
+		go cloud.HandleLiveStreamHD(livestreamCursor, configuration, communication, mqttClient, rtspSubClient)
 	} else {
-		livestreamHDCursor := queue.Latest()
-		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspClient)
+		livestreamCursor := queue.Latest()
+		go cloud.HandleLiveStreamHD(livestreamCursor, configuration, communication, mqttClient, rtspClient)
 	}
 
 	// Handle recording, will write an mp4 to disk.
