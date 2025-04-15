@@ -18,7 +18,6 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/pion/interceptor"
 	"github.com/pion/interceptor/pkg/intervalpli"
-	"github.com/pion/webrtc/v4"
 	pionWebRTC "github.com/pion/webrtc/v4"
 	pionMedia "github.com/pion/webrtc/v4/pkg/media"
 )
@@ -137,7 +136,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 		interceptorRegistry := &interceptor.Registry{}
 
 		// Use the default set of Interceptors
-		if err := webrtc.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
+		if err := pionWebRTC.RegisterDefaultInterceptors(mediaEngine, interceptorRegistry); err != nil {
 			panic(err)
 		}
 
