@@ -1089,7 +1089,7 @@ func WriteMPEG4Audio(forma *format.MPEG4Audio, aus [][]byte) ([]byte, error) {
 	pkts := make(mpeg4audio.ADTSPackets, len(aus))
 	for i, au := range aus {
 		pkts[i] = &mpeg4audio.ADTSPacket{
-			Type:         forma.Config.Type,
+			Type:         mpeg4audio.ObjectType(forma.Config.Type),
 			SampleRate:   forma.Config.SampleRate,
 			ChannelCount: forma.Config.ChannelCount,
 			AU:           au,
