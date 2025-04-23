@@ -254,7 +254,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	}
 
 	// Handle livestream HD (high resolution over WEBRTC)
-	communication.HandleLiveHDHandshake = make(chan models.RequestHDStreamPayload, 1)
+	communication.HandleLiveHDHandshake = make(chan models.RequestHDStreamPayload, 10)
 	if subStreamEnabled {
 		livestreamHDCursor := subQueue.Latest()
 		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspSubClient)
@@ -267,7 +267,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	go capture.HandleRecordStream(queue, configDirectory, configuration, communication, rtspClient)
 
 	// Handle processing of motion
-	communication.HandleMotion = make(chan models.MotionDataPartial, 1)
+	communication.HandleMotion = make(chan models.MotionDataPartial, 10)
 	if subStreamEnabled {
 		motionCursor := subQueue.Latest()
 		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspSubClient)
@@ -289,10 +289,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	go cloud.HandleUpload(configDirectory, configuration, communication)
 
 	// Handle ONVIF actions
-	communication.HandleONVIF = make(chan models.OnvifAction, 1)
+	communication.HandleONVIF = make(chan models.OnvifAction, 10)
 	go onvif.HandleONVIFActions(configuration, communication)
 
-	communication.HandleAudio = make(chan models.AudioDataPartial, 1)
+	communication.HandleAudio = make(chan models.AudioDataPartial, 10)
 	if rtspBackChannelClient.HasBackChannel {
 		communication.HasBackChannel = true
 		go WriteAudioToBackchannel(communication, rtspBackChannelClient)
