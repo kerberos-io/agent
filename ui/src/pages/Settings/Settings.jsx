@@ -2508,6 +2508,117 @@ class Settings extends React.Component {
                 </BlockFooter>
               </Block>
             )}
+
+            {/* Persistence block */}
+            {showPersistenceSection && config.cloud === this.KERBEROS_VAULT && (
+              <Block>
+                <BlockHeader>
+                  <h4>{t('settings.persistence.secondary_persistence')}</h4>
+                </BlockHeader>
+                <BlockBody>
+                  <Input
+                    noPadding
+                    label={t('settings.persistence.kerberosvault_apiurl')}
+                    placeholder={t(
+                      'settings.persistence.kerberosvault_description_apiurl'
+                    )}
+                    value={config.kstorage ? config.kstorage.uri : ''}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'kstorage',
+                        'uri',
+                        value,
+                        config.kstorage
+                      )
+                    }
+                  />
+                  <Input
+                    noPadding
+                    label={t('settings.persistence.kerberosvault_provider')}
+                    placeholder={t(
+                      'settings.persistence.kerberosvault_description_provider'
+                    )}
+                    value={config.kstorage ? config.kstorage.provider : ''}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'kstorage',
+                        'provider',
+                        value,
+                        config.kstorage
+                      )
+                    }
+                  />
+                  <Input
+                    noPadding
+                    label={t('settings.persistence.kerberosvault_directory')}
+                    placeholder={t(
+                      'settings.persistence.kerberosvault_description_directory'
+                    )}
+                    value={config.kstorage ? config.kstorage.directory : ''}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'kstorage',
+                        'directory',
+                        value,
+                        config.kstorage
+                      )
+                    }
+                  />
+                  <Input
+                    type="password"
+                    iconright="activity"
+                    label={t('settings.persistence.kerberosvault_accesskey')}
+                    placeholder={t(
+                      'settings.persistence.kerberosvault_description_accesskey'
+                    )}
+                    value={config.kstorage ? config.kstorage.access_key : ''}
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'kstorage',
+                        'access_key',
+                        value,
+                        config.kstorage
+                      )
+                    }
+                  />
+                  <Input
+                    type="password"
+                    iconright="activity"
+                    label={t('settings.persistence.kerberosvault_secretkey')}
+                    placeholder={t(
+                      'settings.persistence.kerberosvault_description_secretkey'
+                    )}
+                    value={
+                      config.kstorage ? config.kstorage.secret_access_key : ''
+                    }
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'kstorage',
+                        'secret_access_key',
+                        value,
+                        config.kstorage
+                      )
+                    }
+                  />
+                </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label={t('settings.persistence.verify_connection')}
+                    disabled={loading}
+                    onClick={this.verifyPersistenceSettings}
+                    type={loading ? 'neutral' : 'default'}
+                    icon="verify"
+                  />
+                  <Button
+                    label="Save"
+                    type="submit"
+                    onClick={this.saveConfig}
+                    buttonType="submit"
+                    icon="pencil"
+                  />
+                </BlockFooter>
+              </Block>
+            )}
           </div>
         </div>
       </div>
