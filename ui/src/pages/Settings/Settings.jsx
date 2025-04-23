@@ -64,6 +64,9 @@ class Settings extends React.Component {
       verifyPersistenceSuccess: false,
       verifyPersistenceError: false,
       verifyPersistenceMessage: '',
+      verifySecondaryPersistenceSuccess: false,
+      verifySecondaryPersistenceError: false,
+      verifySecondaryPersistenceMessage: '',
       verifyCameraSuccess: false,
       verifyCameraError: false,
       verifyCameraMessage: '',
@@ -592,6 +595,9 @@ class Settings extends React.Component {
       verifyPersistenceSuccess,
       verifyPersistenceError,
       verifyPersistenceMessage,
+      verifySecondaryPersistenceSuccess,
+      verifySecondaryPersistenceError,
+      verifySecondaryPersistenceMessage,
       verifyCameraSuccess,
       verifyCameraError,
       verifyCameraErrorMessage,
@@ -851,6 +857,20 @@ class Settings extends React.Component {
             message={`${t(
               'settings.info.verify_persistence_error'
             )} :${verifyPersistenceMessage}`}
+          />
+        )}
+        {verifySecondaryPersistenceSuccess && (
+          <InfoBar
+            type="success"
+            message={t('settings.info.verify_persistence_success')}
+          />
+        )}
+        {verifySecondaryPersistenceError && (
+          <InfoBar
+            type="alert"
+            message={`${t(
+              'settings.info.verify_persistence_error'
+            )} :${verifySecondaryPersistenceMessage}`}
           />
         )}
         <div className="stats grid-container --two-columns">
