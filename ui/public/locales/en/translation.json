@@ -189,6 +189,8 @@
       "description_kerberoshub": "Kerberos Agents can send heartbeats to a central",
       "description2_kerberoshub": "installation. Heartbeats and other relevant information are synced to Kerberos Hub to show realtime information about your video landscape.",
       "persistence": "Persistence",
+      "secondary_persistence": "Secondary Persistence",
+      "description_secondary_persistence": "Recordings will be sent to secondary persistence if the primary persistence is unavailable or fails. This can be useful for failover purposes.",
       "saasoffering": "Kerberos Hub (SAAS offering)",
       "description_persistence": "Having the ability to store your recordings is the beginning of everything. You can choose between our",
       "description2_persistence": ", or a 3rd party provider",

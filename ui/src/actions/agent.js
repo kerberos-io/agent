@@ -4,6 +4,7 @@ import {
   doVerifyOnvif,
   doVerifyHub,
   doVerifyPersistence,
+  doVerifySecondaryPersistence,
   doGetKerberosAgentTags,
   doGetDashboardInformation,
   doGetEvents,
@@ -92,6 +93,28 @@ export const verifyPersistence = (config, onSuccess, onError) => {
       () => {
         dispatch({
           type: 'VERIFY_PERSISTENCE',
+        });
+        if (onSuccess) {
+          onSuccess();
+        }
+      },
+      (error) => {
+        const { data } = error.response.data;
+        if (onError) {
+          onError(data);
+        }
+      }
+    );
+  };
+};
+
+export const verifySecondaryPersistence = (config, onSuccess, onError) => {
+  return (dispatch) => {
+    doVerifySecondaryPersistence(
+      config,
+      () => {
+        dispatch({
+          type: 'VERIFY_SECONDARY_PERSISTENCE',
         });
         if (onSuccess) {
           onSuccess();
