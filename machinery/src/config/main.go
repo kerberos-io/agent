@@ -183,15 +183,19 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 			}
 			jsonFile.Close()
 		}
-
 	}
-
 	return
 }
 
 // This function will override the configuration with environment variables.
 func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 	environmentVariables := os.Environ()
+
+	// Initialize the configuration for some new fields.
+	if configuration.Config.KStorageSecondary == nil {
+		configuration.Config.KStorageSecondary = &models.KStorage{}
+	}
+
 	for _, env := range environmentVariables {
 		if strings.Contains(env, "AGENT_") {
 			key := strings.Split(env, "=")[0]
