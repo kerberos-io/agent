@@ -1183,121 +1183,137 @@ func VerifySecondaryPersistence(c *gin.Context, configDirectory string) {
 
 		if config.Cloud == "kstorage" || config.Cloud == "kerberosvault" {
 
-			uri := config.KStorageSecondary.URI
-			accessKey := config.KStorageSecondary.AccessKey
-			secretAccessKey := config.KStorageSecondary.SecretAccessKey
-			directory := config.KStorageSecondary.Directory
-			provider := config.KStorageSecondary.Provider
+			if config.KStorageSecondary == nil {
+				msg := "cloud.VerifySecondaryPersistence(kerberosvault): please fill-in the required Kerberos Vault credentials."
+				log.Log.Error(msg)
+				c.JSON(400, models.APIResponse{
+					Data: msg,
+				})
 
-			if err == nil && uri != "" && accessKey != "" && secretAccessKey != "" {
+			} else {
 
-				var client *http.Client
-				if os.Getenv("AGENT_TLS_INSECURE") == "true" {
-					tr := &http.Transport{
-						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				uri := config.KStorageSecondary.URI
+				accessKey := config.KStorageSecondary.AccessKey
+				secretAccessKey := config.KStorageSecondary.SecretAccessKey
+				directory := config.KStorageSecondary.Directory
+				provider := config.KStorageSecondary.Provider
+
+				if err == nil && uri != "" && accessKey != "" && secretAccessKey != "" {
+
+					var client *http.Client
+					if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+						tr := &http.Transport{
+							TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+						}
+						client = &http.Client{Transport: tr}
+					} else {
+						client = &http.Client{}
 					}
-					client = &http.Client{Transport: tr}
-				} else {
-					client = &http.Client{}
-				}
 
-				req, err := http.NewRequest("POST", uri+"/ping", nil)
-				if err == nil {
-					req.Header.Add("X-Kerberos-Storage-AccessKey", accessKey)
-					req.Header.Add("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
-					resp, err := client.Do(req)
-
+					req, err := http.NewRequest("POST", uri+"/ping", nil)
 					if err == nil {
-						body, err := io.ReadAll(resp.Body)
-						defer resp.Body.Close()
-						if err == nil && resp.StatusCode == http.StatusOK {
+						req.Header.Add("X-Kerberos-Storage-AccessKey", accessKey)
+						req.Header.Add("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
+						resp, err := client.Do(req)
 
-							if provider != "" || directory != "" {
+						if err == nil {
+							body, err := io.ReadAll(resp.Body)
+							defer resp.Body.Close()
+							if err == nil && resp.StatusCode == http.StatusOK {
 
-								// Generate a random name.
-								timestamp := time.Now().Unix()
-								fileName := strconv.FormatInt(timestamp, 10) +
-									"_6-967003_" + config.Name + "_200-200-400-400_24_769.mp4"
+								if provider != "" || directory != "" {
 
-								// Open test-480p.mp4
-								file, err := os.Open(configDirectory + "/data/test-480p.mp4")
-								if err != nil {
-									msg := "cloud.VerifyPersistence(kerberosvault): error reading test-480p.mp4: " + err.Error()
-									log.Log.Error(msg)
-									c.JSON(400, models.APIResponse{
-										Data: msg,
-									})
-								}
-								defer file.Close()
+									// Generate a random name.
+									timestamp := time.Now().Unix()
+									fileName := strconv.FormatInt(timestamp, 10) +
+										"_6-967003_" + config.Name + "_200-200-400-400_24_769.mp4"
 
-								req, err := http.NewRequest("POST", uri+"/storage", file)
-								if err == nil {
-
-									req.Header.Set("Content-Type", "video/mp4")
-									req.Header.Set("X-Kerberos-Storage-CloudKey", config.HubKey)
-									req.Header.Set("X-Kerberos-Storage-AccessKey", accessKey)
-									req.Header.Set("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
-									req.Header.Set("X-Kerberos-Storage-Provider", provider)
-									req.Header.Set("X-Kerberos-Storage-FileName", fileName)
-									req.Header.Set("X-Kerberos-Storage-Device", config.Key)
-									req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
-									req.Header.Set("X-Kerberos-Storage-Directory", directory)
-
-									var client *http.Client
-									if os.Getenv("AGENT_TLS_INSECURE") == "true" {
-										tr := &http.Transport{
-											TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-										}
-										client = &http.Client{Transport: tr}
-									} else {
-										client = &http.Client{}
+									// Open test-480p.mp4
+									file, err := os.Open(configDirectory + "/data/test-480p.mp4")
+									if err != nil {
+										msg := "cloud.VerifyPersistence(kerberosvault): error reading test-480p.mp4: " + err.Error()
+										log.Log.Error(msg)
+										c.JSON(400, models.APIResponse{
+											Data: msg,
+										})
 									}
+									defer file.Close()
 
-									resp, err := client.Do(req)
-
+									req, err := http.NewRequest("POST", uri+"/storage", file)
 									if err == nil {
-										if resp != nil {
-											body, err := io.ReadAll(resp.Body)
-											defer resp.Body.Close()
-											if err == nil {
-												if resp.StatusCode == 200 {
-													msg := "cloud.VerifySecondaryPersistence(kerberosvault): Upload allowed using the credentials provided (" + accessKey + ", " + secretAccessKey + ")"
-													log.Log.Info(msg)
-													c.JSON(200, models.APIResponse{
-														Data: body,
-													})
-												} else {
-													msg := "cloud.VerifySecondaryPersistence(kerberosvault): Something went wrong while verifying your persistence settings. Make sure your provider is the same as the storage provider in your Kerberos Vault, and the relevant storage provider is configured properly."
-													log.Log.Error(msg)
-													c.JSON(400, models.APIResponse{
-														Data: msg,
-													})
+
+										req.Header.Set("Content-Type", "video/mp4")
+										req.Header.Set("X-Kerberos-Storage-CloudKey", config.HubKey)
+										req.Header.Set("X-Kerberos-Storage-AccessKey", accessKey)
+										req.Header.Set("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
+										req.Header.Set("X-Kerberos-Storage-Provider", provider)
+										req.Header.Set("X-Kerberos-Storage-FileName", fileName)
+										req.Header.Set("X-Kerberos-Storage-Device", config.Key)
+										req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
+										req.Header.Set("X-Kerberos-Storage-Directory", directory)
+
+										var client *http.Client
+										if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+											tr := &http.Transport{
+												TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+											}
+											client = &http.Client{Transport: tr}
+										} else {
+											client = &http.Client{}
+										}
+
+										resp, err := client.Do(req)
+
+										if err == nil {
+											if resp != nil {
+												body, err := io.ReadAll(resp.Body)
+												defer resp.Body.Close()
+												if err == nil {
+													if resp.StatusCode == 200 {
+														msg := "cloud.VerifySecondaryPersistence(kerberosvault): Upload allowed using the credentials provided (" + accessKey + ", " + secretAccessKey + ")"
+														log.Log.Info(msg)
+														c.JSON(200, models.APIResponse{
+															Data: body,
+														})
+													} else {
+														msg := "cloud.VerifySecondaryPersistence(kerberosvault): Something went wrong while verifying your persistence settings. Make sure your provider is the same as the storage provider in your Kerberos Vault, and the relevant storage provider is configured properly."
+														log.Log.Error(msg)
+														c.JSON(400, models.APIResponse{
+															Data: msg,
+														})
+													}
 												}
 											}
+										} else {
+											msg := "cloud.VerifySecondaryPersistence(kerberosvault): Upload of fake recording failed: " + err.Error()
+											log.Log.Error(msg)
+											c.JSON(400, models.APIResponse{
+												Data: msg,
+											})
 										}
 									} else {
-										msg := "cloud.VerifySecondaryPersistence(kerberosvault): Upload of fake recording failed: " + err.Error()
+										msg := "cloud.VerifySecondaryPersistence(kerberosvault): Something went wrong while creating /storage POST request." + err.Error()
 										log.Log.Error(msg)
 										c.JSON(400, models.APIResponse{
 											Data: msg,
 										})
 									}
 								} else {
-									msg := "cloud.VerifySecondaryPersistence(kerberosvault): Something went wrong while creating /storage POST request." + err.Error()
+									msg := "cloud.VerifySecondaryPersistence(kerberosvault): Provider and/or directory is missing from the request."
 									log.Log.Error(msg)
 									c.JSON(400, models.APIResponse{
 										Data: msg,
 									})
 								}
 							} else {
-								msg := "cloud.VerifySecondaryPersistence(kerberosvault): Provider and/or directory is missing from the request."
+								msg := "cloud.VerifySecondaryPersistence(kerberosvault): Something went wrong while verifying storage credentials: " + string(body)
 								log.Log.Error(msg)
 								c.JSON(400, models.APIResponse{
 									Data: msg,
 								})
 							}
 						} else {
-							msg := "cloud.VerifySecondaryPersistence(kerberosvault): Something went wrong while verifying storage credentials: " + string(body)
+							msg := "cloud.VerifySecondaryPersistence(kerberosvault): Something went wrong while verifying storage credentials:" + err.Error()
 							log.Log.Error(msg)
 							c.JSON(400, models.APIResponse{
 								Data: msg,
@@ -1311,18 +1327,12 @@ func VerifySecondaryPersistence(c *gin.Context, configDirectory string) {
 						})
 					}
 				} else {
-					msg := "cloud.VerifySecondaryPersistence(kerberosvault): Something went wrong while verifying storage credentials:" + err.Error()
+					msg := "cloud.VerifySecondaryPersistence(kerberosvault): please fill-in the required Kerberos Vault credentials."
 					log.Log.Error(msg)
 					c.JSON(400, models.APIResponse{
 						Data: msg,
 					})
 				}
-			} else {
-				msg := "cloud.VerifySecondaryPersistence(kerberosvault): please fill-in the required Kerberos Vault credentials."
-				log.Log.Error(msg)
-				c.JSON(400, models.APIResponse{
-					Data: msg,
-				})
 			}
 		}
 	} else {

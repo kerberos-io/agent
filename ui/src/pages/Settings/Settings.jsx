@@ -74,6 +74,7 @@ class Settings extends React.Component {
       verifyOnvifError: false,
       verifyOnvifErrorMessage: '',
       loading: false,
+      loadingSecondary: false,
       loadingHub: false,
       loadingCamera: false,
     };
@@ -356,6 +357,8 @@ class Settings extends React.Component {
       configSuccess: false,
       configError: false,
       loadingCamera: false,
+      loading: false,
+      loadingSecondary: false,
       loadingOnvif: true,
     });
 
@@ -409,6 +412,8 @@ class Settings extends React.Component {
         verifyOnvifSuccess: false,
         verifyOnvifError: false,
         loadingHub: true,
+        loading: false,
+        loadingSecondary: false,
       });
 
       // .... test fields
@@ -459,6 +464,7 @@ class Settings extends React.Component {
         verifyOnvifError: false,
         verifyCameraErrorMessage: '',
         loading: true,
+        loadingSecondary: false,
       });
 
       dispatchVerifyPersistence(
@@ -471,6 +477,7 @@ class Settings extends React.Component {
             persistenceSuccess: false,
             persistenceError: false,
             loading: false,
+            loadingSecondary: false,
           });
         },
         (error) => {
@@ -481,6 +488,7 @@ class Settings extends React.Component {
             persistenceSuccess: false,
             persistenceError: false,
             loading: false,
+            loadingSecondary: false,
           });
         }
       );
@@ -506,7 +514,8 @@ class Settings extends React.Component {
         verifyOnvifSuccess: false,
         verifyOnvifError: false,
         verifyCameraErrorMessage: '',
-        loading: true,
+        loading: false,
+        loadingSecondary: true,
       });
 
       dispatchVerifySecondaryPersistence(
@@ -519,6 +528,7 @@ class Settings extends React.Component {
             persistenceSuccess: false,
             persistenceError: false,
             loading: false,
+            loadingSecondary: false,
           });
         },
         (error) => {
@@ -529,6 +539,7 @@ class Settings extends React.Component {
             persistenceSuccess: false,
             persistenceError: false,
             loading: false,
+            loadingSecondary: false,
           });
         }
       );
@@ -607,6 +618,7 @@ class Settings extends React.Component {
       verifyOnvifErrorMessage,
       loadingCamera,
       loading,
+      loadingSecondary,
       loadingHub,
     } = this.state;
 
@@ -2584,7 +2596,7 @@ class Settings extends React.Component {
               </Block>
             )}
 
-            {/* Persistence block */}
+            {/* Secondary Vault block */}
             {showPersistenceSection && config.cloud === this.KERBEROS_VAULT && (
               <Block>
                 <BlockHeader>
@@ -2702,9 +2714,9 @@ class Settings extends React.Component {
                 <BlockFooter>
                   <Button
                     label={t('settings.persistence.verify_connection')}
-                    disabled={loading}
+                    disabled={loadingSecondary}
                     onClick={this.verifySecondaryPersistenceSettings}
-                    type={loading ? 'neutral' : 'default'}
+                    type={loadingSecondary ? 'neutral' : 'default'}
                     icon="verify"
                   />
                   <Button
