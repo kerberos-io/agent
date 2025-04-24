@@ -98,6 +98,7 @@
 		"region": "eu-west-1"
 	},
 	"kstorage": {},
+	"kstorage_secondary": {},
 	"dropbox": {},
 	"mqtturi": "tcp://mqtt.kerberos.io:1883",
 	"mqtt_username": "",
