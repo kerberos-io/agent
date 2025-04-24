@@ -436,7 +436,7 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				configuration.Config.S3.Region = value
 				break
 
-			/* When storing in a Kerberos Vault */
+			/* When storing in a Vault */
 			case "AGENT_KERBEROSVAULT_URI":
 				configuration.Config.KStorage.URI = value
 				break
@@ -451,6 +451,23 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				break
 			case "AGENT_KERBEROSVAULT_DIRECTORY":
 				configuration.Config.KStorage.Directory = value
+				break
+
+			/* When storing in a secondary Vault */
+			case "AGENT_KERBEROSVAULT_SECONDARY_URI":
+				configuration.Config.KStorageSecondary.URI = value
+				break
+			case "AGENT_KERBEROSVAULT_SECONDARY_ACCESS_KEY":
+				configuration.Config.KStorageSecondary.AccessKey = value
+				break
+			case "AGENT_KERBEROSVAULT_SECONDARY_SECRET_KEY":
+				configuration.Config.KStorageSecondary.SecretAccessKey = value
+				break
+			case "AGENT_KERBEROSVAULT_SECONDARY_PROVIDER":
+				configuration.Config.KStorageSecondary.Provider = value
+				break
+			case "AGENT_KERBEROSVAULT_SECONDARY_DIRECTORY":
+				configuration.Config.KStorageSecondary.Directory = value
 				break
 
 			/* When storing in dropbox */
