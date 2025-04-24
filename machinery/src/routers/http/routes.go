@@ -54,14 +54,19 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 			components.UpdateConfig(c, configDirectory, configuration, communication)
 		})
 
-		// Will verify the current hub settings.
+		// Will verify the hub settings.
 		api.POST("/hub/verify", func(c *gin.Context) {
 			cloud.VerifyHub(c)
 		})
 
-		// Will verify the current persistence settings.
+		// Will verify the persistence settings.
 		api.POST("/persistence/verify", func(c *gin.Context) {
 			cloud.VerifyPersistence(c, configDirectory)
+		})
+
+		// Will verify the secondary persistence settings.
+		api.POST("/persistence/secondary/verify", func(c *gin.Context) {
+			cloud.VerifySecondaryPersistence(c, configDirectory)
 		})
 
 		// Camera specific methods. Doesn't require any authorization.

@@ -33,6 +33,7 @@ import {
   verifyCamera,
   verifyHub,
   verifyPersistence,
+  verifySecondaryPersistence,
   getConfig,
   updateConfig,
 } from '../../actions/agent';
@@ -63,6 +64,9 @@ class Settings extends React.Component {
       verifyPersistenceSuccess: false,
       verifyPersistenceError: false,
       verifyPersistenceMessage: '',
+      verifySecondaryPersistenceSuccess: false,
+      verifySecondaryPersistenceError: false,
+      verifySecondaryPersistenceMessage: '',
       verifyCameraSuccess: false,
       verifyCameraError: false,
       verifyCameraMessage: '',
@@ -70,6 +74,7 @@ class Settings extends React.Component {
       verifyOnvifError: false,
       verifyOnvifErrorMessage: '',
       loading: false,
+      loadingSecondary: false,
       loadingHub: false,
       loadingCamera: false,
     };
@@ -125,6 +130,8 @@ class Settings extends React.Component {
     this.onUpdateTimeline = this.onUpdateTimeline.bind(this);
     this.initialiseLiveview = this.initialiseLiveview.bind(this);
     this.verifyPersistenceSettings = this.verifyPersistenceSettings.bind(this);
+    this.verifySecondaryPersistenceSettings =
+      this.verifySecondaryPersistenceSettings.bind(this);
     this.verifyHubSettings = this.verifyHubSettings.bind(this);
     this.verifyCameraSettings = this.verifyCameraSettings.bind(this);
     this.verifySubCameraSettings = this.verifySubCameraSettings.bind(this);
@@ -350,6 +357,8 @@ class Settings extends React.Component {
       configSuccess: false,
       configError: false,
       loadingCamera: false,
+      loading: false,
+      loadingSecondary: false,
       loadingOnvif: true,
     });
 
@@ -390,6 +399,8 @@ class Settings extends React.Component {
         configError: false,
         verifyPersistenceSuccess: false,
         verifyPersistenceError: false,
+        verifySecondaryPersistenceSuccess: false,
+        verifySecondaryPersistenceError: false,
         verifyHubSuccess: false,
         verifyHubError: false,
         verifyHubErrorMessage: '',
@@ -401,6 +412,8 @@ class Settings extends React.Component {
         verifyOnvifSuccess: false,
         verifyOnvifError: false,
         loadingHub: true,
+        loading: false,
+        loadingSecondary: false,
       });
 
       // .... test fields
@@ -441,6 +454,8 @@ class Settings extends React.Component {
         verifyHubError: false,
         verifyPersistenceSuccess: false,
         verifyPersistenceError: false,
+        verifySecondaryPersistenceSuccess: false,
+        verifySecondaryPersistenceError: false,
         persistenceSuccess: false,
         persistenceError: false,
         verifyCameraSuccess: false,
@@ -449,6 +464,7 @@ class Settings extends React.Component {
         verifyOnvifError: false,
         verifyCameraErrorMessage: '',
         loading: true,
+        loadingSecondary: false,
       });
 
       dispatchVerifyPersistence(
@@ -461,6 +477,7 @@ class Settings extends React.Component {
             persistenceSuccess: false,
             persistenceError: false,
             loading: false,
+            loadingSecondary: false,
           });
         },
         (error) => {
@@ -471,6 +488,58 @@ class Settings extends React.Component {
             persistenceSuccess: false,
             persistenceError: false,
             loading: false,
+            loadingSecondary: false,
+          });
+        }
+      );
+    }
+  }
+
+  verifySecondaryPersistenceSettings() {
+    const { config, dispatchVerifySecondaryPersistence } = this.props;
+    if (config) {
+      this.setState({
+        configSuccess: false,
+        configError: false,
+        verifyHubSuccess: false,
+        verifyHubError: false,
+        verifyPersistenceSuccess: false,
+        verifyPersistenceError: false,
+        verifySecondaryPersistenceSuccess: false,
+        verifySecondaryPersistenceError: false,
+        persistenceSuccess: false,
+        persistenceError: false,
+        verifyCameraSuccess: false,
+        verifyCameraError: false,
+        verifyOnvifSuccess: false,
+        verifyOnvifError: false,
+        verifyCameraErrorMessage: '',
+        loading: false,
+        loadingSecondary: true,
+      });
+
+      dispatchVerifySecondaryPersistence(
+        config.config,
+        () => {
+          this.setState({
+            verifySecondaryPersistenceSuccess: true,
+            verifySecondaryPersistenceError: false,
+            verifySecondaryPersistenceMessage: '',
+            persistenceSuccess: false,
+            persistenceError: false,
+            loading: false,
+            loadingSecondary: false,
+          });
+        },
+        (error) => {
+          this.setState({
+            verifySecondaryPersistenceSuccess: false,
+            verifySecondaryPersistenceError: true,
+            verifySecondaryPersistenceMessage: error,
+            persistenceSuccess: false,
+            persistenceError: false,
+            loading: false,
+            loadingSecondary: false,
           });
         }
       );
@@ -537,6 +606,9 @@ class Settings extends React.Component {
       verifyPersistenceSuccess,
       verifyPersistenceError,
       verifyPersistenceMessage,
+      verifySecondaryPersistenceSuccess,
+      verifySecondaryPersistenceError,
+      verifySecondaryPersistenceMessage,
       verifyCameraSuccess,
       verifyCameraError,
       verifyCameraErrorMessage,
@@ -546,6 +618,7 @@ class Settings extends React.Component {
       verifyOnvifErrorMessage,
       loadingCamera,
       loading,
+      loadingSecondary,
       loadingHub,
     } = this.state;
 
@@ -796,6 +869,20 @@ class Settings extends React.Component {
             message={`${t(
               'settings.info.verify_persistence_error'
             )} :${verifyPersistenceMessage}`}
+          />
+        )}
+        {verifySecondaryPersistenceSuccess && (
+          <InfoBar
+            type="success"
+            message={t('settings.info.verify_persistence_success')}
+          />
+        )}
+        {verifySecondaryPersistenceError && (
+          <InfoBar
+            type="alert"
+            message={`${t(
+              'settings.info.verify_persistence_error'
+            )} :${verifySecondaryPersistenceMessage}`}
           />
         )}
         <div className="stats grid-container --two-columns">
@@ -2508,6 +2595,140 @@ class Settings extends React.Component {
                 </BlockFooter>
               </Block>
             )}
+
+            {/* Secondary Vault block */}
+            {showPersistenceSection && config.cloud === this.KERBEROS_VAULT && (
+              <Block>
+                <BlockHeader>
+                  <h4>{t('settings.persistence.secondary_persistence')}</h4>
+                </BlockHeader>
+                <BlockBody>
+                  <p>
+                    {t(
+                      'settings.persistence.description_secondary_persistence'
+                    )}
+                  </p>
+                  <Input
+                    noPadding
+                    label={t('settings.persistence.kerberosvault_apiurl')}
+                    placeholder={t(
+                      'settings.persistence.kerberosvault_description_apiurl'
+                    )}
+                    value={
+                      config.kstorage_secondary
+                        ? config.kstorage_secondary.uri
+                        : ''
+                    }
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'kstorage_secondary',
+                        'uri',
+                        value,
+                        config.kstorage_secondary
+                      )
+                    }
+                  />
+                  <Input
+                    noPadding
+                    label={t('settings.persistence.kerberosvault_provider')}
+                    placeholder={t(
+                      'settings.persistence.kerberosvault_description_provider'
+                    )}
+                    value={
+                      config.kstorage_secondary
+                        ? config.kstorage_secondary.provider
+                        : ''
+                    }
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'kstorage_secondary',
+                        'provider',
+                        value,
+                        config.kstorage_secondary
+                      )
+                    }
+                  />
+                  <Input
+                    noPadding
+                    label={t('settings.persistence.kerberosvault_directory')}
+                    placeholder={t(
+                      'settings.persistence.kerberosvault_description_directory'
+                    )}
+                    value={
+                      config.kstorage_secondary
+                        ? config.kstorage_secondary.directory
+                        : ''
+                    }
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'kstorage_secondary',
+                        'directory',
+                        value,
+                        config.kstorage_secondary
+                      )
+                    }
+                  />
+                  <Input
+                    type="password"
+                    iconright="activity"
+                    label={t('settings.persistence.kerberosvault_accesskey')}
+                    placeholder={t(
+                      'settings.persistence.kerberosvault_description_accesskey'
+                    )}
+                    value={
+                      config.kstorage_secondary
+                        ? config.kstorage_secondary.access_key
+                        : ''
+                    }
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'kstorage_secondary',
+                        'access_key',
+                        value,
+                        config.kstorage_secondary
+                      )
+                    }
+                  />
+                  <Input
+                    type="password"
+                    iconright="activity"
+                    label={t('settings.persistence.kerberosvault_secretkey')}
+                    placeholder={t(
+                      'settings.persistence.kerberosvault_description_secretkey'
+                    )}
+                    value={
+                      config.kstorage_secondary
+                        ? config.kstorage_secondary.secret_access_key
+                        : ''
+                    }
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'kstorage_secondary',
+                        'secret_access_key',
+                        value,
+                        config.kstorage_secondary
+                      )
+                    }
+                  />
+                </BlockBody>
+                <BlockFooter>
+                  <Button
+                    label={t('settings.persistence.verify_connection')}
+                    disabled={loadingSecondary}
+                    onClick={this.verifySecondaryPersistenceSettings}
+                    type={loadingSecondary ? 'neutral' : 'default'}
+                    icon="verify"
+                  />
+                  <Button
+                    label="Save"
+                    type="submit"
+                    onClick={this.saveConfig}
+                    buttonType="submit"
+                    icon="pencil"
+                  />
+                </BlockFooter>
+              </Block>
+            )}
           </div>
         </div>
       </div>
@@ -2532,6 +2753,8 @@ const mapDispatchToProps = (dispatch /* , ownProps */) => ({
     dispatch(verifyHub(config, success, error)),
   dispatchVerifyPersistence: (config, success, error) =>
     dispatch(verifyPersistence(config, success, error)),
+  dispatchVerifySecondaryPersistence: (config, success, error) =>
+    dispatch(verifySecondaryPersistence(config, success, error)),
   dispatchGetConfig: (callback) => dispatch(getConfig(callback)),
   dispatchUpdateConfig: (field, value) => dispatch(updateConfig(field, value)),
   dispatchSaveConfig: (config, success, error) =>
@@ -2549,6 +2772,7 @@ Settings.propTypes = {
   images: PropTypes.array.isRequired,
   dispatchVerifyHub: PropTypes.func.isRequired,
   dispatchVerifyPersistence: PropTypes.func.isRequired,
+  dispatchVerifySecondaryPersistence: PropTypes.func.isRequired,
   dispatchGetConfig: PropTypes.func.isRequired,
   dispatchUpdateConfig: PropTypes.func.isRequired,
   dispatchSaveConfig: PropTypes.func.isRequired,

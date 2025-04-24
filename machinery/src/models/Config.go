@@ -28,6 +28,7 @@ type Config struct {
 	Cloud                   string       `json:"cloud" bson:"cloud"`
 	S3                      *S3          `json:"s3,omitempty" bson:"s3,omitempty"`
 	KStorage                *KStorage    `json:"kstorage,omitempty" bson:"kstorage,omitempty"`
+	KStorageSecondary       *KStorage    `json:"kstorage_secondary,omitempty" bson:"kstorage_secondary,omitempty"`
 	Dropbox                 *Dropbox     `json:"dropbox,omitempty" bson:"dropbox,omitempty"`
 	MQTTURI                 string       `json:"mqtturi" bson:"mqtturi,omitempty"`
 	MQTTUsername            string       `json:"mqtt_username" bson:"mqtt_username"`
@@ -152,12 +153,12 @@ type S3 struct {
 // KStorage contains the credentials of the Kerberos Storage/Kerberos Cloud instance.
 // By defining KStorage you can make your recordings available in the cloud, at a centrel place.
 type KStorage struct {
-	URI             string `json:"uri,omitempty" bson:"uri,omitempty"`
-	CloudKey        string `json:"cloud_key,omitempty" bson:"cloud_key,omitempty"` /* old way, remove this */
-	AccessKey       string `json:"access_key,omitempty" bson:"access_key,omitempty"`
-	SecretAccessKey string `json:"secret_access_key,omitempty" bson:"secret_access_key,omitempty"`
-	Provider        string `json:"provider,omitempty" bson:"provider,omitempty"`
-	Directory       string `json:"directory,omitempty" bson:"directory,omitempty"`
+	URI             string `json:"uri" bson:"uri"`
+	CloudKey        string `json:"cloud_key" bson:"cloud_key"` /* old way, remove this */
+	AccessKey       string `json:"access_key" bson:"access_key"`
+	SecretAccessKey string `json:"secret_access_key" bson:"secret_access_key"`
+	Provider        string `json:"provider" bson:"provider"`
+	Directory       string `json:"directory" bson:"directory"`
 }
 
 // Dropbox integration

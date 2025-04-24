@@ -190,68 +190,73 @@ Next to attaching the configuration file, it is also possible to override the co
 
 | Name                                    | Description                                                                                     | Default Value                  |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
-| `LOG_LEVEL`                             | Level for logging, could be "info", "warning", "debug", "error" or "fatal".                     | "info"                         |
-| `LOG_OUTPUT`                            | Logging output format "json" or "text".                                                         | "text"                         |
-| `AGENT_MODE`                            | You can choose to run this in 'release' for production, and or 'demo' for showcasing.           | "release"                      |
-| `AGENT_TLS_INSECURE`                    | Specify if you want to use `InsecureSkipVerify` for the internal HTTP client.                   | "false"                        |
-| `AGENT_USERNAME`                        | The username used to authenticate against the Kerberos Agent login page.                        | "root"                         |
-| `AGENT_PASSWORD`                        | The password used to authenticate against the Kerberos Agent login page.                        | "root"                         |
-| `AGENT_KEY`                             | A unique identifier for your Kerberos Agent, this is auto-generated but can be overriden.       | ""                             |
-| `AGENT_NAME`                            | The agent friendly-name.                                                                        | "agent"                        |
-| `AGENT_TIMEZONE`                        | Timezone which is used for converting time.                                                     | "Africa/Ceuta"                 |
-| `AGENT_REMOVE_AFTER_UPLOAD`             | When enabled, recordings uploaded successfully to a storage will be removed from disk.          | "true"                         |
-| `AGENT_OFFLINE`                         | Makes sure no external connection is made.                                                      | "false"                        |
-| `AGENT_AUTO_CLEAN`                      | Cleans up the recordings directory.                                                             | "true"                         |
-| `AGENT_AUTO_CLEAN_MAX_SIZE`             | If `AUTO_CLEAN` enabled, set the max size of the recordings directory (in MB).                  | "100"                          |
-| `AGENT_TIME`                            | Enable the timetable for Kerberos Agent                                                         | "false"                        |
-| `AGENT_TIMETABLE`                       | A (weekly) time table to specify when to make recordings "start1,end1,start2,end2;start1..      | ""                             |
-| `AGENT_REGION_POLYGON`                  | A single polygon set for motion detection: "x1,y1;x2,y2;x3,y3;...                               | ""                             |
-| `AGENT_CAPTURE_IPCAMERA_RTSP`           | Full-HD RTSP endpoint to the camera you're targetting.                                          | ""                             |
-| `AGENT_CAPTURE_IPCAMERA_SUB_RTSP`       | Sub-stream RTSP endpoint used for livestreaming (WebRTC).                                       | ""                             |
-| `AGENT_CAPTURE_IPCAMERA_ONVIF`          | Mark as a compliant ONVIF device.                                                               | ""                             |
-| `AGENT_CAPTURE_IPCAMERA_ONVIF_XADDR`    | ONVIF endpoint/address running on the camera.                                                   | ""                             |
-| `AGENT_CAPTURE_IPCAMERA_ONVIF_USERNAME` | ONVIF username to authenticate against.                                                         | ""                             |
-| `AGENT_CAPTURE_IPCAMERA_ONVIF_PASSWORD` | ONVIF password to authenticate against.                                                         | ""                             |
-| `AGENT_CAPTURE_MOTION`                  | Toggle for enabling or disabling motion.                                                        | "true"                         |
-| `AGENT_CAPTURE_LIVEVIEW`                | Toggle for enabling or disabling liveview.                                                      | "true"                         |
-| `AGENT_CAPTURE_SNAPSHOTS`               | Toggle for enabling or disabling snapshot generation.                                           | "true"                         |
-| `AGENT_CAPTURE_RECORDING`               | Toggle for enabling making recordings.                                                          | "true"                         |
-| `AGENT_CAPTURE_CONTINUOUS`              | Toggle for enabling continuous "true" or motion "false".                                        | "false"                        |
-| `AGENT_CAPTURE_PRERECORDING`            | If `CONTINUOUS` set to `false`, specify the recording time (seconds) before/after motion event. | "10"                           |
-| `AGENT_CAPTURE_POSTRECORDING`           | If `CONTINUOUS` set to `false`, specify the recording time (seconds) after motion event.        | "20"                           |
-| `AGENT_CAPTURE_MAXLENGTH`               | The maximum length of a single recording (seconds).                                             | "30"                           |
-| `AGENT_CAPTURE_PIXEL_CHANGE`            | If `CONTINUOUS` set to `false`, the number of pixel require to change before motion triggers.   | "150"                          |
-| `AGENT_CAPTURE_FRAGMENTED`              | Set the format of the recorded MP4 to fragmented (suitable for HLS).                            | "false"                        |
-| `AGENT_CAPTURE_FRAGMENTED_DURATION`     | If `AGENT_CAPTURE_FRAGMENTED` set to `true`, define the duration (seconds) of a fragment.       | "8"                            |
-| `AGENT_MQTT_URI`                        | An MQTT broker endpoint that is used for bi-directional communication (live view, onvif, etc)   | "tcp://mqtt.kerberos.io:1883"  |
-| `AGENT_MQTT_USERNAME`                   | Username of the MQTT broker.                                                                    | ""                             |
-| `AGENT_MQTT_PASSWORD`                   | Password of the MQTT broker.                                                                    | ""                             |
-| `AGENT_REALTIME_PROCESSING`             | If `AGENT_REALTIME_PROCESSING` set to `true`, the agent will send key frames to the topic       | ""                             |
-| `AGENT_REALTIME_PROCESSING_TOPIC`       | The topic to which keyframes will be sent in base64 encoded format.                             | ""                             |
-| `AGENT_STUN_URI`                        | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn.kerberos.io:8443"   |
-| `AGENT_FORCE_TURN`                      | Force using a TURN server, by generating relay candidates only.                                 | "false"                        |
-| `AGENT_TURN_URI`                        | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn.kerberos.io:8443"   |
-| `AGENT_TURN_USERNAME`                   | TURN username used for WebRTC.                                                                  | "username1"                    |
-| `AGENT_TURN_PASSWORD`                   | TURN password used for WebRTC.                                                                  | "password1"                    |
-| `AGENT_CLOUD`                           | Store recordings in Kerberos Hub (s3), Kerberos Vault (kstorage), or Dropbox (dropbox).         | "s3"                           |
-| `AGENT_HUB_ENCRYPTION`                  | Turning on/off encryption of traffic from your Kerberos Agent to Kerberos Hub.                  | "true"                         |
-| `AGENT_HUB_URI`                         | The Kerberos Hub API, defaults to our Kerberos Hub SAAS.                                        | "https://api.hub.domain.com"   |
-| `AGENT_HUB_KEY`                         | The access key linked to your account in Kerberos Hub.                                          | ""                             |
-| `AGENT_HUB_PRIVATE_KEY`                 | The secret access key linked to your account in Kerberos Hub.                                   | ""                             |
-| `AGENT_HUB_REGION`                      | The Kerberos Hub region, to which you want to upload.                                           | ""                             |
-| `AGENT_HUB_SITE`                        | The site ID of a site you've created in your Kerberos Hub account.                              | ""                             |
-| `AGENT_KERBEROSVAULT_URI`               | The Kerberos Vault API url.                                                                     | "https://vault.domain.com/api" |
-| `AGENT_KERBEROSVAULT_ACCESS_KEY`        | The access key of a Kerberos Vault account.                                                     | ""                             |
-| `AGENT_KERBEROSVAULT_SECRET_KEY`        | The secret key of a Kerberos Vault account.                                                     | ""                             |
-| `AGENT_KERBEROSVAULT_PROVIDER`          | A Kerberos Vault provider you have created (optional).                                          | ""                             |
-| `AGENT_KERBEROSVAULT_DIRECTORY`         | The directory, in the Kerberos vault, where the recordings will be stored.                      | ""                             |
-| `AGENT_DROPBOX_ACCESS_TOKEN`            | The Access Token from your Dropbox app, that is used to leverage the Dropbox SDK.               | ""                             |
-| `AGENT_DROPBOX_DIRECTORY`               | The directory, in Dropbox, where the recordings will be stored.                                 | ""                             |
-| `AGENT_ENCRYPTION`                      | Enable 'true' or disable 'false' end-to-end encryption for MQTT messages.                       | "false"                        |
-| `AGENT_ENCRYPTION_RECORDINGS`           | Enable 'true' or disable 'false' end-to-end encryption for recordings.                          | "false"                        |
-| `AGENT_ENCRYPTION_FINGERPRINT`          | The fingerprint of the keypair (public/private keys), so you know which one to use.             | ""                             |
-| `AGENT_ENCRYPTION_PRIVATE_KEY`          | The private key (assymetric/RSA) to decrypt and sign requests send over MQTT.                   | ""                             |
-| `AGENT_ENCRYPTION_SYMMETRIC_KEY`        | The symmetric key (AES) to encrypt and decrypt requests sent over MQTT.                         | ""                             |
+| `LOG_LEVEL`                                 | Level for logging, could be "info", "warning", "debug", "error" or "fatal".                     | "info"                         |
+| `LOG_OUTPUT`                                | Logging output format "json" or "text".                                                         | "text"                         |
+| `AGENT_MODE`                                | You can choose to run this in 'release' for production, and or 'demo' for showcasing.           | "release"                      |
+| `AGENT_TLS_INSECURE`                        | Specify if you want to use `InsecureSkipVerify` for the internal HTTP client.                   | "false"                        |
+| `AGENT_USERNAME`                            | The username used to authenticate against the Kerberos Agent login page.                        | "root"                         |
+| `AGENT_PASSWORD`                            | The password used to authenticate against the Kerberos Agent login page.                        | "root"                         |
+| `AGENT_KEY`                                 | A unique identifier for your Kerberos Agent, this is auto-generated but can be overriden.       | ""                             |
+| `AGENT_NAME`                                | The agent friendly-name.                                                                        | "agent"                        |
+| `AGENT_TIMEZONE`                            | Timezone which is used for converting time.                                                     | "Africa/Ceuta"                 |
+| `AGENT_REMOVE_AFTER_UPLOAD`                 | When enabled, recordings uploaded successfully to a storage will be removed from disk.          | "true"                         |
+| `AGENT_OFFLINE`                             | Makes sure no external connection is made.                                                      | "false"                        |
+| `AGENT_AUTO_CLEAN`                          | Cleans up the recordings directory.                                                             | "true"                         |
+| `AGENT_AUTO_CLEAN_MAX_SIZE`                 | If `AUTO_CLEAN` enabled, set the max size of the recordings directory (in MB).                  | "100"                          |
+| `AGENT_TIME`                                | Enable the timetable for Kerberos Agent                                                         | "false"                        |
+| `AGENT_TIMETABLE`                           | A (weekly) time table to specify when to make recordings "start1,end1,start2,end2;start1..      | ""                             |
+| `AGENT_REGION_POLYGON`                      | A single polygon set for motion detection: "x1,y1;x2,y2;x3,y3;...                               | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_RTSP`               | Full-HD RTSP endpoint to the camera you're targetting.                                          | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_SUB_RTSP`           | Sub-stream RTSP endpoint used for livestreaming (WebRTC).                                       | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF`              | Mark as a compliant ONVIF device.                                                               | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF_XADDR`        | ONVIF endpoint/address running on the camera.                                                   | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF_USERNAME`     | ONVIF username to authenticate against.                                                         | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF_PASSWORD`     | ONVIF password to authenticate against.                                                         | ""                             |
+| `AGENT_CAPTURE_MOTION`                      | Toggle for enabling or disabling motion.                                                        | "true"                         |
+| `AGENT_CAPTURE_LIVEVIEW`                    | Toggle for enabling or disabling liveview.                                                      | "true"                         |
+| `AGENT_CAPTURE_SNAPSHOTS`                   | Toggle for enabling or disabling snapshot generation.                                           | "true"                         |
+| `AGENT_CAPTURE_RECORDING`                   | Toggle for enabling making recordings.                                                          | "true"                         |
+| `AGENT_CAPTURE_CONTINUOUS`                  | Toggle for enabling continuous "true" or motion "false".                                        | "false"                        |
+| `AGENT_CAPTURE_PRERECORDING`                | If `CONTINUOUS` set to `false`, specify the recording time (seconds) before/after motion event. | "10"                           |
+| `AGENT_CAPTURE_POSTRECORDING`               | If `CONTINUOUS` set to `false`, specify the recording time (seconds) after motion event.        | "20"                           |
+| `AGENT_CAPTURE_MAXLENGTH`                   | The maximum length of a single recording (seconds).                                             | "30"                           |
+| `AGENT_CAPTURE_PIXEL_CHANGE`                | If `CONTINUOUS` set to `false`, the number of pixel require to change before motion triggers.   | "150"                          |
+| `AGENT_CAPTURE_FRAGMENTED`                  | Set the format of the recorded MP4 to fragmented (suitable for HLS).                            | "false"                        |
+| `AGENT_CAPTURE_FRAGMENTED_DURATION`         | If `AGENT_CAPTURE_FRAGMENTED` set to `true`, define the duration (seconds) of a fragment.       | "8"                            |
+| `AGENT_MQTT_URI`                            | An MQTT broker endpoint that is used for bi-directional communication (live view, onvif, etc)   | "tcp://mqtt.kerberos.io:1883"  |
+| `AGENT_MQTT_USERNAME`                       | Username of the MQTT broker.                                                                    | ""                             |
+| `AGENT_MQTT_PASSWORD`                       | Password of the MQTT broker.                                                                    | ""                             |
+| `AGENT_REALTIME_PROCESSING`                 | If `AGENT_REALTIME_PROCESSING` set to `true`, the agent will send key frames to the topic       | ""                             |
+| `AGENT_REALTIME_PROCESSING_TOPIC`           | The topic to which keyframes will be sent in base64 encoded format.                             | ""                             |
+| `AGENT_STUN_URI`                            | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn.kerberos.io:8443"   |
+| `AGENT_FORCE_TURN`                          | Force using a TURN server, by generating relay candidates only.                                 | "false"                        |
+| `AGENT_TURN_URI`                            | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn.kerberos.io:8443"   |
+| `AGENT_TURN_USERNAME`                       | TURN username used for WebRTC.                                                                  | "username1"                    |
+| `AGENT_TURN_PASSWORD`                       | TURN password used for WebRTC.                                                                  | "password1"                    |
+| `AGENT_CLOUD`                               | Store recordings in Kerberos Hub (s3), Kerberos Vault (kstorage), or Dropbox (dropbox).         | "s3"                           |
+| `AGENT_HUB_ENCRYPTION`                      | Turning on/off encryption of traffic from your Kerberos Agent to Kerberos Hub.                  | "true"                         |
+| `AGENT_HUB_URI`                             | The Kerberos Hub API, defaults to our Kerberos Hub SAAS.                                        | "https://api.hub.domain.com"   |
+| `AGENT_HUB_KEY`                             | The access key linked to your account in Kerberos Hub.                                          | ""                             |
+| `AGENT_HUB_PRIVATE_KEY`                     | The secret access key linked to your account in Kerberos Hub.                                   | ""                             |
+| `AGENT_HUB_REGION`                          | The Kerberos Hub region, to which you want to upload.                                           | ""                             |
+| `AGENT_HUB_SITE`                            | The site ID of a site you've created in your Kerberos Hub account.                              | ""                             |
+| `AGENT_KERBEROSVAULT_URI`                   | The Kerberos Vault API url.                                                                     | "https://vault.domain.com/api" |
+| `AGENT_KERBEROSVAULT_ACCESS_KEY`            | The access key of a Kerberos Vault account.                                                     | ""                             |
+| `AGENT_KERBEROSVAULT_SECRET_KEY`            | The secret key of a Kerberos Vault account.                                                     | ""                             |
+| `AGENT_KERBEROSVAULT_PROVIDER`              | A Kerberos Vault provider you have created (optional).                                          | ""                             |
+| `AGENT_KERBEROSVAULT_DIRECTORY`             | The directory, in the Kerberos vault, where the recordings will be stored.                      | ""                             |
+| `AGENT_KERBEROSVAULT_SECONDARY_URI`         | The Kerberos Vault API url.                                                                     | "https://vault.domain.com/api" |
+| `AGENT_KERBEROSVAULT_SECONDARY_ACCESS_KEY`  | The access key of a secondary Kerberos Vault account.                                           | ""                             |
+| `AGENT_KERBEROSVAULT_SECONDARY_SECRET_KEY`  | The secret key of a secondary Kerberos Vault account.                                           | ""                             |
+| `AGENT_KERBEROSVAULT_SECONDARY_PROVIDER`    | A secondary Kerberos Vault provider you have created (optional).                                | ""                             |
+| `AGENT_KERBEROSVAULT_SECONDARY_DIRECTORY`   | The directory, in the secondary Kerberos vault, where the recordings will be stored.            | ""                             |
+| `AGENT_DROPBOX_ACCESS_TOKEN`                | The Access Token from your Dropbox app, that is used to leverage the Dropbox SDK.               | ""                             |
+| `AGENT_DROPBOX_DIRECTORY`                   | The directory, in Dropbox, where the recordings will be stored.                                 | ""                             |
+| `AGENT_ENCRYPTION`                          | Enable 'true' or disable 'false' end-to-end encryption for MQTT messages.                       | "false"                        |
+| `AGENT_ENCRYPTION_RECORDINGS`               | Enable 'true' or disable 'false' end-to-end encryption for recordings.                          | "false"                        |
+| `AGENT_ENCRYPTION_FINGERPRINT`              | The fingerprint of the keypair (public/private keys), so you know which one to use.             | ""                             |
+| `AGENT_ENCRYPTION_PRIVATE_KEY`              | The private key (assymetric/RSA) to decrypt and sign requests send over MQTT.                   | ""                             |
+| `AGENT_ENCRYPTION_SYMMETRIC_KEY`            | The symmetric key (AES) to encrypt and decrypt requests sent over MQTT.                         | ""                             |
 
 ## Encryption
 

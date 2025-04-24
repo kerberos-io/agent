@@ -72,6 +72,25 @@ export function doVerifyPersistence(config, onSuccess, onError) {
     });
 }
 
+export function doVerifySecondaryPersistence(config, onSuccess, onError) {
+  const endpoint = API.post(`persistence/secondary/verify`, {
+    ...config,
+  });
+  endpoint
+    .then((res) => {
+      if (res.status !== 200) {
+        throw new Error(res.data);
+      }
+      return res.data;
+    })
+    .then((data) => {
+      onSuccess(data);
+    })
+    .catch((error) => {
+      onError(error);
+    });
+}
+
 export function doVerifyHub(config, onSuccess, onError) {
   const endpoint = API.post(`hub/verify`, {
     ...config,

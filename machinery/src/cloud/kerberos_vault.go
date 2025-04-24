@@ -48,7 +48,6 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 	}
 
 	publicKey := config.KStorage.CloudKey
-	// This is the new way ;)
 	if config.HubKey != "" {
 		publicKey = config.HubKey
 	}
@@ -93,13 +92,78 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 					return true, true, nil
 				} else {
 					log.Log.Info("UploadKerberosVault: Upload Failed, " + resp.Status + ", " + string(body))
-					return false, true, nil
+				}
+			}
+		}
+	} else {
+		log.Log.Info("UploadKerberosVault: Upload Failed, " + err.Error())
+	}
+
+	// We might need to check if we can upload to our secondary storage.
+
+	if config.KStorageSecondary.AccessKey == "" ||
+		config.KStorageSecondary.SecretAccessKey == "" ||
+		config.KStorageSecondary.Directory == "" ||
+		config.KStorageSecondary.URI == "" {
+		log.Log.Info("UploadKerberosVault: Secondary Kerberos Vault not properly configured.")
+	} else {
+		log.Log.Info("UploadKerberosVault: Uploading to Secondary Kerberos Vault (" + config.KStorageSecondary.URI + ")")
+
+		file, err = os.OpenFile(fullname, os.O_RDWR, 0755)
+		if file != nil {
+			defer file.Close()
+		}
+		if err != nil {
+			err := "UploadKerberosVault: Upload Failed, file doesn't exists anymore."
+			log.Log.Info(err)
+			return false, false, errors.New(err)
+		}
+
+		req, err := http.NewRequest("POST", config.KStorageSecondary.URI+"/storage", file)
+		if err != nil {
+			errorMessage := "UploadKerberosVault: error reading request, " + config.KStorageSecondary.URI + "/storage: " + err.Error()
+			log.Log.Error(errorMessage)
+			return false, true, errors.New(errorMessage)
+		}
+		req.Header.Set("Content-Type", "video/mp4")
+		req.Header.Set("X-Kerberos-Storage-CloudKey", publicKey)
+		req.Header.Set("X-Kerberos-Storage-AccessKey", config.KStorageSecondary.AccessKey)
+		req.Header.Set("X-Kerberos-Storage-SecretAccessKey", config.KStorageSecondary.SecretAccessKey)
+		req.Header.Set("X-Kerberos-Storage-Provider", config.KStorageSecondary.Provider)
+		req.Header.Set("X-Kerberos-Storage-FileName", fileName)
+		req.Header.Set("X-Kerberos-Storage-Device", config.Key)
+		req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
+		req.Header.Set("X-Kerberos-Storage-Directory", config.KStorageSecondary.Directory)
+
+		var client *http.Client
+		if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			client = &http.Client{Transport: tr}
+		} else {
+			client = &http.Client{}
+		}
+
+		resp, err := client.Do(req)
+		if resp != nil {
+			defer resp.Body.Close()
+		}
+
+		if err == nil {
+			if resp != nil {
+				body, err := ioutil.ReadAll(resp.Body)
+				if err == nil {
+					if resp.StatusCode == 200 {
+						log.Log.Info("UploadKerberosVault: Upload Finished to secondary, " + resp.Status + ", " + string(body))
+						return true, true, nil
+					} else {
+						log.Log.Info("UploadKerberosVault: Upload Failed to secondary, " + resp.Status + ", " + string(body))
+					}
 				}
 			}
 		}
 	}
 
-	errorMessage := "UploadKerberosVault: Upload Failed, " + err.Error()
-	log.Log.Info(errorMessage)
-	return false, true, errors.New(errorMessage)
+	return false, true, nil
 }
