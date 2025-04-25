@@ -41,7 +41,7 @@ You attach a volume to your container by leveraging the `-v` option. To mount yo
 
 ### Override with environment variables
 
-Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments easier when leveraging `docker compose` or `kubernetes` deployments much easier and scalable. Using this approach we simplify automation through `ansible` and `terraform`. You'll find [the full list of environment variables on the main README.md file](https://github.com/kerberos-io/agent#override-with-environment-variables).
+Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deployments when leveraging `docker compose` or `kubernetes` much easier and more scalable. Using this approach we simplify automation through `ansible` and `terraform`. You'll find [the full list of environment variables on the main README.md file](https://github.com/kerberos-io/agent#override-with-environment-variables).
 
 ### 2. Running multiple containers with Docker compose
 
