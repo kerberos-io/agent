@@ -135,6 +135,12 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 		conjungo.Merge(&kerberosvault, configuration.CustomConfig.KStorage, opts)
 		configuration.Config.KStorage = &kerberosvault
 
+		// Merge Secondary Kerberos Vault settings
+		var kerberosvaultSecondary models.KStorage
+		conjungo.Merge(&kerberosvaultSecondary, configuration.GlobalConfig.KStorageSecondary, opts)
+		conjungo.Merge(&kerberosvaultSecondary, configuration.CustomConfig.KStorageSecondary, opts)
+		configuration.Config.KStorageSecondary = &kerberosvaultSecondary
+
 		// Merge Kerberos S3 settings
 		var s3 models.S3
 		conjungo.Merge(&s3, configuration.GlobalConfig.S3, opts)
