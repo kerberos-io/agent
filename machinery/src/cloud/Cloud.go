@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"image"
 	"io"
 	"os"
 	"strings"
@@ -689,25 +690,28 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 			var pkt packets.Packet
 
 			for cursorError == nil {
-				pkt, cursorError = livestreamCursor.ReadPacket()
-				if len(pkt.Data) == 0 || !pkt.IsKeyFrame {
-					continue
-				}
+
 				now := time.Now().Unix()
 				select {
 				case <-communication.HandleLiveSD:
 					lastLivestreamRequest = now
 				default:
 				}
+
 				if now-lastLivestreamRequest > 3 {
 					continue
 				}
+
+				pkt, cursorError = livestreamCursor.ReadPacket()
+				if len(pkt.Data) == 0 || !pkt.IsKeyFrame {
+					continue
+				}
+
 				log.Log.Info("cloud.HandleLiveStreamSD(): Sending base64 encoded images to MQTT.")
 				img, err := rtspClient.DecodePacket(pkt)
 				if err == nil {
 					bytes, _ := utils.ImageToBytes(&img)
 					encoded := base64.StdEncoding.EncodeToString(bytes)
-
 					valueMap := make(map[string]interface{})
 					valueMap["image"] = encoded
 					message := models.Message{
@@ -724,6 +728,8 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 						log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
 					}
 				}
+				// Cleaning image
+				img = image.YCbCr{}
 			}
 
 		} else {
