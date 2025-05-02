@@ -295,7 +295,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	communication.HandleAudio = make(chan models.AudioDataPartial, 10)
 	if rtspBackChannelClient.HasBackChannel {
 		communication.HasBackChannel = true
-		go WriteAudioToBackchannel(communication, rtspBackChannelClient)
+		go WriteFileToBackChannel(communication, rtspBackChannelClient)
 	}
 
 	// If we reach this point, we have a working RTSP connection.

@@ -407,3 +407,8 @@ func ImageToBytes(img image.Image) ([]byte, error) {
 	err := jpeg.Encode(w, img, &jpeg.Options{Quality: 15})
 	return buffer.Bytes(), err
 }
+
+func RandomUint32() uint32 {
+	// Generate a random uint32 value
+	return uint32(rand.Int31())
+}
