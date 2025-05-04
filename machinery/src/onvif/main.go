@@ -12,6 +12,7 @@ import (
 
 	onvifc "github.com/cedricve/go-onvif"
 	"github.com/gin-gonic/gin"
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/onvif"
@@ -187,6 +188,16 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 		}
 	}
 	log.Log.Debug("onvif.HandleONVIFActions(): finished")
+}
+
+func HandleAudioActions(configuration *models.Configuration, communication *models.Communication, backchannel capture.RTSPClient) {
+	log.Log.Debug("onvif.HandleAudioActions(): started")
+
+	/*for action := range communication.HandleAudio {
+		fmt.Println("onvif.HandleAudioActions(): action", action)
+		cloud.WriteFileToBackChannel(communication, backchannel)
+	}*/
+	log.Log.Debug("onvif.HandleAudioActions(): finished")
 }
 
 func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, device.GetCapabilitiesResponse, error) {

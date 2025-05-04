@@ -75,7 +75,7 @@ func WriteFileToBackChannel(communication *models.Communication, rtspClient capt
 	sequenceNumber := uint16(0)
 
 	// Do the warmup!
-	file, err := os.Open("./aandacht.wav")
+	file, err := os.Open("./audio/air-raid.wav")
 	if err != nil {
 		fmt.Println("WriteFileToBackChannel: error opening audiofile.bye file")
 	}
@@ -94,7 +94,6 @@ func WriteFileToBackChannel(communication *models.Communication, rtspClient capt
 		if err != nil {
 			break
 		}
-
 		// Encode PCM to MULAW
 		bufferUlaw := g711.EncodeUlaw(buffer)
 		fmt.Println("WriteFileToBackChannel: bufferUlaw", bufferUlaw)

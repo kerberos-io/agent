@@ -2,6 +2,7 @@ package components
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"sync/atomic"
@@ -297,6 +298,18 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		communication.HasBackChannel = true
 		go WriteFileToBackChannel(communication, rtspBackChannelClient)
 	}
+	//go onvif.HandleAudioActions(configuration, communication, rtspBackChannelClient)
+	go func() {
+		for action := range communication.HandleAudio {
+			fmt.Println("onvif.HandleAudioActions(): action", action)
+			// Ensure cloud.WriteFileToBackChannel is implemented or replace with a valid function
+			if WriteFileToBackChannel != nil {
+				WriteFileToBackChannel(communication, rtspBackChannelClient)
+			} else {
+				fmt.Println("cloud.WriteFileToBackChannel is not defined")
+			}
+		}
+	}()
 
 	// If we reach this point, we have a working RTSP connection.
 	communication.CameraConnected = true

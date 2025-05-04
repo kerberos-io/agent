@@ -166,6 +166,12 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 									NumberOfChanges: changesToReturn,
 								}
 								communication.HandleMotion <- dataToPass //Save data to the channel
+
+								audioToPass := models.AudioDataPartial{
+									Timestamp: time.Now().Unix(),
+									Data:      []int16{},
+								}
+								communication.HandleAudio <- audioToPass //Save data to the channel
 							}
 						}
 					}
