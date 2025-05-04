@@ -2,7 +2,6 @@ package components
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strconv"
 	"sync/atomic"
@@ -296,10 +295,13 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	communication.HandleAudio = make(chan models.AudioDataPartial, 10)
 	if rtspBackChannelClient.HasBackChannel {
 		communication.HasBackChannel = true
-		go WriteFileToBackChannel(communication, rtspBackChannelClient)
+		for {
+			go WriteFileToBackChannel(communication, rtspBackChannelClient)
+			time.Sleep(3 * time.Second)
+		}
 	}
 	//go onvif.HandleAudioActions(configuration, communication, rtspBackChannelClient)
-	go func() {
+	/*go func() {
 		for action := range communication.HandleAudio {
 			fmt.Println("onvif.HandleAudioActions(): action", action)
 			// Ensure cloud.WriteFileToBackChannel is implemented or replace with a valid function
@@ -309,7 +311,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 				fmt.Println("cloud.WriteFileToBackChannel is not defined")
 			}
 		}
-	}()
+	}()*/
 
 	// If we reach this point, we have a working RTSP connection.
 	communication.CameraConnected = true

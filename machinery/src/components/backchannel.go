@@ -2,6 +2,7 @@ package components
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -102,8 +103,8 @@ func WriteFileToBackChannel(communication *models.Communication, rtspClient capt
 			Packet: &rtp.Packet{
 				Header: rtp.Header{
 					Version:        2,
-					Marker:         true, // should be true
-					PayloadType:    0,    //packet.PayloadType, // will be owerwriten
+					Marker:         false, // should be true
+					PayloadType:    0,     //packet.PayloadType, // will be owerwriten
 					SequenceNumber: sequenceNumber,
 					Timestamp:      uint32(length),
 					SSRC:           ssrc,
@@ -114,6 +115,20 @@ func WriteFileToBackChannel(communication *models.Communication, rtspClient capt
 		err = rtspClient.WritePacket(pkt)
 		if err != nil {
 			log.Log.Error("Audio.WriteFileToBackChannel(): error writing packet to backchannel")
+			if err.Error() == "EOF" {
+				log.Log.Info("Audio.WriteFileToBackChannel(): EOF, restarting backchannel")
+				rtspClient.Close()
+				err = rtspClient.ConnectBackChannel(context.Background())
+				if err != nil {
+					log.Log.Error("Audio.WriteFileToBackChannel(): error connecting to backchannel")
+					fmt.Println(err)
+				}
+				err = rtspClient.StartBackChannel(context.Background())
+				if err != nil {
+					log.Log.Error("Audio.WriteFileToBackChannel(): error starting backchannel")
+					fmt.Println(err)
+				}
+			}
 		} else {
 			log.Log.Info("Audio.WriteFileToBackChannel(): wrote packet to backchannel")
 		}
