@@ -297,7 +297,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		communication.HasBackChannel = true
 		for {
 			go WriteFileToBackChannel(communication, rtspBackChannelClient)
-			time.Sleep(3 * time.Second)
+			time.Sleep(10 * time.Second)
 		}
 	}
 	//go onvif.HandleAudioActions(configuration, communication, rtspBackChannelClient)

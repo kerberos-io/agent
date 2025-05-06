@@ -76,7 +76,7 @@ func WriteFileToBackChannel(communication *models.Communication, rtspClient capt
 	sequenceNumber := uint16(0)
 
 	// Do the warmup!
-	file, err := os.Open("./audio/air-raid.wav")
+	file, err := os.Open("./audio/police-siren.wav")
 	if err != nil {
 		fmt.Println("WriteFileToBackChannel: error opening audiofile.bye file")
 	}
