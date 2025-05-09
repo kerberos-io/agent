@@ -26,11 +26,11 @@ services:
       STORAGE_REGION: ${AWS_DEFAULT_REGION}
       STORAGE_SECURE: true
       STORAGE_PATH: kerberos-uploads
-      STORAGE_DIRECTORY: /etc/opt/kerberosio/capture
+      STORAGE_DIRECTORY: /home/agent/data/recordings
     volumes:
-      - ./config:/etc/opt/kerberosio/config
-      - ./media:/etc/opt/kerberosio/capture
-      - ./logs:/etc/opt/kerberosio/logs
+      - ./config:/home/agent/data/config
+      - ./media:/home/agent/data/recordings
+      - ./logs:/home/agent/data/logs
     networks:
       - cluster-net
 
