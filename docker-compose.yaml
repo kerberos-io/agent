@@ -1,0 +1,38 @@
+x-common-variables: &common-variables
+  # Add variables here to add them to all agents
+  # AGENT_HUB_KEY: "xxxxx" # The access key linked to your account in Kerberos Hub.
+  # AGENT_HUB_PRIVATE_KEY: "xxxxx" # The secret access key linked to your account in Kerberos Hub.
+  # find full list of environment variables here: https://github.com/kerberos-io/agent#override-with-environment-variables
+services:
+  kerberos-agent1:
+    image: "kerberos/agent:latest"
+    container_name: kerberos-agent
+    privileged: true
+    restart: always
+    devices:
+      - "/dev/video0:/dev/video0"
+    ports:
+      - "8080:80"
+    environment:
+      <<: *common-variables
+      AGENT_NAME: agent1
+      # AGENT_CAPTURE_IPCAMERA_RTSP: rtsp://username:password@x.x.x.x/Streaming/Channels/101 # Hikvision camera RTSP url example
+      AGENT_KEY: "1"
+      TZ: UTC
+      STORAGE_DRIVER: s3
+      STORAGE_ENDPOINT: s3.amazonaws.com
+      STORAGE_ACCESSKEY: ${AWS_ACCESS_KEY_ID}
+      STORAGE_SECRETKEY: ${AWS_SECRET_ACCESS_KEY}
+      STORAGE_BUCKET: ${AWS_BUCKET_NAME}
+      STORAGE_REGION: ${AWS_DEFAULT_REGION}
+      STORAGE_SECURE: true
+      STORAGE_PATH: kerberos-uploads
+      STORAGE_DIRECTORY: /etc/opt/kerberosio/capture
+    volumes:
+      - ./config:/etc/opt/kerberosio/config
+      - ./media:/etc/opt/kerberosio/capture
+      - ./logs:/etc/opt/kerberosio/logs
+networks:
+  default:
+    name: cluster-net
+    external: true
