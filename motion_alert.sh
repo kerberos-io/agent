@@ -47,7 +47,7 @@ if [[ "$NEW_FILE" != "$LAST_FILE" ]]; then
 
      # Sync media directory to S3
     echo "Syncing media directory to S3..."
-    aws s3 sync "$WATCH_DIR" "s3://$AWS_BUCKET_NAME/kerberos-uploads/" --storage-class ONEZONE_IA
+    aws s3 sync "$WATCH_DIR" "s3://$AWS_BUCKET_NAME/kerberos-uploads/" --storage-class STANDARD
 
 else
     echo "No new motion."
