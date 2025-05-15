@@ -1,0 +1,121 @@
+
+{
+	"type": "",
+	"key": "",
+	"name": "agent",
+	"time": "false",
+	"offline": "false",
+	"auto_clean": "true",
+	"remove_after_upload": "true",
+	"max_directory_size": 100,
+	"timezone": "Africa/Ceuta",
+	"capture": {
+		"name": "",
+		"ipcamera": {
+			"rtsp": "",
+			"sub_rtsp": "",
+			"fps": ""
+		},
+		"usbcamera": {
+			"device": ""
+		},
+		"raspicamera": {
+			"device": ""
+		},
+		"continuous": "false",
+		"recording": "true",
+		"snapshots": "true",
+		"liveview": "true",
+		"motion": "true",
+		"postrecording": 20,
+		"prerecording": 10,
+		"maxlengthrecording": 30,
+		"transcodingwebrtc": "",
+		"transcodingresolution": 0,
+		"forwardwebrtc": "",
+		"fragmented": "false",
+		"fragmentedduration": 8,
+		"pixelChangeThreshold": 150
+	},
+	"timetable": [
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		},
+		{
+			"start1": 0,
+			"end1": 43199,
+			"start2": 43200,
+			"end2": 86400
+		}
+	],
+	"region": {
+		"name": "",
+		"rectangle": {
+			"x1": 0,
+			"y1": 0,
+			"x2": 800,
+			"y2": 640
+		},
+		"polygon": []
+	},
+	"cloud": "s3",
+	"s3": {
+		"proxyuri": "http://proxy.kerberos.io",
+		"bucket": "kerberosaccept",
+		"region": "eu-west-1"
+	},
+	"kstorage": {},
+	"kstorage_secondary": {},
+	"dropbox": {},
+	"mqtturi": "tcp://mqtt.kerberos.io:1883",
+	"mqtt_username": "",
+	"mqtt_password": "",
+	"stunuri": "stun:turn.kerberos.io:8443",
+	"turn_force": "false",
+	"turnuri": "turn:turn.kerberos.io:8443",
+	"turn_username": "username1",
+	"turn_password": "password1",
+	"heartbeaturi": "",
+	"hub_encryption": "true",
+	"hub_uri": "https://api.cloud.kerberos.io",
+	"hub_key": "",
+	"hub_private_key": "",
+	"hub_site": "",
+	"condition_uri": "",
+	"encryption": {},
+	"realtimeprocessing": "false",
+	"realtimeprocessing_topic": ""
+}
