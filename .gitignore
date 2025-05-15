@@ -10,6 +10,6 @@ machinery/data/recordings
 machinery/data/snapshots
 machinery/test*
 machinery/init-dev.sh
-machinery/.env
+machinery/.env.local
 machinery/vendor
 deployments/docker/private-docker-compose.yaml
