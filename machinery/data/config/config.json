@@ -99,6 +99,7 @@
 	},
 	"kstorage": {},
 	"kstorage_secondary": {},
+	"kstorageRetryPolicy": 5,
 	"dropbox": {},
 	"mqtturi": "tcp://mqtt.kerberos.io:1883",
 	"mqtt_username": "",
