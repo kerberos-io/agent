@@ -6,10 +6,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
+
+// We will count the number of retries we have done.
+// If we have done more than "kstorageRetryPolicy" retries, we will stop, and start sending to the secondary storage.
+var kstorageRetryCount = 0
 
 func UploadKerberosVault(configuration *models.Configuration, fileName string) (bool, bool, error) {
 
@@ -88,9 +93,14 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 			body, err := ioutil.ReadAll(resp.Body)
 			if err == nil {
 				if resp.StatusCode == 200 {
+					kstorageRetryCount = 0
 					log.Log.Info("UploadKerberosVault: Upload Finished, " + resp.Status + ", " + string(body))
 					return true, true, nil
 				} else {
+					if kstorageRetryCount < config.KStorageRetryPolicy {
+						kstorageRetryCount = (kstorageRetryCount + 1)
+					}
+					time.Sleep(5 * time.Second)
 					log.Log.Info("UploadKerberosVault: Upload Failed, " + resp.Status + ", " + string(body))
 				}
 			}
@@ -100,13 +110,18 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 	}
 
 	// We might need to check if we can upload to our secondary storage.
-
 	if config.KStorageSecondary.AccessKey == "" ||
 		config.KStorageSecondary.SecretAccessKey == "" ||
 		config.KStorageSecondary.Directory == "" ||
 		config.KStorageSecondary.URI == "" {
 		log.Log.Info("UploadKerberosVault: Secondary Kerberos Vault not properly configured.")
 	} else {
+
+		if kstorageRetryCount < config.KStorageRetryPolicy {
+			log.Log.Info("Do not upload to secondary storage, we are still in retry policy.")
+			return false, true, nil
+		}
+
 		log.Log.Info("UploadKerberosVault: Uploading to Secondary Kerberos Vault (" + config.KStorageSecondary.URI + ")")
 
 		file, err = os.OpenFile(fullname, os.O_RDWR, 0755)
