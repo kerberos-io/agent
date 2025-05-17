@@ -2,6 +2,10 @@
 // README at: https://github.com/devcontainers/templates/tree/main/src/python
 {
 	"name": "go:1.24-bookworm",
+	"runArgs": [
+		"--name=agent",
+		"--network=host"
+	],
 	"dockerFile": "Dockerfile",
 	"customizations": {
 		"vscode": {

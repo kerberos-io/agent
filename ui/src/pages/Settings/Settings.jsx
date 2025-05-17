@@ -2536,6 +2536,43 @@ class Settings extends React.Component {
                           )
                         }
                       />
+                      <Input
+                        noPadding
+                        label={t(
+                          'settings.persistence.kerberosvault_maxretries'
+                        )}
+                        placeholder={t(
+                          'settings.persistence.kerberosvault_description_maxretries'
+                        )}
+                        value={
+                          config.kstorage ? config.kstorage.max_retries : ''
+                        }
+                        onChange={(value) =>
+                          this.onUpdateField(
+                            'kstorage',
+                            'max_retries',
+                            value,
+                            config.kstorage
+                          )
+                        }
+                      />
+
+                      <Input
+                        noPadding
+                        label={t('settings.persistence.kerberosvault_timeout')}
+                        placeholder={t(
+                          'settings.persistence.kerberosvault_description_timeout'
+                        )}
+                        value={config.kstorage ? config.kstorage.timeout : ''}
+                        onChange={(value) =>
+                          this.onUpdateField(
+                            'kstorage',
+                            'timeout',
+                            value,
+                            config.kstorage
+                          )
+                        }
+                      />
                     </>
                   )}
                   {config.cloud === this.DROPBOX && (

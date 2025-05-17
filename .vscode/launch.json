@@ -16,7 +16,7 @@
                 "-port",
                 "8080"
             ],
-            "envFile": "${workspaceFolder}/machinery/.env",
+            "envFile": "${workspaceFolder}/machinery/.env.local",
             "buildFlags": "--tags dynamic",
         },
         {

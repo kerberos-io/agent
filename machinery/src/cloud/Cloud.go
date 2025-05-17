@@ -131,7 +131,7 @@ func HandleUpload(configDirectory string, configuration *models.Configuration, c
 							log.Log.Error("HandleUpload: " + err.Error())
 						}
 					} else {
-						delay = 20 * time.Second // slow down
+						delay = 5 * time.Second // slow down
 						if err != nil {
 							log.Log.Error("HandleUpload: " + err.Error())
 						}

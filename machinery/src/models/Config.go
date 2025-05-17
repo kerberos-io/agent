@@ -159,6 +159,8 @@ type KStorage struct {
 	SecretAccessKey string `json:"secret_access_key,omitempty" bson:"secret_access_key,omitempty"`
 	Provider        string `json:"provider,omitempty" bson:"provider,omitempty"`
 	Directory       string `json:"directory,omitempty" bson:"directory,omitempty"`
+	MaxRetries      int    `json:"max_retries,omitempty" bson:"max_retries,omitempty"`
+	Timeout         int    `json:"timeout,omitempty" bson:"timeout,omitempty"`
 }
 
 // Dropbox integration
