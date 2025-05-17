@@ -29,7 +29,6 @@ type Config struct {
 	S3                      *S3          `json:"s3,omitempty" bson:"s3,omitempty"`
 	KStorage                *KStorage    `json:"kstorage,omitempty" bson:"kstorage,omitempty"`
 	KStorageSecondary       *KStorage    `json:"kstorage_secondary,omitempty" bson:"kstorage_secondary,omitempty"`
-	KStorageRetryPolicy     int          `json:"kstorageRetryPolicy,omitempty" bson:"kstorageRetryPolicy,omitempty"`
 	Dropbox                 *Dropbox     `json:"dropbox,omitempty" bson:"dropbox,omitempty"`
 	MQTTURI                 string       `json:"mqtturi" bson:"mqtturi,omitempty"`
 	MQTTUsername            string       `json:"mqtt_username" bson:"mqtt_username"`
@@ -160,6 +159,8 @@ type KStorage struct {
 	SecretAccessKey string `json:"secret_access_key,omitempty" bson:"secret_access_key,omitempty"`
 	Provider        string `json:"provider,omitempty" bson:"provider,omitempty"`
 	Directory       string `json:"directory,omitempty" bson:"directory,omitempty"`
+	MaxRetries      int    `json:"max_retries,omitempty" bson:"max_retries,omitempty"`
+	Timeout         int    `json:"timeout,omitempty" bson:"timeout,omitempty"`
 }
 
 // Dropbox integration

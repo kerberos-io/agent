@@ -463,6 +463,20 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				configuration.Config.KStorage.Directory = value
 				break
 
+			/* Retry policy and timeout */
+			case "AGENT_KERBEROSVAULT_MAX_RETRIES":
+				maxRetries, err := strconv.Atoi(value)
+				if err == nil {
+					configuration.Config.KStorage.MaxRetries = maxRetries
+				}
+				break
+			case "AGENT_KERBEROSVAULT_TIMEOUT":
+				timeout, err := strconv.Atoi(value)
+				if err == nil {
+					configuration.Config.KStorage.Timeout = timeout
+				}
+				break
+
 			/* When storing in a secondary Vault */
 			case "AGENT_KERBEROSVAULT_SECONDARY_URI":
 				configuration.Config.KStorageSecondary.URI = value
