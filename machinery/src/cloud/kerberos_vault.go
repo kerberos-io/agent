@@ -124,29 +124,29 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 		config.KStorageSecondary.SecretAccessKey == "" ||
 		config.KStorageSecondary.Directory == "" ||
 		config.KStorageSecondary.URI == "" {
-		log.Log.Info("UploadKerberosVault: Secondary Kerberos Vault not properly configured.")
+		log.Log.Info("UploadKerberosVault (Secondary): Secondary Kerberos Vault not properly configured.")
 	} else {
 
 		if kstorageRetryCount < config.KStorage.MaxRetries {
-			log.Log.Info("Do not upload to secondary storage, we are still in retry policy.")
+			log.Log.Info("UploadKerberosVault (Secondary): Do not upload to secondary storage, we are still in retry policy.")
 			return false, true, nil
 		}
 
-		log.Log.Info("UploadKerberosVault: Uploading to Secondary Kerberos Vault (" + config.KStorageSecondary.URI + ")")
+		log.Log.Info("UploadKerberosVault (Secondary): Uploading to Secondary Kerberos Vault (" + config.KStorageSecondary.URI + ")")
 
 		file, err = os.OpenFile(fullname, os.O_RDWR, 0755)
 		if file != nil {
 			defer file.Close()
 		}
 		if err != nil {
-			err := "UploadKerberosVault: Upload Failed, file doesn't exists anymore"
+			err := "UploadKerberosVault (Secondary): Upload Failed, file doesn't exists anymore"
 			log.Log.Info(err)
 			return false, false, errors.New(err)
 		}
 
 		req, err := http.NewRequest("POST", config.KStorageSecondary.URI+"/storage", file)
 		if err != nil {
-			errorMessage := "UploadKerberosVault: error reading request, " + config.KStorageSecondary.URI + "/storage: " + err.Error()
+			errorMessage := "UploadKerberosVault (Secondary): error reading request, " + config.KStorageSecondary.URI + "/storage: " + err.Error()
 			log.Log.Error(errorMessage)
 			return false, true, errors.New(errorMessage)
 		}
@@ -180,10 +180,10 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 				body, err := io.ReadAll(resp.Body)
 				if err == nil {
 					if resp.StatusCode == 200 {
-						log.Log.Info("UploadKerberosVault: Upload Finished to secondary, " + resp.Status + ", " + string(body))
+						log.Log.Info("UploadKerberosVault (Secondary): Upload Finished to secondary, " + resp.Status + ", " + string(body))
 						return true, true, nil
 					} else {
-						log.Log.Info("UploadKerberosVault: Upload Failed to secondary, " + resp.Status + ", " + string(body))
+						log.Log.Info("UploadKerberosVault (Secondary): Upload Failed to secondary, " + resp.Status + ", " + string(body))
 					}
 				}
 			}
