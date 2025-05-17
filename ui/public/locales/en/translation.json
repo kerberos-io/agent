@@ -223,7 +223,7 @@
       "kerberosvault_description_accesskey": "The access key of your Vault account.",
       "kerberosvault_secretkey": "Secret key",
       "kerberosvault_description_secretkey": "The secret key of your Vault account.",
-      "kerberosvault_maxretries:": "Max retries",
+      "kerberosvault_maxretries": "Max retries",
       "kerberosvault_description_maxretries": "The maximum number of retries to upload a recording.",
       "kerberosvault_timeout": "Timeout",
       "kerberosvault_description_timeout": "If a timeout occurs, recordings will be sent directly to the secondary Vault.",
