@@ -1,5 +1,6 @@
 
-FROM kerberos/base:af04230 AS build-machinery
+ARG BASE_IMAGE_VERSION=70ec57e
+FROM kerberos/base:${BASE_IMAGE_VERSION} AS build-machinery
 LABEL AUTHOR=Kerberos.io
 
 ENV GOROOT=/usr/local/go
