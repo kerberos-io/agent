@@ -39,13 +39,14 @@ jobs:
       - name: Available platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
       - name: Run Buildx
-        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}} --push .
+        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}} --push .
       - name: Create new and append to manifest
-        run: docker buildx imagetools create -t $REPO:${{ github.ref_name }} $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}}
+        run: docker buildx imagetools create -t $REPO:${{ github.event.inputs.tag || github.ref_name }} $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
       - name: Create new and append to manifest latest
-        run: docker buildx imagetools create -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}}
+        run: docker buildx imagetools create -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
+        if: github.event.inputs.tag == 'test'
       - name: Run Buildx with output
-        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{github.ref_name}} --output type=tar,dest=output-${{matrix.architecture}}.tar .
+        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{github.event.inputs.tag || github.ref_name}} --output type=tar,dest=output-${{matrix.architecture}}.tar .
       - name: Strip binary
         run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
       - name: Create a release
@@ -53,8 +54,8 @@ jobs:
         with:
           latest: true
           allowUpdates: true
-          name: ${{ github.ref_name }}
-          tag: ${{ github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag: ${{ github.event.inputs.tag || github.ref_name }}
           generateReleaseNotes: false
           omitBodyDuringUpdate: true
           artifacts: "agent-${{matrix.architecture}}.tar"
@@ -97,13 +98,14 @@ jobs:
       - name: Available platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
       - name: Run Buildx
-        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}} --push .
+        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}} --push .
       - name: Create new and append to manifest
-        run: docker buildx imagetools create --append -t $REPO:${{ github.ref_name }} $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}}
+        run: docker buildx imagetools create --append -t $REPO:${{ github.event.inputs.tag || github.ref_name }} $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
       - name: Create new and append to manifest latest
-        run: docker buildx imagetools create --append -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{github.ref_name}}
+        run: docker buildx imagetools create --append -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
+        if: github.event.inputs.tag == 'test'
       - name: Run Buildx with output
-        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{github.ref_name}} --output type=tar,dest=output-${{matrix.architecture}}.tar .
+        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{github.event.inputs.tag || github.ref_name}} --output type=tar,dest=output-${{matrix.architecture}}.tar .
       - name: Strip binary
         run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
       - name: Create a release
@@ -111,8 +113,8 @@ jobs:
         with:
           latest: true
           allowUpdates: true
-          name: ${{ github.ref_name }}
-          tag: ${{ github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag: ${{ github.event.inputs.tag || github.ref_name }}
           generateReleaseNotes: false
           omitBodyDuringUpdate: true
           artifacts: "agent-${{matrix.architecture}}.tar"
