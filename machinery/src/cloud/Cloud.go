@@ -366,7 +366,7 @@ loop:
 
 				if pullPointAddressInitialState == "" && pullPointAddressLoopState == "" {
 					var events []onvif.ONVIFEvents
-					outputs, err := onvif.GetRelayOutputs(device)
+					/*outputs, err := onvif.GetRelayOutputs(device)
 					if err != nil {
 						log.Log.Debug("cloud.HandleHeartBeat(): error while getting relay outputs: " + err.Error())
 					} else {
@@ -394,7 +394,7 @@ loop:
 							}
 							events = append(events, event)
 						}
-					}
+					}*/
 
 					// Marshal the events
 					onvifEventsList, err = json.Marshal(events)

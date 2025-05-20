@@ -1268,13 +1268,13 @@ func TriggerRelayOutput(dev *onvif.Device, output string) (err error) {
 	err = nil
 
 	// Get all outputs
-	relayoutputs, err := GetRelayOutputs(dev)
+	//relayoutputs, err := GetRelayOutputs(dev)
 
 	// For the moment we expect a single output
 	// However in theory there might be multiple outputs. We might need to change
 	// this in the future "kerberos-io/onvif" library.
 	if err == nil {
-		token := relayoutputs.RelayOutputs[0].Token
+		/*token := relayoutputs.RelayOutputs[0].Token
 		if output == string(token+"-output") {
 			outputState := device.SetRelayOutputState{
 				RelayOutputToken: token,
@@ -1293,9 +1293,9 @@ func TriggerRelayOutput(dev *onvif.Device, output string) (err error) {
 			} else {
 				log.Log.Error("onvif.main.TriggerRelayOutput(): " + stringBody)
 			}
-		} else {
-			log.Log.Error("onvif.main.TriggerRelayOutput(): could not find relay output (" + output + ")")
-		}
+		} else {*/
+		log.Log.Error("onvif.main.TriggerRelayOutput(): could not find relay output (" + output + ")")
+		//}
 	} else {
 		log.Log.Error("onvif.main.TriggerRelayOutput(): something went wrong while getting the relay outputs " + err.Error())
 	}
