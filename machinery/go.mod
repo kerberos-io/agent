@@ -3,6 +3,7 @@ module github.com/kerberos-io/agent/machinery
 go 1.24.2
 
 require (
+	github.com/Eyevinn/mp4ff v0.48.0
 	github.com/InVisionApp/conjungo v1.1.0
 	github.com/appleboy/gin-jwt/v2 v2.10.3
 	github.com/bluenviron/gortsplib/v4 v4.14.0
