@@ -78,6 +78,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 		// For continuous and motion based recording we will use a single file.
 		var file *os.File
 
+		// Get Video and Audio streams.
+		//videoSteams, _ := rtspClient.GetVideoStreams()
+		audioStreams, _ := rtspClient.GetAudioStreams()
+		// Check if we have AAC audio codec.
+		audioCodec := ""
+		for _, stream := range audioStreams {
+			if stream.Name == "AAC" {
+				audioCodec = stream.Name
+			} else if stream.Name == "PCM_MULAW" {
+				audioCodec = stream.Name
+			}
+		}
+
 		// Check if continuous recording.
 		if config.Capture.Continuous == "true" {
 
@@ -237,7 +250,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265, widthOption, heightOption)
 						}
 						// For an MP4 container, AAC is the only audio codec supported.
-						audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
+						if audioCodec == "AAC" {
+							audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
+						}
 					} else {
 						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 					}
@@ -405,7 +420,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 				}
 				// For an MP4 container, AAC is the only audio codec supported.
-				audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
+				if audioCodec == "AAC" {
+					audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
+				}
+
 				start := false
 
 				// Get as much packets we need.
