@@ -1,6 +1,9 @@
 package packets
 
 type Stream struct {
+	// The ID of the stream.
+	Index int
+
 	// The name of the stream.
 	Name string
 
