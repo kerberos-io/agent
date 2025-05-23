@@ -377,7 +377,7 @@ func GoToOnvifPreset(c *gin.Context) {
 // @Description Will get the digital inputs from the ONVIF device.
 // @Success 200 {object} models.APIResponse
 func DoGetDigitalInputs(c *gin.Context) {
-	var onvifCredentials models.OnvifCredentials
+	/*var onvifCredentials models.OnvifCredentials
 	err := c.BindJSON(&onvifCredentials)
 
 	if err == nil && onvifCredentials.ONVIFXAddr != "" {
@@ -450,7 +450,7 @@ func DoGetDigitalInputs(c *gin.Context) {
 		c.JSON(400, gin.H{
 			"data": "Something went wrong: " + err.Error(),
 		})
-	}
+	}*/
 }
 
 // DoGetRelayOutputs godoc

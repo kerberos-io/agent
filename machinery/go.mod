@@ -21,7 +21,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/kellydunn/golang-geo v0.7.0
 	github.com/kerberos-io/joy4 v1.0.64
-	github.com/kerberos-io/onvif v1.0.0
+	github.com/kerberos-io/onvif v0.0.14
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pion/interceptor v0.1.37
@@ -93,10 +93,8 @@ require (
 	github.com/hashicorp/go-secure-stdlib/parseutil v0.1.7 // indirect
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
-	github.com/icholy/digest v0.1.23 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/juju/errors v1.0.0 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/klauspost/cpuid v1.2.3 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
