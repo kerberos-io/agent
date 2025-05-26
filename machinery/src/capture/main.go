@@ -123,18 +123,20 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
 					// Write the last packet
-					ttime := convertPTS(pkt.TimeLegacy)
+					ttimeLegacy := convertPTS(pkt.TimeLegacy)
+					ttime := convertPTS2(pkt.Time)
+
 					if pkt.IsVideo {
 
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(0, pkt.Data, ttime, ttime-previousDuration)
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, ttime-previousDuration)
 
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
-							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
@@ -270,17 +272,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 					}
 
-					ttime := convertPTS(pkt.TimeLegacy)
+					ttimeLegacy := convertPTS(pkt.TimeLegacy)
+					ttime := convertPTS2(pkt.Time)
+
 					if pkt.IsVideo {
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(0, pkt.Data, ttime, ttime-previousDuration)
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, ttime-previousDuration)
 
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
-							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
@@ -292,17 +296,20 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					recordingStatus = "started"
 
 				} else if start {
-					ttime := convertPTS(pkt.TimeLegacy)
+
+					ttimeLegacy := convertPTS(pkt.TimeLegacy)
+					ttime := convertPTS2(pkt.Time)
+
 					if pkt.IsVideo {
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(0, pkt.Data, ttime, ttime-previousDuration)
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, ttime-previousDuration)
 
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
-							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
