@@ -29,10 +29,26 @@ type MP4 struct {
 func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 
 	videoTimescale := uint32(90000)
-	init := mp4.CreateEmptyInit()
+
+	init := mp4ff.NewMP4Init()
+
+	// Set the major brand, minor version, and compatible brands
+	majorBrand := "isom"
+	minorVersion := uint32(512)
+	compatibleBrands := []string{"iso2", "avc1", "mp41"}
+	ftyp := mp4ff.NewFtyp(majorBrand, minorVersion, compatibleBrands)
+	init.AddChild(ftyp)
+	moov := mp4ff.NewMoovBox()
+	init.AddChild(moov)
+	mvhd := mp4ff.CreateMvhd()
+	moov.AddChild(mvhd)
+	mvex := mp4ff.NewMvexBox()
+	moov.AddChild(mvex)
+
 	init.AddEmptyTrack(videoTimescale, "video", "und")
 
-	init.Moov.Mvex.AddChild(&mp4.MehdBox{FragmentDuration: int64(450000)})
+	init.Ftyp.AddCompatibleBrands([]string{"isom", "iso2", "avc1", "mp41"})
+	init.Moov.Mvex.AddChild(&mp4.MehdBox{FragmentDuration: int64(900000)})
 
 	trak := init.Moov.Trak
 	includePS := true
@@ -40,10 +56,9 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 	if err != nil {
 		panic(err)
 	}
-	trak.Tkhd.Duration = 450000 // 5 seconds
 
 	// Add an ELST box to the track
-	elst := &mp4ff.ElstBox{
+	/*elst := &mp4ff.ElstBox{
 		Version: 0,
 		Flags:   0,
 		Entries: []mp4ff.ElstEntry{
@@ -57,7 +72,7 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 	}
 	init.Moov.Trak.AddChild(&mp4ff.EdtsBox{
 		Elst: []*mp4ff.ElstBox{elst},
-	})
+	})*/
 
 	// We set the trackIDs (should be dynamic)
 	trackIDs := []uint32{1}
@@ -77,11 +92,11 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 	init.Moov.Mvhd.SetModificationTimeS(time.Now().Unix())
 
 	// Set Stts
-	init.Moov.Trak.Mdia.Minf.Stbl.Stts.SampleCount = []uint32{124}
-	init.Moov.Trak.Mdia.Minf.Stbl.Stts.SampleTimeDelta = []uint32{90000} // 1 second in 90kHz timescale
+	//init.Moov.Trak.Mdia.Minf.Stbl.Stts.SampleCount = []uint32{124}
+	//init.Moov.Trak.Mdia.Minf.Stbl.Stts.SampleTimeDelta = []uint32{90000} // 1 second in 90kHz timescale
 
 	// Set Stsc
-	init.Moov.Trak.Mdia.Minf.Stbl.Stsc.Version = 0
+	/*init.Moov.Trak.Mdia.Minf.Stbl.Stsc.Version = 0
 	init.Moov.Trak.Mdia.Minf.Stbl.Stsc.Flags = 0
 	init.Moov.Trak.Mdia.Minf.Stbl.Stsc.SampleDescriptionID = []uint32{1}
 	init.Moov.Trak.Mdia.Minf.Stbl.Stsc.Entries = []mp4ff.StscEntry{
@@ -89,7 +104,16 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 			FirstChunk:      1,
 			SamplesPerChunk: 124,
 		},
-	}
+	}*/
+
+	// Sets stsz
+	//init.Moov.Trak.Mdia.Minf.Stbl.Stsz.Version = 0
+	//init.Moov.Trak.Mdia.Minf.Stbl.Stsz.Flags = 0
+	//init.Moov.Trak.Mdia.Minf.Stbl.Stsz.SampleNumber = 124
+	//init.Moov.Trak.Mdia.Minf.Stbl.Stsz.SampleSize = []uint32{35109, 131, 166, 193, 274, 268, 250, 340, 404, 400, 321, 357, 391, 367, 411, 395, 383, 364, 417, 374, 351, 353, 416, 380, 338, 286, 305, 300, 272, 271, 361, 364, 310, 316, 255, 332, 312, 304, 330, 735, 546, 391, 374, 288, 215, 311, 378, 467, 509, 402, 450, 502, 489, 598, 662, 675, 629, 592, 705, 711, 724, 717, 717, 35109, 131, 166, 193, 274, 268, 250, 340, 404, 400, 321, 357, 391, 367, 411, 395, 383, 364, 417, 374, 351, 353, 416, 380, 338, 286, 305, 300, 272, 271, 361, 364, 310, 316, 255, 332, 312, 304, 330, 735, 546, 391, 374, 288, 215, 311, 378, 467, 509, 402, 450, 502, 489, 598, 662, 675, 629, 592, 705, 711, 724, 717, 717}
+
+	// Set stco
+	//init.Moov.Trak.Mdia.Minf.Stbl.Stco.ChunkOffset = []uint32{35109, 131, 166}
 
 	// Set the compressorName
 	//trak.Mdia.
@@ -159,6 +183,9 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 
 		mp4.Start = true
 
+		// Increment the segment count
+		mp4.SegmentCount = mp4.SegmentCount + 1
+
 		// Create a new media segment
 		seg := mp4ff.NewMediaSegment()
 		frag, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), trackID)
@@ -166,9 +193,6 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			panic(err)
 		}
 		seg.AddFragment(frag)
-
-		// Increment the segment count
-		mp4.SegmentCount = mp4.SegmentCount + 1
 
 		// Set to MP4 struct
 		mp4.Segment = seg
@@ -187,7 +211,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 	fullSample.Sample = mp4ff.Sample{
 		Dur:                   uint32(duration),
 		Size:                  uint32(len(data)),
-		Flags:                 0,
+		Flags:                 1,
 		CompositionTimeOffset: 0,
 	}
 
