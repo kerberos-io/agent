@@ -25,6 +25,7 @@ type Communication struct {
 	HandleAudio           chan AudioDataPartial
 	HandleUpload          chan string
 	HandleHeartBeat       chan string
+	ProcessONVIFMotion    chan string
 	HandleLiveSD          chan int64
 	HandleLiveHDKeepalive chan string
 	HandleLiveHDHandshake chan RequestHDStreamPayload

@@ -11,6 +11,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
+	"github.com/kerberos-io/agent/machinery/src/onvif"
 )
 
 func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
@@ -31,6 +32,16 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 	if config.Capture.Continuous == "true" {
 
 		log.Log.Info("computervision.main.ProcessMotion(): you've enabled continuous recording, so no motion detection required.")
+
+	} else if config.Capture.MotionONVIF == "true" {
+
+		log.Log.Info("computervision.main.ProcessMotion(): ONVIF motion detected is enabled, so creating subscription to ONVIF motion events.")
+
+		err := onvif.ProcessONVIFMotion(configuration, communication)
+
+		if err != nil {
+			log.Log.Error("computervision.main.ProcessMotion(): ONVIF motion detected failed: " + err.Error())
+		}
 
 	} else {
 
