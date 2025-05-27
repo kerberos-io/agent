@@ -973,7 +973,7 @@ type ONVIFEvents struct {
 }
 
 // Create PullPointSubscription
-func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
+func CreatePullPointSubscription(dev *onvif.Device, topicKinds xsd.String) (string, error) {
 
 	// We'll create a subscription to the device
 	// This will allow us to receive events from the device
@@ -994,8 +994,7 @@ func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
 		Filter: &event.FilterType{
 			TopicExpression: &event.TopicExpressionType{
 				Dialect:    xsd.String("http://www.onvif.org/ver10/tev/topicExpression/ConcreteSet"),
-				TopicKinds: "tns1:Device/Trigger//.", // -> This works for Avigilon, Hanwa, Hikvision
-				// TopicKinds: "//.", -> This works for Axis, but throws other errors.
+				TopicKinds: topicKinds,
 			},
 		},
 	})
@@ -1199,6 +1198,124 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 
 	eventsArray, _ = GetInputOutputs()
 	return eventsArray, err
+}
+
+func ProcessONVIFMotion(configuration *models.Configuration, communication *models.Communication) (error){
+	cameraConfiguration := configuration.Config.Capture.IPCamera
+	topicKinds := xsd.String("tns1:RuleEngine/CellMotionDetector/Motion")
+	var pullPointAddress string
+	var device *onvif.Device
+
+    defer func() {
+        if pullPointAddress != "" &&  device != nil {
+            log.Log.Debug("onvif.main.ProcessONVIFMotion(): Unsubscribing from pullPointAddress")
+            UnsubscribePullPoint(device, pullPointAddress)
+        }
+    }()
+
+	for {
+		select {
+		case <-communication.ProcessONVIFMotion:
+			log.Log.Debug("onvif.main.ProcessONVIFMotion(): Stopping motion processing due to reconfiguration")
+			return nil
+		case <-time.After(10 * time.Second):
+		}
+
+		if cameraConfiguration.ONVIFXAddr != "" {
+			device, _, err := ConnectToOnvifDevice(&cameraConfiguration)
+			if err != nil {
+				log.Log.Error("onvif.main.ProcessONVIFMotion(): error while connecting to ONVIF device: " + err.Error())
+				continue
+			}
+
+			if pullPointAddress != "" {
+				log.Log.Debug("onvif.main.ProcessONVIFMotion(): Fetching events from pullPointAddress")
+				notifications := GetNotificationMessage(device, pullPointAddress)
+				log.Log.Debug("onvif.main.ProcessONVIFMotion(): Completed fetching events from pullPointAddress")
+				if notifications == nil {
+					log.Log.Error("onvif.main.ProcessONVIFMotion(): Error while getting events. Notifications were nil.")
+					continue
+				}
+				for _, msg := range notifications {
+					for _, item := range msg.Message.Message.Data.SimpleItem {
+						if item.Name == "IsMotion" && item.Value == "true" {
+							log.Log.Debug("onvif.main.ProcessONVIFMotion(): Motion detected!")
+							dataToPass := models.MotionDataPartial{
+								Timestamp:       time.Now().Unix(),
+								NumberOfChanges: 1000,
+							}
+							communication.HandleMotion <- dataToPass
+						} else if item.Name == "IsMotion" && item.Value == "false" {
+							log.Log.Debug("onvif.main.ProcessONVIFMotion(): Motion no longer detected!")
+						}
+					}
+				}
+			} else {
+				log.Log.Debug("onvif.main.ProcessONVIFMotion(): no pull point address found. Creating subscription.")
+				pullPointAddress, err = CreatePullPointSubscription(device, topicKinds)
+				if err != nil {
+					log.Log.Error("onvif.main.ProcessONVIFMotion(): error while creating pull point subscription: " + err.Error())
+				}
+			}
+		} else {
+			log.Log.Debug("onvif.main.ProcessONVIFMotion(): ONVIF is not enabled. Sleeping for 60 seconds.")
+			time.Sleep(60 * time.Second)
+		}
+	}
+}
+
+
+func GetNotificationMessage(dev *onvif.Device, pullPointAddress string) ([]event.NotificationMessage) {
+	type Body struct {
+		PullMessagesResponse event.PullMessagesResponse `xml:"PullMessagesResponse"`
+	}
+
+	type Envelope struct {
+		XMLName xml.Name `xml:"Envelope"`
+		Body    Body     `xml:"Body"`
+	}
+
+	pullMessage := event.PullMessages{
+		Timeout:      xsd.Duration("PT5S"),
+		MessageLimit: 10,
+	}
+
+	if pullPointAddress == "" {
+		log.Log.Error("onvif.main.GetNotificationMessage(): empty pullPointAddress")
+		return nil
+	}
+
+	requestBody, err := xml.Marshal(pullMessage)
+	if err != nil {
+		log.Log.Error("onvif.main.GetNotificationMessage(): " + err.Error())
+		return nil
+	}
+
+	res, err := dev.SendSoap(string(pullPointAddress), string(requestBody))
+	if err != nil {
+		log.Log.Error("onvif.main.GetNotificationMessage(): " + err.Error())
+		return nil
+	}
+	if res.Body == nil {
+		log.Log.Error("onvif.main.GetNotificationMessage(): empty response Body")
+		return nil
+	}
+
+	defer res.Body.Close()
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
+	    log.Log.Error("onvif.main.GetNotificationMessage(): Failed to read response body: " + err.Error())
+	    return nil
+	}
+
+	var envelope Envelope
+	if err := xml.Unmarshal(data, &envelope); err != nil {
+		log.Log.Error("onvif.main.GetNotificationMessage(): Failed to parse PullMessages XML: " + err.Error())
+		return nil;
+	}
+	log.Log.Debug("onvif.main.GetNotificationMessage(): Envelope unmarshalled")
+
+	return envelope.Body.PullMessagesResponse.NotificationMessage
 }
 
 // This method will get the digital inputs from the device.

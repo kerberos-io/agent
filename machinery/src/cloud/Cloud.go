@@ -28,7 +28,11 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
+	xsd "github.com/kerberos-io/onvif/xsd"
 )
+
+var topicKinds = xsd.String("tns1:Device/Trigger//.") // -> This works for Avigilon, Hanwa, Hikvision
+// var topicKinds = xsd.String("//.") // -> This works for Axis, but throws other errors.
 
 func PendingUpload(configDirectory string) {
 	ff, err := utils.ReadDirectory(configDirectory + "/data/cloud/")
@@ -239,7 +243,7 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err != nil {
-			pullPointAddressLoopState, err = onvif.CreatePullPointSubscription(device)
+			pullPointAddressLoopState, err = onvif.CreatePullPointSubscription(device, topicKinds)
 			if err != nil {
 				log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 			}
@@ -306,7 +310,7 @@ loop:
 				//      - In this scenario we are creating a new subscription to retrieve the initial (current) state of the inputs and outputs.
 
 				// Get a new pull point address, to get the initiatal state of the inputs and outputs.
-				pullPointAddressInitialState, err := onvif.CreatePullPointSubscription(device)
+				pullPointAddressInitialState, err := onvif.CreatePullPointSubscription(device, topicKinds)
 				if err != nil {
 					log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 				}
@@ -344,7 +348,7 @@ loop:
 					} else if err != nil {
 						log.Log.Error("cloud.HandleHeartBeat(): error while getting events: " + err.Error())
 						onvifEventsList = []byte("[]")
-						pullPointAddressLoopState, err = onvif.CreatePullPointSubscription(device)
+						pullPointAddressLoopState, err = onvif.CreatePullPointSubscription(device, topicKinds)
 						if err != nil {
 							log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 						}
@@ -354,7 +358,7 @@ loop:
 					}
 				} else {
 					log.Log.Debug("cloud.HandleHeartBeat(): no pull point address found.")
-					pullPointAddressLoopState, err = onvif.CreatePullPointSubscription(device)
+					pullPointAddressLoopState, err = onvif.CreatePullPointSubscription(device, topicKinds)
 					if err != nil {
 						log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 					}

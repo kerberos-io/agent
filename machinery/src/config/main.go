@@ -266,6 +266,9 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 			case "AGENT_CAPTURE_MOTION":
 				configuration.Config.Capture.Motion = value
 				break
+			case "AGENT_CAPTURE_MOTION_ONVIF":
+				configuration.Config.Capture.MotionONVIF = value
+				break
 			case "AGENT_CAPTURE_SNAPSHOTS":
 				configuration.Config.Capture.Snapshots = value
 				break

@@ -62,7 +62,7 @@ RUN /dist/agent/main version
 ###############################################
 # Build Bento4 -> we want fragmented mp4 files
 
-ENV BENTO4_VERSION 1.6.0-641
+ENV BENTO4_VERSION=1.6.0-641
 RUN cd /tmp && git clone https://github.com/axiomatic-systems/Bento4 && cd Bento4 && \
 	git checkout tags/v${BENTO4_VERSION} && \
 	cd Build && \
