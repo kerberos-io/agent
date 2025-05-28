@@ -1,12 +1,17 @@
 package video
 
 import (
+	"bytes"
+	"fmt"
+	"log"
 	"os"
 	"time"
 
 	"github.com/Eyevinn/mp4ff/mp4"
 	mp4ff "github.com/Eyevinn/mp4ff/mp4"
 )
+
+var LastPTS uint64 = 0 // Last PTS for the current segment
 
 type MP4 struct {
 	// FileName is the name of the file
@@ -57,23 +62,6 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 		panic(err)
 	}
 
-	// Add an ELST box to the track
-	/*elst := &mp4ff.ElstBox{
-		Version: 0,
-		Flags:   0,
-		Entries: []mp4ff.ElstEntry{
-			{
-				SegmentDuration:   450000, // 5 seconds
-				MediaTime:         0,
-				MediaRateInteger:  1,
-				MediaRateFraction: 0,
-			},
-		},
-	}
-	init.Moov.Trak.AddChild(&mp4ff.EdtsBox{
-		Elst: []*mp4ff.ElstBox{elst},
-	})*/
-
 	// We set the trackIDs (should be dynamic)
 	trackIDs := []uint32{1}
 
@@ -90,39 +78,14 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 	init.Moov.Mvhd.SetCreationTimeS(time.Now().Unix())
 	// Set the modification time
 	init.Moov.Mvhd.SetModificationTimeS(time.Now().Unix())
-
-	// Set Stts
-	//init.Moov.Trak.Mdia.Minf.Stbl.Stts.SampleCount = []uint32{124}
-	//init.Moov.Trak.Mdia.Minf.Stbl.Stts.SampleTimeDelta = []uint32{90000} // 1 second in 90kHz timescale
-
-	// Set Stsc
-	/*init.Moov.Trak.Mdia.Minf.Stbl.Stsc.Version = 0
-	init.Moov.Trak.Mdia.Minf.Stbl.Stsc.Flags = 0
-	init.Moov.Trak.Mdia.Minf.Stbl.Stsc.SampleDescriptionID = []uint32{1}
-	init.Moov.Trak.Mdia.Minf.Stbl.Stsc.Entries = []mp4ff.StscEntry{
-		{
-			FirstChunk:      1,
-			SamplesPerChunk: 124,
-		},
-	}*/
-
-	// Sets stsz
-	//init.Moov.Trak.Mdia.Minf.Stbl.Stsz.Version = 0
-	//init.Moov.Trak.Mdia.Minf.Stbl.Stsz.Flags = 0
-	//init.Moov.Trak.Mdia.Minf.Stbl.Stsz.SampleNumber = 124
-	//init.Moov.Trak.Mdia.Minf.Stbl.Stsz.SampleSize = []uint32{35109, 131, 166, 193, 274, 268, 250, 340, 404, 400, 321, 357, 391, 367, 411, 395, 383, 364, 417, 374, 351, 353, 416, 380, 338, 286, 305, 300, 272, 271, 361, 364, 310, 316, 255, 332, 312, 304, 330, 735, 546, 391, 374, 288, 215, 311, 378, 467, 509, 402, 450, 502, 489, 598, 662, 675, 629, 592, 705, 711, 724, 717, 717, 35109, 131, 166, 193, 274, 268, 250, 340, 404, 400, 321, 357, 391, 367, 411, 395, 383, 364, 417, 374, 351, 353, 416, 380, 338, 286, 305, 300, 272, 271, 361, 364, 310, 316, 255, 332, 312, 304, 330, 735, 546, 391, 374, 288, 215, 311, 378, 467, 509, 402, 450, 502, 489, 598, 662, 675, 629, 592, 705, 711, 724, 717, 717}
-
-	// Set stco
-	//init.Moov.Trak.Mdia.Minf.Stbl.Stco.ChunkOffset = []uint32{35109, 131, 166}
-
-	// Set the compressorName
-	//trak.Mdia.
-
 	err = init.Encode(ofd)
+	if err != nil {
+		panic(err)
+	}
 
 	sidxBox := mp4ff.CreateSidx(0)
 	sidxBox.Timescale = videoTimescale
-	err = sidxBox.Encode(ofd)
+	//err = sidxBox.Encode(ofd)
 
 	// Add sidx box
 
@@ -171,56 +134,68 @@ func (mp4 *MP4) AddMediaSegment(segNr int) {
 
 func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64, duration uint64) {
 
-	if isKeyframe {
+	//if pts == 0 {
+	//	return
+	//}
 
-		// Write the segment to the file
-		if mp4.Start {
-			err := mp4.Segment.Encode(mp4.Writer)
+	lengthPrefixed, err := annexBToLengthPrefixed(data)
+	var fullSample mp4ff.FullSample
+	if err == nil {
+		// Set the sample dat
+		// a
+		duration = duration * 90 // Convert duration to 90kHz timescale
+		fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(lengthPrefixed), isKeyframe)
+		mp4.TotalDuration += duration
+		fullSample.Data = lengthPrefixed
+		fullSample.DecodeTime = mp4.TotalDuration - duration
+		fullSample.Sample = mp4ff.Sample{
+			Dur:  uint32(duration),
+			Size: uint32(len(fullSample.Data)),
+		}
+
+		if isKeyframe {
+
+			// Write the segment to the file
+			if mp4.Start {
+				err := mp4.Segment.Encode(mp4.Writer)
+				if err != nil {
+					panic(err)
+				}
+			}
+
+			mp4.Start = true
+
+			// Increment the segment count
+			mp4.SegmentCount = mp4.SegmentCount + 1
+
+			// Create a new media segment
+			seg := mp4ff.NewMediaSegmentWithoutStyp()
+			frag, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), trackID)
 			if err != nil {
 				panic(err)
 			}
+			seg.AddFragment(frag)
+
+			// Set to MP4 struct
+			mp4.Segment = seg
+			mp4.Fragment = frag
+
+			// Set the start PTS for the next segment
+			mp4.StartPTS = pts
 		}
 
-		mp4.Start = true
+		if mp4.Start {
 
-		// Increment the segment count
-		mp4.SegmentCount = mp4.SegmentCount + 1
-
-		// Create a new media segment
-		seg := mp4ff.NewMediaSegment()
-		frag, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), trackID)
-		if err != nil {
-			panic(err)
+			// Add a sample to the track
+			// This is a placeholder function
+			// In a real implementation, this would add a sample to the track
+			err = mp4.Fragment.AddFullSampleToTrack(fullSample, trackID)
+			if err != nil {
+				log.Printf("Error adding sample to track %d: %v", trackID, err)
+				return
+			}
+			LastPTS = pts
 		}
-		seg.AddFragment(frag)
-
-		// Set to MP4 struct
-		mp4.Segment = seg
-		mp4.Fragment = frag
-
-		// Set the start PTS for the next segment
-		mp4.StartPTS = pts
-	}
-
-	var fullSample mp4ff.FullSample
-	// Set the sample data
-	duration = duration * 90 // Convert duration to 90kHz timescale
-	mp4.TotalDuration += duration
-	fullSample.Data = data
-	fullSample.DecodeTime = mp4.TotalDuration
-	fullSample.Sample = mp4ff.Sample{
-		Dur:                   uint32(duration),
-		Size:                  uint32(len(data)),
-		Flags:                 1,
-		CompositionTimeOffset: 0,
-	}
-
-	// Add a sample to the track
-	// This is a placeholder function
-	// In a real implementation, this would add a sample to the track
-	err := mp4.Fragment.AddFullSampleToTrack(fullSample, trackID)
-	if err != nil {
-		panic(err)
 	}
 }
 
@@ -230,4 +205,85 @@ func (mp4 *MP4) Close() {
 		panic(err)
 	}
 	defer mp4.Writer.Close()
+}
+
+// annexBToLengthPrefixed converts Annex B formatted H264 data (with start codes)
+// into length-prefixed NAL units (4-byte length before each NAL unit).
+func annexBToLengthPrefixed(data []byte) ([]byte, error) {
+	var out bytes.Buffer
+
+	// Find start codes and split NAL units
+	nalus := splitNALUs(data)
+	if len(nalus) == 0 {
+		return nil, fmt.Errorf("no NAL units found")
+	}
+
+	for _, nalu := range nalus {
+		// Remove Annex B start codes (0x000001 or 0x00000001) from the beginning of each NALU
+		nalu = removeAnnexBStartCode(nalu)
+		if len(nalu) == 0 {
+			continue
+		}
+		// Write 4-byte big-endian length
+		length := uint32(len(nalu))
+		lenBytes := []byte{
+			byte(length >> 24),
+			byte(length >> 16),
+			byte(length >> 8),
+			byte(length),
+		}
+		out.Write(lenBytes)
+		out.Write(nalu)
+	}
+
+	return out.Bytes(), nil
+}
+
+// removeAnnexBStartCode removes a leading Annex B start code from a NALU if present.
+func removeAnnexBStartCode(nalu []byte) []byte {
+	if len(nalu) >= 4 && nalu[0] == 0x00 && nalu[1] == 0x00 {
+		if nalu[2] == 0x01 {
+			return nalu[3:]
+		}
+		if nalu[2] == 0x00 && nalu[3] == 0x01 {
+			return nalu[4:]
+		}
+	}
+	return nalu
+}
+
+// splitNALUs splits Annex B data into raw NAL units without start codes.
+func splitNALUs(data []byte) [][]byte {
+	var nalus [][]byte
+	start := 0
+
+	for start < len(data) {
+		// Find next start code (0x000001 or 0x00000001)
+		i := findStartCode(data, start+3)
+		if i < 0 {
+			// Last NALU till end of data
+			nalus = append(nalus, data[start:])
+			break
+		}
+		// NAL unit is between start and i
+		nalus = append(nalus, data[start:i])
+		start = i
+	}
+
+	return nalus
+}
+
+// findStartCode returns the index of the next Annex B start code (0x000001 or 0x00000001) after pos, or -1 if none.
+func findStartCode(data []byte, pos int) int {
+	for i := pos; i+3 < len(data); i++ {
+		if data[i] == 0x00 && data[i+1] == 0x00 {
+			if data[i+2] == 0x01 {
+				return i
+			}
+			if i+3 < len(data) && data[i+2] == 0x00 && data[i+3] == 0x01 {
+				return i
+			}
+		}
+	}
+	return -1
 }

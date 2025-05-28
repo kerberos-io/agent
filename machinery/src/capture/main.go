@@ -105,7 +105,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var cursorError error
 			var pkt packets.Packet
 			var nextPkt packets.Packet
-			var previousDuration uint64
 			recordingStatus := "idle"
 			recordingCursor := queue.Oldest()
 
@@ -125,11 +124,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// Write the last packet
 					ttimeLegacy := convertPTS(pkt.TimeLegacy)
 					ttime := convertPTS2(pkt.Time)
+					ttimeNext := convertPTS2(nextPkt.Time)
+					duration := ttimeNext - ttime
 
 					if pkt.IsVideo {
 
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, ttime-previousDuration)
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, duration)
 
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -144,8 +145,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 						}
 					}
-					previousDuration = ttime
-
 					// Close mp4
 					mp4Video.Close()
 
@@ -230,10 +229,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						"769"
 
 					name = s + ".mp4"
-					fullName = configDirectory + "/data/recordings/" + name
-
 					new_name := s + "_new.mp4"
-					new_fullName := configDirectory + "/data/recordings/" + new_name
+					fullName = configDirectory + "/data/recordings/" + new_name
+
+					new_fullName := configDirectory + "/data/recordings/" + name
 
 					// Running...
 					log.Log.Info("capture.main.HandleRecordStream(continuous): recording started")
@@ -255,7 +254,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						mp4Video.SetHeight(height)
 						mp4Video.AddVideoTrack("H264")
 						mp4Video.AddAudioTrack("AAC")
-						mp4Video.AddMediaSegment(0)
 
 						myMuxer, _ = mp4.CreateMp4Muxer(file)
 						// We choose between H264 and H265
@@ -274,10 +272,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					ttimeLegacy := convertPTS(pkt.TimeLegacy)
 					ttime := convertPTS2(pkt.Time)
+					ttimeNext := convertPTS2(nextPkt.Time)
+					duration := ttimeNext - ttime
 
 					if pkt.IsVideo {
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, ttime-previousDuration)
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, duration)
 
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -292,17 +292,18 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 						}
 					}
-					previousDuration = ttime
 					recordingStatus = "started"
 
 				} else if start {
 
 					ttimeLegacy := convertPTS(pkt.TimeLegacy)
 					ttime := convertPTS2(pkt.Time)
+					ttimeNext := convertPTS2(nextPkt.Time)
+					duration := ttimeNext - ttime
 
 					if pkt.IsVideo {
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, ttime-previousDuration)
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, duration)
 
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -317,9 +318,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 						}
 					}
-					previousDuration = ttime
 				}
-
 				pkt = nextPkt
 			}
 
