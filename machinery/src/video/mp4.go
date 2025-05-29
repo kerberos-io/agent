@@ -45,10 +45,21 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 	init.AddChild(ftyp)
 	moov := mp4ff.NewMoovBox()
 	init.AddChild(moov)
+
+	uuid := &mp4ff.UUIDBox{}
+	uuid.SetUUID("6b0c1f8e-3d2a-4f5b-9c7d-8f1e2b3c4d5e")
+	uuid.UnknownPayload = []byte("Custom UUID Payload - Cedric is the best")
+	moov.AddChild(uuid)
+
 	mvhd := mp4ff.CreateMvhd()
 	moov.AddChild(mvhd)
 	mvex := mp4ff.NewMvexBox()
 	moov.AddChild(mvex)
+
+	// Add user defined boxes
+	// For example, you can add a custom box like this:
+	// customBox := mp4ff.NewUserBox("udta", []byte("Custom Data"))
+	// moov.AddChild(customBox)
 
 	init.AddEmptyTrack(videoTimescale, "video", "und")
 
@@ -83,8 +94,8 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 		panic(err)
 	}
 
-	sidxBox := mp4ff.CreateSidx(0)
-	sidxBox.Timescale = videoTimescale
+	//sidxBox := mp4ff.CreateSidx(0)
+	// sidxBox.Timescale = videoTimescale
 	//err = sidxBox.Encode(ofd)
 
 	// Add sidx box
@@ -205,6 +216,30 @@ func (mp4 *MP4) Close() {
 		panic(err)
 	}
 	defer mp4.Writer.Close()
+
+	ifd, err := os.Open(mp4.FileName)
+	if err != nil {
+		//return fmt.Errorf("error opening file: %w", err)
+	}
+	defer ifd.Close()
+	outFilePath := mp4.FileName + "_with_sidx_bocxes.mp4"
+	ofd, err := os.Create(outFilePath)
+	if err != nil {
+		//return fmt.Errorf("error creating file: %w", err)
+	}
+	defer ofd.Close()
+
+	var flags mp4ff.DecFileFlags
+	mp4Root, _ := mp4ff.DecodeFile(ifd, mp4ff.WithDecodeFlags(flags))
+	fmt.Printf("Decoded MP4 file: %v\n", mp4Root)
+
+	addIfNotExists := true
+	err = mp4Root.UpdateSidx(addIfNotExists, false)
+	if err != nil {
+		//return fmt.Errorf("addSidx failed: %w", err)
+	}
+	mp4Root.Encode(ofd)
+
 }
 
 // annexBToLengthPrefixed converts Annex B formatted H264 data (with start codes)
