@@ -16,6 +16,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
+	"github.com/kerberos-io/agent/machinery/src/video"
 	"github.com/yapingcat/gomedia/go-mp4"
 )
 
@@ -95,6 +96,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 		if config.Capture.Continuous == "true" {
 
 			//var cws *cacheWriterSeeker
+			var mp4Video *video.MP4
 			var myMuxer *mp4.Movmuxer
 			var videoTrack uint32
 			var audioTrack uint32
@@ -133,14 +135,22 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
 					// Write the last packet
-					ttime := convertPTS(pkt.TimeLegacy)
+					ttimeLegacy := convertPTS(pkt.TimeLegacy)
+					ttime := convertPTS2(pkt.Time)
+					ttimeNext := convertPTS2(nextPkt.Time)
+					duration := ttimeNext - ttime
+
 					if pkt.IsVideo {
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+
+						// New method using new mp4 library
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, duration)
+
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
-							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
@@ -148,6 +158,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 						}
 					}
+					// Close mp4
+					mp4Video.Close()
 
 					// This will write the trailer a well.
 					if err := myMuxer.WriteTrailer(); err != nil {
@@ -230,18 +242,34 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						"769"
 
 					name = s + ".mp4"
-					fullName = configDirectory + "/data/recordings/" + name
+					new_name := s + "_new.mp4"
+					fullName = configDirectory + "/data/recordings/" + new_name
+
+					new_fullName := configDirectory + "/data/recordings/" + name
 
 					// Running...
 					log.Log.Info("capture.main.HandleRecordStream(continuous): recording started")
-
 					file, err = os.Create(fullName)
+
 					if err == nil {
-						//cws = newCacheWriterSeeker(4096)
-						myMuxer, _ = mp4.CreateMp4Muxer(file)
-						// We choose between H264 and H265
+
+						// Get width and height from the camera.
 						width := configuration.Config.Capture.IPCamera.Width
 						height := configuration.Config.Capture.IPCamera.Height
+
+						// Get SPS and PPS NALUs from the camera.
+						spsNALUS := configuration.Config.Capture.IPCamera.SPSNALUs
+						ppsNALUS := configuration.Config.Capture.IPCamera.PPSNALUs
+
+						// Create a video file, and set the dimensions.
+						mp4Video = video.NewMP4(new_fullName, spsNALUS, ppsNALUS)
+						mp4Video.SetWidth(width)
+						mp4Video.SetHeight(height)
+						mp4Video.AddVideoTrack("H264")
+						mp4Video.AddAudioTrack("AAC")
+
+						myMuxer, _ = mp4.CreateMp4Muxer(file)
+						// We choose between H264 and H265
 						widthOption := mp4.WithVideoWidth(uint32(width))
 						heightOption := mp4.WithVideoHeight(uint32(height))
 						if pkt.Codec == "H264" {
@@ -257,14 +285,21 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 					}
 
-					ttime := convertPTS(pkt.TimeLegacy)
+					ttimeLegacy := convertPTS(pkt.TimeLegacy)
+					ttime := convertPTS2(pkt.Time)
+					ttimeNext := convertPTS2(nextPkt.Time)
+					duration := ttimeNext - ttime
+
 					if pkt.IsVideo {
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+						// New method using new mp4 library
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, duration)
+
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
-							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
@@ -272,18 +307,25 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 						}
 					}
-
 					recordingStatus = "started"
 
 				} else if start {
-					ttime := convertPTS(pkt.TimeLegacy)
+
+					ttimeLegacy := convertPTS(pkt.TimeLegacy)
+					ttime := convertPTS2(pkt.Time)
+					ttimeNext := convertPTS2(nextPkt.Time)
+					duration := ttimeNext - ttime
+
 					if pkt.IsVideo {
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
+						// New method using new mp4 library
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, duration)
+
+						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
-							if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
+							if err := myMuxer.Write(audioTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
@@ -292,7 +334,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 				}
-
 				pkt = nextPkt
 			}
 
