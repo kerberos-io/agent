@@ -62,9 +62,7 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 	// moov.AddChild(customBox)
 
 	init.AddEmptyTrack(videoTimescale, "video", "und")
-
 	init.Ftyp.AddCompatibleBrands([]string{"isom", "iso2", "avc1", "mp41"})
-	init.Moov.Mvex.AddChild(&mp4.MehdBox{FragmentDuration: int64(900000)})
 
 	trak := init.Moov.Trak
 	includePS := true
@@ -81,9 +79,6 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 	if err != nil {
 		panic(err)
 	}
-
-	// Set estimated duration
-	init.Moov.Mvhd.Duration = 450000 // 5 seconds
 
 	// Set the creation time
 	init.Moov.Mvhd.SetCreationTimeS(time.Now().Unix())
@@ -154,14 +149,20 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 	if err == nil {
 		// Set the sample dat
 		// a
+		flags := uint32(33554432)
+		if !isKeyframe {
+			flags = uint32(16842752)
+		}
+
 		duration = duration * 90 // Convert duration to 90kHz timescale
 		fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(lengthPrefixed), isKeyframe)
 		mp4.TotalDuration += duration
 		fullSample.Data = lengthPrefixed
 		fullSample.DecodeTime = mp4.TotalDuration - duration
 		fullSample.Sample = mp4ff.Sample{
-			Dur:  uint32(duration),
-			Size: uint32(len(fullSample.Data)),
+			Dur:   uint32(duration),
+			Size:  uint32(len(fullSample.Data)),
+			Flags: flags,
 		}
 
 		if isKeyframe {
@@ -180,7 +181,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			mp4.SegmentCount = mp4.SegmentCount + 1
 
 			// Create a new media segment
-			seg := mp4ff.NewMediaSegmentWithoutStyp()
+			seg := mp4ff.NewMediaSegment()
 			frag, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), trackID)
 			if err != nil {
 				panic(err)
@@ -215,7 +216,7 @@ func (mp4 *MP4) Close() {
 	if err != nil {
 		panic(err)
 	}
-	defer mp4.Writer.Close()
+	mp4.Writer.Close()
 
 	ifd, err := os.Open(mp4.FileName)
 	if err != nil {
@@ -235,6 +236,13 @@ func (mp4 *MP4) Close() {
 
 	addIfNotExists := true
 	err = mp4Root.UpdateSidx(addIfNotExists, false)
+
+	// Set the total duration in the moov box
+	mp4Root.Moov.Mvhd.Duration = mp4.TotalDuration
+	mp4Root.Moov.Mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: int64(mp4.TotalDuration)})
+	mp4Root.Moov.Trak.Tkhd.Duration = mp4.TotalDuration
+
+	// Get total duration in 90kHz timescale
 	if err != nil {
 		//return fmt.Errorf("addSidx failed: %w", err)
 	}
