@@ -1,6 +1,7 @@
 package video
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"log"
@@ -22,57 +23,28 @@ type MP4 struct {
 	Segment       *mp4ff.MediaSegment
 	Fragment      *mp4ff.Fragment
 	TrackIDs      []uint32
-	Writer        *os.File
+	FileWriter    *os.File
+	Writer        *bufio.Writer
 	SegmentCount  int
 	SampleCount   int
 	StartPTS      uint64
 	TotalDuration uint64
 	Start         bool
+	SPSNALUs      [][]byte // SPS NALUs for H264
+	PPSNALUs      [][]byte // PPS NALUs for H264
+	FreeBoxSize   int64
 }
 
 // NewMP4 creates a new MP4 object
 func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 
-	videoTimescale := uint32(90000)
-
 	init := mp4ff.NewMP4Init()
 
-	// Set the major brand, minor version, and compatible brands
-	majorBrand := "isom"
-	minorVersion := uint32(512)
-	compatibleBrands := []string{"iso2", "avc1", "mp41"}
-	ftyp := mp4ff.NewFtyp(majorBrand, minorVersion, compatibleBrands)
-	init.AddChild(ftyp)
-	moov := mp4ff.NewMoovBox()
-	init.AddChild(moov)
-
-	uuid := &mp4ff.UUIDBox{}
-	uuid.SetUUID("6b0c1f8e-3d2a-4f5b-9c7d-8f1e2b3c4d5e")
-	uuid.UnknownPayload = []byte("Custom UUID Payload - Cedric is the best")
-	moov.AddChild(uuid)
-
-	mvhd := mp4ff.CreateMvhd()
-	moov.AddChild(mvhd)
-	mvex := mp4ff.NewMvexBox()
-	moov.AddChild(mvex)
-
-	// Add user defined boxes
-	// For example, you can add a custom box like this:
-	// customBox := mp4ff.NewUserBox("udta", []byte("Custom Data"))
-	// moov.AddChild(customBox)
-
-	init.AddEmptyTrack(videoTimescale, "video", "und")
-	init.Ftyp.AddCompatibleBrands([]string{"isom", "iso2", "avc1", "mp41"})
-
-	trak := init.Moov.Trak
-	includePS := true
-	err := trak.SetAVCDescriptor("avc1", spsNALUs, ppsNALUs, includePS)
-	if err != nil {
-		panic(err)
-	}
-
-	// We set the trackIDs (should be dynamic)
-	trackIDs := []uint32{1}
+	// Add a free box to the init segment
+	// Prepend a free box to the init segment with a size of 1000
+	freeBoxSize := 10000
+	free := mp4ff.NewFreeBox(make([]byte, freeBoxSize))
+	init.AddChild(free)
 
 	// Create a writer
 	ofd, err := os.Create(fileName)
@@ -80,30 +52,24 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 		panic(err)
 	}
 
-	// Set the creation time
-	init.Moov.Mvhd.SetCreationTimeS(time.Now().Unix())
-	// Set the modification time
-	init.Moov.Mvhd.SetModificationTimeS(time.Now().Unix())
-	err = init.Encode(ofd)
-	if err != nil {
-		panic(err)
-	}
+	// Create a buffered writer
+	bufferedWriter := bufio.NewWriterSize(ofd, 64*1024) // 64KB buffer
 
-	//sidxBox := mp4ff.CreateSidx(0)
-	// sidxBox.Timescale = videoTimescale
-	//err = sidxBox.Encode(ofd)
-
-	// Add sidx box
-
+	// We will write the empty init segment to the file
+	// so we can overwrite it later with the actual init segment.
+	err = init.Encode(bufferedWriter)
 	if err != nil {
 		panic(err)
 	}
 
 	return &MP4{
-		FileName: fileName,
-		TrackIDs: trackIDs,
-		Init:     init,
-		Writer:   ofd,
+		FileName:    fileName,
+		FreeBoxSize: int64(freeBoxSize),
+		Init:        init,
+		FileWriter:  ofd,
+		Writer:      bufferedWriter,
+		SPSNALUs:    spsNALUs,
+		PPSNALUs:    ppsNALUs,
 	}
 }
 
@@ -125,6 +91,7 @@ func (mp4 *MP4) AddVideoTrack(codec string) {
 	// Add a video track to the MP4 file
 	// This is a placeholder function
 	// In a real implementation, this would add a video track to the MP4 file
+	mp4.TrackIDs = append(mp4.TrackIDs, 1) // Example track ID
 }
 
 // AddAudioTrack
@@ -133,16 +100,13 @@ func (mp4 *MP4) AddAudioTrack(codec string) {
 	// Add an audio track to the MP4 file
 	// This is a placeholder function
 	// In a real implementation, this would add an audio track to the MP4 file
+	mp4.TrackIDs = append(mp4.TrackIDs, 2) // Example track ID
 }
 
 func (mp4 *MP4) AddMediaSegment(segNr int) {
 }
 
 func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64, duration uint64) {
-
-	//if pts == 0 {
-	//	return
-	//}
 
 	lengthPrefixed, err := annexBToLengthPrefixed(data)
 	var fullSample mp4ff.FullSample
@@ -216,13 +180,74 @@ func (mp4 *MP4) Close() {
 	if err != nil {
 		panic(err)
 	}
-	mp4.Writer.Close()
+	mp4.Writer.Flush()
+	defer mp4.FileWriter.Close()
 
-	ifd, err := os.Open(mp4.FileName)
+	// Now we have all the moof and mdat boxes written to the file.
+	// We can now generate the ftyp and moov boxes, and replace it with the free box we added earlier (size of 10008 bytes).
+	mp4.Init = mp4ff.NewMP4Init()
+	mp4.Init.Moov = mp4ff.NewMoovBox()
+	majorBrand := "isom"
+	minorVersion := uint32(512)
+	compatibleBrands := []string{"iso2", "avc1", "mp41"}
+	ftyp := mp4ff.NewFtyp(majorBrand, minorVersion, compatibleBrands)
+	mp4.Init.AddChild(ftyp)
+	moov := mp4ff.NewMoovBox()
+	mp4.Init.AddChild(moov)
+
+	uuid := &mp4ff.UUIDBox{}
+	uuid.SetUUID("6b0c1f8e-3d2a-4f5b-9c7d-8f1e2b3c4d5e")
+	uuid.UnknownPayload = []byte("Custom UUID Payload - Cedric is the best")
+	moov.AddChild(uuid)
+
+	mvhd := mp4ff.CreateMvhd()
+	moov.AddChild(mvhd)
+	mvex := mp4ff.NewMvexBox()
+	moov.AddChild(mvex)
+
+	videoTimescale := uint32(90000) // 90kHz timescale for video
+	mp4.Init.AddEmptyTrack(videoTimescale, "video", "und")
+	mp4.Init.Ftyp.AddCompatibleBrands([]string{"isom", "iso2", "avc1", "mp41"})
+
+	trak := mp4.Init.Moov.Trak
+	includePS := true
+	err = trak.SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
 	if err != nil {
-		//return fmt.Errorf("error opening file: %w", err)
+		panic(err)
 	}
-	defer ifd.Close()
+
+	// Set the creation time
+	mp4.Init.Moov.Mvhd.SetCreationTimeS(time.Now().Unix())
+	// Set the modification time
+	mp4.Init.Moov.Mvhd.SetModificationTimeS(time.Now().Unix())
+
+	// Get a bit slice writer for the init segment
+	// Get a byte buffer of 10008 bytes to write the init segment
+
+	buffer := bytes.NewBuffer(make([]byte, 0))
+	mp4.Init.Encode(buffer)
+
+	// The first 10008 bytes of the file is a free box, so we can read it and replace it with the moov box.
+	// The init box might not be 10008 bytes, so we need to read the first 10008 bytes and then replace it with the moov box.
+	// while the remaining bytes are for a new free box.
+	// Write the init segment at the beginning of the file, replacing the free box
+	if _, err := mp4.FileWriter.WriteAt(buffer.Bytes(), 0); err != nil {
+		panic(err)
+	}
+
+	remainingSize := mp4.FreeBoxSize - int64(buffer.Len())
+	if remainingSize > 0 {
+		newFreeBox := mp4ff.NewFreeBox(make([]byte, remainingSize))
+		var freeBuf bytes.Buffer
+		if err := newFreeBox.Encode(&freeBuf); err != nil {
+			panic(err)
+		}
+		if _, err := mp4.FileWriter.WriteAt(freeBuf.Bytes(), int64(buffer.Len())); err != nil {
+			panic(err)
+		}
+	}
+
+	/*defer ifd.Close()
 	outFilePath := mp4.FileName + "_with_sidx_bocxes.mp4"
 	ofd, err := os.Create(outFilePath)
 	if err != nil {
@@ -235,18 +260,12 @@ func (mp4 *MP4) Close() {
 	fmt.Printf("Decoded MP4 file: %v\n", mp4Root)
 
 	addIfNotExists := true
-	err = mp4Root.UpdateSidx(addIfNotExists, false)
+	err = mp4Root.UpdateSidx(addIfNotExists, false)*/
 
 	// Set the total duration in the moov box
-	mp4Root.Moov.Mvhd.Duration = mp4.TotalDuration
-	mp4Root.Moov.Mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: int64(mp4.TotalDuration)})
-	mp4Root.Moov.Trak.Tkhd.Duration = mp4.TotalDuration
-
-	// Get total duration in 90kHz timescale
-	if err != nil {
-		//return fmt.Errorf("addSidx failed: %w", err)
-	}
-	mp4Root.Encode(ofd)
+	//mp4.Init.Moov.Mvhd.Duration = mp4.TotalDuration
+	//mp4.Init.Moov.Mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: 5000000}) //int64(mp4.TotalDuration)})
+	//mp4.Init.Moov.Trak.Tkhd.Duration = mp4.TotalDuration
 
 }
 
