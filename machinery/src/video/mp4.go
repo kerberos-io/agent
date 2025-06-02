@@ -10,6 +10,7 @@ import (
 
 	"github.com/Eyevinn/mp4ff/mp4"
 	mp4ff "github.com/Eyevinn/mp4ff/mp4"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 )
 
 var LastPTS uint64 = 0 // Last PTS for the current segment
@@ -33,6 +34,8 @@ type MP4 struct {
 	SPSNALUs      [][]byte // SPS NALUs for H264
 	PPSNALUs      [][]byte // PPS NALUs for H264
 	FreeBoxSize   int64
+	MoofBoxes     int64   // Number of moof boxes in the file
+	MoofBoxSizes  []int64 // Sizes of each moof box
 }
 
 // NewMP4 creates a new MP4 object
@@ -42,7 +45,7 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 
 	// Add a free box to the init segment
 	// Prepend a free box to the init segment with a size of 1000
-	freeBoxSize := 10000
+	freeBoxSize := 2048
 	free := mp4ff.NewFreeBox(make([]byte, freeBoxSize))
 	init.AddChild(free)
 
@@ -133,6 +136,8 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 
 			// Write the segment to the file
 			if mp4.Start {
+				mp4.MoofBoxes = mp4.MoofBoxes + 1
+				mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
 				err := mp4.Segment.Encode(mp4.Writer)
 				if err != nil {
 					panic(err)
@@ -193,18 +198,20 @@ func (mp4 *MP4) Close() {
 	ftyp := mp4ff.NewFtyp(majorBrand, minorVersion, compatibleBrands)
 	mp4.Init.AddChild(ftyp)
 	moov := mp4ff.NewMoovBox()
+
+	// Set the creation time and modification time for the moov box
+	mdhd := mp4ff.MdhdBox{
+		Version:          0,
+		Flags:            0,
+		CreationTime:     uint64(time.Now().Unix()),
+		ModificationTime: uint64(time.Now().Unix()),
+		Timescale:        90000,        // 90kHz timescale
+		Language:         uint16(0x55), // Undetermined language (und)
+	}
+	moov.AddChild(&mdhd)
 	mp4.Init.AddChild(moov)
 
-	uuid := &mp4ff.UUIDBox{}
-	uuid.SetUUID("6b0c1f8e-3d2a-4f5b-9c7d-8f1e2b3c4d5e")
-	uuid.UnknownPayload = []byte("Custom UUID Payload - Cedric is the best")
-	moov.AddChild(uuid)
-
-	mvhd := mp4ff.CreateMvhd()
-	moov.AddChild(mvhd)
-	mvex := mp4ff.NewMvexBox()
-	moov.AddChild(mvex)
-
+	// Add the video track to the moov box
 	videoTimescale := uint32(90000) // 90kHz timescale for video
 	mp4.Init.AddEmptyTrack(videoTimescale, "video", "und")
 	mp4.Init.Ftyp.AddCompatibleBrands([]string{"isom", "iso2", "avc1", "mp41"})
@@ -216,14 +223,45 @@ func (mp4 *MP4) Close() {
 		panic(err)
 	}
 
-	// Set the creation time
-	mp4.Init.Moov.Mvhd.SetCreationTimeS(time.Now().Unix())
-	// Set the modification time
-	mp4.Init.Moov.Mvhd.SetModificationTimeS(time.Now().Unix())
+	// Override the HandlerBox, and more specifically the name field with "agent and version"
+	mp4.Init.Moov.Trak.Mdia.Hdlr.Name = "agent " + utils.VERSION
+
+	// Set the total duration in the moov box
+	mp4.Init.Moov.Mvhd.Duration = mp4.TotalDuration
+	mp4.Init.Moov.Mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: int64(mp4.TotalDuration)})
+	mp4.Init.Moov.Trak.Tkhd.Duration = mp4.TotalDuration
+
+	// We will create a fingerprint that's be encrypted with the public key, so we can verify the integrity of the file later.
+	// The fingerprint will be a UUID box, which is a custom box that we can use to store the fingerprint.
+	// Following fields are included in the fingerprint (UUID):
+	// - Moov.Mvhd.CreationTime (the time the file was created)
+	// - Moov.Mvhd.Duration (the total duration of the video)
+	// - Moov.Trak.Hdlr.Name // (the name of the handler, which is the agent and version)
+	// - len(Moof) // (the number of moof boxes in the file)
+	// - size(Moof1) // (the size of the first moof box)
+	// - size(Moof2) // (the size of the second moof box)
+	// ..
+	//
+	// All attributes of the fingerprint are concatenated into a single string, which is then hashed using SHA-256
+	// and encrypted with the public key.
+
+	fingerprint := fmt.Sprintf("%d", mp4.Init.Moov.Mvhd.CreationTime) +
+		fmt.Sprintf("%d", mp4.Init.Moov.Mvhd.Duration) +
+		mp4.Init.Moov.Trak.Mdia.Hdlr.Name +
+		fmt.Sprintf("%d", mp4.MoofBoxes) // Number of moof boxes
+
+	uuid := &mp4ff.UUIDBox{}
+	uuid.SetUUID("6b0c1f8e-3d2a-4f5b-9c7d-8f1e2b3c4d5e")
+	uuid.UnknownPayload = []byte(fingerprint)
+	moov.AddChild(uuid)
+
+	mvhd := mp4ff.CreateMvhd()
+	moov.AddChild(mvhd)
+	mvex := mp4ff.NewMvexBox()
+	moov.AddChild(mvex)
 
 	// Get a bit slice writer for the init segment
 	// Get a byte buffer of 10008 bytes to write the init segment
-
 	buffer := bytes.NewBuffer(make([]byte, 0))
 	mp4.Init.Encode(buffer)
 
@@ -247,26 +285,9 @@ func (mp4 *MP4) Close() {
 		}
 	}
 
-	/*defer ifd.Close()
-	outFilePath := mp4.FileName + "_with_sidx_bocxes.mp4"
-	ofd, err := os.Create(outFilePath)
-	if err != nil {
-		//return fmt.Errorf("error creating file: %w", err)
-	}
-	defer ofd.Close()
-
-	var flags mp4ff.DecFileFlags
-	mp4Root, _ := mp4ff.DecodeFile(ifd, mp4ff.WithDecodeFlags(flags))
-	fmt.Printf("Decoded MP4 file: %v\n", mp4Root)
-
-	addIfNotExists := true
-	err = mp4Root.UpdateSidx(addIfNotExists, false)*/
-
-	// Set the total duration in the moov box
-	//mp4.Init.Moov.Mvhd.Duration = mp4.TotalDuration
-	//mp4.Init.Moov.Mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: 5000000}) //int64(mp4.TotalDuration)})
-	//mp4.Init.Moov.Trak.Tkhd.Duration = mp4.TotalDuration
-
+	/*
+		err = mp4Root.UpdateSidx(addIfNotExists, false)
+	*/
 }
 
 // annexBToLengthPrefixed converts Annex B formatted H264 data (with start codes)

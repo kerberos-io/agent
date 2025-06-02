@@ -252,8 +252,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						mp4Video = video.NewMP4(new_fullName, spsNALUS, ppsNALUS)
 						mp4Video.SetWidth(width)
 						mp4Video.SetHeight(height)
-						mp4Video.AddVideoTrack("H264")
-						mp4Video.AddAudioTrack("AAC")
+						//mp4Video.AddVideoTrack("H264")
+						//mp4Video.AddAudioTrack("AAC")
 
 						myMuxer, _ = mp4.CreateMp4Muxer(file)
 						// We choose between H264 and H265
