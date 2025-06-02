@@ -9,6 +9,7 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
@@ -23,8 +24,13 @@ import (
 	"github.com/tevino/abool"
 )
 
-func Bootstrap(configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
+var tracer = otel.Tracer("github.com/Salaton/tracing/pkg/usecases/product")
+
+func Bootstrap(ctx context.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
+
 	log.Log.Debug("components.Kerberos.Bootstrap(): bootstrapping the kerberos agent.")
+	_, span := tracer.Start(ctx, "CreateProducBootstrap")
+	span.End()
 
 	// We will keep track of the Kerberos Agent up time
 	// This is send to Kerberos Hub in a heartbeat.
