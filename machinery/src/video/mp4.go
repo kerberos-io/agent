@@ -3,12 +3,19 @@ package video
 import (
 	"bufio"
 	"bytes"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	mp4ff "github.com/Eyevinn/mp4ff/mp4"
+	"github.com/kerberos-io/agent/machinery/src/encryption"
+	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 )
 
@@ -181,7 +188,8 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 	}
 }
 
-func (mp4 *MP4) Close() {
+func (mp4 *MP4) Close(config *models.Config) {
+
 	err := mp4.Segment.Encode(mp4.Writer)
 	if err != nil {
 		panic(err)
@@ -250,15 +258,53 @@ func (mp4 *MP4) Close() {
 	// All attributes of the fingerprint are concatenated into a single string, which is then hashed using SHA-256
 	// and encrypted with the public key.
 
-	fingerprint := fmt.Sprintf("%d", init.Moov.Mvhd.CreationTime) +
-		fmt.Sprintf("%d", init.Moov.Mvhd.Duration) +
-		init.Moov.Trak.Mdia.Hdlr.Name +
-		fmt.Sprintf("%d", mp4.MoofBoxes) // Number of moof boxes
+	fingerprint := fmt.Sprintf("%d", init.Moov.Mvhd.CreationTime) + "_" +
+		fmt.Sprintf("%d", init.Moov.Mvhd.Duration) + "_" +
+		init.Moov.Trak.Mdia.Hdlr.Name + "_" +
+		fmt.Sprintf("%d", mp4.MoofBoxes) + "_" // Number of moof boxes
 
-	uuid := &mp4ff.UUIDBox{}
-	uuid.SetUUID("6b0c1f8e-3d2a-4f5b-9c7d-8f1e2b3c4d5e")
-	uuid.UnknownPayload = []byte(fingerprint)
-	init.Moov.AddChild(uuid)
+	for i, size := range mp4.MoofBoxSizes {
+		fingerprint += fmt.Sprintf("%d", size)
+		if i < len(mp4.MoofBoxSizes)-1 {
+			fingerprint += "_"
+		}
+	}
+	// Remove trailing underscore if present
+	if len(fingerprint) > 0 && fingerprint[len(fingerprint)-1] == '_' {
+		fingerprint = fingerprint[:len(fingerprint)-1]
+	}
+
+	// Load the private key from the configuration
+	privateKey := config.Signing.PrivateKey
+	r := strings.NewReader(privateKey)
+	pemBytes, _ := ioutil.ReadAll(r)
+	block, _ := pem.Decode(pemBytes)
+
+	if block == nil {
+		//log.Log.Error("mp4.Close(): error decoding PEM block containing private key")
+		//return
+	} else {
+		// Parse private key
+		b := block.Bytes
+		key, err := x509.ParsePKCS8PrivateKey(b)
+		if err != nil {
+			//log.Log.Error("mp4.Close(): error parsing private key: " + err.Error())
+			//return
+		} else {
+			// Conver key to *rsa.PrivateKey
+			rsaKey, _ := key.(*rsa.PrivateKey)
+			fingerprintBytes := []byte(fingerprint)
+			signature, err := encryption.SignWithPrivateKey(fingerprintBytes, rsaKey)
+			if err != nil && len(signature) > 0 {
+				uuid := &mp4ff.UUIDBox{}
+				uuid.SetUUID("6b0c1f8e-3d2a-4f5b-9c7d-8f1e2b3c4d5e")
+				uuid.UnknownPayload = []byte(fingerprint)
+				init.Moov.AddChild(uuid)
+			} else {
+				//log.Log.Error("mp4.Close(): error signing fingerprint: " + err.Error())
+			}
+		}
+	}
 
 	// We will also calculate the SIDX box, which is a segment index box that contains information about the segments in the file.
 	// This is useful for seeking in the file, and for streaming the file.

@@ -145,7 +145,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 					// Close mp4
-					mp4Video.Close()
+					mp4Video.Close(&config)
 
 					// This will write the trailer a well.
 					if err := myMuxer.WriteTrailer(); err != nil {
@@ -230,7 +230,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					name = s + ".mp4"
 					new_name := s + "_new.mp4"
 					fullName = configDirectory + "/data/recordings/" + new_name
-
 					new_fullName := configDirectory + "/data/recordings/" + name
 
 					// Running...
@@ -334,11 +333,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					start = false
 					file.Close()
 					file = nil
-
-					// Check if need to convert to fragmented using bento
-					if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
-						utils.CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
-					}
 
 					// Check if we need to encrypt the recording.
 					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
