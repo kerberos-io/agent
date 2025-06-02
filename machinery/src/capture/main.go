@@ -123,14 +123,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					// Write the last packet
 					ttimeLegacy := convertPTS(pkt.TimeLegacy)
-					ttime := convertPTS2(pkt.Time)
-					ttimeNext := convertPTS2(nextPkt.Time)
-					duration := ttimeNext - ttime
+					ttimeNext := convertPTS(nextPkt.TimeLegacy)
+					duration := ttimeNext - ttimeLegacy
 
 					if pkt.IsVideo {
 
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, duration)
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration)
 
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -271,13 +270,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 
 					ttimeLegacy := convertPTS(pkt.TimeLegacy)
-					ttime := convertPTS2(pkt.Time)
-					ttimeNext := convertPTS2(nextPkt.Time)
-					duration := ttimeNext - ttime
+					ttimeNext := convertPTS(nextPkt.TimeLegacy)
+					duration := ttimeNext - ttimeLegacy
 
 					if pkt.IsVideo {
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, duration)
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration)
 
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -297,13 +295,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				} else if start {
 
 					ttimeLegacy := convertPTS(pkt.TimeLegacy)
-					ttime := convertPTS2(pkt.Time)
-					ttimeNext := convertPTS2(nextPkt.Time)
-					duration := ttimeNext - ttime
+					ttimeNext := convertPTS(nextPkt.TimeLegacy)
+					duration := ttimeNext - ttimeLegacy
 
 					if pkt.IsVideo {
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttime, duration)
+						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration)
 
 						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())

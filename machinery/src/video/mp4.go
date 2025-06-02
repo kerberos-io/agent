@@ -8,7 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/Eyevinn/mp4ff/mp4"
 	mp4ff "github.com/Eyevinn/mp4ff/mp4"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 )
@@ -20,7 +19,7 @@ type MP4 struct {
 	FileName      string
 	width         int
 	height        int
-	Init          *mp4.InitSegment
+	Segments      []*mp4ff.MediaSegment // List of media segments
 	Segment       *mp4ff.MediaSegment
 	Fragment      *mp4ff.Fragment
 	TrackIDs      []uint32
@@ -36,6 +35,7 @@ type MP4 struct {
 	FreeBoxSize   int64
 	MoofBoxes     int64   // Number of moof boxes in the file
 	MoofBoxSizes  []int64 // Sizes of each moof box
+	StartTime     uint64  // Start time of the MP4 file
 }
 
 // NewMP4 creates a new MP4 object
@@ -67,8 +67,8 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 
 	return &MP4{
 		FileName:    fileName,
+		StartTime:   uint64(time.Now().Unix()),
 		FreeBoxSize: int64(freeBoxSize),
-		Init:        init,
 		FileWriter:  ofd,
 		Writer:      bufferedWriter,
 		SPSNALUs:    spsNALUs,
@@ -142,6 +142,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 				if err != nil {
 					panic(err)
 				}
+				mp4.Segments = append(mp4.Segments, mp4.Segment)
 			}
 
 			mp4.Start = true
@@ -185,51 +186,55 @@ func (mp4 *MP4) Close() {
 	if err != nil {
 		panic(err)
 	}
+	mp4.Segments = append(mp4.Segments, mp4.Segment)
 	mp4.Writer.Flush()
 	defer mp4.FileWriter.Close()
 
 	// Now we have all the moof and mdat boxes written to the file.
 	// We can now generate the ftyp and moov boxes, and replace it with the free box we added earlier (size of 10008 bytes).
-	mp4.Init = mp4ff.NewMP4Init()
-	mp4.Init.Moov = mp4ff.NewMoovBox()
+	init := mp4ff.NewMP4Init()
+
+	// Create a new ftyp box
 	majorBrand := "isom"
 	minorVersion := uint32(512)
 	compatibleBrands := []string{"iso2", "avc1", "mp41"}
 	ftyp := mp4ff.NewFtyp(majorBrand, minorVersion, compatibleBrands)
-	mp4.Init.AddChild(ftyp)
+	init.AddChild(ftyp)
+	init.Ftyp.AddCompatibleBrands([]string{"isom", "iso2", "avc1", "mp41"})
+
+	// Create a new moov box
 	moov := mp4ff.NewMoovBox()
+	init.AddChild(moov)
 
 	// Set the creation time and modification time for the moov box
-	mdhd := mp4ff.MdhdBox{
+	videoTimescale := uint32(90000)
+	mvhd := &mp4ff.MvhdBox{
 		Version:          0,
 		Flags:            0,
-		CreationTime:     uint64(time.Now().Unix()),
-		ModificationTime: uint64(time.Now().Unix()),
-		Timescale:        90000,        // 90kHz timescale
-		Language:         uint16(0x55), // Undetermined language (und)
+		CreationTime:     mp4.StartTime,
+		ModificationTime: mp4.StartTime,
+		Timescale:        videoTimescale, // 90kHz timescale
+		Duration:         mp4.TotalDuration,
 	}
-	moov.AddChild(&mdhd)
-	mp4.Init.AddChild(moov)
+	init.Moov.AddChild(mvhd)
+
+	// Set the total duration in the moov box
+	mvex := mp4ff.NewMvexBox()
+	mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: int64(mp4.TotalDuration)})
+	init.Moov.AddChild(mvex)
 
 	// Add the video track to the moov box
-	videoTimescale := uint32(90000) // 90kHz timescale for video
-	mp4.Init.AddEmptyTrack(videoTimescale, "video", "und")
-	mp4.Init.Ftyp.AddCompatibleBrands([]string{"isom", "iso2", "avc1", "mp41"})
-
-	trak := mp4.Init.Moov.Trak
+	// 90kHz timescale for video
+	init.AddEmptyTrack(videoTimescale, "video", "und")
 	includePS := true
-	err = trak.SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
+	err = init.Moov.Trak.SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
 	if err != nil {
 		panic(err)
 	}
-
+	// Set the total duration in the track header
+	init.Moov.Trak.Tkhd.Duration = mp4.TotalDuration
 	// Override the HandlerBox, and more specifically the name field with "agent and version"
-	mp4.Init.Moov.Trak.Mdia.Hdlr.Name = "agent " + utils.VERSION
-
-	// Set the total duration in the moov box
-	mp4.Init.Moov.Mvhd.Duration = mp4.TotalDuration
-	mp4.Init.Moov.Mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: int64(mp4.TotalDuration)})
-	mp4.Init.Moov.Trak.Tkhd.Duration = mp4.TotalDuration
+	init.Moov.Trak.Mdia.Hdlr.Name = "agent " + utils.VERSION
 
 	// We will create a fingerprint that's be encrypted with the public key, so we can verify the integrity of the file later.
 	// The fingerprint will be a UUID box, which is a custom box that we can use to store the fingerprint.
@@ -245,25 +250,49 @@ func (mp4 *MP4) Close() {
 	// All attributes of the fingerprint are concatenated into a single string, which is then hashed using SHA-256
 	// and encrypted with the public key.
 
-	fingerprint := fmt.Sprintf("%d", mp4.Init.Moov.Mvhd.CreationTime) +
-		fmt.Sprintf("%d", mp4.Init.Moov.Mvhd.Duration) +
-		mp4.Init.Moov.Trak.Mdia.Hdlr.Name +
+	fingerprint := fmt.Sprintf("%d", init.Moov.Mvhd.CreationTime) +
+		fmt.Sprintf("%d", init.Moov.Mvhd.Duration) +
+		init.Moov.Trak.Mdia.Hdlr.Name +
 		fmt.Sprintf("%d", mp4.MoofBoxes) // Number of moof boxes
 
 	uuid := &mp4ff.UUIDBox{}
 	uuid.SetUUID("6b0c1f8e-3d2a-4f5b-9c7d-8f1e2b3c4d5e")
 	uuid.UnknownPayload = []byte(fingerprint)
-	moov.AddChild(uuid)
+	init.Moov.AddChild(uuid)
 
-	mvhd := mp4ff.CreateMvhd()
-	moov.AddChild(mvhd)
-	mvex := mp4ff.NewMvexBox()
-	moov.AddChild(mvex)
+	// We will also calculate the SIDX box, which is a segment index box that contains information about the segments in the file.
+	// This is useful for seeking in the file, and for streaming the file.
+	sidx := &mp4ff.SidxBox{
+		Version:                  0,
+		Flags:                    0,
+		ReferenceID:              0,
+		Timescale:                videoTimescale,
+		EarliestPresentationTime: 0,
+		FirstOffset:              0,
+		SidxRefs:                 make([]mp4ff.SidxRef, 0),
+	}
+	referenceTrak := init.Moov.Trak
+	trex, ok := init.Moov.Mvex.GetTrex(referenceTrak.Tkhd.TrackID)
+	if !ok {
+		// We have an issue.
+	}
 
+	segDatas, err := findSegmentData(mp4.Segments, referenceTrak, trex)
+	if err != nil {
+		// We have an issue.
+	}
+	fillSidx(sidx, referenceTrak, segDatas, true)
+
+	// Add the SIDX box to the moov box
+	init.AddChild(sidx)
+
+	/*
+		err = mp4Root.UpdateSidx(addIfNotExists, false)
+	*/
 	// Get a bit slice writer for the init segment
 	// Get a byte buffer of 10008 bytes to write the init segment
 	buffer := bytes.NewBuffer(make([]byte, 0))
-	mp4.Init.Encode(buffer)
+	init.Encode(buffer)
 
 	// The first 10008 bytes of the file is a free box, so we can read it and replace it with the moov box.
 	// The init box might not be 10008 bytes, so we need to read the first 10008 bytes and then replace it with the moov box.
@@ -273,6 +302,7 @@ func (mp4 *MP4) Close() {
 		panic(err)
 	}
 
+	// Calculate the remaining size for the free box
 	remainingSize := mp4.FreeBoxSize - int64(buffer.Len())
 	if remainingSize > 0 {
 		newFreeBox := mp4ff.NewFreeBox(make([]byte, remainingSize))
@@ -284,10 +314,76 @@ func (mp4 *MP4) Close() {
 			panic(err)
 		}
 	}
+}
 
-	/*
-		err = mp4Root.UpdateSidx(addIfNotExists, false)
-	*/
+type segData struct {
+	startPos         uint64
+	presentationTime uint64
+	baseDecodeTime   uint64
+	dur              uint32
+	size             uint32
+}
+
+func fillSidx(sidx *mp4ff.SidxBox, refTrak *mp4ff.TrakBox, segDatas []segData, nonZeroEPT bool) {
+	ept := uint64(0)
+	if nonZeroEPT {
+		ept = segDatas[0].presentationTime
+	}
+	sidx.Version = 1
+	sidx.Timescale = refTrak.Mdia.Mdhd.Timescale
+	sidx.ReferenceID = 1
+	sidx.EarliestPresentationTime = ept
+	sidx.FirstOffset = 0
+	sidx.SidxRefs = make([]mp4ff.SidxRef, 0, len(segDatas))
+
+	for _, segData := range segDatas {
+		size := segData.size
+		sidx.SidxRefs = append(sidx.SidxRefs, mp4ff.SidxRef{
+			ReferencedSize:     size,
+			SubSegmentDuration: segData.dur,
+			StartsWithSAP:      1,
+			SAPType:            1,
+		})
+	}
+}
+
+// findSegmentData returns a slice of segment media data using a reference track.
+func findSegmentData(segs []*mp4ff.MediaSegment, refTrak *mp4ff.TrakBox, trex *mp4ff.TrexBox) ([]segData, error) {
+	segDatas := make([]segData, 0, len(segs))
+	for _, seg := range segs {
+		var firstCompositionTimeOffest int64
+		dur := uint32(0)
+		var baseTime uint64
+		for fIdx, frag := range seg.Fragments {
+			for _, traf := range frag.Moof.Trafs {
+				tfhd := traf.Tfhd
+				if tfhd.TrackID == refTrak.Tkhd.TrackID { // Find track that gives sidx time values
+					if fIdx == 0 {
+						baseTime = traf.Tfdt.BaseMediaDecodeTime()
+					}
+					for i, trun := range traf.Truns {
+						trun.AddSampleDefaultValues(tfhd, trex)
+						samples := trun.GetSamples()
+						for j, sample := range samples {
+							if fIdx == 0 && i == 0 && j == 0 {
+								firstCompositionTimeOffest = int64(sample.CompositionTimeOffset)
+							}
+							dur += sample.Dur
+						}
+					}
+				}
+			}
+		}
+		sd := segData{
+			startPos:         seg.StartPos,
+			presentationTime: uint64(int64(baseTime) + firstCompositionTimeOffest),
+			baseDecodeTime:   baseTime,
+			dur:              dur,
+			size:             uint32(seg.Size()),
+		}
+		segDatas = append(segDatas, sd)
+	}
+	return segDatas, nil
 }
 
 // annexBToLengthPrefixed converts Annex B formatted H264 data (with start codes)
