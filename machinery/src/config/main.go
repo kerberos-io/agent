@@ -524,9 +524,9 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 			case "AGENT_SIGNING":
 				configuration.Config.Signing.Enabled = value
 				break
-			case "AGENT_SIGNING_PUBLIC_KEY":
-				signingPublicKey := strings.ReplaceAll(value, "\\n", "\n")
-				configuration.Config.Signing.PublicKey = signingPublicKey
+			case "AGENT_SIGNING_PRIVATE_KEY":
+				signingPrivateKey := strings.ReplaceAll(value, "\\n", "\n")
+				configuration.Config.Signing.PrivateKey = signingPrivateKey
 				break
 			}
 		}

@@ -183,6 +183,6 @@ type Encryption struct {
 
 // Signing
 type Signing struct {
-	Enabled   string `json:"enabled" bson:"enabled"`
-	PublicKey string `json:"public_key" bson:"public_key"`
+	Enabled    string `json:"enabled" bson:"enabled"`
+	PrivateKey string `json:"private_key" bson:"private_key"`
 }

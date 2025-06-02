@@ -258,7 +258,7 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_ENCRYPTION_PRIVATE_KEY`              | The private key (assymetric/RSA) to decrypt and sign requests send over MQTT.                   | ""                             |
 | `AGENT_ENCRYPTION_SYMMETRIC_KEY`            | The symmetric key (AES) to encrypt and decrypt requests sent over MQTT.                         | ""                             |
 | `AGENT_SIGNING`                             | Enable 'true' or disable 'false' for signing recordings.                                        | "true"                         |
-| `AGENT_SIGNING_PUBLIC_KEY`                  | The public key (RSA) to sign the recordings fingerprint to validate origin.                     | "" - uses default one if empty |
+| `AGENT_SIGNING_PRIVATE_KEY`                 | The private key (RSA) to sign the recordings fingerprint to validate origin.                    | "" - uses default one if empty |
 
 
 ## Encryption
