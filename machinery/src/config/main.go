@@ -519,6 +519,15 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 			case "AGENT_ENCRYPTION_SYMMETRIC_KEY":
 				configuration.Config.Encryption.SymmetricKey = value
 				break
+
+			/* When signing is enabled */
+			case "AGENT_SIGNING":
+				configuration.Config.Signing.Enabled = value
+				break
+			case "AGENT_SIGNING_PUBLIC_KEY":
+				signingPublicKey := strings.ReplaceAll(value, "\\n", "\n")
+				configuration.Config.Signing.PublicKey = signingPublicKey
+				break
 			}
 		}
 	}

@@ -46,6 +46,7 @@ type Config struct {
 	HubSite                 string       `json:"hub_site" bson:"hub_site"`
 	ConditionURI            string       `json:"condition_uri" bson:"condition_uri"`
 	Encryption              *Encryption  `json:"encryption,omitempty" bson:"encryption,omitempty"`
+	Signing                 *Signing     `json:"signing,omitempty" bson:"signing,omitempty"`
 	RealtimeProcessing      string       `json:"realtimeprocessing,omitempty" bson:"realtimeprocessing,omitempty"`
 	RealtimeProcessingTopic string       `json:"realtimeprocessing_topic" bson:"realtimeprocessing_topic"`
 }
@@ -178,4 +179,10 @@ type Encryption struct {
 	Fingerprint  string `json:"fingerprint" bson:"fingerprint"`
 	PrivateKey   string `json:"private_key" bson:"private_key"`
 	SymmetricKey string `json:"symmetric_key" bson:"symmetric_key"`
+}
+
+// Signing
+type Signing struct {
+	Enabled   string `json:"enabled" bson:"enabled"`
+	PublicKey string `json:"public_key" bson:"public_key"`
 }
