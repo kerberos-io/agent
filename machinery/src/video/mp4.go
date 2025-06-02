@@ -295,10 +295,10 @@ func (mp4 *MP4) Close(config *models.Config) {
 			rsaKey, _ := key.(*rsa.PrivateKey)
 			fingerprintBytes := []byte(fingerprint)
 			signature, err := encryption.SignWithPrivateKey(fingerprintBytes, rsaKey)
-			if err != nil && len(signature) > 0 {
+			if err == nil && len(signature) > 0 {
 				uuid := &mp4ff.UUIDBox{}
 				uuid.SetUUID("6b0c1f8e-3d2a-4f5b-9c7d-8f1e2b3c4d5e")
-				uuid.UnknownPayload = []byte(fingerprint)
+				uuid.UnknownPayload = signature
 				init.Moov.AddChild(uuid)
 			} else {
 				//log.Log.Error("mp4.Close(): error signing fingerprint: " + err.Error())
