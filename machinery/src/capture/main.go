@@ -250,17 +250,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						mp4Video = video.NewMP4(new_fullName, spsNALUS, ppsNALUS)
 						mp4Video.SetWidth(width)
 						mp4Video.SetHeight(height)
-						//mp4Video.AddVideoTrack("H264")
+						//
 						//mp4Video.AddAudioTrack("AAC")
 
 						myMuxer, _ = mp4.CreateMp4Muxer(file)
 						// We choose between H264 and H265
-						widthOption := mp4.WithVideoWidth(uint32(width))
-						heightOption := mp4.WithVideoHeight(uint32(height))
+						//widthOption := mp4.WithVideoWidth(uint32(width))
+						//heightOption := mp4.WithVideoHeight(uint32(height))
 						if pkt.Codec == "H264" {
-							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264, widthOption, heightOption)
+							mp4Video.AddVideoTrack("H264")
+							//videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264, widthOption, heightOption)
 						} else if pkt.Codec == "H265" {
-							videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265, widthOption, heightOption)
+							mp4Video.AddVideoTrack("H265")
+							//videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265, widthOption, heightOption)
 						}
 						// For an MP4 container, AAC is the only audio codec supported.
 						audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
@@ -274,14 +276,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					if pkt.IsVideo {
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration)
-
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
+						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
-							if err := myMuxer.Write(audioTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
+							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
@@ -299,14 +299,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					if pkt.IsVideo {
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration)
-
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
+						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
-							if err := myMuxer.Write(audioTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
+							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {

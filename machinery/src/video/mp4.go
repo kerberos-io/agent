@@ -116,7 +116,7 @@ func (mp4 *MP4) AddAudioTrack(codec string) {
 func (mp4 *MP4) AddMediaSegment(segNr int) {
 }
 
-func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64, duration uint64) {
+func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64, duration uint64) error {
 
 	lengthPrefixed, err := annexBToLengthPrefixed(data)
 	var fullSample mp4ff.FullSample
@@ -147,7 +147,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 				mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
 				err := mp4.Segment.Encode(mp4.Writer)
 				if err != nil {
-					panic(err)
+					return err
 				}
 				mp4.Segments = append(mp4.Segments, mp4.Segment)
 			}
@@ -161,7 +161,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			seg := mp4ff.NewMediaSegment()
 			frag, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), trackID)
 			if err != nil {
-				panic(err)
+				return err
 			}
 			seg.AddFragment(frag)
 
@@ -181,11 +181,16 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			err = mp4.Fragment.AddFullSampleToTrack(fullSample, trackID)
 			if err != nil {
 				log.Printf("Error adding sample to track %d: %v", trackID, err)
-				return
+				return err
 			}
 			LastPTS = pts
 		}
+	} else {
+		log.Printf("Error converting Annex B to length-prefixed: %v", err)
+		return err
 	}
+
+	return nil
 }
 
 func (mp4 *MP4) Close(config *models.Config) {
