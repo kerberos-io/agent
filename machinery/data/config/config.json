@@ -116,6 +116,7 @@
 	"hub_site": "",
 	"condition_uri": "",
 	"encryption": {},
+	"signing": {},
 	"realtimeprocessing": "false",
 	"realtimeprocessing_topic": ""
 }

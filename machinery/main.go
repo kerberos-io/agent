@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -11,47 +12,61 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 
 	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/routers"
 	"github.com/kerberos-io/agent/machinery/src/utils"
-	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
-	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
 )
 
 var VERSION = utils.VERSION
 
-func main() {
-	// You might be interested in debugging the agent.
-	if os.Getenv("DATADOG_AGENT_ENABLED") == "true" {
-		if os.Getenv("DATADOG_AGENT_K8S_ENABLED") == "true" {
-			tracer.Start()
-			defer tracer.Stop()
-		} else {
-			service := os.Getenv("DATADOG_AGENT_SERVICE")
-			environment := os.Getenv("DATADOG_AGENT_ENVIRONMENT")
-			log.Log.Info("Starting Datadog Agent with service: " + service + " and environment: " + environment)
-			rules := []tracer.SamplingRule{tracer.RateRule(1)}
-			tracer.Start(
-				tracer.WithSamplingRules(rules),
-				tracer.WithService(service),
-				tracer.WithEnv(environment),
-			)
-			defer tracer.Stop()
-			err := profiler.Start(
-				profiler.WithService(service),
-				profiler.WithEnv(environment),
-				profiler.WithProfileTypes(
-					profiler.CPUProfile,
-					profiler.HeapProfile,
-				),
-			)
-			if err != nil {
-				log.Log.Fatal(err.Error())
-			}
-			defer profiler.Stop()
-		}
+func startTracing() (*trace.TracerProvider, error) {
+	serviceName := "product-app"
+	headers := map[string]string{
+		"content-type": "application/json",
 	}
+
+	exporter, err := otlptrace.New(
+		context.Background(),
+		otlptracehttp.NewClient(
+			otlptracehttp.WithEndpoint("localhost:4318"),
+			otlptracehttp.WithHeaders(headers),
+			otlptracehttp.WithInsecure(),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating new exporter: %w", err)
+	}
+
+	tracerprovider := trace.NewTracerProvider(
+		trace.WithBatcher(
+			exporter,
+			trace.WithMaxExportBatchSize(trace.DefaultMaxExportBatchSize),
+			trace.WithBatchTimeout(trace.DefaultScheduleDelay*time.Millisecond),
+			trace.WithMaxExportBatchSize(trace.DefaultMaxExportBatchSize),
+		),
+		trace.WithResource(
+			resource.NewWithAttributes(
+				semconv.SchemaURL,
+				semconv.ServiceNameKey.String(serviceName),
+				attribute.String("environment", "testing"),
+			),
+		),
+	)
+
+	otel.SetTracerProvider(tracerprovider)
+
+	return tracerprovider, nil
+}
+
+func main() {
 
 	// Start the show ;)
 	// We'll parse the flags (named variables), and start the agent.
@@ -82,6 +97,19 @@ func main() {
 	// Specify the timezone of the log: "UTC" or "Local".
 	timezone, _ := time.LoadLocation("CET")
 	log.Log.Init(logLevel, logOutput, configDirectory, timezone)
+
+	// Start OpenTelemetry tracing
+	traceProvider, err := startTracing()
+	if err != nil {
+		log.Log.Error("traceprovider: " + err.Error())
+	}
+	defer func() {
+		if err := traceProvider.Shutdown(context.Background()); err != nil {
+			log.Log.Error("traceprovider: " + err.Error())
+		}
+	}()
+
+	_ = traceProvider.Tracer("my-app")
 
 	switch action {
 
@@ -175,7 +203,7 @@ func main() {
 				HandleBootstrap: make(chan string, 1),
 			}
 
-			go components.Bootstrap(configDirectory, &configuration, &communication, &capture)
+			go components.Bootstrap(ctx, configDirectory, &configuration, &communication, &capture)
 
 			// Start the REST API.
 			routers.StartWebserver(configDirectory, &configuration, &communication, &capture)

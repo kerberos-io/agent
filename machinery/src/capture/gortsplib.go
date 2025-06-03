@@ -156,7 +156,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			// but try to fetch it later on.
 			if errSPS != nil {
 				log.Log.Debug("capture.golibrtsp.Connect(H264): " + errSPS.Error())
+				streamIndex := len(g.Streams)
 				g.Streams = append(g.Streams, packets.Stream{
+					Index:         streamIndex,
 					Name:          formaH264.Codec(),
 					IsVideo:       true,
 					IsAudio:       false,
@@ -168,7 +170,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 					IsBackChannel: false,
 				})
 			} else {
+				streamIndex := len(g.Streams)
 				g.Streams = append(g.Streams, packets.Stream{
+					Index:         streamIndex,
 					Name:          formaH264.Codec(),
 					IsVideo:       true,
 					IsAudio:       false,
@@ -216,8 +220,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 				log.Log.Info("capture.golibrtsp.Connect(H265): " + err.Error())
 				return
 			}
-
+			streamIndex := len(g.Streams)
 			g.Streams = append(g.Streams, packets.Stream{
+				Index:         streamIndex,
 				Name:          formaH265.Codec(),
 				IsVideo:       true,
 				IsAudio:       false,
@@ -265,8 +270,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 				log.Log.Error("capture.golibrtsp.Connect(G711): " + err.Error())
 			} else {
 				g.AudioG711Decoder = audiortpDec
-
+				streamIndex := len(g.Streams)
 				g.Streams = append(g.Streams, packets.Stream{
+					Index:         streamIndex,
 					Name:          "PCM_MULAW",
 					IsVideo:       false,
 					IsAudio:       true,
@@ -300,8 +306,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 				log.Log.Error("capture.golibrtsp.Connect(Opus): " + err.Error())
 			} else {
 				g.AudioOpusDecoder = audiortpDec
-
+				streamIndex := len(g.Streams)
 				g.Streams = append(g.Streams, packets.Stream{
+					Index:         streamIndex,
 					Name:          "OPUS",
 					IsVideo:       false,
 					IsAudio:       true,
@@ -328,7 +335,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			// Something went wrong .. Do something
 			log.Log.Error("capture.golibrtsp.Connect(MPEG4): " + err.Error())
 		} else {
+			streamIndex := len(g.Streams)
 			g.Streams = append(g.Streams, packets.Stream{
+				Index:         streamIndex,
 				Name:          "AAC",
 				IsVideo:       false,
 				IsAudio:       true,
@@ -397,7 +406,9 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 			g.HasBackChannel = false
 		} else {
 			g.HasBackChannel = true
+			streamIndex := len(g.Streams)
 			g.Streams = append(g.Streams, packets.Stream{
+				Index:         streamIndex,
 				Name:          "PCM_MULAW",
 				IsVideo:       false,
 				IsAudio:       true,
@@ -860,8 +871,8 @@ func (g *Golibrtsp) DecodePacketRaw(pkt packets.Packet) (image.Gray, error) {
 }
 
 // Get a list of streams from the RTSP server.
-func (j *Golibrtsp) GetStreams() ([]packets.Stream, error) {
-	return j.Streams, nil
+func (g *Golibrtsp) GetStreams() ([]packets.Stream, error) {
+	return g.Streams, nil
 }
 
 // Get a list of video streams from the RTSP server.
