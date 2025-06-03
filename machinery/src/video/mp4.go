@@ -43,6 +43,8 @@ type MP4 struct {
 	MoofBoxes     int64   // Number of moof boxes in the file
 	MoofBoxSizes  []int64 // Sizes of each moof box
 	StartTime     uint64  // Start time of the MP4 file
+	VideoTrack    int     // Track ID for the video track
+	AudioTrack    int     // Track ID for the audio track
 }
 
 // NewMP4 creates a new MP4 object
@@ -98,19 +100,17 @@ func (mp4 *MP4) SetHeight(height int) {
 // AddVideoTrack
 // Add a video track to the MP4 file
 func (mp4 *MP4) AddVideoTrack(codec string) {
-	// Add a video track to the MP4 file
-	// This is a placeholder function
-	// In a real implementation, this would add a video track to the MP4 file
-	mp4.TrackIDs = append(mp4.TrackIDs, 1) // Example track ID
+	nextTrack := uint32(len(mp4.TrackIDs) + 1)
+	mp4.VideoTrack = int(nextTrack)
+	mp4.TrackIDs = append(mp4.TrackIDs, nextTrack)
 }
 
 // AddAudioTrack
 // Add an audio track to the MP4 file
 func (mp4 *MP4) AddAudioTrack(codec string) {
-	// Add an audio track to the MP4 file
-	// This is a placeholder function
-	// In a real implementation, this would add an audio track to the MP4 file
-	mp4.TrackIDs = append(mp4.TrackIDs, 2) // Example track ID
+	nextTrack := uint32(len(mp4.TrackIDs) + 1)
+	mp4.AudioTrack = int(nextTrack)
+	mp4.TrackIDs = append(mp4.TrackIDs, nextTrack)
 }
 
 func (mp4 *MP4) AddMediaSegment(segNr int) {
