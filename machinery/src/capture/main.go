@@ -143,29 +143,15 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					if pkt.IsVideo {
 						// Write the last packet
 						ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttimeNext := convertPTS(nextPkt.TimeLegacy)
-						if nextPkt.IsVideo {
-							ttimeNext = convertPTS(nextPkt.TimeLegacy)
-						} else if nextNextPkt.IsVideo {
-							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
-						}
-						duration := ttimeNext - ttimeLegacy
 						// New method using new mp4 library
-						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
+						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						// Write the last packet
 						ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttimeNext := convertPTS(nextPkt.TimeLegacy)
-						if nextPkt.IsAudio {
-							ttimeNext = convertPTS(nextPkt.TimeLegacy)
-						} else if nextNextPkt.IsAudio {
-							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
-						}
-						duration := ttimeNext - ttimeLegacy
 						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
+							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
@@ -275,33 +261,16 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 
 					if pkt.IsVideo {
-
 						ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttimeNext := convertPTS(nextPkt.TimeLegacy)
-						if nextPkt.IsVideo {
-							ttimeNext = convertPTS(nextPkt.TimeLegacy)
-						} else if nextNextPkt.IsVideo {
-							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
-						}
-						duration := ttimeNext - ttimeLegacy
-
 						// New method using new mp4 library
-						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
+						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 
 						ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttimeNext := convertPTS(nextPkt.TimeLegacy)
-						if nextPkt.IsAudio {
-							ttimeNext = convertPTS(nextPkt.TimeLegacy)
-						} else if nextNextPkt.IsAudio {
-							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
-						}
-						duration := ttimeNext - ttimeLegacy
-
 						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
+							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
@@ -314,32 +283,15 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				} else if start {
 
 					if pkt.IsVideo {
-
 						ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttimeNext := convertPTS(nextPkt.TimeLegacy)
-						if nextPkt.IsVideo {
-							ttimeNext = convertPTS(nextPkt.TimeLegacy)
-						} else if nextNextPkt.IsVideo {
-							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
-						}
-						duration := ttimeNext - ttimeLegacy
 						// New method using new mp4 library
-						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
+						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
-
 						ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttimeNext := convertPTS(nextPkt.TimeLegacy)
-						if nextPkt.IsAudio {
-							ttimeNext = convertPTS(nextPkt.TimeLegacy)
-						} else if nextNextPkt.IsAudio {
-							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
-						}
-						duration := ttimeNext - ttimeLegacy
-
 						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
+							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {

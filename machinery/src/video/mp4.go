@@ -23,31 +23,34 @@ var LastPTS uint64 = 0 // Last PTS for the current segment
 
 type MP4 struct {
 	// FileName is the name of the file
-	FileName       string
-	width          int
-	height         int
-	Segments       []*mp4ff.MediaSegment // List of media segments
-	Segment        *mp4ff.MediaSegment
-	VideoFragment  *mp4ff.Fragment
-	AudioFragment  *mp4ff.Fragment
-	TrackIDs       []uint32
-	FileWriter     *os.File
-	Writer         *bufio.Writer
-	SegmentCount   int
-	SampleCount    int
-	StartPTS       uint64
-	TotalDuration  uint64
-	Start          bool
-	SPSNALUs       [][]byte // SPS NALUs for H264
-	PPSNALUs       [][]byte // PPS NALUs for H264
-	FreeBoxSize    int64
-	MoofBoxes      int64   // Number of moof boxes in the file
-	MoofBoxSizes   []int64 // Sizes of each moof box
-	StartTime      uint64  // Start time of the MP4 file
-	VideoTrackName string  // Name of the video track
-	VideoTrack     int     // Track ID for the video track
-	AudioTrackName string  // Name of the audio track
-	AudioTrack     int     // Track ID for the audio track
+	FileName           string
+	width              int
+	height             int
+	Segments           []*mp4ff.MediaSegment // List of media segments
+	Segment            *mp4ff.MediaSegment
+	VideoFragment      *mp4ff.Fragment
+	AudioFragment      *mp4ff.Fragment
+	TrackIDs           []uint32
+	FileWriter         *os.File
+	Writer             *bufio.Writer
+	SegmentCount       int
+	SampleCount        int
+	StartPTS           uint64
+	VideoTotalDuration uint64
+	AudioTotalDuration uint64
+	Start              bool
+	SPSNALUs           [][]byte // SPS NALUs for H264
+	PPSNALUs           [][]byte // PPS NALUs for H264
+	FreeBoxSize        int64
+	MoofBoxes          int64             // Number of moof boxes in the file
+	MoofBoxSizes       []int64           // Sizes of each moof box
+	StartTime          uint64            // Start time of the MP4 file
+	VideoTrackName     string            // Name of the video track
+	VideoTrack         int               // Track ID for the video track
+	AudioTrackName     string            // Name of the audio track
+	AudioTrack         int               // Track ID for the audio track
+	VideoFullSample    *mp4ff.FullSample // Full sample for video track
+	AudioFullSample    *mp4ff.FullSample // Full sample for audio track
 }
 
 // NewMP4 creates a new MP4 object
@@ -123,7 +126,7 @@ func (mp4 *MP4) AddAudioTrack(codec string) uint32 {
 func (mp4 *MP4) AddMediaSegment(segNr int) {
 }
 
-func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64, duration uint64) error {
+func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64) error {
 
 	if isKeyframe {
 
@@ -147,7 +150,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		seg := mp4ff.NewMediaSegment()
 
 		// Create a video fragment
-		videoFragment, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), 1)
+		videoFragment, err := mp4ff.CreateMultiTrackFragment(uint32(mp4.SegmentCount), []uint32{1, 2}) // Assuming 1 for video track and 2 for audio track
 		if err != nil {
 			return err
 		}
@@ -155,12 +158,12 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		mp4.VideoFragment = videoFragment
 
 		// Create an audio fragment
-		/*audioFragment, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), 2)
+		audioFragment, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), 2)
 		if err != nil {
 			return err
 		}
 		seg.AddFragment(audioFragment)
-		mp4.AudioFragment = audioFragment*/
+		mp4.AudioFragment = audioFragment
 
 		// Set to MP4 struct
 		mp4.Segment = seg
@@ -174,53 +177,61 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		// Add a sample to the track
 		// This is a placeholder function
 		// In a real implementation, this would add a sample to the track
-		var fullSample mp4ff.FullSample
 		if trackID == uint32(mp4.VideoTrack) {
 			lengthPrefixed, err := annexBToLengthPrefixed(data)
 			if err == nil {
+				if mp4.VideoFullSample != nil {
+					duration := pts - mp4.VideoFullSample.DecodeTime
+					fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(lengthPrefixed), isKeyframe)
+					mp4.VideoTotalDuration += duration
+					mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
+					mp4.VideoFullSample.Sample.Dur = uint32(duration)
+					err := mp4.VideoFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)
+					if err != nil {
+						log.Printf("Error adding sample to track %d: %v", trackID, err)
+						return err
+					}
+				}
+
 				// Set the sample data
+				var fullSample mp4ff.FullSample
 				flags := uint32(33554432)
 				if !isKeyframe {
 					flags = uint32(16842752)
 				}
-
-				duration = duration * 90 // Convert duration to 90kHz timescale
-				fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(lengthPrefixed), isKeyframe)
-				mp4.TotalDuration += duration
+				fullSample.DecodeTime = pts
 				fullSample.Data = lengthPrefixed
-				fullSample.DecodeTime = mp4.TotalDuration - duration
 				fullSample.Sample = mp4ff.Sample{
-					Dur:   uint32(duration),
 					Size:  uint32(len(fullSample.Data)),
 					Flags: flags,
 				}
+				mp4.VideoFullSample = &fullSample
+			}
+		} else if trackID == uint32(mp4.AudioTrack) {
 
-				err := mp4.VideoFragment.AddFullSampleToTrack(fullSample, trackID)
+			if mp4.AudioFullSample != nil {
+				duration := pts - mp4.AudioFullSample.DecodeTime
+				fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, duration, len(data))
+				mp4.AudioTotalDuration += duration
+				mp4.AudioFullSample.DecodeTime = mp4.AudioTotalDuration - duration
+				mp4.AudioFullSample.Sample.Dur = uint32(duration)
+				err := mp4.VideoFragment.AddFullSampleToTrack(*mp4.AudioFullSample, trackID)
 				if err != nil {
 					log.Printf("Error adding sample to track %d: %v", trackID, err)
 					return err
 				}
 			}
-		} else if trackID == uint32(mp4.AudioTrack) {
-			/*duration = duration * 48 // Convert duration to 48kHz timescale
-			fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, duration, len(data))
-			mp4.TotalDuration += duration
+
+			// Set the sample data
+			var fullSample mp4ff.FullSample
+			fullSample.DecodeTime = pts
 			fullSample.Data = data
-			fullSample.DecodeTime = mp4.TotalDuration - duration
 			fullSample.Sample = mp4ff.Sample{
-				Dur:   uint32(duration),
 				Size:  uint32(len(fullSample.Data)),
 				Flags: 0,
 			}
-
-			err := mp4.AudioFragment.AddFullSampleToTrack(fullSample, trackID)
-			if err != nil {
-				log.Printf("Error adding sample to track %d: %v", trackID, err)
-				return err
-			}*/
+			mp4.AudioFullSample = &fullSample
 		}
-
-		LastPTS = pts
 	}
 
 	return nil
@@ -253,21 +264,21 @@ func (mp4 *MP4) Close(config *models.Config) {
 	init.AddChild(moov)
 
 	// Set the creation time and modification time for the moov box
-	videoTimescale := uint32(90000)
-	audioTimescale := uint32(16000)
+	videoTimescale := uint32(1000)
+	audioTimescale := uint32(1000)
 	mvhd := &mp4ff.MvhdBox{
 		Version:          0,
 		Flags:            0,
 		CreationTime:     mp4.StartTime,
 		ModificationTime: mp4.StartTime,
 		Timescale:        videoTimescale, // 90kHz timescale
-		Duration:         mp4.TotalDuration,
+		Duration:         mp4.VideoTotalDuration,
 	}
 	init.Moov.AddChild(mvhd)
 
 	// Set the total duration in the moov box
 	mvex := mp4ff.NewMvexBox()
-	mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: int64(mp4.TotalDuration)})
+	mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: int64(mp4.VideoTotalDuration)})
 	init.Moov.AddChild(mvex)
 
 	// Add the video track to the moov box
@@ -276,14 +287,14 @@ func (mp4 *MP4) Close(config *models.Config) {
 	if mp4.VideoTrackName == "H264" || mp4.VideoTrackName == "AVC1" {
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
-		err = init.Moov.Trak.SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
+		err = init.Moov.Traks[0].SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
 		if err != nil {
 			//panic(err)
 		}
 	} else if mp4.VideoTrackName == "H265" || mp4.VideoTrackName == "HEV1" {
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
-		err = init.Moov.Trak.SetHEVCDescriptor("hev1", [][]byte{}, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
+		err = init.Moov.Traks[0].SetHEVCDescriptor("hev1", [][]byte{}, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
 		if err != nil {
 			//panic(err)
 		}
@@ -293,14 +304,15 @@ func (mp4 *MP4) Close(config *models.Config) {
 		// Add an audio track to the moov box
 		init.AddEmptyTrack(audioTimescale, "audio", "und")
 		// Set the audio descriptor
-		err = init.Moov.Trak.SetAACDescriptor(5, 16000)
+		err = init.Moov.Traks[1].SetAACDescriptor(2, 48000)
 		if err != nil {
 			//panic(err)
 		}
 	}
 
 	// Set the total duration in the track header
-	init.Moov.Trak.Tkhd.Duration = mp4.TotalDuration
+	init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
+	init.Moov.Traks[1].Tkhd.Duration = mp4.AudioTotalDuration
 	// Override the HandlerBox, and more specifically the name field with "agent and version"
 	init.Moov.Trak.Mdia.Hdlr.Name = "agent " + utils.VERSION
 
