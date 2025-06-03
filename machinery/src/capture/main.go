@@ -246,12 +246,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					mp4Video.SetHeight(height)
 
 					if videoCodec == "H264" {
-						mp4Video.AddVideoTrack("H264")
+						videoTrack = mp4Video.AddVideoTrack("H264")
 					} else if videoCodec == "H265" {
-						mp4Video.AddVideoTrack("H265")
+						videoTrack = mp4Video.AddVideoTrack("H265")
 					}
 					if audioCodec == "AAC" {
-						mp4Video.AddAudioTrack("AAC")
+						audioTrack = mp4Video.AddAudioTrack("AAC")
 					} else if audioCodec == "PCM_MULAW" {
 						log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 					}

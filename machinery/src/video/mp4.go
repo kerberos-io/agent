@@ -23,28 +23,30 @@ var LastPTS uint64 = 0 // Last PTS for the current segment
 
 type MP4 struct {
 	// FileName is the name of the file
-	FileName      string
-	width         int
-	height        int
-	Segments      []*mp4ff.MediaSegment // List of media segments
-	Segment       *mp4ff.MediaSegment
-	Fragment      *mp4ff.Fragment
-	TrackIDs      []uint32
-	FileWriter    *os.File
-	Writer        *bufio.Writer
-	SegmentCount  int
-	SampleCount   int
-	StartPTS      uint64
-	TotalDuration uint64
-	Start         bool
-	SPSNALUs      [][]byte // SPS NALUs for H264
-	PPSNALUs      [][]byte // PPS NALUs for H264
-	FreeBoxSize   int64
-	MoofBoxes     int64   // Number of moof boxes in the file
-	MoofBoxSizes  []int64 // Sizes of each moof box
-	StartTime     uint64  // Start time of the MP4 file
-	VideoTrack    int     // Track ID for the video track
-	AudioTrack    int     // Track ID for the audio track
+	FileName       string
+	width          int
+	height         int
+	Segments       []*mp4ff.MediaSegment // List of media segments
+	Segment        *mp4ff.MediaSegment
+	Fragment       *mp4ff.Fragment
+	TrackIDs       []uint32
+	FileWriter     *os.File
+	Writer         *bufio.Writer
+	SegmentCount   int
+	SampleCount    int
+	StartPTS       uint64
+	TotalDuration  uint64
+	Start          bool
+	SPSNALUs       [][]byte // SPS NALUs for H264
+	PPSNALUs       [][]byte // PPS NALUs for H264
+	FreeBoxSize    int64
+	MoofBoxes      int64   // Number of moof boxes in the file
+	MoofBoxSizes   []int64 // Sizes of each moof box
+	StartTime      uint64  // Start time of the MP4 file
+	VideoTrackName string  // Name of the video track
+	VideoTrack     int     // Track ID for the video track
+	AudioTrackName string  // Name of the audio track
+	AudioTrack     int     // Track ID for the audio track
 }
 
 // NewMP4 creates a new MP4 object
@@ -99,18 +101,22 @@ func (mp4 *MP4) SetHeight(height int) {
 
 // AddVideoTrack
 // Add a video track to the MP4 file
-func (mp4 *MP4) AddVideoTrack(codec string) {
+func (mp4 *MP4) AddVideoTrack(codec string) uint32 {
 	nextTrack := uint32(len(mp4.TrackIDs) + 1)
 	mp4.VideoTrack = int(nextTrack)
 	mp4.TrackIDs = append(mp4.TrackIDs, nextTrack)
+	mp4.VideoTrackName = codec
+	return nextTrack
 }
 
 // AddAudioTrack
 // Add an audio track to the MP4 file
-func (mp4 *MP4) AddAudioTrack(codec string) {
+func (mp4 *MP4) AddAudioTrack(codec string) uint32 {
 	nextTrack := uint32(len(mp4.TrackIDs) + 1)
 	mp4.AudioTrack = int(nextTrack)
 	mp4.TrackIDs = append(mp4.TrackIDs, nextTrack)
+	mp4.AudioTrackName = codec
+	return nextTrack
 }
 
 func (mp4 *MP4) AddMediaSegment(segNr int) {
@@ -221,6 +227,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 
 	// Set the creation time and modification time for the moov box
 	videoTimescale := uint32(90000)
+	audioTimescale := uint32(16000)
 	mvhd := &mp4ff.MvhdBox{
 		Version:          0,
 		Flags:            0,
@@ -238,12 +245,33 @@ func (mp4 *MP4) Close(config *models.Config) {
 
 	// Add the video track to the moov box
 	// 90kHz timescale for video
-	init.AddEmptyTrack(videoTimescale, "video", "und")
-	includePS := true
-	err = init.Moov.Trak.SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
-	if err != nil {
-		panic(err)
+
+	if mp4.VideoTrackName == "H264" || mp4.VideoTrackName == "AVC1" {
+		init.AddEmptyTrack(videoTimescale, "video", "und")
+		includePS := true
+		err = init.Moov.Trak.SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
+		if err != nil {
+			//panic(err)
+		}
+	} else if mp4.VideoTrackName == "H265" || mp4.VideoTrackName == "HEV1" {
+		init.AddEmptyTrack(videoTimescale, "video", "und")
+		includePS := true
+		err = init.Moov.Trak.SetHEVCDescriptor("hev1", [][]byte{}, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
+		if err != nil {
+			//panic(err)
+		}
 	}
+
+	if mp4.AudioTrackName == "AAC" || mp4.AudioTrackName == "MP4A" {
+		// Add an audio track to the moov box
+		init.AddEmptyTrack(audioTimescale, "audio", "und")
+		// Set the audio descriptor
+		err = init.Moov.Trak.SetAACDescriptor(5, 16000)
+		if err != nil {
+			//panic(err)
+		}
+	}
+
 	// Set the total duration in the track header
 	init.Moov.Trak.Tkhd.Duration = mp4.TotalDuration
 	// Override the HandlerBox, and more specifically the name field with "agent and version"
