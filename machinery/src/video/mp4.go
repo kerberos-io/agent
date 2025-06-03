@@ -157,14 +157,6 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		seg.AddFragment(videoFragment)
 		mp4.VideoFragment = videoFragment
 
-		// Create an audio fragment
-		audioFragment, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), 2)
-		if err != nil {
-			return err
-		}
-		seg.AddFragment(audioFragment)
-		mp4.AudioFragment = audioFragment
-
 		// Set to MP4 struct
 		mp4.Segment = seg
 
@@ -182,7 +174,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			if err == nil {
 				if mp4.VideoFullSample != nil {
 					duration := pts - mp4.VideoFullSample.DecodeTime
-					fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(lengthPrefixed), isKeyframe)
+					fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(mp4.VideoFullSample.Data), isKeyframe)
 					mp4.VideoTotalDuration += duration
 					mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
 					mp4.VideoFullSample.Sample.Dur = uint32(duration)
@@ -202,8 +194,9 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 				fullSample.DecodeTime = pts
 				fullSample.Data = lengthPrefixed
 				fullSample.Sample = mp4ff.Sample{
-					Size:  uint32(len(fullSample.Data)),
-					Flags: flags,
+					Size:                  uint32(len(fullSample.Data)),
+					Flags:                 flags,
+					CompositionTimeOffset: 0, // No composition time offset for video
 				}
 				mp4.VideoFullSample = &fullSample
 			}
@@ -227,8 +220,9 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			fullSample.DecodeTime = pts
 			fullSample.Data = data
 			fullSample.Sample = mp4ff.Sample{
-				Size:  uint32(len(fullSample.Data)),
-				Flags: 0,
+				Size:                  uint32(len(fullSample.Data)),
+				Flags:                 0,
+				CompositionTimeOffset: 0, // No composition time offset for audio
 			}
 			mp4.AudioFullSample = &fullSample
 		}
@@ -237,9 +231,18 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 	return nil
 }
 
-func (mp4 *MP4) Close(config *models.Config) {
+func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 
-	err := mp4.Segment.Encode(mp4.Writer)
+	// Add the last sample to the track
+	duration := pts - mp4.VideoFullSample.DecodeTime
+	fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, duration, len(mp4.VideoFullSample.Data))
+	mp4.VideoTotalDuration += duration
+	mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
+	mp4.VideoFullSample.Sample.Dur = uint32(duration)
+	err := mp4.VideoFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)
+
+	// Encode the last segment
+	err = mp4.Segment.Encode(mp4.Writer)
 	if err != nil {
 		panic(err)
 	}
@@ -271,7 +274,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 		Flags:            0,
 		CreationTime:     mp4.StartTime,
 		ModificationTime: mp4.StartTime,
-		Timescale:        videoTimescale, // 90kHz timescale
+		Timescale:        videoTimescale,
 		Duration:         mp4.VideoTotalDuration,
 	}
 	init.Moov.AddChild(mvhd)
@@ -304,7 +307,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 		// Add an audio track to the moov box
 		init.AddEmptyTrack(audioTimescale, "audio", "und")
 		// Set the audio descriptor
-		err = init.Moov.Traks[1].SetAACDescriptor(2, 48000)
+		err = init.Moov.Traks[1].SetAACDescriptor(5, 48000)
 		if err != nil {
 			//panic(err)
 		}
