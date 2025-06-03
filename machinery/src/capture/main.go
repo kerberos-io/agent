@@ -76,6 +76,20 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			config.Name = config.FriendlyName
 		}
 
+		// Get the audio and video codec from the camera.
+		// We only expect one audio and one video codec.
+		// If there are multiple audio or video streams, we will use the first one.
+		audioCodec := ""
+		videoCodec := ""
+		audioStreams, _ := rtspClient.GetAudioStreams()
+		videoStreams, _ := rtspClient.GetVideoStreams()
+		if len(audioStreams) > 0 {
+			audioCodec = audioStreams[0].Name
+		}
+		if len(videoStreams) > 0 {
+			videoCodec = videoStreams[0].Name
+		}
+
 		// For continuous and motion based recording we will use a single file.
 		var file *os.File
 
@@ -127,16 +141,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					duration := ttimeNext - ttimeLegacy
 
 					if pkt.IsVideo {
-
 						// New method using new mp4 library
-						mp4Video.AddSampleToTrack(1, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration)
-
-						if err := myMuxer.Write(videoTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
+						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						if pkt.Codec == "AAC" {
-							if err := myMuxer.Write(audioTrack, pkt.Data, ttimeLegacy, ttimeLegacy); err != nil {
+							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
@@ -144,25 +155,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 						}
 					}
+
 					// Close mp4
 					mp4Video.Close(&config)
-
-					// This will write the trailer a well.
-					if err := myMuxer.WriteTrailer(); err != nil {
-						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-					}
-
 					log.Log.Info("capture.main.HandleRecordStream(continuous): recording finished: file save: " + name)
 
 					// Cleanup muxer
 					start = false
-					file.Close()
-					file = nil
-
-					// Check if need to convert to fragmented using bento
-					if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
-						utils.CreateFragmentedMP4(fullName, config.Capture.FragmentedDuration)
-					}
 
 					// Check if we need to encrypt the recording.
 					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
@@ -228,46 +227,33 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						"769"
 
 					name = s + ".mp4"
-					new_name := s + "_new.mp4"
-					fullName = configDirectory + "/data/recordings/" + new_name
-					new_fullName := configDirectory + "/data/recordings/" + name
+					fullName = configDirectory + "/data/recordings/" + name
 
 					// Running...
 					log.Log.Info("capture.main.HandleRecordStream(continuous): recording started")
-					file, err = os.Create(fullName)
 
-					if err == nil {
+					// Get width and height from the camera.
+					width := configuration.Config.Capture.IPCamera.Width
+					height := configuration.Config.Capture.IPCamera.Height
 
-						// Get width and height from the camera.
-						width := configuration.Config.Capture.IPCamera.Width
-						height := configuration.Config.Capture.IPCamera.Height
+					// Get SPS and PPS NALUs from the camera.
+					spsNALUS := configuration.Config.Capture.IPCamera.SPSNALUs
+					ppsNALUS := configuration.Config.Capture.IPCamera.PPSNALUs
 
-						// Get SPS and PPS NALUs from the camera.
-						spsNALUS := configuration.Config.Capture.IPCamera.SPSNALUs
-						ppsNALUS := configuration.Config.Capture.IPCamera.PPSNALUs
+					// Create a video file, and set the dimensions.
+					mp4Video = video.NewMP4(fullName, spsNALUS, ppsNALUS)
+					mp4Video.SetWidth(width)
+					mp4Video.SetHeight(height)
 
-						// Create a video file, and set the dimensions.
-						mp4Video = video.NewMP4(new_fullName, spsNALUS, ppsNALUS)
-						mp4Video.SetWidth(width)
-						mp4Video.SetHeight(height)
-						//
-						//mp4Video.AddAudioTrack("AAC")
-
-						myMuxer, _ = mp4.CreateMp4Muxer(file)
-						// We choose between H264 and H265
-						//widthOption := mp4.WithVideoWidth(uint32(width))
-						//heightOption := mp4.WithVideoHeight(uint32(height))
-						if pkt.Codec == "H264" {
-							mp4Video.AddVideoTrack("H264")
-							//videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264, widthOption, heightOption)
-						} else if pkt.Codec == "H265" {
-							mp4Video.AddVideoTrack("H265")
-							//videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265, widthOption, heightOption)
-						}
-						// For an MP4 container, AAC is the only audio codec supported.
-						audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
-					} else {
-						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+					if videoCodec == "H264" {
+						mp4Video.AddVideoTrack("H264")
+					} else if videoCodec == "H265" {
+						mp4Video.AddVideoTrack("H265")
+					}
+					if audioCodec == "AAC" {
+						mp4Video.AddAudioTrack("AAC")
+					} else if audioCodec == "PCM_MULAW" {
+						log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 					}
 
 					ttimeLegacy := convertPTS(pkt.TimeLegacy)
@@ -329,8 +315,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					// Cleanup muxer
 					start = false
-					file.Close()
-					file = nil
 
 					// Check if we need to encrypt the recording.
 					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
