@@ -4,6 +4,7 @@ package capture
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"image"
 	"os"
 	"strconv"
@@ -119,6 +120,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var cursorError error
 			var pkt packets.Packet
 			var nextPkt packets.Packet
+			var nextNextPkt packets.Packet
 			recordingStatus := "idle"
 			recordingCursor := queue.Oldest()
 
@@ -126,26 +128,43 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				pkt, cursorError = recordingCursor.ReadPacket()
 			}
 
+			if cursorError == nil {
+				nextPkt, cursorError = recordingCursor.ReadPacket()
+			}
+
 			for cursorError == nil {
 
-				nextPkt, cursorError = recordingCursor.ReadPacket()
+				nextNextPkt, cursorError = recordingCursor.ReadPacket()
 
 				now := time.Now().Unix()
 
 				if start && // If already recording and current frame is a keyframe and we should stop recording
 					nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
-					// Write the last packet
-					ttimeLegacy := convertPTS(pkt.TimeLegacy)
-					ttimeNext := convertPTS(nextPkt.TimeLegacy)
-					duration := ttimeNext - ttimeLegacy
-
 					if pkt.IsVideo {
+						// Write the last packet
+						ttimeLegacy := convertPTS(pkt.TimeLegacy)
+						ttimeNext := convertPTS(nextPkt.TimeLegacy)
+						if nextPkt.IsVideo {
+							ttimeNext = convertPTS(nextPkt.TimeLegacy)
+						} else if nextNextPkt.IsVideo {
+							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
+						}
+						duration := ttimeNext - ttimeLegacy
 						// New method using new mp4 library
 						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
+						// Write the last packet
+						ttimeLegacy := convertPTS(pkt.TimeLegacy)
+						ttimeNext := convertPTS(nextPkt.TimeLegacy)
+						if nextPkt.IsAudio {
+							ttimeNext = convertPTS(nextPkt.TimeLegacy)
+						} else if nextNextPkt.IsAudio {
+							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
+						}
+						duration := ttimeNext - ttimeLegacy
 						if pkt.Codec == "AAC" {
 							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -256,16 +275,32 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 					}
 
-					ttimeLegacy := convertPTS(pkt.TimeLegacy)
-					ttimeNext := convertPTS(nextPkt.TimeLegacy)
-					duration := ttimeNext - ttimeLegacy
-
 					if pkt.IsVideo {
+
+						ttimeLegacy := convertPTS(pkt.TimeLegacy)
+						ttimeNext := convertPTS(nextPkt.TimeLegacy)
+						if nextPkt.IsVideo {
+							ttimeNext = convertPTS(nextPkt.TimeLegacy)
+						} else if nextNextPkt.IsVideo {
+							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
+						}
+						duration := ttimeNext - ttimeLegacy
+
 						// New method using new mp4 library
 						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
+
+						ttimeLegacy := convertPTS(pkt.TimeLegacy)
+						ttimeNext := convertPTS(nextPkt.TimeLegacy)
+						if nextPkt.IsAudio {
+							ttimeNext = convertPTS(nextPkt.TimeLegacy)
+						} else if nextNextPkt.IsAudio {
+							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
+						}
+						duration := ttimeNext - ttimeLegacy
+
 						if pkt.Codec == "AAC" {
 							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -279,16 +314,33 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				} else if start {
 
-					ttimeLegacy := convertPTS(pkt.TimeLegacy)
-					ttimeNext := convertPTS(nextPkt.TimeLegacy)
-					duration := ttimeNext - ttimeLegacy
-
 					if pkt.IsVideo {
+
+						ttimeLegacy := convertPTS(pkt.TimeLegacy)
+						ttimeNext := convertPTS(nextPkt.TimeLegacy)
+						if nextPkt.IsVideo {
+							ttimeNext = convertPTS(nextPkt.TimeLegacy)
+						} else if nextNextPkt.IsVideo {
+							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
+						}
+						duration := ttimeNext - ttimeLegacy
+
+						fmt.Println(duration * 90)
 						// New method using new mp4 library
 						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
+
+						ttimeLegacy := convertPTS(pkt.TimeLegacy)
+						ttimeNext := convertPTS(nextPkt.TimeLegacy)
+						if nextPkt.IsAudio {
+							ttimeNext = convertPTS(nextPkt.TimeLegacy)
+						} else if nextNextPkt.IsAudio {
+							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
+						}
+						duration := ttimeNext - ttimeLegacy
+
 						if pkt.Codec == "AAC" {
 							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -300,6 +352,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 				}
 				pkt = nextPkt
+				nextPkt = nextNextPkt
 			}
 
 			// We might have interrupted the recording while restarting the agent.

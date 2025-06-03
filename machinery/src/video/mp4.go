@@ -124,76 +124,85 @@ func (mp4 *MP4) AddMediaSegment(segNr int) {
 
 func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64, duration uint64) error {
 
-	lengthPrefixed, err := annexBToLengthPrefixed(data)
-	var fullSample mp4ff.FullSample
-	if err == nil {
-		// Set the sample dat
-		// a
-		flags := uint32(33554432)
-		if !isKeyframe {
-			flags = uint32(16842752)
-		}
+	if isKeyframe {
 
-		duration = duration * 90 // Convert duration to 90kHz timescale
-		fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(lengthPrefixed), isKeyframe)
-		mp4.TotalDuration += duration
-		fullSample.Data = lengthPrefixed
-		fullSample.DecodeTime = mp4.TotalDuration - duration
-		fullSample.Sample = mp4ff.Sample{
-			Dur:   uint32(duration),
-			Size:  uint32(len(fullSample.Data)),
-			Flags: flags,
-		}
-
-		if isKeyframe {
-
-			// Write the segment to the file
-			if mp4.Start {
-				mp4.MoofBoxes = mp4.MoofBoxes + 1
-				mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
-				err := mp4.Segment.Encode(mp4.Writer)
-				if err != nil {
-					return err
-				}
-				mp4.Segments = append(mp4.Segments, mp4.Segment)
-			}
-
-			mp4.Start = true
-
-			// Increment the segment count
-			mp4.SegmentCount = mp4.SegmentCount + 1
-
-			// Create a new media segment
-			seg := mp4ff.NewMediaSegment()
-			frag, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), trackID)
-			if err != nil {
-				return err
-			}
-			seg.AddFragment(frag)
-
-			// Set to MP4 struct
-			mp4.Segment = seg
-			mp4.Fragment = frag
-
-			// Set the start PTS for the next segment
-			mp4.StartPTS = pts
-		}
-
+		// Write the segment to the file
 		if mp4.Start {
-
-			// Add a sample to the track
-			// This is a placeholder function
-			// In a real implementation, this would add a sample to the track
-			err = mp4.Fragment.AddFullSampleToTrack(fullSample, trackID)
+			mp4.MoofBoxes = mp4.MoofBoxes + 1
+			mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
+			err := mp4.Segment.Encode(mp4.Writer)
 			if err != nil {
-				log.Printf("Error adding sample to track %d: %v", trackID, err)
 				return err
 			}
-			LastPTS = pts
+			mp4.Segments = append(mp4.Segments, mp4.Segment)
 		}
-	} else {
-		log.Printf("Error converting Annex B to length-prefixed: %v", err)
-		return err
+
+		mp4.Start = true
+
+		// Increment the segment count
+		mp4.SegmentCount = mp4.SegmentCount + 1
+
+		// Create a new media segment
+		seg := mp4ff.NewMediaSegment()
+		frag, err := mp4ff.CreateMultiTrackFragment(uint32(mp4.SegmentCount), []uint32{1})
+		if err != nil {
+			return err
+		}
+		seg.AddFragment(frag)
+
+		// Set to MP4 struct
+		mp4.Segment = seg
+		mp4.Fragment = frag
+
+		// Set the start PTS for the next segment
+		mp4.StartPTS = pts
+	}
+
+	if mp4.Start {
+
+		// Add a sample to the track
+		// This is a placeholder function
+		// In a real implementation, this would add a sample to the track
+		var fullSample mp4ff.FullSample
+		if trackID == uint32(mp4.VideoTrack) {
+			lengthPrefixed, err := annexBToLengthPrefixed(data)
+			if err == nil {
+				// Set the sample data
+				flags := uint32(33554432)
+				if !isKeyframe {
+					flags = uint32(16842752)
+				}
+
+				duration = duration * 90 // Convert duration to 90kHz timescale
+				fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(lengthPrefixed), isKeyframe)
+				mp4.TotalDuration += duration
+				fullSample.Data = lengthPrefixed
+				fullSample.DecodeTime = mp4.TotalDuration - duration
+				fullSample.Sample = mp4ff.Sample{
+					Dur:   uint32(duration),
+					Size:  uint32(len(fullSample.Data)),
+					Flags: flags,
+				}
+			}
+		} else if trackID == uint32(mp4.AudioTrack) {
+			duration = duration * 48 // Convert duration to 48kHz timescale
+			fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, duration, len(data))
+			mp4.TotalDuration += duration
+			fullSample.Data = data
+			fullSample.DecodeTime = mp4.TotalDuration - duration
+			fullSample.Sample = mp4ff.Sample{
+				Dur:   uint32(duration),
+				Size:  uint32(len(fullSample.Data)),
+				Flags: 0,
+			}
+		}
+
+		err := mp4.Fragment.AddFullSampleToTrack(fullSample, trackID)
+		if err != nil {
+			log.Printf("Error adding sample to track %d: %v", trackID, err)
+			return err
+		}
+		LastPTS = pts
 	}
 
 	return nil
