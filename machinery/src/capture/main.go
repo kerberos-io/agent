@@ -4,7 +4,6 @@ package capture
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"image"
 	"os"
 	"strconv"
@@ -324,8 +323,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							ttimeNext = convertPTS(nextNextPkt.TimeLegacy)
 						}
 						duration := ttimeNext - ttimeLegacy
-
-						fmt.Println(duration * 90)
 						// New method using new mp4 library
 						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttimeLegacy, duration); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())

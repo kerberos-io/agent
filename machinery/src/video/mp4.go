@@ -28,7 +28,8 @@ type MP4 struct {
 	height         int
 	Segments       []*mp4ff.MediaSegment // List of media segments
 	Segment        *mp4ff.MediaSegment
-	Fragment       *mp4ff.Fragment
+	VideoFragment  *mp4ff.Fragment
+	AudioFragment  *mp4ff.Fragment
 	TrackIDs       []uint32
 	FileWriter     *os.File
 	Writer         *bufio.Writer
@@ -144,15 +145,25 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 
 		// Create a new media segment
 		seg := mp4ff.NewMediaSegment()
-		frag, err := mp4ff.CreateMultiTrackFragment(uint32(mp4.SegmentCount), []uint32{1})
+
+		// Create a video fragment
+		videoFragment, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), 1)
 		if err != nil {
 			return err
 		}
-		seg.AddFragment(frag)
+		seg.AddFragment(videoFragment)
+		mp4.VideoFragment = videoFragment
+
+		// Create an audio fragment
+		/*audioFragment, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), 2)
+		if err != nil {
+			return err
+		}
+		seg.AddFragment(audioFragment)
+		mp4.AudioFragment = audioFragment*/
 
 		// Set to MP4 struct
 		mp4.Segment = seg
-		mp4.Fragment = frag
 
 		// Set the start PTS for the next segment
 		mp4.StartPTS = pts
@@ -183,9 +194,15 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 					Size:  uint32(len(fullSample.Data)),
 					Flags: flags,
 				}
+
+				err := mp4.VideoFragment.AddFullSampleToTrack(fullSample, trackID)
+				if err != nil {
+					log.Printf("Error adding sample to track %d: %v", trackID, err)
+					return err
+				}
 			}
 		} else if trackID == uint32(mp4.AudioTrack) {
-			duration = duration * 48 // Convert duration to 48kHz timescale
+			/*duration = duration * 48 // Convert duration to 48kHz timescale
 			fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, duration, len(data))
 			mp4.TotalDuration += duration
 			fullSample.Data = data
@@ -195,13 +212,14 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 				Size:  uint32(len(fullSample.Data)),
 				Flags: 0,
 			}
+
+			err := mp4.AudioFragment.AddFullSampleToTrack(fullSample, trackID)
+			if err != nil {
+				log.Printf("Error adding sample to track %d: %v", trackID, err)
+				return err
+			}*/
 		}
 
-		err := mp4.Fragment.AddFullSampleToTrack(fullSample, trackID)
-		if err != nil {
-			log.Printf("Error adding sample to track %d: %v", trackID, err)
-			return err
-		}
 		LastPTS = pts
 	}
 
