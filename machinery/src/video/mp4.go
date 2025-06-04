@@ -29,8 +29,6 @@ type MP4 struct {
 	height             int
 	Segments           []*mp4ff.MediaSegment // List of media segments
 	Segment            *mp4ff.MediaSegment
-	VideoFragment      *mp4ff.Fragment
-	AudioFragment      *mp4ff.Fragment
 	MultiTrackFragment *mp4ff.Fragment
 	TrackIDs           []uint32
 	FileWriter         *os.File
@@ -158,21 +156,6 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		}
 		mp4.MultiTrackFragment = multiTrackFragment
 		seg.AddFragment(multiTrackFragment)
-
-		/*videoFragment, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), 1)
-		if err != nil {
-			return err
-		}
-		seg.AddFragment(videoFragment)
-		mp4.VideoFragment = videoFragment
-
-		// Create an audio fragment
-		audioFragment, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), 2)
-		if err != nil {
-			return err
-		}
-		seg.AddFragment(audioFragment)
-		mp4.AudioFragment = audioFragment*/
 
 		// Set to MP4 struct
 		mp4.Segment = seg
@@ -315,9 +298,7 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 	mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: int64(mp4.VideoTotalDuration)})
 	init.Moov.AddChild(mvex)
 
-	// Add the video track to the moov box
-	// 90kHz timescale for video
-
+	// Add a track for the video
 	if mp4.VideoTrackName == "H264" || mp4.VideoTrackName == "AVC1" {
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
@@ -325,6 +306,7 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 		if err != nil {
 			//panic(err)
 		}
+		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
 	} else if mp4.VideoTrackName == "H265" || mp4.VideoTrackName == "HEV1" {
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
@@ -332,7 +314,11 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 		if err != nil {
 			//panic(err)
 		}
+		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
+		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
 	}
+
+	// Try adding audio track if available
 	if mp4.AudioTrackName == "AAC" || mp4.AudioTrackName == "MP4A" {
 		// Add an audio track to the moov box
 		init.AddEmptyTrack(audioTimescale, "audio", "und")
@@ -341,14 +327,22 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 		if err != nil {
 			//panic(err)
 		}
+		init.Moov.Traks[1].Tkhd.Duration = mp4.AudioTotalDuration
+		init.Moov.Traks[1].Mdia.Hdlr.Name = "agent " + utils.VERSION
 	}
 
-	// Set the total duration in the track header
-	init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
-	init.Moov.Traks[1].Tkhd.Duration = mp4.AudioTotalDuration
-
-	// Override the HandlerBox, and more specifically the name field with "agent and version"
-	init.Moov.Trak.Mdia.Hdlr.Name = "agent " + utils.VERSION
+	// Try adding subtitle track if available
+	if mp4.VideoTrackName == "VTT" || mp4.VideoTrackName == "WebVTT" {
+		// Add a subtitle track to the moov box
+		init.AddEmptyTrack(videoTimescale, "subtitle", "und")
+		// Set the subtitle descriptor
+		err := init.Moov.Traks[2].SetWvttDescriptor("")
+		if err != nil {
+			//log.Log.Error("mp4.Close(): error setting VTT descriptor: " + err.Error())
+			//return
+		}
+		init.Moov.Traks[2].Mdia.Hdlr.Name = "agent " + utils.VERSION
+	}
 
 	// We will create a fingerprint that's be encrypted with the public key, so we can verify the integrity of the file later.
 	// The fingerprint will be a UUID box, which is a custom box that we can use to store the fingerprint.
