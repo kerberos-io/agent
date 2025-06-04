@@ -327,7 +327,7 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 		// Add an audio track to the moov box
 		init.AddEmptyTrack(audioTimescale, "audio", "und")
 		// Set the audio descriptor
-		err = init.Moov.Traks[1].SetAACDescriptor(2, 48000)
+		err = init.Moov.Traks[1].SetAACDescriptor(29, 48000)
 		if err != nil {
 			//panic(err)
 		}
@@ -336,6 +336,7 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 	// Set the total duration in the track header
 	init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
 	init.Moov.Traks[1].Tkhd.Duration = mp4.AudioTotalDuration
+
 	// Override the HandlerBox, and more specifically the name field with "agent and version"
 	init.Moov.Trak.Mdia.Hdlr.Name = "agent " + utils.VERSION
 
