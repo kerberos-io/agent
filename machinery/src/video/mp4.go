@@ -31,6 +31,7 @@ type MP4 struct {
 	Segment            *mp4ff.MediaSegment
 	VideoFragment      *mp4ff.Fragment
 	AudioFragment      *mp4ff.Fragment
+	MultiTrackFragment *mp4ff.Fragment
 	TrackIDs           []uint32
 	FileWriter         *os.File
 	Writer             *bufio.Writer
@@ -152,9 +153,13 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		seg := mp4ff.NewMediaSegment()
 
 		// Create a video fragment
-		//videoFragment, err := mp4ff.CreateMultiTrackFragment(uint32(mp4.SegmentCount), []uint32{1, 2}) // Assuming 1 for video track and 2 for audio track
+		multiTrackFragment, err := mp4ff.CreateMultiTrackFragment(uint32(mp4.SegmentCount), []uint32{1, 2}) // Assuming 1 for video track and 2 for audio track
+		if err != nil {
+		}
+		mp4.MultiTrackFragment = multiTrackFragment
+		seg.AddFragment(multiTrackFragment)
 
-		videoFragment, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), 1)
+		/*videoFragment, err := mp4ff.CreateFragment(uint32(mp4.SegmentCount), 1)
 		if err != nil {
 			return err
 		}
@@ -167,7 +172,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			return err
 		}
 		seg.AddFragment(audioFragment)
-		mp4.AudioFragment = audioFragment
+		mp4.AudioFragment = audioFragment*/
 
 		// Set to MP4 struct
 		mp4.Segment = seg
@@ -190,7 +195,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 					mp4.VideoTotalDuration += duration
 					mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
 					mp4.VideoFullSample.Sample.Dur = uint32(duration)
-					err := mp4.VideoFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)
+					err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)
 					if err != nil {
 						log.Printf("Error adding sample to track %d: %v", trackID, err)
 						return err
@@ -213,9 +218,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 				mp4.VideoFullSample = &fullSample
 			}
 		} else if trackID == uint32(mp4.AudioTrack) {
-
 			if mp4.AudioFullSample != nil {
-
 				SplitAACFrame(mp4.AudioFullSample.Data, func(aac []byte) {
 					dts := pts - mp4.AudioFullSample.DecodeTime
 					fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, 21, len(aac[7:]))
@@ -225,7 +228,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 					mp4.AudioFullSample.DecodeTime = mp4.AudioPTS - dts
 					mp4.AudioFullSample.Sample.Dur = uint32(dts)
 					mp4.AudioFullSample.Sample.Size = uint32(len(aac[7:]))
-					err := mp4.AudioFragment.AddFullSampleToTrack(*mp4.AudioFullSample, trackID)
+					err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.AudioFullSample, trackID)
 					if err != nil {
 						log.Printf("Error adding sample to track %d: %v", trackID, err)
 					}
@@ -252,15 +255,15 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 
 	// Add the last sample to the track
-	duration := pts - mp4.VideoFullSample.DecodeTime
+	/*duration := pts - mp4.VideoFullSample.DecodeTime
 	fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, duration, len(mp4.VideoFullSample.Data))
 	mp4.VideoTotalDuration += duration
 	mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
 	mp4.VideoFullSample.Sample.Dur = uint32(duration)
-	err := mp4.VideoFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)
+	err := mp4.VideoFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)*/
 
 	// Encode the last segment
-	err = mp4.Segment.Encode(mp4.Writer)
+	err := mp4.Segment.Encode(mp4.Writer)
 	if err != nil {
 		panic(err)
 	}
@@ -320,7 +323,6 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 			//panic(err)
 		}
 	}
-
 	if mp4.AudioTrackName == "AAC" || mp4.AudioTrackName == "MP4A" {
 		// Add an audio track to the moov box
 		init.AddEmptyTrack(audioTimescale, "audio", "und")
@@ -401,7 +403,7 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 
 	// We will also calculate the SIDX box, which is a segment index box that contains information about the segments in the file.
 	// This is useful for seeking in the file, and for streaming the file.
-	sidx := &mp4ff.SidxBox{
+	/*sidx := &mp4ff.SidxBox{
 		Version:                  0,
 		Flags:                    0,
 		ReferenceID:              0,
@@ -423,7 +425,7 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 	fillSidx(sidx, referenceTrak, segDatas, true)
 
 	// Add the SIDX box to the moov box
-	init.AddChild(sidx)
+	init.AddChild(sidx)*/
 
 	/*
 		err = mp4Root.UpdateSidx(addIfNotExists, false)
