@@ -191,13 +191,13 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			if err == nil {
 				if mp4.VideoFullSample != nil {
 					duration := pts - mp4.VideoFullSample.DecodeTime
-					fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(mp4.VideoFullSample.Data), isKeyframe)
+					//fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(mp4.VideoFullSample.Data), isKeyframe)
 					mp4.VideoTotalDuration += duration
 					mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
 					mp4.VideoFullSample.Sample.Dur = uint32(duration)
 					err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)
 					if err != nil {
-						log.Printf("Error adding sample to track %d: %v", trackID, err)
+						//log.Printf("Error adding sample to track %d: %v", trackID, err)
 						return err
 					}
 				}
@@ -219,16 +219,24 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			}
 		} else if trackID == uint32(mp4.AudioTrack) {
 			if mp4.AudioFullSample != nil {
-				SplitAACFrame(mp4.AudioFullSample.Data, func(aac []byte) {
+				SplitAACFrame(mp4.AudioFullSample.Data, func(started bool, aac []byte) {
+					sampleToAdd := *mp4.AudioFullSample
 					dts := pts - mp4.AudioFullSample.DecodeTime
-					fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, 21, len(aac[7:]))
+					if pts < mp4.AudioFullSample.DecodeTime {
+						//log.Printf("Warning: PTS %d is less than previous sample's DecodeTime %d, resetting AudioFullSample", pts, mp4.AudioFullSample.DecodeTime)
+						dts = 1
+					}
+					if started {
+						dts = 1
+					}
+					//fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, dts, len(aac[7:]))
 					mp4.AudioTotalDuration += dts
 					mp4.AudioPTS += dts
-					mp4.AudioFullSample.Data = aac[7:] // Remove the ADTS header (first 7 bytes)
-					mp4.AudioFullSample.DecodeTime = mp4.AudioPTS - dts
-					mp4.AudioFullSample.Sample.Dur = uint32(dts)
-					mp4.AudioFullSample.Sample.Size = uint32(len(aac[7:]))
-					err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.AudioFullSample, trackID)
+					sampleToAdd.Data = aac[7:] // Remove the ADTS header (first 7 bytes)
+					sampleToAdd.DecodeTime = mp4.AudioPTS - dts
+					sampleToAdd.Sample.Dur = uint32(dts)
+					sampleToAdd.Sample.Size = uint32(len(aac[7:]))
+					err := mp4.MultiTrackFragment.AddFullSampleToTrack(sampleToAdd, trackID)
 					if err != nil {
 						log.Printf("Error adding sample to track %d: %v", trackID, err)
 					}
@@ -255,19 +263,21 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 
 	// Add the last sample to the track
-	/*duration := pts - mp4.VideoFullSample.DecodeTime
-	fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, duration, len(mp4.VideoFullSample.Data))
-	mp4.VideoTotalDuration += duration
-	mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
-	mp4.VideoFullSample.Sample.Dur = uint32(duration)
-	err := mp4.VideoFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)*/
-
-	// Encode the last segment
-	err := mp4.Segment.Encode(mp4.Writer)
-	if err != nil {
-		panic(err)
+	if trackID == uint32(mp4.VideoTrack) && mp4.VideoFullSample != nil {
+		duration := pts - mp4.VideoFullSample.DecodeTime
+		fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, duration, len(mp4.VideoFullSample.Data))
+		mp4.VideoTotalDuration += duration
+		mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
+		mp4.VideoFullSample.Sample.Dur = uint32(duration)
+		err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)
+		// Encode the last segment
+		err = mp4.Segment.Encode(mp4.Writer)
+		if err != nil {
+			panic(err)
+		}
+		mp4.Segments = append(mp4.Segments, mp4.Segment)
 	}
-	mp4.Segments = append(mp4.Segments, mp4.Segment)
+
 	mp4.Writer.Flush()
 	defer mp4.FileWriter.Close()
 
@@ -311,14 +321,14 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 	if mp4.VideoTrackName == "H264" || mp4.VideoTrackName == "AVC1" {
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
-		err = init.Moov.Traks[0].SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
+		err := init.Moov.Traks[0].SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
 		if err != nil {
 			//panic(err)
 		}
 	} else if mp4.VideoTrackName == "H265" || mp4.VideoTrackName == "HEV1" {
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
-		err = init.Moov.Traks[0].SetHEVCDescriptor("hev1", [][]byte{}, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
+		err := init.Moov.Traks[0].SetHEVCDescriptor("hev1", [][]byte{}, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
 		if err != nil {
 			//panic(err)
 		}
@@ -327,7 +337,7 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 		// Add an audio track to the moov box
 		init.AddEmptyTrack(audioTimescale, "audio", "und")
 		// Set the audio descriptor
-		err = init.Moov.Traks[1].SetAACDescriptor(29, 48000)
+		err := init.Moov.Traks[1].SetAACDescriptor(29, 48000)
 		if err != nil {
 			//panic(err)
 		}
@@ -683,13 +693,15 @@ func SplitFrameWithStartCode(frames []byte, onFrame func(nalu []byte) bool) {
 	}
 }
 
-func SplitAACFrame(frames []byte, onFrame func(aac []byte)) {
+func SplitAACFrame(frames []byte, onFrame func(started bool, aac []byte)) {
 	var adts ADTS_Frame_Header
 	start := FindSyncword(frames, 0)
+	started := false
 	for start >= 0 {
 		adts.Decode(frames[start:])
-		onFrame(frames[start : start+int(adts.Variable_Header.Frame_length)])
+		onFrame(started, frames[start:start+int(adts.Variable_Header.Frame_length)])
 		start = FindSyncword(frames, start+int(adts.Variable_Header.Frame_length))
+		started = true
 	}
 }
 
