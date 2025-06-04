@@ -166,9 +166,6 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 
 	if mp4.Start {
 
-		// Add a sample to the track
-		// This is a placeholder function
-		// In a real implementation, this would add a sample to the track
 		if trackID == uint32(mp4.VideoTrack) {
 			lengthPrefixed, err := annexBToLengthPrefixed(data)
 			if err == nil {
@@ -432,9 +429,6 @@ func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
 	// Add the SIDX box to the moov box
 	init.AddChild(sidx)*/
 
-	/*
-		err = mp4Root.UpdateSidx(addIfNotExists, false)
-	*/
 	// Get a bit slice writer for the init segment
 	// Get a byte buffer of 10008 bytes to write the init segment
 	buffer := bytes.NewBuffer(make([]byte, 0))
