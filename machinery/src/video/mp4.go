@@ -216,16 +216,20 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 
 			if mp4.AudioFullSample != nil {
 
-				dts := pts - mp4.AudioFullSample.DecodeTime
-				fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, 21, len(mp4.AudioFullSample.Data))
-				mp4.AudioTotalDuration += 21
-				mp4.AudioPTS += dts
-				mp4.AudioFullSample.DecodeTime = mp4.AudioPTS - dts
-				mp4.AudioFullSample.Sample.Dur = uint32(21)
-				err := mp4.AudioFragment.AddFullSampleToTrack(*mp4.AudioFullSample, trackID)
-				if err != nil {
-					log.Printf("Error adding sample to track %d: %v", trackID, err)
-				}
+				SplitAACFrame(mp4.AudioFullSample.Data, func(aac []byte) {
+					dts := pts - mp4.AudioFullSample.DecodeTime
+					fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, 21, len(aac[7:]))
+					mp4.AudioTotalDuration += dts
+					mp4.AudioPTS += dts
+					mp4.AudioFullSample.Data = aac[7:] // Remove the ADTS header (first 7 bytes)
+					mp4.AudioFullSample.DecodeTime = mp4.AudioPTS - dts
+					mp4.AudioFullSample.Sample.Dur = uint32(dts)
+					mp4.AudioFullSample.Sample.Size = uint32(len(aac[7:]))
+					err := mp4.AudioFragment.AddFullSampleToTrack(*mp4.AudioFullSample, trackID)
+					if err != nil {
+						log.Printf("Error adding sample to track %d: %v", trackID, err)
+					}
+				})
 			}
 
 			// Set the sample data

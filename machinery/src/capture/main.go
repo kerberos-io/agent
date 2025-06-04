@@ -138,7 +138,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					if pkt.IsVideo {
 						// Write the last packet
 						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS2(pkt.Time)
+						ttime := convertPTS(pkt.TimeLegacy)
 						// New method using new mp4 library
 						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -146,7 +146,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					} else if pkt.IsAudio {
 						// Write the last packet
 						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS2(pkt.Time)
+						ttime := convertPTS(pkt.TimeLegacy)
 						if pkt.Codec == "AAC" {
 							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -158,7 +158,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 
 					// Close mp4 and write the last
-					ttime := convertPTS2(nextPkt.Time)
+					ttime := convertPTS(nextPkt.TimeLegacy)
 					if pkt.IsVideo {
 						mp4Video.Close(&config, videoTrack, ttime)
 					} else if pkt.IsAudio {
@@ -264,14 +264,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					if pkt.IsVideo {
 						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS2(pkt.Time)
+						ttime := convertPTS(pkt.TimeLegacy)
 						// New method using new mp4 library
 						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS2(pkt.Time)
+						ttime := convertPTS(pkt.TimeLegacy)
 						if pkt.Codec == "AAC" {
 							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -287,14 +287,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					if pkt.IsVideo {
 						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS2(pkt.Time)
+						ttime := convertPTS(pkt.TimeLegacy)
 						// New method using new mp4 library
 						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS2(pkt.Time)
+						ttime := convertPTS(pkt.TimeLegacy)
 						if pkt.Codec == "AAC" {
 							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
