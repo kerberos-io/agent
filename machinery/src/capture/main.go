@@ -157,13 +157,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					// Close mp4 and write the last
-					ttime := convertPTS(nextPkt.TimeLegacy)
-					if pkt.IsVideo {
-						mp4Video.Close(&config, videoTrack, ttime)
-					} else if pkt.IsAudio {
-						mp4Video.Close(&config, audioTrack, ttime)
-					}
+					// Close mp4
+					mp4Video.Close(&config)
 					log.Log.Info("capture.main.HandleRecordStream(continuous): recording finished: file save: " + name)
 
 					// Cleanup muxer

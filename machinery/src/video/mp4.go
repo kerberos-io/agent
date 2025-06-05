@@ -52,6 +52,9 @@ type MP4 struct {
 	AudioTrack         int               // Track ID for the audio track
 	VideoFullSample    *mp4ff.FullSample // Full sample for video track
 	AudioFullSample    *mp4ff.FullSample // Full sample for audio track
+	LastAudioSampleDTS uint64            // Last PTS for audio sample
+	LastVideoSampleDTS uint64            // Last PTS for video sample
+	SampleType         string            // Type of the sample (e.g., "video", "audio", "subtitle")
 }
 
 // NewMP4 creates a new MP4 object
@@ -171,6 +174,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			if err == nil {
 				if mp4.VideoFullSample != nil {
 					duration := pts - mp4.VideoFullSample.DecodeTime
+					mp4.LastVideoSampleDTS = duration
 					//fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(mp4.VideoFullSample.Data), isKeyframe)
 					mp4.VideoTotalDuration += duration
 					mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
@@ -196,6 +200,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 					CompositionTimeOffset: 0, // No composition time offset for video
 				}
 				mp4.VideoFullSample = &fullSample
+				mp4.SampleType = "video"
 			}
 		} else if trackID == uint32(mp4.AudioTrack) {
 			if mp4.AudioFullSample != nil {
@@ -209,6 +214,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 					if started {
 						dts = 1
 					}
+					mp4.LastAudioSampleDTS = dts
 					//fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, dts, len(aac[7:]))
 					mp4.AudioTotalDuration += dts
 					mp4.AudioPTS += dts
@@ -234,28 +240,46 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 				CompositionTimeOffset: 0, // No composition time offset for audio
 			}
 			mp4.AudioFullSample = &fullSample
+			mp4.SampleType = "audio"
 		}
 	}
 
 	return nil
 }
 
-func (mp4 *MP4) Close(config *models.Config, trackID uint32, pts uint64) {
+func (mp4 *MP4) Close(config *models.Config) {
 
-	// Add the last sample to the track
-	if trackID == uint32(mp4.VideoTrack) && mp4.VideoFullSample != nil {
-		duration := pts - mp4.VideoFullSample.DecodeTime
-		fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, duration, len(mp4.VideoFullSample.Data))
+	// Add the last sample to the track, we will predict the duration based on the last sample
+	// We are not insert the last sample as we might corrupt playback (as we do not know accurately the next PTS).
+	// In theory it means we will lose the last sample, so there is millisecond dataloss, but it is better than corrupting playback.
+	// We could this by using a delayed packet reader, and look for the next PTS (closest one), but that would require a lot of memory and CPU.
+
+	/*duration := uint64(0)
+	trackID := uint32(1)
+	if mp4.SampleType == "video" {
+		duration = mp4.LastVideoSampleDTS
+		trackID = uint32(mp4.VideoTrack)
+	} else if mp4.SampleType == "audio" {
+		duration = 21 //mp4.LastAudioSampleDTS
+
+	} else {
+		log.Println("mp4.Close(): unknown sample type, cannot calculate duration")
+	}
+
+	if duration > 0 {
 		mp4.VideoTotalDuration += duration
 		mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
 		mp4.VideoFullSample.Sample.Dur = uint32(duration)
 		err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)
-		// Encode the last segment
-		err = mp4.Segment.Encode(mp4.Writer)
 		if err != nil {
-			panic(err)
 		}
 		mp4.Segments = append(mp4.Segments, mp4.Segment)
+	}*/
+
+	// Encode the last segment
+	err := mp4.Segment.Encode(mp4.Writer)
+	if err != nil {
+		panic(err)
 	}
 
 	mp4.Writer.Flush()
