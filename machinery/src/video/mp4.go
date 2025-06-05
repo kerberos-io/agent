@@ -156,7 +156,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		seg := mp4ff.NewMediaSegment()
 
 		// Create a video fragment
-		multiTrackFragment, err := mp4ff.CreateMultiTrackFragment(uint32(mp4.SegmentCount), []uint32{1, 2}) // Assuming 1 for video track and 2 for audio track
+		multiTrackFragment, err := mp4ff.CreateMultiTrackFragment(uint32(mp4.SegmentCount), mp4.TrackIDs) // Assuming 1 for video track and 2 for audio track
 		if err != nil {
 		}
 		mp4.MultiTrackFragment = multiTrackFragment
@@ -172,7 +172,15 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 	if mp4.Start {
 
 		if trackID == uint32(mp4.VideoTrack) {
-			lengthPrefixed, err := annexBToLengthPrefixed(data)
+
+			var lengthPrefixed []byte
+			var err error
+			if mp4.VideoTrackName == "H264" || mp4.VideoTrackName == "AVC1" { // Convert Annex B to length-prefixed NAL units if H264
+				lengthPrefixed, err = annexBToLengthPrefixed(data)
+			} else if mp4.VideoTrackName == "H265" || mp4.VideoTrackName == "HVC1" { // Convert H265 Annex B to length-prefixed NAL units
+				lengthPrefixed, err = annexBToLengthPrefixed(data)
+			}
+
 			if err == nil {
 				if mp4.VideoFullSample != nil {
 					duration := pts - mp4.VideoFullSample.DecodeTime
@@ -294,10 +302,9 @@ func (mp4 *MP4) Close(config *models.Config) {
 	// Create a new ftyp box
 	majorBrand := "isom"
 	minorVersion := uint32(512)
-	compatibleBrands := []string{"iso2", "avc1", "mp41"}
+	compatibleBrands := []string{"iso2", "avc1", "hvc1", "mp41"}
 	ftyp := mp4ff.NewFtyp(majorBrand, minorVersion, compatibleBrands)
 	init.AddChild(ftyp)
-	init.Ftyp.AddCompatibleBrands([]string{"isom", "iso2", "avc1", "mp41"})
 
 	// Create a new moov box
 	moov := mp4ff.NewMoovBox()
@@ -330,15 +337,18 @@ func (mp4 *MP4) Close(config *models.Config) {
 			//panic(err)
 		}
 		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
-	} else if mp4.VideoTrackName == "H265" || mp4.VideoTrackName == "HEV1" {
+		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
+		//init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
+	} else if mp4.VideoTrackName == "H265" || mp4.VideoTrackName == "HVC1" {
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
-		err := init.Moov.Traks[0].SetHEVCDescriptor("hev1", mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
+		err := init.Moov.Traks[0].SetHEVCDescriptor("hvc1", mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
 		if err != nil {
 			//panic(err)
 		}
 		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
+		//init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
 	}
 
 	// Try adding audio track if available
@@ -352,6 +362,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 		}
 		init.Moov.Traks[1].Tkhd.Duration = mp4.AudioTotalDuration
 		init.Moov.Traks[1].Mdia.Hdlr.Name = "agent " + utils.VERSION
+		//init.Moov.Traks[1].Mdia.Mdhd.Duration = mp4.AudioTotalDuration
 	}
 
 	// Try adding subtitle track if available
