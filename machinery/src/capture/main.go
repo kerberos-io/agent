@@ -240,9 +240,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// Get SPS and PPS NALUs from the camera.
 					spsNALUS := configuration.Config.Capture.IPCamera.SPSNALUs
 					ppsNALUS := configuration.Config.Capture.IPCamera.PPSNALUs
+					vpsNALUS := configuration.Config.Capture.IPCamera.VPSNALUs
 
 					// Create a video file, and set the dimensions.
-					mp4Video = video.NewMP4(fullName, spsNALUS, ppsNALUS)
+					mp4Video = video.NewMP4(fullName, spsNALUS, ppsNALUS, vpsNALUS)
 					mp4Video.SetWidth(width)
 					mp4Video.SetHeight(height)
 

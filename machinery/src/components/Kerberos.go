@@ -170,6 +170,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Set the SPS and PPS values in the configuration.
 	configuration.Config.Capture.IPCamera.SPSNALUs = [][]byte{videoStream.SPS}
 	configuration.Config.Capture.IPCamera.PPSNALUs = [][]byte{videoStream.PPS}
+	configuration.Config.Capture.IPCamera.VPSNALUs = [][]byte{videoStream.VPS}
 
 	// Define queues for the main and sub stream.
 	var queue *packets.Queue

@@ -42,6 +42,7 @@ type MP4 struct {
 	Start              bool
 	SPSNALUs           [][]byte // SPS NALUs for H264
 	PPSNALUs           [][]byte // PPS NALUs for H264
+	VPSNALUs           [][]byte // VPS NALUs for H264
 	FreeBoxSize        int64
 	MoofBoxes          int64             // Number of moof boxes in the file
 	MoofBoxSizes       []int64           // Sizes of each moof box
@@ -58,7 +59,7 @@ type MP4 struct {
 }
 
 // NewMP4 creates a new MP4 object
-func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
+func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte, vpsNALUs [][]byte) *MP4 {
 
 	init := mp4ff.NewMP4Init()
 
@@ -92,6 +93,7 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte) *MP4 {
 		Writer:      bufferedWriter,
 		SPSNALUs:    spsNALUs,
 		PPSNALUs:    ppsNALUs,
+		VPSNALUs:    vpsNALUs,
 	}
 }
 
@@ -331,7 +333,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 	} else if mp4.VideoTrackName == "H265" || mp4.VideoTrackName == "HEV1" {
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
-		err := init.Moov.Traks[0].SetHEVCDescriptor("hev1", [][]byte{}, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
+		err := init.Moov.Traks[0].SetHEVCDescriptor("hev1", mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
 		if err != nil {
 			//panic(err)
 		}

@@ -91,6 +91,7 @@ type IPCamera struct {
 	ONVIFPassword string   `json:"onvif_password" bson:"onvif_password"`
 	SPSNALUs      [][]byte `json:"sps_nalus,omitempty" bson:"sps_nalus,omitempty"`
 	PPSNALUs      [][]byte `json:"pps_nalus,omitempty" bson:"pps_nalus,omitempty"`
+	VPSNALUs      [][]byte `json:"pps_nalus,omitempty" bson:"pps_nalus,omitempty"`
 }
 
 // USBCamera configuration, such as the device path (/dev/video*)
