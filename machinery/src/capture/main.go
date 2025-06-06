@@ -299,10 +299,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			// If this happens we need to check to properly close the recording.
 			if cursorError != nil {
 				if recordingStatus == "started" {
-					// This will write the trailer a well.
-					if err := myMuxer.WriteTrailer(); err != nil {
-						log.Log.Error(err.Error())
-					}
 
 					log.Log.Info("capture.main.HandleRecordStream(continuous): Recording finished: file save: " + name)
 
@@ -395,24 +391,21 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				// Running...
 				log.Log.Info("capture.main.HandleRecordStream(motiondetection): recording started")
-				file, _ = os.Create(fullName)
-				myMuxer, _ = mp4.CreateMp4Muxer(file)
 
-				// Check which video codec we need to use.
-				videoSteams, _ := rtspClient.GetVideoStreams()
-				for _, stream := range videoSteams {
-					width := configuration.Config.Capture.IPCamera.Width
-					height := configuration.Config.Capture.IPCamera.Height
-					widthOption := mp4.WithVideoWidth(uint32(width))
-					heightOption := mp4.WithVideoHeight(uint32(height))
-					if stream.Name == "H264" {
-						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H264, widthOption, heightOption)
-					} else if stream.Name == "H265" {
-						videoTrack = myMuxer.AddVideoTrack(mp4.MP4_CODEC_H265, widthOption, heightOption)
-					}
-				}
-				// For an MP4 container, AAC is the only audio codec supported.
-				audioTrack = myMuxer.AddAudioTrack(mp4.MP4_CODEC_AAC)
+				// Get width and height from the camera.
+				width := configuration.Config.Capture.IPCamera.Width
+				height := configuration.Config.Capture.IPCamera.Height
+
+				// Get SPS and PPS NALUs from the camera.
+				spsNALUS := configuration.Config.Capture.IPCamera.SPSNALUs
+				ppsNALUS := configuration.Config.Capture.IPCamera.PPSNALUs
+				vpsNALUS := configuration.Config.Capture.IPCamera.VPSNALUs
+
+				// Create a video file, and set the dimensions.
+				mp4Video := video.NewMP4(fullName, spsNALUS, ppsNALUS, vpsNALUS)
+				mp4Video.SetWidth(width)
+				mp4Video.SetHeight(height)
+
 				start := false
 
 				// Get as much packets we need.

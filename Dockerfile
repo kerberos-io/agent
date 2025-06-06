@@ -32,9 +32,11 @@ RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
 ##################
 # Build Machinery
 
+ENV TAGS="timetzdata netgo osusergo"
+ENV LDFLAGS="-s -w -extldflags '-static -latomic'"
 RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go mod download && \
-	go build -tags timetzdata,netgo,osusergo --ldflags '-s -w -extldflags "-static -latomic"' main.go && \
+	CGO_ENABLED=0 go build -tags "$TAGS" -ldflags "$LDFLAGS" -trimpath main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv version /agent && \
@@ -58,18 +60,6 @@ RUN cp -r /agent ./
 # This will collect dependent libraries so they're later copied to the final image.
 
 RUN /dist/agent/main version
-
-###############################################
-# Build Bento4 -> we want fragmented mp4 files
-
-ENV BENTO4_VERSION 1.6.0-641
-RUN cd /tmp && git clone https://github.com/axiomatic-systems/Bento4 && cd Bento4 && \
-	git checkout tags/v${BENTO4_VERSION} && \
-	cd Build && \
-	cmake -DCMAKE_BUILD_TYPE=Release .. && \
-	make && \
-	mv /tmp/Bento4/Build/mp4fragment /dist/agent/ && \
-	rm -rf /tmp/Bento4
 
 FROM node:18.14.0-alpine3.16 AS build-ui
 
