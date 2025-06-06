@@ -483,9 +483,12 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 				// If PCM_MULAW we can send it directly.
 
 				if hasAAC {
-					// We will transcode the audio
+					// We will transcode the audio from AAC to PCM_MULAW
+					// Not sure how to do this yet, but we need to use a decoder
+					// and then encode it to PCM_MULAW.
 					// TODO..
 					//d := fdkaac.NewAacDecoder()
+					pkt = nextPkt
 					continue
 				}
 
