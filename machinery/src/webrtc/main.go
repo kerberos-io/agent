@@ -394,17 +394,20 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 
 		var cursorError error
 		var pkt packets.Packet
-		var previousTimeVideo int64
-		var previousTimeAudio int64
+		var nextPkt packets.Packet
 
 		start := false
 		receivedKeyFrame := false
 		lastKeepAlive := "0"
 		peerCount := "0"
 
+		if cursorError == nil {
+			pkt, cursorError = livestreamCursor.ReadPacket()
+		}
+
 		for cursorError == nil {
 
-			pkt, cursorError = livestreamCursor.ReadPacket()
+			nextPkt, cursorError = livestreamCursor.ReadPacket()
 
 			//if config.Capture.ForwardWebRTC != "true" && peerConnectionCount == 0 {
 			//	start = false
@@ -454,8 +457,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 			if pkt.IsVideo {
 
 				// Calculate the difference
-				bufferDuration := pkt.Time - previousTimeVideo
-				previousTimeVideo = pkt.Time
+				bufferDuration := nextPkt.Time - pkt.Time
 
 				// Start at the first keyframe
 				if pkt.IsKeyFrame {
@@ -488,17 +490,17 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 				}
 
 				// Calculate the difference
-				bufferDuration := pkt.Time - previousTimeAudio
-				previousTimeAudio = pkt.Time
+				bufferDuration := nextPkt.Time - pkt.Time
 
 				// We will send the audio
 				bufferDurationCasted := time.Duration(bufferDuration) * time.Millisecond
 				sample := pionMedia.Sample{Data: pkt.Data, Duration: bufferDurationCasted, PacketTimestamp: uint32(pkt.Time)}
-				//sample = pionMedia.Sample{Data: pkt.Data, Duration: time.Second}
 				if err := audioTrack.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
 					log.Log.Error("webrtc.main.WriteToTrack(): something went wrong while writing sample: " + err.Error())
 				}
 			}
+
+			pkt = nextPkt
 		}
 	}
 

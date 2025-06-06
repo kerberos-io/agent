@@ -135,20 +135,16 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				if start && // If already recording and current frame is a keyframe and we should stop recording
 					nextPkt.IsKeyFrame && (timestamp+recordingPeriod-now <= 0 || now-startRecording >= maxRecordingPeriod) {
 
+					pts := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
 						// Write the last packet
-						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS(pkt.TimeLegacy)
-						// New method using new mp4 library
-						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
+						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
 						// Write the last packet
-						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS(pkt.TimeLegacy)
 						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
+							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
@@ -258,22 +254,20 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 					}
 
+					pts := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
-						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS(pkt.TimeLegacy)
-						// New method using new mp4 library
-						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
+						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
-						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS(pkt.TimeLegacy)
 						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
+							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
 							// TODO: transcode to AAC, some work to do..
+							// We might need to use ffmpeg to transcode the audio to AAC.
+							// For now we will skip the audio track.
 							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 						}
 					}
@@ -281,18 +275,15 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				} else if start {
 
+					pts := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
-						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS(pkt.TimeLegacy)
 						// New method using new mp4 library
-						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
+						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
-						//ttimeLegacy := convertPTS(pkt.TimeLegacy)
-						ttime := convertPTS(pkt.TimeLegacy)
 						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, ttime); err != nil {
+							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.Codec == "PCM_MULAW" {
@@ -711,6 +702,6 @@ func convertPTS(v time.Duration) uint64 {
 	return uint64(v.Milliseconds())
 }
 
-func convertPTS2(v int64) uint64 {
+/*func convertPTS2(v int64) uint64 {
 	return uint64(v) / 100
-}
+}*/
