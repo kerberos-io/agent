@@ -394,20 +394,17 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 
 		var cursorError error
 		var pkt packets.Packet
-		var nextPkt packets.Packet
+		var lastAudioSample *pionMedia.Sample = nil
+		var lastVideoSample *pionMedia.Sample = nil
 
 		start := false
 		receivedKeyFrame := false
 		lastKeepAlive := "0"
 		peerCount := "0"
 
-		if cursorError == nil {
-			pkt, cursorError = livestreamCursor.ReadPacket()
-		}
-
 		for cursorError == nil {
 
-			nextPkt, cursorError = livestreamCursor.ReadPacket()
+			pkt, cursorError = livestreamCursor.ReadPacket()
 
 			//if config.Capture.ForwardWebRTC != "true" && peerConnectionCount == 0 {
 			//	start = false
@@ -433,13 +430,11 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 			if config.Capture.ForwardWebRTC == "true" && (hasTimedOut || hasNoPeers) {
 				start = false
 				receivedKeyFrame = false
-				pkt = nextPkt
 				continue
 			}
 
 			if len(pkt.Data) == 0 || pkt.Data == nil {
 				receivedKeyFrame = false
-				pkt = nextPkt
 				continue
 			}
 
@@ -447,7 +442,6 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 				if pkt.IsKeyFrame {
 					receivedKeyFrame = true
 				} else {
-					pkt = nextPkt
 					continue
 				}
 			}
@@ -459,24 +453,27 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 
 			if pkt.IsVideo {
 
-				// Calculate the difference
-				bufferDuration := nextPkt.Time - pkt.Time
-
 				// Start at the first keyframe
 				if pkt.IsKeyFrame {
 					start = true
 				}
 				if start {
-					bufferDurationCasted := time.Duration(bufferDuration) * time.Millisecond
-					sample := pionMedia.Sample{Data: pkt.Data, Duration: bufferDurationCasted, PacketTimestamp: uint32(pkt.Time)}
+					sample := pionMedia.Sample{Data: pkt.Data, PacketTimestamp: uint32(pkt.TimeLegacy)}
 					//sample = pionMedia.Sample{Data: pkt.Data, Duration: time.Second}
 					if config.Capture.ForwardWebRTC == "true" {
 						// We will send the video to a remote peer
 						// TODO..
 					} else {
-						if err := videoTrack.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
-							log.Log.Error("webrtc.main.WriteToTrack(): something went wrong while writing sample: " + err.Error())
+						if lastVideoSample != nil {
+							duration := sample.PacketTimestamp - lastVideoSample.PacketTimestamp
+							bufferDurationCasted := time.Duration(duration) * time.Millisecond
+							lastVideoSample.Duration = bufferDurationCasted
+							if err := videoTrack.WriteSample(*lastVideoSample); err != nil && err != io.ErrClosedPipe {
+								log.Log.Error("webrtc.main.WriteToTrack(): something went wrong while writing sample: " + err.Error())
+							}
 						}
+
+						lastVideoSample = &sample
 					}
 				}
 			} else if pkt.IsAudio {
@@ -491,22 +488,23 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 					// and then encode it to PCM_MULAW.
 					// TODO..
 					//d := fdkaac.NewAacDecoder()
-					pkt = nextPkt
 					continue
 				}
 
-				// Calculate the difference
-				bufferDuration := nextPkt.Time - pkt.Time
-
 				// We will send the audio
-				bufferDurationCasted := time.Duration(bufferDuration) * time.Millisecond
-				sample := pionMedia.Sample{Data: pkt.Data, Duration: bufferDurationCasted, PacketTimestamp: uint32(pkt.Time)}
-				if err := audioTrack.WriteSample(sample); err != nil && err != io.ErrClosedPipe {
-					log.Log.Error("webrtc.main.WriteToTrack(): something went wrong while writing sample: " + err.Error())
-				}
-			}
+				sample := pionMedia.Sample{Data: pkt.Data, PacketTimestamp: uint32(pkt.TimeLegacy)}
 
-			pkt = nextPkt
+				if lastAudioSample != nil {
+					duration := sample.PacketTimestamp - lastAudioSample.PacketTimestamp
+					bufferDurationCasted := time.Duration(duration) * time.Millisecond
+					lastAudioSample.Duration = bufferDurationCasted
+					if err := audioTrack.WriteSample(*lastAudioSample); err != nil && err != io.ErrClosedPipe {
+						log.Log.Error("webrtc.main.WriteToTrack(): something went wrong while writing sample: " + err.Error())
+					}
+				}
+
+				lastAudioSample = &sample
+			}
 		}
 	}
 
