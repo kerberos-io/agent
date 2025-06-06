@@ -433,11 +433,13 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 			if config.Capture.ForwardWebRTC == "true" && (hasTimedOut || hasNoPeers) {
 				start = false
 				receivedKeyFrame = false
+				pkt = nextPkt
 				continue
 			}
 
 			if len(pkt.Data) == 0 || pkt.Data == nil {
 				receivedKeyFrame = false
+				pkt = nextPkt
 				continue
 			}
 
@@ -445,6 +447,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 				if pkt.IsKeyFrame {
 					receivedKeyFrame = true
 				} else {
+					pkt = nextPkt
 					continue
 				}
 			}
