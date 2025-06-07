@@ -36,7 +36,7 @@ ENV TAGS="timetzdata netgo osusergo"
 ENV LDFLAGS="-s -w -extldflags '-static -latomic'"
 RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go mod download && \
-	CGO_ENABLED=0 go build -tags "$TAGS" -ldflags "$LDFLAGS" -trimpath main.go && \
+	go build -tags "$TAGS" -ldflags "$LDFLAGS" -trimpath main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv version /agent && \
