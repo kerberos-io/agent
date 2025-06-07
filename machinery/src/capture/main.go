@@ -17,7 +17,6 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/video"
-	"github.com/yapingcat/gomedia/go-mp4"
 )
 
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
@@ -90,15 +89,11 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			videoCodec = videoStreams[0].Name
 		}
 
-		// For continuous and motion based recording we will use a single file.
-		var file *os.File
-
 		// Check if continuous recording.
 		if config.Capture.Continuous == "true" {
 
 			//var cws *cacheWriterSeeker
 			var mp4Video *video.MP4
-			var myMuxer *mp4.Movmuxer
 			var videoTrack uint32
 			var audioTrack uint32
 			var name string
@@ -343,8 +338,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var lastDuration int64
 			var lastRecordingTime int64
 
-			//var cws *cacheWriterSeeker
-			var myMuxer *mp4.Movmuxer
 			var videoTrack uint32
 			var audioTrack uint32
 
@@ -444,29 +437,21 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						start = true
 					}
 					if start {
-						ttime := convertPTS(pkt.TimeLegacy)
+						pts := convertPTS(pkt.TimeLegacy)
 						if pkt.IsVideo {
-							if err := myMuxer.Write(videoTrack, pkt.Data, ttime, ttime); err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
+							if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
+								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
 						} else if pkt.IsAudio {
 							if pkt.Codec == "AAC" {
-								if err := myMuxer.Write(audioTrack, pkt.Data, ttime, ttime); err != nil {
-									log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
+								if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
+									log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 								}
 							} else if pkt.Codec == "PCM_MULAW" {
 								// TODO: transcode to AAC, some work to do..
-								log.Log.Debug("capture.main.HandleRecordStream(motiondetection): no AAC audio codec detected, skipping audio track.")
-							}
-						}
-
-						// We will sync to file every keyframe.
-						if pkt.IsKeyFrame {
-							err := file.Sync()
-							if err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
-							} else {
-								log.Log.Debug("capture.main.HandleRecordStream(motiondetection): synced file " + name)
+								// We might need to use ffmpeg to transcode the audio to AAC.
+								// For now we will skip the audio track.
+								log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 							}
 						}
 					}
@@ -474,15 +459,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					pkt = nextPkt
 				}
 
-				// This will write the trailer a well.
-				myMuxer.WriteTrailer()
-
+				// This will close the recording and write the last packet.
+				mp4Video.Close(&config)
 				log.Log.Info("capture.main.HandleRecordStream(motiondetection): file save: " + name)
 
 				lastDuration = pkt.Time
 				lastRecordingTime = time.Now().Unix()
-				file.Close()
-				file = nil
 
 				// Check if need to convert to fragmented using bento
 				if config.Capture.Fragmented == "true" && config.Capture.FragmentedDuration > 0 {
