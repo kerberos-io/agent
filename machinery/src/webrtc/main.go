@@ -458,7 +458,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 					start = true
 				}
 				if start {
-					sample := pionMedia.Sample{Data: pkt.Data, PacketTimestamp: uint32(pkt.TimeLegacy)}
+					sample := pionMedia.Sample{Data: pkt.Data, PacketTimestamp: uint32(pkt.Time)}
 					//sample = pionMedia.Sample{Data: pkt.Data, Duration: time.Second}
 					if config.Capture.ForwardWebRTC == "true" {
 						// We will send the video to a remote peer
@@ -492,7 +492,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 				}
 
 				// We will send the audio
-				sample := pionMedia.Sample{Data: pkt.Data, PacketTimestamp: uint32(pkt.TimeLegacy)}
+				sample := pionMedia.Sample{Data: pkt.Data, PacketTimestamp: uint32(pkt.Time)}
 
 				if lastAudioSample != nil {
 					duration := sample.PacketTimestamp - lastAudioSample.PacketTimestamp
