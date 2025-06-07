@@ -287,11 +287,9 @@ func (mp4 *MP4) Close(config *models.Config) {
 	}*/
 
 	// Encode the last segment
-	if mp4.Segment != nil {
-		err := mp4.Segment.Encode(mp4.Writer)
-		if err != nil {
-			panic(err)
-		}
+	err := mp4.Segment.Encode(mp4.Writer)
+	if err != nil {
+		panic(err)
 	}
 
 	mp4.Writer.Flush()

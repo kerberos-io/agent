@@ -441,7 +441,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					default:
 					}
 
-					if (timestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod) && nextPkt.IsKeyFrame {
+					if (timestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-1000) && nextPkt.IsKeyFrame {
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 						break
 					}
