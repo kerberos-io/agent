@@ -32,11 +32,9 @@ RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
 ##################
 # Build Machinery
 
-ENV TAGS="timetzdata netgo osusergo"
-ENV LDFLAGS="-s -w -extldflags '-static -latomic'"
 RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go mod download && \
-	go build -tags "$TAGS" -ldflags "$LDFLAGS" -trimpath main.go && \
+	go build -tags timetzdata,netgo,osusergo --ldflags '-s -w -extldflags "-static -latomic"' main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv version /agent && \
@@ -47,7 +45,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	mkdir -p /agent/data/recordings && \
 	mkdir -p /agent/data/capture-test && \
 	mkdir -p /agent/data/config && \
-	rm -rf /go/src/gitlab.com/
+	rm -rf /go/src/github.com/
 
 ####################################
 # Let's create a /dist folder containing just the files necessary for runtime.
