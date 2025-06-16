@@ -91,7 +91,7 @@ func main() {
 	log.Log.Init(logLevel, logOutput, configDirectory, timezone)
 
 	// Start OpenTelemetry tracing
-	traceProvider, err := startTracing()
+	/*traceProvider, err := startTracing()
 	if err != nil {
 		log.Log.Error("traceprovider: " + err.Error())
 	}
@@ -100,8 +100,7 @@ func main() {
 			log.Log.Error("traceprovider: " + err.Error())
 		}
 	}()
-
-	_ = traceProvider.Tracer("my-app")
+	_ = traceProvider.Tracer("my-app")*/
 
 	switch action {
 
