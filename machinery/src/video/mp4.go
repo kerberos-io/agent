@@ -355,8 +355,14 @@ func (mp4 *MP4) Close(config *models.Config) {
 	if mp4.AudioTrackName == "AAC" || mp4.AudioTrackName == "MP4A" {
 		// Add an audio track to the moov box
 		init.AddEmptyTrack(audioTimescale, "audio", "und")
+
+		// Check if the same sample rate is set, otherwise we default to 48000
+		audioSampleRate := 48000
+		if config.Capture.IPCamera.SampleRate > 0 {
+			audioSampleRate = config.Capture.IPCamera.SampleRate
+		}
 		// Set the audio descriptor
-		err := init.Moov.Traks[1].SetAACDescriptor(29, 48000)
+		err := init.Moov.Traks[1].SetAACDescriptor(29, audioSampleRate)
 		if err != nil {
 			//panic(err)
 		}

@@ -342,6 +342,8 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 				IsVideo:       false,
 				IsAudio:       true,
 				IsBackChannel: false,
+				SampleRate:    audioFormaMPEG4.Config.SampleRate,
+				Channels:      audioFormaMPEG4.Config.ChannelCount,
 			})
 
 			// Set the index for the audio

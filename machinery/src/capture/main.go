@@ -85,6 +85,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 		videoStreams, _ := rtspClient.GetVideoStreams()
 		if len(audioStreams) > 0 {
 			audioCodec = audioStreams[0].Name
+			config.Capture.IPCamera.SampleRate = audioStreams[0].SampleRate
+			config.Capture.IPCamera.Channels = audioStreams[0].Channels
 		}
 		if len(videoStreams) > 0 {
 			videoCodec = videoStreams[0].Name

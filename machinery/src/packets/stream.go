@@ -42,4 +42,10 @@ type Stream struct {
 
 	// IsBackChannel is true if this stream is a back channel.
 	IsBackChannel bool
+
+	// SampleRate is the sample rate of the audio stream.
+	SampleRate int
+
+	// Channels is the number of audio channels.
+	Channels int
 }
