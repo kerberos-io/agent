@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"time"
 
@@ -12,13 +11,6 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 
 	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/routers"
@@ -27,7 +19,7 @@ import (
 
 var VERSION = utils.VERSION
 
-func startTracing() (*trace.TracerProvider, error) {
+/*func startTracing() (*trace.TracerProvider, error) {
 	serviceName := "product-app"
 	headers := map[string]string{
 		"content-type": "application/json",
@@ -64,7 +56,7 @@ func startTracing() (*trace.TracerProvider, error) {
 	otel.SetTracerProvider(tracerprovider)
 
 	return tracerprovider, nil
-}
+}*/
 
 func main() {
 
