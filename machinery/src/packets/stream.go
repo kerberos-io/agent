@@ -2,7 +2,7 @@ package packets
 
 type Stream struct {
 	// The ID of the stream.
-	Index int
+	Index int `json:"index" bson:"index"`
 
 	// The name of the stream.
 	Name string
