@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
@@ -11,6 +12,13 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 
 	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/routers"
@@ -19,8 +27,8 @@ import (
 
 var VERSION = utils.VERSION
 
-/*func startTracing() (*trace.TracerProvider, error) {
-	serviceName := "product-app"
+func startTracing(otelEndpoint string) (*trace.TracerProvider, error) {
+	serviceName := "agent"
 	headers := map[string]string{
 		"content-type": "application/json",
 	}
@@ -28,7 +36,7 @@ var VERSION = utils.VERSION
 	exporter, err := otlptrace.New(
 		context.Background(),
 		otlptracehttp.NewClient(
-			otlptracehttp.WithEndpoint("localhost:4318"),
+			otlptracehttp.WithEndpoint(otelEndpoint),
 			otlptracehttp.WithHeaders(headers),
 			otlptracehttp.WithInsecure(),
 		),
@@ -48,7 +56,7 @@ var VERSION = utils.VERSION
 			resource.NewWithAttributes(
 				semconv.SchemaURL,
 				semconv.ServiceNameKey.String(serviceName),
-				attribute.String("environment", "testing"),
+				attribute.String("environment", "develop"),
 			),
 		),
 	)
@@ -56,7 +64,7 @@ var VERSION = utils.VERSION
 	otel.SetTracerProvider(tracerprovider)
 
 	return tracerprovider, nil
-}*/
+}
 
 func main() {
 
@@ -91,16 +99,20 @@ func main() {
 	log.Log.Init(logLevel, logOutput, configDirectory, timezone)
 
 	// Start OpenTelemetry tracing
-	/*traceProvider, err := startTracing()
-	if err != nil {
-		log.Log.Error("traceprovider: " + err.Error())
-	}
-	defer func() {
-		if err := traceProvider.Shutdown(context.Background()); err != nil {
+	if otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); otelEndpoint == "" {
+		log.Log.Info("main.Main(): No OpenTelemetry endpoint provided, skipping tracing")
+	} else {
+		log.Log.Info("main.Main(): Starting OpenTelemetry tracing with endpoint: " + otelEndpoint)
+		traceProvider, err := startTracing(otelEndpoint)
+		if err != nil {
 			log.Log.Error("traceprovider: " + err.Error())
 		}
-	}()
-	_ = traceProvider.Tracer("my-app")*/
+		defer func() {
+			if err := traceProvider.Shutdown(context.Background()); err != nil {
+				log.Log.Error("traceprovider: " + err.Error())
+			}
+		}()
+	}
 
 	switch action {
 

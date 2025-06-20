@@ -9,6 +9,7 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
@@ -23,16 +24,13 @@ import (
 	"github.com/tevino/abool"
 )
 
-//var tracer = otel.Tracer("github.com/Salaton/tracing/pkg/usecases/product")
+var tracer = otel.Tracer("github.com/kerberos-io/agent")
 
 func Bootstrap(ctx context.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
 
 	log.Log.Debug("components.Kerberos.Bootstrap(): bootstrapping the kerberos agent.")
 
-	/*
-		_, span := tracer.Start(ctx, "CreateProducBootstrap")
-		span.End()
-	*/
+	_, span := tracer.Start(ctx, "Bootstrap")
 
 	// We will keep track of the Kerberos Agent up time
 	// This is send to Kerberos Hub in a heartbeat.
@@ -86,6 +84,8 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 	// Configure a MQTT client which helps for a bi-directional communication
 	mqttClient := routers.ConfigureMQTT(configDirectory, configuration, communication)
 
+	span.End()
+
 	// Run the agent and fire up all the other
 	// goroutines which do image capture, motion detection, onvif, etc.
 	for {
@@ -122,6 +122,9 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 
 func RunAgent(configDirectory string, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, uptimeStart time.Time, cameraSettings *models.Camera, captureDevice *capture.Capture) string {
 
+	ctxRunAgent := context.TODO()
+	_, span := tracer.Start(ctxRunAgent, "RunAgent")
+
 	log.Log.Info("components.Kerberos.RunAgent(): Creating camera and processing threads.")
 	config := configuration.Config
 
@@ -132,7 +135,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	rtspUrl := config.Capture.IPCamera.RTSP
 	rtspClient := captureDevice.SetMainClient(rtspUrl)
 	if rtspUrl != "" {
-		err := rtspClient.Connect(context.Background())
+		err := rtspClient.Connect(ctxRunAgent)
 		if err != nil {
 			log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP stream: " + err.Error())
 			rtspClient.Close()
@@ -314,6 +317,9 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	// If we reach this point, we have a working RTSP connection.
 	communication.CameraConnected = true
+
+	// Otel end span
+	span.End()
 
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	// This will go into a blocking state, once this channel is triggered

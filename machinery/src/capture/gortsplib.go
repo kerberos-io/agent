@@ -33,7 +33,10 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/pion/rtp"
+	"go.opentelemetry.io/otel"
 )
+
+var tracer = otel.Tracer("github.com/kerberos-io/agent")
 
 // Implements the RTSPClient interface.
 type Golibrtsp struct {
@@ -103,7 +106,10 @@ func init() {
 }
 
 // Connect to the RTSP server.
-func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
+func (g *Golibrtsp) Connect(ctxRunAgent context.Context) (err error) {
+
+	_, span := tracer.Start(ctxRunAgent, "Connect")
+	defer span.End()
 
 	transport := gortsplib.TransportTCP
 	g.Client = gortsplib.Client{
