@@ -184,6 +184,8 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			if err == nil {
 				if mp4.VideoFullSample != nil {
 					duration := pts - mp4.VideoFullSample.DecodeTime
+					log.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t", trackID, pts, duration, len(lengthPrefixed), isKeyframe)
+
 					mp4.LastVideoSampleDTS = duration
 					//fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(mp4.VideoFullSample.Data), isKeyframe)
 					mp4.VideoTotalDuration += duration
