@@ -36,7 +36,7 @@ require (
 	github.com/swaggo/swag v1.16.4
 	github.com/tevino/abool v1.2.0
 	github.com/zaf/g711 v1.4.0
-	go.mongodb.org/mongo-driver v1.17.4
+	go.mongodb.org/mongo-driver v1.17.3
 	go.opentelemetry.io/otel v1.36.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.36.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.36.0
