@@ -93,19 +93,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			videoCodec = videoStreams[0].Name
 		}
 
-		// Get Video and Audio streams.
-		//videoSteams, _ := rtspClient.GetVideoStreams()
-		audioStreams, _ := rtspClient.GetAudioStreams()
-		// Check if we have AAC audio codec.
-		audioCodec := ""
-		for _, stream := range audioStreams {
-			if stream.Name == "AAC" {
-				audioCodec = stream.Name
-			} else if stream.Name == "PCM_MULAW" {
-				audioCodec = stream.Name
-			}
-		}
-
 		// Check if continuous recording.
 		if config.Capture.Continuous == "true" {
 
