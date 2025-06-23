@@ -91,7 +91,7 @@ type IPCamera struct {
 	ONVIFPassword string   `json:"onvif_password" bson:"onvif_password"`
 	SPSNALUs      [][]byte `json:"sps_nalus,omitempty" bson:"sps_nalus,omitempty"`
 	PPSNALUs      [][]byte `json:"pps_nalus,omitempty" bson:"pps_nalus,omitempty"`
-	VPSNALUs      [][]byte `json:"pps_nalus,omitempty" bson:"pps_nalus,omitempty"`
+	VPSNALUs      [][]byte `json:"vps_nalus,omitempty" bson:"vps_nalus,omitempty"`
 	SampleRate    int      `json:"sample_rate,omitempty" bson:"sample_rate,omitempty"`
 	Channels      int      `json:"channels,omitempty" bson:"channels,omitempty"`
 }
