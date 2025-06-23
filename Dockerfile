@@ -44,8 +44,7 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	mkdir -p /agent/data/log && \
 	mkdir -p /agent/data/recordings && \
 	mkdir -p /agent/data/capture-test && \
-	mkdir -p /agent/data/config && \
-	rm -rf /go/src/gitlab.com/
+	mkdir -p /agent/data/config
 
 ####################################
 # Let's create a /dist folder containing just the files necessary for runtime.
@@ -58,18 +57,6 @@ RUN cp -r /agent ./
 # This will collect dependent libraries so they're later copied to the final image.
 
 RUN /dist/agent/main version
-
-###############################################
-# Build Bento4 -> we want fragmented mp4 files
-
-ENV BENTO4_VERSION 1.6.0-641
-RUN cd /tmp && git clone https://github.com/axiomatic-systems/Bento4 && cd Bento4 && \
-	git checkout tags/v${BENTO4_VERSION} && \
-	cd Build && \
-	cmake -DCMAKE_BUILD_TYPE=Release .. && \
-	make && \
-	mv /tmp/Bento4/Build/mp4fragment /dist/agent/ && \
-	rm -rf /tmp/Bento4
 
 FROM node:18.14.0-alpine3.16 AS build-ui
 
@@ -112,7 +99,6 @@ RUN apk update && apk add ca-certificates curl libstdc++ libc6-compat --no-cache
 # Try running agent
 
 RUN mv /agent/* /home/agent/
-RUN cp /home/agent/mp4fragment /usr/local/bin/
 RUN /home/agent/main version
 
 #######################
