@@ -9,13 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"time"
 
 	mp4ff "github.com/Eyevinn/mp4ff/mp4"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
+	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 )
@@ -184,7 +184,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			if err == nil {
 				if mp4.VideoFullSample != nil {
 					duration := pts - mp4.VideoFullSample.DecodeTime
-					log.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t", trackID, pts, duration, len(lengthPrefixed), isKeyframe)
+					log.Log.Info("Adding sample to track " + fmt.Sprintf("%d, PTS: %d, Duration: %d, size: %d, Keyframe: %t", trackID, pts, duration, len(lengthPrefixed), isKeyframe))
 
 					mp4.LastVideoSampleDTS = duration
 					//fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(mp4.VideoFullSample.Data), isKeyframe)
@@ -236,7 +236,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 					sampleToAdd.Sample.Size = uint32(len(aac[7:]))
 					err := mp4.MultiTrackFragment.AddFullSampleToTrack(sampleToAdd, trackID)
 					if err != nil {
-						log.Printf("Error adding sample to track %d: %v", trackID, err)
+						log.Log.Error("mp4.AddSampleToTrack(): error adding sample to track " + fmt.Sprintf("%d: %v", trackID, err))
 					}
 				})
 			}
