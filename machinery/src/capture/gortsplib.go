@@ -36,7 +36,7 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
-var tracer = otel.Tracer("github.com/kerberos-io/agent")
+var tracer = otel.Tracer("github.com/kerberos-io/agent/machinery/src/capture")
 
 // Implements the RTSPClient interface.
 type Golibrtsp struct {
@@ -106,9 +106,9 @@ func init() {
 }
 
 // Connect to the RTSP server.
-func (g *Golibrtsp) Connect(ctxRunAgent context.Context) (err error) {
+func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err error) {
 
-	_, span := tracer.Start(ctxRunAgent, "Connect")
+	_, span := tracer.Start(ctxOtel, "Connect")
 	defer span.End()
 
 	transport := gortsplib.TransportTCP
@@ -369,7 +369,11 @@ func (g *Golibrtsp) Connect(ctxRunAgent context.Context) (err error) {
 	return
 }
 
-func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
+func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.Context) (err error) {
+
+	_, span := tracer.Start(ctxRunAgent, "ConnectBackChannel")
+	defer span.End()
+
 	// Transport TCP
 	transport := gortsplib.TransportTCP
 	g.Client = gortsplib.Client{
@@ -797,7 +801,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 }
 
 // Start the RTSP client, and start reading packets.
-func (g *Golibrtsp) StartBackChannel(ctx context.Context) (err error) {
+func (g *Golibrtsp) StartBackChannel(ctx context.Context, ctxRunAgent context.Context) (err error) {
 	log.Log.Info("capture.golibrtsp.StartBackChannel(): started")
 	// Wait for a second, so we can be sure the stream is playing.
 	time.Sleep(1 * time.Second)
@@ -906,7 +910,11 @@ func (g *Golibrtsp) GetAudioStreams() ([]packets.Stream, error) {
 }
 
 // Close the connection to the RTSP server.
-func (g *Golibrtsp) Close() error {
+func (g *Golibrtsp) Close(ctxOtel context.Context) error {
+
+	_, span := tracer.Start(ctxOtel, "Close")
+	defer span.End()
+
 	// Close the demuxer.
 	g.Client.Close()
 

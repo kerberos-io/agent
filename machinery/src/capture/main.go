@@ -17,6 +17,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/video"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
@@ -530,6 +531,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 // @Success 200 {object} models.APIResponse
 func VerifyCamera(c *gin.Context) {
 
+	// Start OpenTelemetry tracing
+	ctxVerifyCamera, span := tracer.Start(context.Background(), "VerifyCamera", trace.WithSpanKind(trace.SpanKindServer))
+	defer span.End()
+
 	var cameraStreams models.CameraStreams
 	err := c.BindJSON(&cameraStreams)
 
@@ -555,12 +560,11 @@ func VerifyCamera(c *gin.Context) {
 			Url: rtspUrl,
 		}
 
-		err := rtspClient.Connect(ctx)
+		err := rtspClient.Connect(ctx, ctxVerifyCamera)
 		if err == nil {
 
 			// Get the streams from the rtsp client.
 			streams, _ := rtspClient.GetStreams()
-
 			videoIdx := -1
 			audioIdx := -1
 			for i, stream := range streams {
@@ -571,7 +575,7 @@ func VerifyCamera(c *gin.Context) {
 				}
 			}
 
-			err := rtspClient.Close()
+			err := rtspClient.Close(ctxVerifyCamera)
 			if err == nil {
 				if videoIdx > -1 {
 					c.JSON(200, models.APIResponse{

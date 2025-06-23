@@ -24,13 +24,14 @@ import (
 	"github.com/tevino/abool"
 )
 
-var tracer = otel.Tracer("github.com/kerberos-io/agent")
+var tracer = otel.Tracer("github.com/kerberos-io/agent/machinery/src/components")
 
 func Bootstrap(ctx context.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
 
 	log.Log.Debug("components.Kerberos.Bootstrap(): bootstrapping the kerberos agent.")
 
-	_, span := tracer.Start(ctx, "Bootstrap")
+	bootstrapContext := context.Background()
+	_, span := tracer.Start(bootstrapContext, "Bootstrap")
 
 	// We will keep track of the Kerberos Agent up time
 	// This is send to Kerberos Hub in a heartbeat.
@@ -122,8 +123,8 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 
 func RunAgent(configDirectory string, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, uptimeStart time.Time, cameraSettings *models.Camera, captureDevice *capture.Capture) string {
 
-	ctxRunAgent := context.TODO()
-	_, span := tracer.Start(ctxRunAgent, "RunAgent")
+	ctx := context.Background()
+	ctxRunAgent, span := tracer.Start(ctx, "RunAgent")
 
 	log.Log.Info("components.Kerberos.RunAgent(): Creating camera and processing threads.")
 	config := configuration.Config
@@ -135,10 +136,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	rtspUrl := config.Capture.IPCamera.RTSP
 	rtspClient := captureDevice.SetMainClient(rtspUrl)
 	if rtspUrl != "" {
-		err := rtspClient.Connect(ctxRunAgent)
+		err := rtspClient.Connect(ctx, ctxRunAgent)
 		if err != nil {
 			log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP stream: " + err.Error())
-			rtspClient.Close()
+			rtspClient.Close(ctxRunAgent)
 			rtspClient = nil
 			time.Sleep(time.Second * 3)
 			return status
@@ -156,7 +157,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	videoStreams, err := rtspClient.GetVideoStreams()
 	if err != nil || len(videoStreams) == 0 {
 		log.Log.Error("components.Kerberos.RunAgent(): no video stream found, might be the wrong codec (we only support H264 for the moment)")
-		rtspClient.Close()
+		rtspClient.Close(ctxRunAgent)
 		time.Sleep(time.Second * 3)
 		return status
 	}
@@ -199,7 +200,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		rtspSubClient := captureDevice.SetSubClient(subRtspUrl)
 		captureDevice.RTSPSubClient = rtspSubClient
 
-		err := rtspSubClient.Connect(context.Background())
+		err := rtspSubClient.Connect(ctx, ctxRunAgent)
 		if err != nil {
 			log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP sub stream: " + err.Error())
 			time.Sleep(time.Second * 3)
@@ -211,7 +212,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		videoSubStreams, err = rtspSubClient.GetVideoStreams()
 		if err != nil || len(videoSubStreams) == 0 {
 			log.Log.Error("components.Kerberos.RunAgent(): no video sub stream found, might be the wrong codec (we only support H264 for the moment)")
-			rtspSubClient.Close()
+			rtspSubClient.Close(ctxRunAgent)
 			time.Sleep(time.Second * 3)
 			return status
 		}
@@ -236,17 +237,17 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	log.Log.Info("components.Kerberos.RunAgent(): SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
 	queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
 	queue.WriteHeader(videoStreams)
-	go rtspClient.Start(context.Background(), "main", queue, configuration, communication)
+	go rtspClient.Start(ctx, "main", queue, configuration, communication)
 
 	// Main stream is connected and ready to go.
 	communication.MainStreamConnected = true
 
 	// Try to create backchannel
 	rtspBackChannelClient := captureDevice.SetBackChannelClient(rtspUrl)
-	err = rtspBackChannelClient.ConnectBackChannel(context.Background())
+	err = rtspBackChannelClient.ConnectBackChannel(ctx, ctxRunAgent)
 	if err == nil {
 		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP backchannel stream: " + rtspUrl)
-		go rtspBackChannelClient.StartBackChannel(context.Background())
+		go rtspBackChannelClient.StartBackChannel(ctx, ctxRunAgent)
 	}
 
 	rtspSubClient := captureDevice.RTSPSubClient
@@ -255,7 +256,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		communication.SubQueue = subQueue
 		subQueue.SetMaxGopCount(3) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
 		subQueue.WriteHeader(videoSubStreams)
-		go rtspSubClient.Start(context.Background(), "sub", subQueue, configuration, communication)
+		go rtspSubClient.Start(ctx, "sub", subQueue, configuration, communication)
 
 		// Sub stream is connected and ready to go.
 		communication.SubStreamConnected = true
@@ -364,7 +365,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	time.Sleep(time.Second * 3)
 
-	err = rtspClient.Close()
+	err = rtspClient.Close(ctxRunAgent)
 	if err != nil {
 		log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP stream: " + err.Error())
 		time.Sleep(time.Second * 3)
@@ -376,7 +377,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	communication.Queue = nil
 
 	if subStreamEnabled {
-		err = rtspSubClient.Close()
+		err = rtspSubClient.Close(ctxRunAgent)
 		if err != nil {
 			log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP sub stream: " + err.Error())
 			time.Sleep(time.Second * 3)
@@ -387,7 +388,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		communication.SubQueue = nil
 	}
 
-	err = rtspBackChannelClient.Close()
+	err = rtspBackChannelClient.Close(ctxRunAgent)
 	if err != nil {
 		log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP backchannel stream: " + err.Error())
 	}

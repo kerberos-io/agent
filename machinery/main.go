@@ -27,8 +27,8 @@ import (
 
 var VERSION = utils.VERSION
 
-func startTracing(otelEndpoint string) (*trace.TracerProvider, error) {
-	serviceName := "agent"
+func startTracing(agentKey string, otelEndpoint string) (*trace.TracerProvider, error) {
+	serviceName := "agent-" + agentKey
 	headers := map[string]string{
 		"content-type": "application/json",
 	}
@@ -36,7 +36,7 @@ func startTracing(otelEndpoint string) (*trace.TracerProvider, error) {
 	exporter, err := otlptrace.New(
 		context.Background(),
 		otlptracehttp.NewClient(
-			otlptracehttp.WithEndpoint(otelEndpoint),
+			otlptracehttp.WithEndpoint("74.241.203.114:4318"),
 			otlptracehttp.WithHeaders(headers),
 			otlptracehttp.WithInsecure(),
 		),
@@ -98,22 +98,6 @@ func main() {
 	timezone, _ := time.LoadLocation("CET")
 	log.Log.Init(logLevel, logOutput, configDirectory, timezone)
 
-	// Start OpenTelemetry tracing
-	if otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); otelEndpoint == "" {
-		log.Log.Info("main.Main(): No OpenTelemetry endpoint provided, skipping tracing")
-	} else {
-		log.Log.Info("main.Main(): Starting OpenTelemetry tracing with endpoint: " + otelEndpoint)
-		traceProvider, err := startTracing(otelEndpoint)
-		if err != nil {
-			log.Log.Error("traceprovider: " + err.Error())
-		}
-		defer func() {
-			if err := traceProvider.Shutdown(context.Background()); err != nil {
-				log.Log.Error("traceprovider: " + err.Error())
-			}
-		}()
-	}
-
 	switch action {
 
 	case "version":
@@ -145,7 +129,7 @@ func main() {
 
 	case "run":
 		{
-			// Print Kerberos.io ASCII art
+			// Print Agent ASCII art
 			utils.PrintASCIIArt()
 
 			// Print the environment variables which include "AGENT_" as prefix.
@@ -158,11 +142,28 @@ func main() {
 			configuration.Name = name
 			configuration.Port = port
 
-			// Open this configuration either from Kerberos Agent or Kerberos Factory.
+			// Open this configuration either from Agent or Factory.
 			configService.OpenConfig(configDirectory, &configuration)
 
 			// We will override the configuration with the environment variables
 			configService.OverrideWithEnvironmentVariables(&configuration)
+
+			// Start OpenTelemetry tracing
+			if otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); otelEndpoint == "" {
+				log.Log.Info("main.Main(): No OpenTelemetry endpoint provided, skipping tracing")
+			} else {
+				log.Log.Info("main.Main(): Starting OpenTelemetry tracing with endpoint: " + otelEndpoint)
+				agentKey := configuration.Config.Key
+				traceProvider, err := startTracing(agentKey, otelEndpoint)
+				if err != nil {
+					log.Log.Error("traceprovider: " + err.Error())
+				}
+				defer func() {
+					if err := traceProvider.Shutdown(context.Background()); err != nil {
+						log.Log.Error("traceprovider: " + err.Error())
+					}
+				}()
+			}
 
 			// Printing final configuration
 			utils.PrintConfiguration(&configuration)
