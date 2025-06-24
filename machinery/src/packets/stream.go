@@ -1,6 +1,9 @@
 package packets
 
 type Stream struct {
+	// The ID of the stream.
+	Index int `json:"index" bson:"index"`
+
 	// The name of the stream.
 	Name string
 
@@ -39,4 +42,10 @@ type Stream struct {
 
 	// IsBackChannel is true if this stream is a back channel.
 	IsBackChannel bool
+
+	// SampleRate is the sample rate of the audio stream.
+	SampleRate int
+
+	// Channels is the number of audio channels.
+	Channels int
 }

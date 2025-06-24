@@ -38,16 +38,16 @@ func (c *Capture) SetBackChannelClient(rtspUrl string) *Golibrtsp {
 // RTSPClient is a interface that abstracts the RTSP client implementation.
 type RTSPClient interface {
 	// Connect to the RTSP server.
-	Connect(ctx context.Context) error
+	Connect(ctx context.Context, otelContext context.Context) error
 
 	// Connect to a backchannel RTSP server.
-	ConnectBackChannel(ctx context.Context) error
+	ConnectBackChannel(ctx context.Context, otelContext context.Context) error
 
 	// Start the RTSP client, and start reading packets.
 	Start(ctx context.Context, streamType string, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) error
 
 	// Start the RTSP client, and start reading packets.
-	StartBackChannel(ctx context.Context) (err error)
+	StartBackChannel(ctx context.Context, otelContext context.Context) error
 
 	// Decode a packet into a image.
 	DecodePacket(pkt packets.Packet) (image.YCbCr, error)
@@ -59,7 +59,7 @@ type RTSPClient interface {
 	WritePacket(pkt packets.Packet) error
 
 	// Close the connection to the RTSP server.
-	Close() error
+	Close(ctx context.Context) error
 
 	// Get a list of streams from the RTSP server.
 	GetStreams() ([]packets.Stream, error)

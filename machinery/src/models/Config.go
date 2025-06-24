@@ -46,6 +46,7 @@ type Config struct {
 	HubSite                 string       `json:"hub_site" bson:"hub_site"`
 	ConditionURI            string       `json:"condition_uri" bson:"condition_uri"`
 	Encryption              *Encryption  `json:"encryption,omitempty" bson:"encryption,omitempty"`
+	Signing                 *Signing     `json:"signing,omitempty" bson:"signing,omitempty"`
 	RealtimeProcessing      string       `json:"realtimeprocessing,omitempty" bson:"realtimeprocessing,omitempty"`
 	RealtimeProcessingTopic string       `json:"realtimeprocessing_topic" bson:"realtimeprocessing_topic"`
 }
@@ -76,18 +77,23 @@ type Capture struct {
 // IPCamera configuration, such as the RTSP url of the IPCamera and the FPS.
 // Also includes ONVIF integration
 type IPCamera struct {
-	RTSP          string `json:"rtsp"`
-	Width         int    `json:"width"`
-	Height        int    `json:"height"`
-	FPS           string `json:"fps"`
-	SubRTSP       string `json:"sub_rtsp"`
-	SubWidth      int    `json:"sub_width"`
-	SubHeight     int    `json:"sub_height"`
-	SubFPS        string `json:"sub_fps"`
-	ONVIF         string `json:"onvif,omitempty" bson:"onvif"`
-	ONVIFXAddr    string `json:"onvif_xaddr" bson:"onvif_xaddr"`
-	ONVIFUsername string `json:"onvif_username" bson:"onvif_username"`
-	ONVIFPassword string `json:"onvif_password" bson:"onvif_password"`
+	RTSP          string   `json:"rtsp"`
+	Width         int      `json:"width"`
+	Height        int      `json:"height"`
+	FPS           string   `json:"fps"`
+	SubRTSP       string   `json:"sub_rtsp"`
+	SubWidth      int      `json:"sub_width"`
+	SubHeight     int      `json:"sub_height"`
+	SubFPS        string   `json:"sub_fps"`
+	ONVIF         string   `json:"onvif,omitempty" bson:"onvif"`
+	ONVIFXAddr    string   `json:"onvif_xaddr" bson:"onvif_xaddr"`
+	ONVIFUsername string   `json:"onvif_username" bson:"onvif_username"`
+	ONVIFPassword string   `json:"onvif_password" bson:"onvif_password"`
+	SPSNALUs      [][]byte `json:"sps_nalus,omitempty" bson:"sps_nalus,omitempty"`
+	PPSNALUs      [][]byte `json:"pps_nalus,omitempty" bson:"pps_nalus,omitempty"`
+	VPSNALUs      [][]byte `json:"vps_nalus,omitempty" bson:"vps_nalus,omitempty"`
+	SampleRate    int      `json:"sample_rate,omitempty" bson:"sample_rate,omitempty"`
+	Channels      int      `json:"channels,omitempty" bson:"channels,omitempty"`
 }
 
 // USBCamera configuration, such as the device path (/dev/video*)
@@ -176,4 +182,10 @@ type Encryption struct {
 	Fingerprint  string `json:"fingerprint" bson:"fingerprint"`
 	PrivateKey   string `json:"private_key" bson:"private_key"`
 	SymmetricKey string `json:"symmetric_key" bson:"symmetric_key"`
+}
+
+// Signing
+type Signing struct {
+	Enabled    string `json:"enabled" bson:"enabled"`
+	PrivateKey string `json:"private_key" bson:"private_key"`
 }

@@ -33,7 +33,10 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/pion/rtp"
+	"go.opentelemetry.io/otel"
 )
+
+var tracer = otel.Tracer("github.com/kerberos-io/agent/machinery/src/capture")
 
 // Implements the RTSPClient interface.
 type Golibrtsp struct {
@@ -103,7 +106,10 @@ func init() {
 }
 
 // Connect to the RTSP server.
-func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
+func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err error) {
+
+	_, span := tracer.Start(ctxOtel, "Connect")
+	defer span.End()
 
 	transport := gortsplib.TransportTCP
 	g.Client = gortsplib.Client{
@@ -156,7 +162,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			// but try to fetch it later on.
 			if errSPS != nil {
 				log.Log.Debug("capture.golibrtsp.Connect(H264): " + errSPS.Error())
+				streamIndex := len(g.Streams)
 				g.Streams = append(g.Streams, packets.Stream{
+					Index:         streamIndex,
 					Name:          formaH264.Codec(),
 					IsVideo:       true,
 					IsAudio:       false,
@@ -168,7 +176,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 					IsBackChannel: false,
 				})
 			} else {
+				streamIndex := len(g.Streams)
 				g.Streams = append(g.Streams, packets.Stream{
+					Index:         streamIndex,
 					Name:          formaH264.Codec(),
 					IsVideo:       true,
 					IsAudio:       false,
@@ -216,8 +226,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 				log.Log.Info("capture.golibrtsp.Connect(H265): " + err.Error())
 				return
 			}
-
+			streamIndex := len(g.Streams)
 			g.Streams = append(g.Streams, packets.Stream{
+				Index:         streamIndex,
 				Name:          formaH265.Codec(),
 				IsVideo:       true,
 				IsAudio:       false,
@@ -265,8 +276,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 				log.Log.Error("capture.golibrtsp.Connect(G711): " + err.Error())
 			} else {
 				g.AudioG711Decoder = audiortpDec
-
+				streamIndex := len(g.Streams)
 				g.Streams = append(g.Streams, packets.Stream{
+					Index:         streamIndex,
 					Name:          "PCM_MULAW",
 					IsVideo:       false,
 					IsAudio:       true,
@@ -300,8 +312,9 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 				log.Log.Error("capture.golibrtsp.Connect(Opus): " + err.Error())
 			} else {
 				g.AudioOpusDecoder = audiortpDec
-
+				streamIndex := len(g.Streams)
 				g.Streams = append(g.Streams, packets.Stream{
+					Index:         streamIndex,
 					Name:          "OPUS",
 					IsVideo:       false,
 					IsAudio:       true,
@@ -328,11 +341,15 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 			// Something went wrong .. Do something
 			log.Log.Error("capture.golibrtsp.Connect(MPEG4): " + err.Error())
 		} else {
+			streamIndex := len(g.Streams)
 			g.Streams = append(g.Streams, packets.Stream{
+				Index:         streamIndex,
 				Name:          "AAC",
 				IsVideo:       false,
 				IsAudio:       true,
 				IsBackChannel: false,
+				SampleRate:    audioFormaMPEG4.Config.SampleRate,
+				Channels:      audioFormaMPEG4.Config.ChannelCount,
 			})
 
 			// Set the index for the audio
@@ -352,7 +369,11 @@ func (g *Golibrtsp) Connect(ctx context.Context) (err error) {
 	return
 }
 
-func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
+func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.Context) (err error) {
+
+	_, span := tracer.Start(ctxRunAgent, "ConnectBackChannel")
+	defer span.End()
+
 	// Transport TCP
 	transport := gortsplib.TransportTCP
 	g.Client = gortsplib.Client{
@@ -397,7 +418,9 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context) (err error) {
 			g.HasBackChannel = false
 		} else {
 			g.HasBackChannel = true
+			streamIndex := len(g.Streams)
 			g.Streams = append(g.Streams, packets.Stream{
+				Index:         streamIndex,
 				Name:          "PCM_MULAW",
 				IsVideo:       false,
 				IsAudio:       true,
@@ -778,7 +801,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 }
 
 // Start the RTSP client, and start reading packets.
-func (g *Golibrtsp) StartBackChannel(ctx context.Context) (err error) {
+func (g *Golibrtsp) StartBackChannel(ctx context.Context, ctxRunAgent context.Context) (err error) {
 	log.Log.Info("capture.golibrtsp.StartBackChannel(): started")
 	// Wait for a second, so we can be sure the stream is playing.
 	time.Sleep(1 * time.Second)
@@ -860,8 +883,8 @@ func (g *Golibrtsp) DecodePacketRaw(pkt packets.Packet) (image.Gray, error) {
 }
 
 // Get a list of streams from the RTSP server.
-func (j *Golibrtsp) GetStreams() ([]packets.Stream, error) {
-	return j.Streams, nil
+func (g *Golibrtsp) GetStreams() ([]packets.Stream, error) {
+	return g.Streams, nil
 }
 
 // Get a list of video streams from the RTSP server.
@@ -887,7 +910,11 @@ func (g *Golibrtsp) GetAudioStreams() ([]packets.Stream, error) {
 }
 
 // Close the connection to the RTSP server.
-func (g *Golibrtsp) Close() error {
+func (g *Golibrtsp) Close(ctxOtel context.Context) error {
+
+	_, span := tracer.Start(ctxOtel, "Close")
+	defer span.End()
+
 	// Close the demuxer.
 	g.Client.Close()
 
