@@ -36,7 +36,7 @@ func startTracing(agentKey string, otelEndpoint string) (*trace.TracerProvider, 
 	exporter, err := otlptrace.New(
 		context.Background(),
 		otlptracehttp.NewClient(
-			otlptracehttp.WithEndpoint("74.241.203.114:4318"),
+			otlptracehttp.WithEndpoint(otelEndpoint),
 			otlptracehttp.WithHeaders(headers),
 			otlptracehttp.WithInsecure(),
 		),

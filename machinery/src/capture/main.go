@@ -220,8 +220,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						"6" + "-" +
 						"967003" + "_" +
 						config.Name + "_" +
-						"200-200-400-400" + "_0_" +
-						"769"
+						"0-0-0-0" + "_0_" +
+						utils.VERSION
 
 					name = s + ".mp4"
 					fullName = configDirectory + "/data/recordings/" + name
@@ -382,7 +382,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					config.Name + "_" +
 					"200-200-400-400" + "_" +
 					strconv.Itoa(numberOfChanges) + "_" +
-					"769"
+					utils.VERSION
 
 				name := s + ".mp4"
 				fullName := configDirectory + "/data/recordings/" + name
