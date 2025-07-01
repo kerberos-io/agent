@@ -215,13 +215,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// - Token
 
 					startRecording = time.Now().UnixMilli()
-					startRecordingSeconds := startRecording / 1000 // convert to seconds
-					s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
-						"6" + "-" +
-						"967003" + "_" +
-						config.Name + "_" +
-						"0-0-0-0" + "_0_" +
-						utils.VERSION
+					startRecordingSeconds := startRecording / 1000            // convert to seconds
+					startRecordingMilliseconds := startRecording % 1000       // convert to milliseconds
+					s := strconv.FormatInt(startRecordingSeconds, 10) + "_" + // start timestamp in seconds
+						strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" + // length of milliseconds
+						strconv.FormatInt(startRecordingMilliseconds, 10) + "_" + // milliseconds
+						config.Name + "_" + // device name
+						"0-0-0-0" + "_0_" + // region coordinates, we will not use this for continuous recording
+						utils.VERSION // version of the agent
 
 					name = s + ".mp4"
 					fullName = configDirectory + "/data/recordings/" + name
