@@ -221,7 +221,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" + // length of milliseconds
 						strconv.FormatInt(startRecordingMilliseconds, 10) + "_" + // milliseconds
 						config.Name + "_" + // device name
-						"0-0-0-0" + "_0_" + // region coordinates, we will not use this for continuous recording
+						"0-0-0-0" + "_" + // region coordinates, we will not use this for continuous recording
+						"0" + "_" + // token
+						"0" + "_" + // duration of recording in milliseconds
 						utils.VERSION // version of the agent
 
 					name = s + ".mp4"
@@ -376,14 +378,24 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// - Region
 				// - Number of changes
 				// - Token
-				startRecordingSeconds := startRecording / 1000 // convert to seconds
-				s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
-					"6" + "-" +
-					"967003" + "_" +
-					config.Name + "_" +
-					"200-200-400-400" + "_" +
-					strconv.Itoa(numberOfChanges) + "_" +
-					utils.VERSION
+
+				startRecordingSeconds := startRecording / 1000      // convert to seconds
+				startRecordingMilliseconds := startRecording % 1000 // convert to milliseconds
+				motionRectangleString := "0-0-0-0"
+				if motion.Rectangle.X != 0 || motion.Rectangle.Y != 0 ||
+					motion.Rectangle.Width != 0 || motion.Rectangle.Height != 0 {
+					motionRectangleString = strconv.Itoa(motion.Rectangle.X) + "-" + strconv.Itoa(motion.Rectangle.Y) + "-" +
+						strconv.Itoa(motion.Rectangle.Width) + "-" + strconv.Itoa(motion.Rectangle.Height)
+				}
+
+				s := strconv.FormatInt(startRecordingSeconds, 10) + "_" + // start timestamp in seconds
+					strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" + // length of milliseconds
+					strconv.FormatInt(startRecordingMilliseconds, 10) + "_" + // milliseconds
+					config.Name + "_" + // device name
+					motionRectangleString + "_" + // region coordinates, we will not use this for continuous recording
+					"0" + "_" + // token
+					"0" + "_" + // duration of recording in milliseconds
+					utils.VERSION // version of the agent
 
 				name := s + ".mp4"
 				fullName := configDirectory + "/data/recordings/" + name
