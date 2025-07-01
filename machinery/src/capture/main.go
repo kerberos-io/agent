@@ -159,6 +159,35 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// Cleanup muxer
 					start = false
 
+					// Update the name of the recording with the duration.
+					// We will update the name of the recording with the duration in milliseconds.
+					if mp4Video.VideoTotalDuration > 0 {
+						duration := mp4Video.VideoTotalDuration
+						// Update the name with the duration in milliseconds.
+						startRecordingSeconds := startRecording / 1000      // convert to seconds
+						startRecordingMilliseconds := startRecording % 1000 // convert to milliseconds
+						s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
+							strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" +
+							strconv.FormatInt(startRecordingMilliseconds, 10) + "_" +
+							config.Name + "_" +
+							"0-0-0-0" + "_" + // region coordinates, we
+							"0" + "_" + // token
+							strconv.FormatInt(int64(duration), 10) + "_" + // duration of recording
+							utils.VERSION // version of the agent
+
+						name = s + ".mp4"
+						fullName = configDirectory + "/data/recordings/" + name
+						log.Log.Info("capture.main.HandleRecordStream(continuous): recording finished: file save: " + name)
+						// Rename the file to the new name.
+						err := os.Rename(configDirectory+"/data/recordings/"+s+".mp4",
+							configDirectory+"/data/recordings/"+name)
+						if err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(continuous): error renaming file: " + err.Error())
+						}
+					} else {
+						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
+					}
+
 					// Check if we need to encrypt the recording.
 					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
 						// reopen file into memory 'fullName'
@@ -307,6 +336,35 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					// Cleanup muxer
 					start = false
+
+					// Update the name of the recording with the duration.
+					// We will update the name of the recording with the duration in milliseconds.
+					if mp4Video.VideoTotalDuration > 0 {
+						duration := mp4Video.VideoTotalDuration
+						// Update the name with the duration in milliseconds.
+						startRecordingSeconds := startRecording / 1000      // convert to seconds
+						startRecordingMilliseconds := startRecording % 1000 // convert to milliseconds
+						s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
+							strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" +
+							strconv.FormatInt(startRecordingMilliseconds, 10) + "_" +
+							config.Name + "_" +
+							"0-0-0-0" + "_" + // region coordinates, we
+							"0" + "_" + // token
+							strconv.FormatInt(int64(duration), 10) + "_" + // duration of recording
+							utils.VERSION // version of the agent
+
+						name = s + ".mp4"
+						fullName = configDirectory + "/data/recordings/" + name
+						log.Log.Info("capture.main.HandleRecordStream(continuous): recording finished: file save: " + name)
+						// Rename the file to the new name.
+						err := os.Rename(configDirectory+"/data/recordings/"+s+".mp4",
+							configDirectory+"/data/recordings/"+name)
+						if err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(continuous): error renaming file: " + err.Error())
+						}
+					} else {
+						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
+					}
 
 					// Check if we need to encrypt the recording.
 					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
@@ -496,8 +554,38 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				mp4Video.Close(&config)
 				log.Log.Info("capture.main.HandleRecordStream(motiondetection): file save: " + name)
 
+				// Update the last duration and last recording time.
+				// This is used to determine if we need to start a new recording.
 				lastDuration = pkt.Time
 				lastRecordingTime = time.Now().UnixMilli()
+
+				// Update the name of the recording with the duration.
+				// We will update the name of the recording with the duration in milliseconds.
+				if mp4Video.VideoTotalDuration > 0 {
+					duration := mp4Video.VideoTotalDuration
+
+					// Update the name with the duration in milliseconds.
+					s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
+						strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" +
+						strconv.FormatInt(startRecordingMilliseconds, 10) + "_" +
+						config.Name + "_" +
+						motionRectangleString + "_" +
+						strconv.Itoa(numberOfChanges) + "_" + // number of changes
+						strconv.FormatInt(int64(duration), 10) + "_" + // duration of recording in milliseconds
+						utils.VERSION // version of the agent
+
+					name = s + ".mp4"
+					fullName = configDirectory + "/data/recordings/" + name
+					log.Log.Info("capture.main.HandleRecordStream(motiondetection): recording finished: file save: " + name)
+					// Rename the file to the new name.
+					err := os.Rename(configDirectory+"/data/recordings/"+s+".mp4",
+						configDirectory+"/data/recordings/"+name)
+					if err != nil {
+						log.Log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
+					}
+				} else {
+					log.Log.Info("capture.main.HandleRecordStream(motiondetection): no video data recorded, not renaming file.")
+				}
 
 				// Check if we need to encrypt the recording.
 				if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
