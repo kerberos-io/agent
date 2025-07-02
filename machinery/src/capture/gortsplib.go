@@ -660,7 +660,10 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					g.Streams[g.VideoH264Index].GopSize = gopSize
 					log.Log.Info(fmt.Sprintf("capture.golibrtsp.Start(%s): Keyframe interval=%d packets, Avg=%.1f, GOP=%.1fs, GOPSize=%d",
 						streamType, keyframeInterval, avgInterval, gopDuration, gopSize))
-					queue.SetMaxGopCount(gopSize)
+					preRecording := configuration.Config.Capture.PreRecording
+					if preRecording > 0 && int(gopDuration) > 0 {
+						queue.SetMaxGopCount(int(preRecording) / int(gopDuration))
+					}
 				}
 
 				pkt.Data = pkt.Data[4:]
@@ -801,7 +804,8 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					g.Streams[g.VideoH265Index].GopSize = gopSize
 					log.Log.Info(fmt.Sprintf("capture.golibrtsp.Start(%s): Keyframe interval=%d packets, Avg=%.1f, GOP=%.1fs, GOPSize=%d",
 						streamType, keyframeInterval, avgInterval, gopDuration, gopSize))
-					queue.SetMaxGopCount(gopSize)
+					preRecording := configuration.Config.Capture.PreRecording
+					queue.SetMaxGopCount(int(preRecording) / int(gopDuration))
 				}
 
 				queue.WritePacket(pkt)

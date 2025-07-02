@@ -419,9 +419,21 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// Taking into account FPS = GOP size (Keyfram interval)
 				if preRecording > 0 {
 
-					gopRatio := int64(2) //configuration.Config.Capture.IPCamera.GOPSize
-					displayTime = startRecording - preRecording/gopRatio - 500*gopRatio
-					fmt.Println(lastRecordingTime)
+					streams, _ := rtspClient.GetStreams()
+					videoIdx := -1
+					audioIdx := -1
+					for i, stream := range streams {
+						if (stream.Name == "H264" || stream.Name == "H265") && videoIdx < 0 {
+							videoIdx = i
+						} else if stream.Name == "PCM_MULAW" && audioIdx < 0 {
+							audioIdx = i
+						}
+					}
+					//videoStream := streams[videoIdx]
+					//gopSize := videoStream.GopSize
+					//fps := videoStream.FPS
+					displayTime = startRecording //*(int64(gopSize)/int64(fps)) // we substract the pre-recording time in milliseconds, divided by the gop size and fps.
+					fmt.Println(lastRecordingTime, startRecording, preRecording, displayTime)
 
 					// Might be that recordings are coming short after each other.
 					// Therefore we do some math with the current time and the last recording time.
@@ -498,7 +510,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				var cursorError error
 				var pkt packets.Packet
 				var nextPkt packets.Packet
-				recordingCursor := queue.DelayedGopCount(int(config.Capture.PreRecording + 1))
+				recordingCursor := queue.Oldest()
 
 				if cursorError == nil {
 					pkt, cursorError = recordingCursor.ReadPacket()
