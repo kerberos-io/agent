@@ -4,6 +4,7 @@ package capture
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"image"
 	"os"
 	"strconv"
@@ -403,6 +404,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 			var lastDuration int64 = 0      // last duration in milliseconds
 			var lastRecordingTime int64 = 0 // last recording time in milliseconds
+			var displayTime int64 = 0       // display time in milliseconds
 
 			var videoTrack uint32
 			var audioTrack uint32
@@ -415,17 +417,21 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				// If we have prerecording we will substract the number of seconds.
 				// Taking into account FPS = GOP size (Keyfram interval)
-				if preRecording > 0 && lastRecordingTime > 0 {
+				if preRecording > 0 {
+
+					gopRatio := int64(2) //configuration.Config.Capture.IPCamera.GOPSize
+					displayTime = startRecording - preRecording/gopRatio - 500*gopRatio
+					fmt.Println(lastRecordingTime)
 
 					// Might be that recordings are coming short after each other.
 					// Therefore we do some math with the current time and the last recording time.
 
-					timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
+					/*timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
 					if timeBetweenNowAndLastRecording > preRecording {
 						startRecording = startRecording - preRecording + 1000 // we add 1000 milliseconds to make sure we have a full second of pre-recording.
 					} else {
-						startRecording = startRecording - timeBetweenNowAndLastRecording
-					}
+						//startRecording = startRecording - timeBetweenNowAndLastRecording
+					}*/
 				}
 
 				// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
@@ -437,8 +443,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// - Number of changes
 				// - Token
 
-				startRecordingSeconds := startRecording / 1000      // convert to seconds
-				startRecordingMilliseconds := startRecording % 1000 // convert to milliseconds
+				displayTimeSeconds := displayTime / 1000      // convert to seconds
+				displayTimeMilliseconds := displayTime % 1000 // convert to milliseconds
 				motionRectangleString := "0-0-0-0"
 				if motion.Rectangle.X != 0 || motion.Rectangle.Y != 0 ||
 					motion.Rectangle.Width != 0 || motion.Rectangle.Height != 0 {
@@ -446,9 +452,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						strconv.Itoa(motion.Rectangle.Width) + "-" + strconv.Itoa(motion.Rectangle.Height)
 				}
 
-				s := strconv.FormatInt(startRecordingSeconds, 10) + "_" + // start timestamp in seconds
-					strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" + // length of milliseconds
-					strconv.FormatInt(startRecordingMilliseconds, 10) + "_" + // milliseconds
+				s := strconv.FormatInt(displayTimeSeconds, 10) + "_" + // start timestamp in seconds
+					strconv.Itoa(len(strconv.FormatInt(displayTimeMilliseconds, 10))) + "-" + // length of milliseconds
+					strconv.FormatInt(displayTimeMilliseconds, 10) + "_" + // milliseconds
 					config.Name + "_" + // device name
 					motionRectangleString + "_" + // region coordinates, we will not use this for continuous recording
 					"0" + "_" + // token
@@ -459,7 +465,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				fullName := configDirectory + "/data/recordings/" + name
 
 				// Running...
-				log.Log.Info("capture.main.HandleRecordStream(motiondetection): recording started")
+				log.Log.Info("capture.main.HandleRecordStream(motiondetection): recording started (" + name + ")" + " at " + strconv.FormatInt(displayTimeSeconds, 10) + " unix")
 
 				// Get width and height from the camera.
 				width := configuration.Config.Capture.IPCamera.Width
@@ -516,6 +522,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 
 					if (timestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-1000) && nextPkt.IsKeyFrame {
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(timestamp+postRecording-now, 10) + " < 0")
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-1000 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-1000, 10))
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 						break
 					}
@@ -565,9 +573,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					duration := mp4Video.VideoTotalDuration
 
 					// Update the name with the duration in milliseconds.
-					s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
-						strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" +
-						strconv.FormatInt(startRecordingMilliseconds, 10) + "_" +
+					s := strconv.FormatInt(displayTimeSeconds, 10) + "_" +
+						strconv.Itoa(len(strconv.FormatInt(displayTimeMilliseconds, 10))) + "-" +
+						strconv.FormatInt(displayTimeMilliseconds, 10) + "_" +
 						config.Name + "_" +
 						motionRectangleString + "_" +
 						strconv.Itoa(numberOfChanges) + "_" + // number of changes

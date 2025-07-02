@@ -288,6 +288,10 @@ func (mp4 *MP4) Close(config *models.Config) {
 		mp4.Segments = append(mp4.Segments, mp4.Segment)
 	}*/
 
+	if mp4.VideoTotalDuration == 0 && mp4.AudioTotalDuration == 0 {
+		log.Log.Error("mp4.Close(): no video or audio samples added, cannot create MP4 file")
+	}
+
 	// Encode the last segment
 	if mp4.Segment != nil {
 		err := mp4.Segment.Encode(mp4.Writer)
