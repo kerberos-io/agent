@@ -91,6 +91,14 @@ type Golibrtsp struct {
 	frameBufferSize  int
 	frameBufferIndex int
 	fpsMutex         sync.Mutex
+
+	// I-frame interval tracking fields
+	packetsSinceLastKeyframe int
+	lastKeyframePacketCount  int
+	keyframeIntervals        []int
+	keyframeBufferSize       int
+	keyframeBufferIndex      int
+	keyframeMutex            sync.Mutex
 }
 
 // Init function
@@ -604,6 +612,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 							g.Streams[g.VideoH264Index].FPS = fps
 							log.Log.Debug(fmt.Sprintf("capture.golibrtsp.Start(%s): Final FPS=%.2f", streamType, fps))
 							g.VideoH264Forma.SPS = nalu
+
 						}
 					case h264.NALUTypePPS:
 						g.VideoH264Forma.PPS = nalu
@@ -640,6 +649,18 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					IsVideo:         true,
 					IsAudio:         false,
 					Codec:           "H264",
+				}
+
+				// Track keyframe intervals
+				keyframeInterval := g.trackKeyframeInterval(idrPresent)
+				if idrPresent && keyframeInterval > 0 {
+					avgInterval := g.getAverageKeyframeInterval()
+					gopDuration := g.getGOPDuration(g.Streams[g.VideoH264Index].FPS)
+					gopSize := int(avgInterval) // Store GOP size in a separate variable
+					g.Streams[g.VideoH264Index].GopSize = gopSize
+					log.Log.Info(fmt.Sprintf("capture.golibrtsp.Start(%s): Keyframe interval=%d packets, Avg=%.1f, GOP=%.1fs, GOPSize=%d",
+						streamType, keyframeInterval, avgInterval, gopDuration, gopSize))
+					queue.SetMaxGopCount(gopSize)
 				}
 
 				pkt.Data = pkt.Data[4:]
@@ -769,6 +790,18 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					IsVideo:         true,
 					IsAudio:         false,
 					Codec:           "H265",
+				}
+
+				// Track keyframe intervals for H265
+				keyframeInterval := g.trackKeyframeInterval(isRandomAccess)
+				if isRandomAccess && keyframeInterval > 0 {
+					avgInterval := g.getAverageKeyframeInterval()
+					gopDuration := g.getGOPDuration(g.Streams[g.VideoH265Index].FPS)
+					gopSize := int(avgInterval) // Store GOP size in a separate variable
+					g.Streams[g.VideoH265Index].GopSize = gopSize
+					log.Log.Info(fmt.Sprintf("capture.golibrtsp.Start(%s): Keyframe interval=%d packets, Avg=%.1f, GOP=%.1fs, GOPSize=%d",
+						streamType, keyframeInterval, avgInterval, gopDuration, gopSize))
+					queue.SetMaxGopCount(gopSize)
 				}
 
 				queue.WritePacket(pkt)
@@ -1147,6 +1180,13 @@ func (g *Golibrtsp) initFPSCalculation() {
 	g.frameTimeBuffer = make([]time.Duration, g.frameBufferSize)
 	g.frameBufferIndex = 0
 	g.lastFrameTime = time.Time{}
+
+	// Initialize I-frame interval tracking
+	g.keyframeBufferSize = 10 // Store last 10 keyframe intervals
+	g.keyframeIntervals = make([]int, g.keyframeBufferSize)
+	g.keyframeBufferIndex = 0
+	g.packetsSinceLastKeyframe = 0
+	g.lastKeyframePacketCount = 0
 }
 
 // Calculate FPS from frame timestamps
@@ -1214,6 +1254,62 @@ func (g *Golibrtsp) getEnhancedFPS(sps *h264.SPS, streamIndex int8) float64 {
 	}
 
 	return 25.0 // Default fallback FPS
+}
+
+// Track I-frame intervals by counting packets between keyframes
+func (g *Golibrtsp) trackKeyframeInterval(isKeyframe bool) int {
+	g.keyframeMutex.Lock()
+	defer g.keyframeMutex.Unlock()
+
+	g.packetsSinceLastKeyframe++
+
+	if isKeyframe {
+		// Store the interval since the last keyframe
+		if g.lastKeyframePacketCount > 0 {
+			interval := g.packetsSinceLastKeyframe
+			g.keyframeIntervals[g.keyframeBufferIndex] = interval
+			g.keyframeBufferIndex = (g.keyframeBufferIndex + 1) % g.keyframeBufferSize
+		}
+
+		// Reset counter for next interval
+		g.lastKeyframePacketCount = g.packetsSinceLastKeyframe
+		g.packetsSinceLastKeyframe = 0
+
+		return g.lastKeyframePacketCount
+	}
+
+	return 0
+}
+
+// Get average keyframe interval (GOP size)
+func (g *Golibrtsp) getAverageKeyframeInterval() float64 {
+	g.keyframeMutex.Lock()
+	defer g.keyframeMutex.Unlock()
+
+	var totalInterval int
+	validSamples := 0
+
+	for _, interval := range g.keyframeIntervals {
+		if interval > 0 {
+			totalInterval += interval
+			validSamples++
+		}
+	}
+
+	if validSamples == 0 {
+		return 0
+	}
+
+	return float64(totalInterval) / float64(validSamples)
+}
+
+// Calculate GOP size in seconds based on FPS and keyframe interval
+func (g *Golibrtsp) getGOPDuration(fps float64) float64 {
+	avgInterval := g.getAverageKeyframeInterval()
+	if avgInterval > 0 && fps > 0 {
+		return avgInterval / fps
+	}
+	return 0
 }
 
 // Get detailed SPS timing information
