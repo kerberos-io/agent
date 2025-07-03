@@ -409,6 +409,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var videoTrack uint32
 			var audioTrack uint32
 
+			streams, _ := rtspClient.GetVideoStreams()
+			videoStream := streams[0] // We will use the first video stream, as we only expect one video stream.
+
 			for motion := range communication.HandleMotion {
 
 				// Get as much packets we need.
@@ -427,9 +430,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				var preRecordingDelta int64 = 0
 				if preRecording > 0 {
 
-					streams, _ := rtspClient.GetVideoStreams()
-					videoStream := streams[0] // We will use the first video stream, as we only expect one video stream.
-
 					gopSize := videoStream.GopSize
 					fps := videoStream.FPS
 					queueSize := queue.GetSize()
@@ -437,7 +437,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// Based on the GOP size and FPS we can calculate the pre-recording time.
 					// It might be that the queue size is 0, in that case we will not calculate the pre-recording time.
 					if queueSize > 0 && gopSize > 0 && fps > 0 {
-						preRecording = int64(queueSize) / int64(fps) * 1000 // convert to milliseconds
+						preRecording = int64(queueSize-1) / int64(fps) * 1000 // convert to milliseconds
 					}
 					timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
 
@@ -449,7 +449,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					} else if timeBetweenNowAndLastRecording < preRecording {
 						// If the time between now and the last recording is less than the pre-recording time,
 						// we will use the pre-recording time.
-						preRecordingDelta = preRecording - timeBetweenNowAndLastRecording
+						preRecordingDelta = timeBetweenNowAndLastRecording
 						displayTime = startRecording - preRecording + preRecordingDelta
 					}
 				}
@@ -573,14 +573,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					pkt = nextPkt
 				}
 
-				// This will close the recording and write the last packet.
-				mp4Video.Close(&config)
-				log.Log.Info("capture.main.HandleRecordStream(motiondetection): file save: " + name)
-
 				// Update the last duration and last recording time.
 				// This is used to determine if we need to start a new recording.
 				lastDuration = pkt.Time
 				lastRecordingTime = time.Now().UnixMilli()
+
+				// This will close the recording and write the last packet.
+				mp4Video.Close(&config)
+				log.Log.Info("capture.main.HandleRecordStream(motiondetection): file save: " + name)
 
 				// Update the name of the recording with the duration.
 				// We will update the name of the recording with the duration in milliseconds.
