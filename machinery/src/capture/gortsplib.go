@@ -655,14 +655,14 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				keyframeInterval := g.trackKeyframeInterval(idrPresent)
 				if idrPresent && keyframeInterval > 0 {
 					avgInterval := g.getAverageKeyframeInterval()
-					gopDuration := g.getGOPDuration(g.Streams[g.VideoH264Index].FPS)
+					gopDuration := float64(keyframeInterval) / g.Streams[g.VideoH265Index].FPS
 					gopSize := int(avgInterval) // Store GOP size in a separate variable
 					g.Streams[g.VideoH264Index].GopSize = gopSize
 					log.Log.Info(fmt.Sprintf("capture.golibrtsp.Start(%s): Keyframe interval=%d packets, Avg=%.1f, GOP=%.1fs, GOPSize=%d",
 						streamType, keyframeInterval, avgInterval, gopDuration, gopSize))
 					preRecording := configuration.Config.Capture.PreRecording
 					if preRecording > 0 && int(gopDuration) > 0 {
-						queue.SetMaxGopCount(int(preRecording) / int(gopDuration))
+						queue.SetMaxGopCount(int(preRecording)/int(gopDuration) + 1)
 					}
 				}
 
@@ -799,13 +799,15 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				keyframeInterval := g.trackKeyframeInterval(isRandomAccess)
 				if isRandomAccess && keyframeInterval > 0 {
 					avgInterval := g.getAverageKeyframeInterval()
-					gopDuration := g.getGOPDuration(g.Streams[g.VideoH265Index].FPS)
+					gopDuration := float64(keyframeInterval) / g.Streams[g.VideoH265Index].FPS
 					gopSize := int(avgInterval) // Store GOP size in a separate variable
 					g.Streams[g.VideoH265Index].GopSize = gopSize
 					log.Log.Info(fmt.Sprintf("capture.golibrtsp.Start(%s): Keyframe interval=%d packets, Avg=%.1f, GOP=%.1fs, GOPSize=%d",
 						streamType, keyframeInterval, avgInterval, gopDuration, gopSize))
 					preRecording := configuration.Config.Capture.PreRecording
-					queue.SetMaxGopCount(int(preRecording) / int(gopDuration))
+					if preRecording > 0 && int(gopDuration) > 0 {
+						queue.SetMaxGopCount(int(preRecording)/int(gopDuration) + 1)
+					}
 				}
 
 				queue.WritePacket(pkt)

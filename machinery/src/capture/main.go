@@ -411,6 +411,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 			for motion := range communication.HandleMotion {
 
+				// Get as much packets we need.
+				var cursorError error
+				var pkt packets.Packet
+				var nextPkt packets.Packet
+				recordingCursor := queue.Oldest() // Start from the latest packet in the queue)
+
+				fmt.Println(queue.GetSize(), "packets in queue")
+
 				timestamp = time.Now().UnixMilli()
 				startRecording = time.Now().UnixMilli() // we mark the current time when the record started.
 				numberOfChanges := motion.NumberOfChanges
@@ -418,32 +426,17 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// If we have prerecording we will substract the number of seconds.
 				// Taking into account FPS = GOP size (Keyfram interval)
 				if preRecording > 0 {
-
-					streams, _ := rtspClient.GetStreams()
-					videoIdx := -1
-					audioIdx := -1
-					for i, stream := range streams {
-						if (stream.Name == "H264" || stream.Name == "H265") && videoIdx < 0 {
-							videoIdx = i
-						} else if stream.Name == "PCM_MULAW" && audioIdx < 0 {
-							audioIdx = i
-						}
-					}
-					//videoStream := streams[videoIdx]
-					//gopSize := videoStream.GopSize
-					//fps := videoStream.FPS
-					displayTime = startRecording //*(int64(gopSize)/int64(fps)) // we substract the pre-recording time in milliseconds, divided by the gop size and fps.
-					fmt.Println(lastRecordingTime, startRecording, preRecording, displayTime)
+					timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
 
 					// Might be that recordings are coming short after each other.
 					// Therefore we do some math with the current time and the last recording time.
-
-					/*timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
 					if timeBetweenNowAndLastRecording > preRecording {
-						startRecording = startRecording - preRecording + 1000 // we add 1000 milliseconds to make sure we have a full second of pre-recording.
-					} else {
-						//startRecording = startRecording - timeBetweenNowAndLastRecording
-					}*/
+						displayTime = startRecording - preRecording + 1000
+					} else if timeBetweenNowAndLastRecording < preRecording {
+						// If the time between now and the last recording is less than the pre-recording time,
+						// we will use the pre-recording time.
+						displayTime = startRecording - preRecording + 1000 + (preRecording - timeBetweenNowAndLastRecording)
+					}
 				}
 
 				// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
@@ -506,12 +499,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				start := false
 
-				// Get as much packets we need.
-				var cursorError error
-				var pkt packets.Packet
-				var nextPkt packets.Packet
-				recordingCursor := queue.Oldest()
-
 				if cursorError == nil {
 					pkt, cursorError = recordingCursor.ReadPacket()
 				}
@@ -524,6 +511,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 
 					now := time.Now().UnixMilli()
+
 					select {
 					case motion := <-communication.HandleMotion:
 						timestamp = now
@@ -581,7 +569,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				// Update the name of the recording with the duration.
 				// We will update the name of the recording with the duration in milliseconds.
-				if mp4Video.VideoTotalDuration > 0 {
+				/*if mp4Video.VideoTotalDuration > 0 {
 					duration := mp4Video.VideoTotalDuration
 
 					// Update the name with the duration in milliseconds.
@@ -605,7 +593,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 				} else {
 					log.Log.Info("capture.main.HandleRecordStream(motiondetection): no video data recorded, not renaming file.")
-				}
+				}*/
 
 				// Check if we need to encrypt the recording.
 				if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
