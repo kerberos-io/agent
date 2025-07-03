@@ -421,12 +421,27 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				timestamp = time.Now().UnixMilli()
 				startRecording = time.Now().UnixMilli() // we mark the current time when the record started.
-				numberOfChanges := motion.NumberOfChanges
 
 				// If we have prerecording we will substract the number of seconds.
 				// Taking into account FPS = GOP size (Keyfram interval)
+				var preRecordingDelta int64 = 0
 				if preRecording > 0 {
+
+					streams, _ := rtspClient.GetVideoStreams()
+					videoStream := streams[0] // We will use the first video stream, as we only expect one video stream.
+
+					gopSize := videoStream.GopSize
+					fps := videoStream.FPS
+					queueSize := queue.GetSize()
+
+					// Based on the GOP size and FPS we can calculate the pre-recording time.
+					// It might be that the queue size is 0, in that case we will not calculate the pre-recording time.
+					if queueSize > 0 && gopSize > 0 && fps > 0 {
+						preRecording = int64(queueSize) / int64(fps) * 1000 // convert to milliseconds
+					}
+
 					timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
+					preRecordingDelta = preRecording - timeBetweenNowAndLastRecording
 
 					// Might be that recordings are coming short after each other.
 					// Therefore we do some math with the current time and the last recording time.
@@ -435,7 +450,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					} else if timeBetweenNowAndLastRecording < preRecording {
 						// If the time between now and the last recording is less than the pre-recording time,
 						// we will use the pre-recording time.
-						displayTime = startRecording - preRecording + 1000 + (preRecording - timeBetweenNowAndLastRecording)
+						displayTime = startRecording - preRecording + preRecordingDelta
 					}
 				}
 
@@ -516,12 +531,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					case motion := <-communication.HandleMotion:
 						timestamp = now
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): motion detected while recording. Expanding recording.")
-						numberOfChanges = motion.NumberOfChanges
+						numberOfChanges := motion.NumberOfChanges
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
 					default:
 					}
 
-					if (timestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-1000) && nextPkt.IsKeyFrame {
+					if (timestamp+postRecording-preRecordingDelta-now < 0 || now-startRecording+preRecordingDelta > maxRecordingPeriod-1000) && nextPkt.IsKeyFrame {
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(timestamp+postRecording-now, 10) + " < 0")
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-1000 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-1000, 10))
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
