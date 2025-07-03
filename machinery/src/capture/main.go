@@ -439,17 +439,17 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					if queueSize > 0 && gopSize > 0 && fps > 0 {
 						preRecording = int64(queueSize) / int64(fps) * 1000 // convert to milliseconds
 					}
-
 					timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
-					preRecordingDelta = preRecording - timeBetweenNowAndLastRecording
 
 					// Might be that recordings are coming short after each other.
 					// Therefore we do some math with the current time and the last recording time.
-					if timeBetweenNowAndLastRecording > preRecording {
+					if timeBetweenNowAndLastRecording >= preRecording {
 						displayTime = startRecording - preRecording + 1000
+						preRecordingDelta = preRecording
 					} else if timeBetweenNowAndLastRecording < preRecording {
 						// If the time between now and the last recording is less than the pre-recording time,
 						// we will use the pre-recording time.
+						preRecordingDelta = preRecording - timeBetweenNowAndLastRecording
 						displayTime = startRecording - preRecording + preRecordingDelta
 					}
 				}
@@ -536,7 +536,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					default:
 					}
 
-					if (timestamp+postRecording-preRecordingDelta-now < 0 || now-startRecording+preRecordingDelta > maxRecordingPeriod-1000) && nextPkt.IsKeyFrame {
+					if (timestamp+postRecording+(preRecording-preRecordingDelta)-now < 0 || now-startRecording > maxRecordingPeriod-preRecordingDelta) && nextPkt.IsKeyFrame {
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(timestamp+postRecording-now, 10) + " < 0")
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-1000 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-1000, 10))
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
