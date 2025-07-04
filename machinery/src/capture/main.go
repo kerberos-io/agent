@@ -442,7 +442,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// It might be that the queue size is 0, in that case we will not calculate the pre-recording time.
 					queuedAvailablePreRecording := preRecording
 					if queueSize > 0 && fps > 0 {
-						queuedAvailablePreRecording = int64(queueSize-1) / int64(fps) * 1000 // convert to milliseconds
+						queuedAvailablePreRecording = int64(queueSize) / int64(fps) * 1000 // convert to milliseconds
 					}
 					timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
 					if lastRecordingTime == 0 {
