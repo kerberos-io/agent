@@ -133,7 +133,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				now := time.Now().UnixMilli()
 
 				if start && // If already recording and current frame is a keyframe and we should stop recording
-					nextPkt.IsKeyFrame && (timestamp+postRecording-now <= 0 || now-startRecording >= maxRecordingPeriod) {
+					nextPkt.IsKeyFrame && (timestamp+postRecording-now <= 0 || now-startRecording >= maxRecordingPeriod-1000) {
 
 					pts := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
@@ -172,18 +172,22 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							strconv.FormatInt(startRecordingMilliseconds, 10) + "_" +
 							config.Name + "_" +
 							"0-0-0-0" + "_" + // region coordinates, we
-							"0" + "_" + // token
-							strconv.FormatInt(int64(duration), 10) + "_" + // duration of recording
-							utils.VERSION // version of the agent
+							"-1" + "_" + // token
+							strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording
+							//utils.VERSION // version of the agent
 
+						oldName := name
 						name = s + ".mp4"
 						fullName = configDirectory + "/data/recordings/" + name
-						log.Log.Info("capture.main.HandleRecordStream(continuous): recording finished: file save: " + name)
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
+
 						// Rename the file to the new name.
-						err := os.Rename(configDirectory+"/data/recordings/"+s+".mp4",
-							configDirectory+"/data/recordings/"+name)
+						err := os.Rename(
+							configDirectory+"/data/recordings/"+oldName,
+							configDirectory+"/data/recordings/"+s+".mp4")
+
 						if err != nil {
-							log.Log.Error("capture.main.HandleRecordStream(continuous): error renaming file: " + err.Error())
+							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
 						}
 					} else {
 						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
@@ -253,8 +257,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						config.Name + "_" + // device name
 						"0-0-0-0" + "_" + // region coordinates, we will not use this for continuous recording
 						"0" + "_" + // token
-						"0" + "_" + // duration of recording in milliseconds
-						utils.VERSION // version of the agent
+						"0" + "_" //+ // duration of recording in milliseconds
+					//utils.VERSION // version of the agent
 
 					name = s + ".mp4"
 					fullName = configDirectory + "/data/recordings/" + name
@@ -350,18 +354,22 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							strconv.FormatInt(startRecordingMilliseconds, 10) + "_" +
 							config.Name + "_" +
 							"0-0-0-0" + "_" + // region coordinates, we
-							"0" + "_" + // token
-							strconv.FormatInt(int64(duration), 10) + "_" + // duration of recording
-							utils.VERSION // version of the agent
+							"-1" + "_" + // token
+							strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording
+							//utils.VERSION // version of the agent
 
+						oldName := name
 						name = s + ".mp4"
 						fullName = configDirectory + "/data/recordings/" + name
-						log.Log.Info("capture.main.HandleRecordStream(continuous): recording finished: file save: " + name)
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
+
 						// Rename the file to the new name.
-						err := os.Rename(configDirectory+"/data/recordings/"+s+".mp4",
-							configDirectory+"/data/recordings/"+name)
+						err := os.Rename(
+							configDirectory+"/data/recordings/"+oldName,
+							configDirectory+"/data/recordings/"+s+".mp4")
+
 						if err != nil {
-							log.Log.Error("capture.main.HandleRecordStream(continuous): error renaming file: " + err.Error())
+							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
 						}
 					} else {
 						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
@@ -472,14 +480,17 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						strconv.Itoa(motion.Rectangle.Width) + "-" + strconv.Itoa(motion.Rectangle.Height)
 				}
 
+				// Get the number of changes from the motion detection.
+				numberOfChanges := motion.NumberOfChanges
+
 				s := strconv.FormatInt(displayTimeSeconds, 10) + "_" + // start timestamp in seconds
 					strconv.Itoa(len(strconv.FormatInt(displayTimeMilliseconds, 10))) + "-" + // length of milliseconds
 					strconv.FormatInt(displayTimeMilliseconds, 10) + "_" + // milliseconds
 					config.Name + "_" + // device name
 					motionRectangleString + "_" + // region coordinates, we will not use this for continuous recording
-					"0" + "_" + // token
-					"0" + "_" + // duration of recording in milliseconds
-					utils.VERSION // version of the agent
+					strconv.Itoa(numberOfChanges) + "_" + // number of changes
+					"0" // + "_" + // duration of recording in milliseconds
+					//utils.VERSION // version of the agent
 
 				name := s + ".mp4"
 				fullName := configDirectory + "/data/recordings/" + name
@@ -584,7 +595,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				// Update the name of the recording with the duration.
 				// We will update the name of the recording with the duration in milliseconds.
-				/*if mp4Video.VideoTotalDuration > 0 {
+				if mp4Video.VideoTotalDuration > 0 {
 					duration := mp4Video.VideoTotalDuration
 
 					// Update the name with the duration in milliseconds.
@@ -594,21 +605,25 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						config.Name + "_" +
 						motionRectangleString + "_" +
 						strconv.Itoa(numberOfChanges) + "_" + // number of changes
-						strconv.FormatInt(int64(duration), 10) + "_" + // duration of recording in milliseconds
-						utils.VERSION // version of the agent
+						strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording in milliseconds
+						//utils.VERSION // version of the agent
 
+					oldName := name
 					name = s + ".mp4"
 					fullName = configDirectory + "/data/recordings/" + name
-					log.Log.Info("capture.main.HandleRecordStream(motiondetection): recording finished: file save: " + name)
+					log.Log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
+
 					// Rename the file to the new name.
-					err := os.Rename(configDirectory+"/data/recordings/"+s+".mp4",
-						configDirectory+"/data/recordings/"+name)
+					err := os.Rename(
+						configDirectory+"/data/recordings/"+oldName,
+						configDirectory+"/data/recordings/"+s+".mp4")
+
 					if err != nil {
 						log.Log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
 					}
 				} else {
 					log.Log.Info("capture.main.HandleRecordStream(motiondetection): no video data recorded, not renaming file.")
-				}*/
+				}
 
 				// Check if we need to encrypt the recording.
 				if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
