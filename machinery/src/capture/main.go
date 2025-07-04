@@ -4,7 +4,6 @@ package capture
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"image"
 	"os"
 	"strconv"
@@ -428,8 +427,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				var nextPkt packets.Packet
 				recordingCursor := queue.Oldest() // Start from the latest packet in the queue)
 
-				fmt.Println(queue.GetSize(), "packets in queue")
-
 				timestamp = time.Now().UnixMilli()
 				startRecording = time.Now().UnixMilli() // we mark the current time when the record started.
 
@@ -438,16 +435,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				var preRecordingDelta int64 = 0
 				if preRecording > 0 {
 
-					gopSize := videoStream.GopSize
 					fps := videoStream.FPS
 					queueSize := queue.GetSize()
 
 					// Based on the GOP size and FPS we can calculate the pre-recording time.
 					// It might be that the queue size is 0, in that case we will not calculate the pre-recording time.
-					if queueSize > 0 && gopSize > 0 && fps > 0 {
-						preRecording = int64(queueSize-1) / int64(fps) * 1000 // convert to milliseconds
+					queuedAvailablePreRecording := preRecording
+					if queueSize > 0 && fps > 0 {
+						queuedAvailablePreRecording = int64(queueSize-1) / int64(fps) * 1000 // convert to milliseconds
 					}
 					timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
+					if lastRecordingTime == 0 {
+						timeBetweenNowAndLastRecording = 0
+					}
 
 					// Might be that recordings are coming short after each other.
 					// Therefore we do some math with the current time and the last recording time.
@@ -457,8 +457,15 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					} else if timeBetweenNowAndLastRecording < preRecording {
 						// If the time between now and the last recording is less than the pre-recording time,
 						// we will use the pre-recording time.
-						preRecordingDelta = timeBetweenNowAndLastRecording
-						displayTime = startRecording - preRecording + preRecordingDelta
+						if queuedAvailablePreRecording < preRecording {
+							displayTime = startRecording - queuedAvailablePreRecording
+						} else {
+							preRecordingDelta = timeBetweenNowAndLastRecording
+							displayTime = startRecording - preRecordingDelta
+						}
+					} else {
+						// If we cannot calculate the pre-recording time, we will use the current time.
+						displayTime = startRecording - preRecording
 					}
 				}
 
