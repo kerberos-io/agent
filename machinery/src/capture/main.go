@@ -457,15 +457,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					} else if timeBetweenNowAndLastRecording < preRecording {
 						// If the time between now and the last recording is less than the pre-recording time,
 						// we will use the pre-recording time.
-						if queuedAvailablePreRecording < preRecording {
+						if lastRecordingTime == 0 && queuedAvailablePreRecording < preRecording {
 							displayTime = startRecording - queuedAvailablePreRecording
 						} else {
 							preRecordingDelta = timeBetweenNowAndLastRecording
 							displayTime = startRecording - preRecordingDelta
 						}
-					} else {
-						// If we cannot calculate the pre-recording time, we will use the current time.
-						displayTime = startRecording - preRecording
 					}
 				}
 
