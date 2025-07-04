@@ -18,4 +18,5 @@ type Packet struct {
 	Time            int64  // packet decode time
 	TimeLegacy      time.Duration
 	Data            []byte // packet data
+	Gopsize         int    // size of the GOP
 }

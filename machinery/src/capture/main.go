@@ -4,6 +4,7 @@ package capture
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"image"
 	"os"
 	"strconv"
@@ -132,7 +133,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				now := time.Now().UnixMilli()
 
 				if start && // If already recording and current frame is a keyframe and we should stop recording
-					nextPkt.IsKeyFrame && (timestamp+postRecording-now <= 0 || now-startRecording >= maxRecordingPeriod) {
+					nextPkt.IsKeyFrame && (timestamp+postRecording-now <= 0 || now-startRecording >= maxRecordingPeriod-1000) {
 
 					pts := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
@@ -158,6 +159,39 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					// Cleanup muxer
 					start = false
+
+					// Update the name of the recording with the duration.
+					// We will update the name of the recording with the duration in milliseconds.
+					if mp4Video.VideoTotalDuration > 0 {
+						duration := mp4Video.VideoTotalDuration
+						// Update the name with the duration in milliseconds.
+						startRecordingSeconds := startRecording / 1000      // convert to seconds
+						startRecordingMilliseconds := startRecording % 1000 // convert to milliseconds
+						s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
+							strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" +
+							strconv.FormatInt(startRecordingMilliseconds, 10) + "_" +
+							config.Name + "_" +
+							"0-0-0-0" + "_" + // region coordinates, we
+							"-1" + "_" + // token
+							strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording
+							//utils.VERSION // version of the agent
+
+						oldName := name
+						name = s + ".mp4"
+						fullName = configDirectory + "/data/recordings/" + name
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
+
+						// Rename the file to the new name.
+						err := os.Rename(
+							configDirectory+"/data/recordings/"+oldName,
+							configDirectory+"/data/recordings/"+s+".mp4")
+
+						if err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
+						}
+					} else {
+						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
+					}
 
 					// Check if we need to encrypt the recording.
 					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
@@ -215,13 +249,16 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// - Token
 
 					startRecording = time.Now().UnixMilli()
-					startRecordingSeconds := startRecording / 1000 // convert to seconds
-					s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
-						"6" + "-" +
-						"967003" + "_" +
-						config.Name + "_" +
-						"200-200-400-400" + "_0_" +
-						"769"
+					startRecordingSeconds := startRecording / 1000            // convert to seconds
+					startRecordingMilliseconds := startRecording % 1000       // convert to milliseconds
+					s := strconv.FormatInt(startRecordingSeconds, 10) + "_" + // start timestamp in seconds
+						strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" + // length of milliseconds
+						strconv.FormatInt(startRecordingMilliseconds, 10) + "_" + // milliseconds
+						config.Name + "_" + // device name
+						"0-0-0-0" + "_" + // region coordinates, we will not use this for continuous recording
+						"0" + "_" + // token
+						"0" + "_" //+ // duration of recording in milliseconds
+					//utils.VERSION // version of the agent
 
 					name = s + ".mp4"
 					fullName = configDirectory + "/data/recordings/" + name
@@ -305,6 +342,39 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// Cleanup muxer
 					start = false
 
+					// Update the name of the recording with the duration.
+					// We will update the name of the recording with the duration in milliseconds.
+					if mp4Video.VideoTotalDuration > 0 {
+						duration := mp4Video.VideoTotalDuration
+						// Update the name with the duration in milliseconds.
+						startRecordingSeconds := startRecording / 1000      // convert to seconds
+						startRecordingMilliseconds := startRecording % 1000 // convert to milliseconds
+						s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
+							strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" +
+							strconv.FormatInt(startRecordingMilliseconds, 10) + "_" +
+							config.Name + "_" +
+							"0-0-0-0" + "_" + // region coordinates, we
+							"-1" + "_" + // token
+							strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording
+							//utils.VERSION // version of the agent
+
+						oldName := name
+						name = s + ".mp4"
+						fullName = configDirectory + "/data/recordings/" + name
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
+
+						// Rename the file to the new name.
+						err := os.Rename(
+							configDirectory+"/data/recordings/"+oldName,
+							configDirectory+"/data/recordings/"+s+".mp4")
+
+						if err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
+						}
+					} else {
+						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
+					}
+
 					// Check if we need to encrypt the recording.
 					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
 						// reopen file into memory 'fullName'
@@ -342,28 +412,53 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 			var lastDuration int64 = 0      // last duration in milliseconds
 			var lastRecordingTime int64 = 0 // last recording time in milliseconds
+			var displayTime int64 = 0       // display time in milliseconds
 
 			var videoTrack uint32
 			var audioTrack uint32
 
+			streams, _ := rtspClient.GetVideoStreams()
+			videoStream := streams[0] // We will use the first video stream, as we only expect one video stream.
+
 			for motion := range communication.HandleMotion {
+
+				// Get as much packets we need.
+				var cursorError error
+				var pkt packets.Packet
+				var nextPkt packets.Packet
+				recordingCursor := queue.Oldest() // Start from the latest packet in the queue)
+
+				fmt.Println(queue.GetSize(), "packets in queue")
 
 				timestamp = time.Now().UnixMilli()
 				startRecording = time.Now().UnixMilli() // we mark the current time when the record started.
-				numberOfChanges := motion.NumberOfChanges
 
 				// If we have prerecording we will substract the number of seconds.
 				// Taking into account FPS = GOP size (Keyfram interval)
-				if preRecording > 0 && lastRecordingTime > 0 {
+				var preRecordingDelta int64 = 0
+				if preRecording > 0 {
+
+					gopSize := videoStream.GopSize
+					fps := videoStream.FPS
+					queueSize := queue.GetSize()
+
+					// Based on the GOP size and FPS we can calculate the pre-recording time.
+					// It might be that the queue size is 0, in that case we will not calculate the pre-recording time.
+					if queueSize > 0 && gopSize > 0 && fps > 0 {
+						preRecording = int64(queueSize-1) / int64(fps) * 1000 // convert to milliseconds
+					}
+					timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
 
 					// Might be that recordings are coming short after each other.
 					// Therefore we do some math with the current time and the last recording time.
-
-					timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
-					if timeBetweenNowAndLastRecording > preRecording {
-						startRecording = startRecording - preRecording + 1000 // we add 1000 milliseconds to make sure we have a full second of pre-recording.
-					} else {
-						startRecording = startRecording - timeBetweenNowAndLastRecording
+					if timeBetweenNowAndLastRecording >= preRecording {
+						displayTime = startRecording - preRecording + 1000
+						preRecordingDelta = preRecording
+					} else if timeBetweenNowAndLastRecording < preRecording {
+						// If the time between now and the last recording is less than the pre-recording time,
+						// we will use the pre-recording time.
+						preRecordingDelta = timeBetweenNowAndLastRecording
+						displayTime = startRecording - preRecording + preRecordingDelta
 					}
 				}
 
@@ -375,20 +470,33 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// - Region
 				// - Number of changes
 				// - Token
-				startRecordingSeconds := startRecording / 1000 // convert to seconds
-				s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
-					"6" + "-" +
-					"967003" + "_" +
-					config.Name + "_" +
-					"200-200-400-400" + "_" +
-					strconv.Itoa(numberOfChanges) + "_" +
-					"769"
+
+				displayTimeSeconds := displayTime / 1000      // convert to seconds
+				displayTimeMilliseconds := displayTime % 1000 // convert to milliseconds
+				motionRectangleString := "0-0-0-0"
+				if motion.Rectangle.X != 0 || motion.Rectangle.Y != 0 ||
+					motion.Rectangle.Width != 0 || motion.Rectangle.Height != 0 {
+					motionRectangleString = strconv.Itoa(motion.Rectangle.X) + "-" + strconv.Itoa(motion.Rectangle.Y) + "-" +
+						strconv.Itoa(motion.Rectangle.Width) + "-" + strconv.Itoa(motion.Rectangle.Height)
+				}
+
+				// Get the number of changes from the motion detection.
+				numberOfChanges := motion.NumberOfChanges
+
+				s := strconv.FormatInt(displayTimeSeconds, 10) + "_" + // start timestamp in seconds
+					strconv.Itoa(len(strconv.FormatInt(displayTimeMilliseconds, 10))) + "-" + // length of milliseconds
+					strconv.FormatInt(displayTimeMilliseconds, 10) + "_" + // milliseconds
+					config.Name + "_" + // device name
+					motionRectangleString + "_" + // region coordinates, we will not use this for continuous recording
+					strconv.Itoa(numberOfChanges) + "_" + // number of changes
+					"0" // + "_" + // duration of recording in milliseconds
+					//utils.VERSION // version of the agent
 
 				name := s + ".mp4"
 				fullName := configDirectory + "/data/recordings/" + name
 
 				// Running...
-				log.Log.Info("capture.main.HandleRecordStream(motiondetection): recording started")
+				log.Log.Info("capture.main.HandleRecordStream(motiondetection): recording started (" + name + ")" + " at " + strconv.FormatInt(displayTimeSeconds, 10) + " unix")
 
 				// Get width and height from the camera.
 				width := configuration.Config.Capture.IPCamera.Width
@@ -417,12 +525,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				start := false
 
-				// Get as much packets we need.
-				var cursorError error
-				var pkt packets.Packet
-				var nextPkt packets.Packet
-				recordingCursor := queue.DelayedGopCount(int(config.Capture.PreRecording + 1))
-
 				if cursorError == nil {
 					pkt, cursorError = recordingCursor.ReadPacket()
 				}
@@ -435,16 +537,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 
 					now := time.Now().UnixMilli()
+
 					select {
 					case motion := <-communication.HandleMotion:
 						timestamp = now
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): motion detected while recording. Expanding recording.")
-						numberOfChanges = motion.NumberOfChanges
+						numberOfChanges := motion.NumberOfChanges
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
 					default:
 					}
 
-					if (timestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-1000) && nextPkt.IsKeyFrame {
+					if (timestamp+postRecording+(preRecording-preRecordingDelta)-now < 0 || now-startRecording > maxRecordingPeriod-preRecordingDelta) && nextPkt.IsKeyFrame {
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(timestamp+postRecording-now, 10) + " < 0")
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-1000 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-1000, 10))
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 						break
 					}
@@ -479,12 +584,46 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					pkt = nextPkt
 				}
 
+				// Update the last duration and last recording time.
+				// This is used to determine if we need to start a new recording.
+				lastDuration = pkt.Time
+				lastRecordingTime = time.Now().UnixMilli()
+
 				// This will close the recording and write the last packet.
 				mp4Video.Close(&config)
 				log.Log.Info("capture.main.HandleRecordStream(motiondetection): file save: " + name)
 
-				lastDuration = pkt.Time
-				lastRecordingTime = time.Now().UnixMilli()
+				// Update the name of the recording with the duration.
+				// We will update the name of the recording with the duration in milliseconds.
+				if mp4Video.VideoTotalDuration > 0 {
+					duration := mp4Video.VideoTotalDuration
+
+					// Update the name with the duration in milliseconds.
+					s := strconv.FormatInt(displayTimeSeconds, 10) + "_" +
+						strconv.Itoa(len(strconv.FormatInt(displayTimeMilliseconds, 10))) + "-" +
+						strconv.FormatInt(displayTimeMilliseconds, 10) + "_" +
+						config.Name + "_" +
+						motionRectangleString + "_" +
+						strconv.Itoa(numberOfChanges) + "_" + // number of changes
+						strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording in milliseconds
+						//utils.VERSION // version of the agent
+
+					oldName := name
+					name = s + ".mp4"
+					fullName = configDirectory + "/data/recordings/" + name
+					log.Log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
+
+					// Rename the file to the new name.
+					err := os.Rename(
+						configDirectory+"/data/recordings/"+oldName,
+						configDirectory+"/data/recordings/"+s+".mp4")
+
+					if err != nil {
+						log.Log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
+					}
+				} else {
+					log.Log.Info("capture.main.HandleRecordStream(motiondetection): no video data recorded, not renaming file.")
+				}
 
 				// Check if we need to encrypt the recording.
 				if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {

@@ -235,7 +235,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	// Set the maximum GOP count, this is used to determine the pre-recording time.
 	log.Log.Info("components.Kerberos.RunAgent(): SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
-	queue.SetMaxGopCount(int(config.Capture.PreRecording) + 1) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
+	queue.SetMaxGopCount(1) // We will adjust this later on, when we have the GOP size.
 	queue.WriteHeader(videoStreams)
 	go rtspClient.Start(ctx, "main", queue, configuration, communication)
 
@@ -254,7 +254,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	if subStreamEnabled && rtspSubClient != nil {
 		subQueue = packets.NewQueue()
 		communication.SubQueue = subQueue
-		subQueue.SetMaxGopCount(3) // GOP time frame is set to prerecording (we'll add 2 gops to leave some room).
+		subQueue.SetMaxGopCount(1) // GOP time frame is set to 1 for motion detection and livestreaming.
 		subQueue.WriteHeader(videoSubStreams)
 		go rtspSubClient.Start(ctx, "sub", subQueue, configuration, communication)
 

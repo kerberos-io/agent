@@ -21,6 +21,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 
 	var isPixelChangeThresholdReached = false
 	var changesToReturn = 0
+	var motionRectangle models.MotionRectangle
 
 	pixelThreshold := config.Capture.PixelChangeThreshold
 	// Might not be set in the config file, so set it to 150
@@ -132,7 +133,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 					if detectMotion {
 
 						// Remember additional information about the result of findmotion
-						isPixelChangeThresholdReached, changesToReturn = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
+						isPixelChangeThresholdReached, changesToReturn, motionRectangle = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
 						if isPixelChangeThresholdReached {
 
 							// If offline mode is disabled, send a message to the hub
@@ -164,6 +165,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 								dataToPass := models.MotionDataPartial{
 									Timestamp:       time.Now().Unix(),
 									NumberOfChanges: changesToReturn,
+									Rectangle:       motionRectangle,
 								}
 								communication.HandleMotion <- dataToPass //Save data to the channel
 							}
@@ -185,24 +187,58 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 	log.Log.Debug("computervision.main.ProcessMotion(): stop the motion detection.")
 }
 
-func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int) {
+func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int, motionRectangle models.MotionRectangle) {
 	image1 := imageArray[0]
 	image2 := imageArray[1]
 	image3 := imageArray[2]
 	threshold := 60
-	changes := AbsDiffBitwiseAndThreshold(image1, image2, image3, threshold, coordinatesToCheck)
-	return changes > pixelChangeThreshold, changes
+	changes, motionRectangle := AbsDiffBitwiseAndThreshold(image1, image2, image3, threshold, coordinatesToCheck)
+	return changes > pixelChangeThreshold, changes, motionRectangle
 }
 
-func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.Gray, threshold int, coordinatesToCheck []int) int {
+func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.Gray, threshold int, coordinatesToCheck []int) (int, models.MotionRectangle) {
 	changes := 0
+	var pixelList [][]int
 	for i := 0; i < len(coordinatesToCheck); i++ {
 		pixel := coordinatesToCheck[i]
 		diff := int(img3.Pix[pixel]) - int(img1.Pix[pixel])
 		diff2 := int(img3.Pix[pixel]) - int(img2.Pix[pixel])
 		if (diff > threshold || diff < -threshold) && (diff2 > threshold || diff2 < -threshold) {
 			changes++
+			// Store the pixel coordinates where the change is detected
+			pixelList = append(pixelList, []int{pixel % img1.Bounds().Dx(), pixel / img1.Bounds().Dx()})
 		}
 	}
-	return changes
+
+	// Calculate rectangle of pixelList (startX, startY, endX, endY)
+	var motionRectangle models.MotionRectangle
+	if len(pixelList) > 0 {
+		startX := pixelList[0][0]
+		startY := pixelList[0][1]
+		endX := startX
+		endY := startY
+		for _, pixel := range pixelList {
+			if pixel[0] < startX {
+				startX = pixel[0]
+			}
+			if pixel[1] < startY {
+				startY = pixel[1]
+			}
+			if pixel[0] > endX {
+				endX = pixel[0]
+			}
+			if pixel[1] > endY {
+				endY = pixel[1]
+			}
+		}
+		log.Log.Debugf("Rectangle of changes detected: startX: %d, startY: %d, endX: %d, endY: %d", startX, startY, endX, endY)
+		motionRectangle = models.MotionRectangle{
+			X:      startX,
+			Y:      startY,
+			Width:  endX - startX,
+			Height: endY - startY,
+		}
+		log.Log.Debugf("Motion rectangle: %+v", motionRectangle)
+	}
+	return changes, motionRectangle
 }

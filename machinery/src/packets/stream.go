@@ -48,4 +48,7 @@ type Stream struct {
 
 	// Channels is the number of audio channels.
 	Channels int
+
+	// GopSize is the size of the GOP (Group of Pictures).
+	GopSize int
 }

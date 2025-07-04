@@ -65,6 +65,7 @@ type Capture struct {
 	Continuous            string      `json:"continuous,omitempty"`
 	PostRecording         int64       `json:"postrecording"`
 	PreRecording          int64       `json:"prerecording"`
+	GopSize               int         `json:"gopsize,omitempty" bson:"gopsize,omitempty"` // GOP size in seconds, used for pre-recording
 	MaxLengthRecording    int64       `json:"maxlengthrecording"`
 	TranscodingWebRTC     string      `json:"transcodingwebrtc"`
 	TranscodingResolution int64       `json:"transcodingresolution"`

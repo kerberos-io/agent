@@ -45,6 +45,11 @@ func (self *Queue) SetMaxGopCount(n int) {
 	return
 }
 
+func (self *Queue) GetMaxGopCount() int {
+	n := self.maxgopcount
+	return n
+}
+
 func (self *Queue) WriteHeader(streams []Stream) error {
 	self.lock.Lock()
 

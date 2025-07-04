@@ -84,6 +84,21 @@ type Golibrtsp struct {
 	AudioMPEG4Decoder *rtpmpeg4audio.Decoder
 
 	Streams []packets.Stream
+
+	// FPS calculation fields
+	lastFrameTime    time.Time
+	frameTimeBuffer  []time.Duration
+	frameBufferSize  int
+	frameBufferIndex int
+	fpsMutex         sync.Mutex
+
+	// I-frame interval tracking fields
+	packetsSinceLastKeyframe int
+	lastKeyframePacketCount  int
+	keyframeIntervals        []int
+	keyframeBufferSize       int
+	keyframeBufferIndex      int
+	keyframeMutex            sync.Mutex
 }
 
 // Init function
@@ -137,8 +152,9 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 		return
 	}
 
-	// Iniatlise the mutex.
+	// Initialize the mutex and FPS calculation.
 	g.VideoDecoderMutex = &sync.Mutex{}
+	g.initFPSCalculation()
 
 	// find the H264 media and format
 	var formaH264 *format.H264
@@ -574,6 +590,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 						var sps h264.SPS
 						errSPS := sps.Unmarshal(nalu)
 						if errSPS == nil {
+							// Debug SPS information
+							g.debugSPSInfo(&sps, streamType)
+
 							// Get width
 							g.Streams[g.VideoH264Index].Width = sps.Width()
 							if streamType == "main" {
@@ -588,12 +607,14 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 							} else if streamType == "sub" {
 								configuration.Config.Capture.IPCamera.SubHeight = sps.Height()
 							}
-							// Get FPS
-							g.Streams[g.VideoH264Index].FPS = sps.FPS()
+							// Get FPS using enhanced method
+							fps := g.getEnhancedFPS(&sps, g.VideoH264Index)
+							g.Streams[g.VideoH264Index].FPS = fps
+							log.Log.Debug(fmt.Sprintf("capture.golibrtsp.Start(%s): Final FPS=%.2f", streamType, fps))
 							g.VideoH264Forma.SPS = nalu
+
 						}
 					case h264.NALUTypePPS:
-						// Read out pps
 						g.VideoH264Forma.PPS = nalu
 					}
 					filteredAU = append(filteredAU, nalu)
@@ -628,6 +649,21 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					IsVideo:         true,
 					IsAudio:         false,
 					Codec:           "H264",
+				}
+
+				// Track keyframe intervals
+				keyframeInterval := g.trackKeyframeInterval(idrPresent)
+				if idrPresent && keyframeInterval > 0 {
+					avgInterval := g.getAverageKeyframeInterval()
+					gopDuration := float64(keyframeInterval) / g.Streams[g.VideoH265Index].FPS
+					gopSize := int(avgInterval) // Store GOP size in a separate variable
+					g.Streams[g.VideoH264Index].GopSize = gopSize
+					log.Log.Info(fmt.Sprintf("capture.golibrtsp.Start(%s): Keyframe interval=%d packets, Avg=%.1f, GOP=%.1fs, GOPSize=%d",
+						streamType, keyframeInterval, avgInterval, gopDuration, gopSize))
+					preRecording := configuration.Config.Capture.PreRecording
+					if preRecording > 0 && int(gopDuration) > 0 {
+						queue.SetMaxGopCount(int(preRecording)/int(gopDuration) + 1)
+					}
 				}
 
 				pkt.Data = pkt.Data[4:]
@@ -757,6 +793,21 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					IsVideo:         true,
 					IsAudio:         false,
 					Codec:           "H265",
+				}
+
+				// Track keyframe intervals for H265
+				keyframeInterval := g.trackKeyframeInterval(isRandomAccess)
+				if isRandomAccess && keyframeInterval > 0 {
+					avgInterval := g.getAverageKeyframeInterval()
+					gopDuration := float64(keyframeInterval) / g.Streams[g.VideoH265Index].FPS
+					gopSize := int(avgInterval) // Store GOP size in a separate variable
+					g.Streams[g.VideoH265Index].GopSize = gopSize
+					log.Log.Info(fmt.Sprintf("capture.golibrtsp.Start(%s): Keyframe interval=%d packets, Avg=%.1f, GOP=%.1fs, GOPSize=%d",
+						streamType, keyframeInterval, avgInterval, gopDuration, gopSize))
+					preRecording := configuration.Config.Capture.PreRecording
+					if preRecording > 0 && int(gopDuration) > 0 {
+						queue.SetMaxGopCount(int(preRecording)/int(gopDuration) + 1)
+					}
 				}
 
 				queue.WritePacket(pkt)
@@ -1127,4 +1178,186 @@ func WriteMPEG4Audio(forma *format.MPEG4Audio, aus [][]byte) ([]byte, error) {
 		return nil, err
 	}
 	return enc, nil
+}
+
+// Initialize FPS calculation buffers
+func (g *Golibrtsp) initFPSCalculation() {
+	g.frameBufferSize = 30 // Store last 30 frame intervals
+	g.frameTimeBuffer = make([]time.Duration, g.frameBufferSize)
+	g.frameBufferIndex = 0
+	g.lastFrameTime = time.Time{}
+
+	// Initialize I-frame interval tracking
+	g.keyframeBufferSize = 10 // Store last 10 keyframe intervals
+	g.keyframeIntervals = make([]int, g.keyframeBufferSize)
+	g.keyframeBufferIndex = 0
+	g.packetsSinceLastKeyframe = 0
+	g.lastKeyframePacketCount = 0
+}
+
+// Calculate FPS from frame timestamps
+func (g *Golibrtsp) calculateFPSFromTimestamps() float64 {
+	g.fpsMutex.Lock()
+	defer g.fpsMutex.Unlock()
+
+	if g.lastFrameTime.IsZero() {
+		g.lastFrameTime = time.Now()
+		return 0
+	}
+
+	now := time.Now()
+	interval := now.Sub(g.lastFrameTime)
+	g.lastFrameTime = now
+
+	// Store the interval
+	g.frameTimeBuffer[g.frameBufferIndex] = interval
+	g.frameBufferIndex = (g.frameBufferIndex + 1) % g.frameBufferSize
+
+	// Calculate average FPS from stored intervals
+	var totalInterval time.Duration
+	validSamples := 0
+
+	for _, interval := range g.frameTimeBuffer {
+		if interval > 0 {
+			totalInterval += interval
+			validSamples++
+		}
+	}
+
+	if validSamples == 0 {
+		return 0
+	}
+
+	avgInterval := totalInterval / time.Duration(validSamples)
+	if avgInterval == 0 {
+		return 0
+	}
+
+	return float64(time.Second) / float64(avgInterval)
+}
+
+// Get enhanced FPS information from SPS with fallback
+func (g *Golibrtsp) getEnhancedFPS(sps *h264.SPS, streamIndex int8) float64 {
+	// First try to get FPS from SPS
+	spsFPS := sps.FPS()
+
+	// Check if SPS FPS is reasonable (between 1 and 120 fps)
+	if spsFPS > 0 && spsFPS <= 120 {
+		log.Log.Debug(fmt.Sprintf("capture.golibrtsp.getEnhancedFPS(): SPS FPS: %.2f", spsFPS))
+		return spsFPS
+	}
+
+	// Fallback to timestamp-based calculation
+	timestampFPS := g.calculateFPSFromTimestamps()
+	if timestampFPS > 0 && timestampFPS <= 120 {
+		log.Log.Debug(fmt.Sprintf("capture.golibrtsp.getEnhancedFPS(): Timestamp FPS: %.2f", timestampFPS))
+		return timestampFPS
+	}
+
+	// Return SPS FPS even if it seems unreasonable, or default
+	if spsFPS > 0 {
+		return spsFPS
+	}
+
+	return 25.0 // Default fallback FPS
+}
+
+// Track I-frame intervals by counting packets between keyframes
+func (g *Golibrtsp) trackKeyframeInterval(isKeyframe bool) int {
+	g.keyframeMutex.Lock()
+	defer g.keyframeMutex.Unlock()
+
+	g.packetsSinceLastKeyframe++
+
+	if isKeyframe {
+		// Store the interval since the last keyframe
+		if g.lastKeyframePacketCount > 0 {
+			interval := g.packetsSinceLastKeyframe
+			g.keyframeIntervals[g.keyframeBufferIndex] = interval
+			g.keyframeBufferIndex = (g.keyframeBufferIndex + 1) % g.keyframeBufferSize
+		}
+
+		// Reset counter for next interval
+		g.lastKeyframePacketCount = g.packetsSinceLastKeyframe
+		g.packetsSinceLastKeyframe = 0
+
+		return g.lastKeyframePacketCount
+	}
+
+	return 0
+}
+
+// Get average keyframe interval (GOP size)
+func (g *Golibrtsp) getAverageKeyframeInterval() float64 {
+	g.keyframeMutex.Lock()
+	defer g.keyframeMutex.Unlock()
+
+	var totalInterval int
+	validSamples := 0
+
+	for _, interval := range g.keyframeIntervals {
+		if interval > 0 {
+			totalInterval += interval
+			validSamples++
+		}
+	}
+
+	if validSamples == 0 {
+		return 0
+	}
+
+	return float64(totalInterval) / float64(validSamples)
+}
+
+// Calculate GOP size in seconds based on FPS and keyframe interval
+func (g *Golibrtsp) getGOPDuration(fps float64) float64 {
+	avgInterval := g.getAverageKeyframeInterval()
+	if avgInterval > 0 && fps > 0 {
+		return avgInterval / fps
+	}
+	return 0
+}
+
+// Get detailed SPS timing information
+func (g *Golibrtsp) getSPSTimingInfo(sps *h264.SPS) (hasVUI bool, timeScale uint32, numUnitsInTick uint32, fps float64) {
+	// Try to get FPS from SPS
+	fps = sps.FPS()
+
+	// Note: The gortsplib SPS struct may not expose VUI parameters directly
+	// but we can still work with the calculated FPS
+	if fps > 0 {
+		hasVUI = true
+		// These are estimated values based on common patterns
+		if fps == 25.0 {
+			timeScale = 50
+			numUnitsInTick = 1
+		} else if fps == 30.0 {
+			timeScale = 60
+			numUnitsInTick = 1
+		} else if fps == 24.0 {
+			timeScale = 48
+			numUnitsInTick = 1
+		} else {
+			// Generic calculation
+			timeScale = uint32(fps * 2)
+			numUnitsInTick = 1
+		}
+	}
+
+	return hasVUI, timeScale, numUnitsInTick, fps
+}
+
+// Debug SPS information
+func (g *Golibrtsp) debugSPSInfo(sps *h264.SPS, streamType string) {
+	hasVUI, timeScale, numUnitsInTick, fps := g.getSPSTimingInfo(sps)
+
+	log.Log.Debug(fmt.Sprintf("capture.golibrtsp.debugSPSInfo(%s): Width=%d, Height=%d",
+		streamType, sps.Width(), sps.Height()))
+	log.Log.Debug(fmt.Sprintf("capture.golibrtsp.debugSPSInfo(%s): HasVUI=%t, FPS=%.2f",
+		streamType, hasVUI, fps))
+
+	if hasVUI {
+		log.Log.Debug(fmt.Sprintf("capture.golibrtsp.debugSPSInfo(%s): TimeScale=%d, NumUnitsInTick=%d",
+			streamType, timeScale, numUnitsInTick))
+	}
 }

@@ -184,7 +184,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			if err == nil {
 				if mp4.VideoFullSample != nil {
 					duration := pts - mp4.VideoFullSample.DecodeTime
-					log.Log.Info("Adding sample to track " + fmt.Sprintf("%d, PTS: %d, Duration: %d, size: %d, Keyframe: %t", trackID, pts, duration, len(lengthPrefixed), isKeyframe))
+					log.Log.Debug("Adding sample to track " + fmt.Sprintf("%d, PTS: %d, Duration: %d, size: %d, Keyframe: %t", trackID, pts, duration, len(lengthPrefixed), isKeyframe))
 
 					mp4.LastVideoSampleDTS = duration
 					//fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(mp4.VideoFullSample.Data), isKeyframe)
@@ -288,10 +288,16 @@ func (mp4 *MP4) Close(config *models.Config) {
 		mp4.Segments = append(mp4.Segments, mp4.Segment)
 	}*/
 
+	if mp4.VideoTotalDuration == 0 && mp4.AudioTotalDuration == 0 {
+		log.Log.Error("mp4.Close(): no video or audio samples added, cannot create MP4 file")
+	}
+
 	// Encode the last segment
-	err := mp4.Segment.Encode(mp4.Writer)
-	if err != nil {
-		panic(err)
+	if mp4.Segment != nil {
+		err := mp4.Segment.Encode(mp4.Writer)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	mp4.Writer.Flush()

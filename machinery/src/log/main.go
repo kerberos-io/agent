@@ -138,6 +138,16 @@ func (self *Logging) Debug(sentence string) {
 	}
 }
 
+func (self *Logging) Debugf(format string, args ...interface{}) {
+	switch self.Logger {
+	case "go-logging":
+		gologging.Debugf(format, args...)
+	case "logrus":
+		logrus.Debugf(format, args...)
+	default:
+	}
+}
+
 func (self *Logging) Error(sentence string) {
 	switch self.Logger {
 	case "go-logging":
