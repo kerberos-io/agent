@@ -17,6 +17,7 @@ type Packet struct {
 	CompositionTime int64  // packet presentation time minus decode time for H264 B-Frame
 	Time            int64  // packet decode time
 	TimeLegacy      time.Duration
+	CurrentTime     int64  // current time in milliseconds (UNIX timestamp)
 	Data            []byte // packet data
 	Gopsize         int    // size of the GOP
 }
