@@ -420,9 +420,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var videoTrack uint32
 			var audioTrack uint32
 
-			//streams, _ := rtspClient.GetVideoStreams()
-			//videoStream := streams[0] // We will use the first video stream, as we only expect one video stream.
-
 			for motion := range communication.HandleMotion {
 
 				// Get as much packets we need.

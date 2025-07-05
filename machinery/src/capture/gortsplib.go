@@ -633,13 +633,6 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					return
 				}
 
-				// Extract DTS from RTP packets
-				//dts2, err := dtsExtractor.Extract(filteredAU, pts2)
-				//if err != nil {
-				// log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
-				// return
-				//}
-
 				pkt := packets.Packet{
 					IsKeyFrame:      idrPresent,
 					Packet:          rtppkt,
