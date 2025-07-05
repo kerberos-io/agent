@@ -79,11 +79,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			maxRecordingPeriod = preRecording + postRecording
 		}
 
-		// Synchronise the last synced time
-		now := time.Now().UnixMilli()
-		startRecording := now
-		timestamp := now
-
 		if config.FriendlyName != "" {
 			config.Name = config.FriendlyName
 		}
@@ -116,14 +111,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			// Do not do anything!
 			log.Log.Info("capture.main.HandleRecordStream(continuous): start recording")
 
-			now = time.Now().Unix()
-			timestamp = now
 			start := false
 
 			// If continuous record the full length
 			postRecording = maxRecordingPeriod
 			// Recording file name
 			fullName := ""
+
+			var startRecording int64 = 0 // start recording timestamp in milliseconds
 
 			// Get as much packets we need.
 			var cursorError error
@@ -143,7 +138,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				now := time.Now().UnixMilli()
 
 				if start && // If already recording and current frame is a keyframe and we should stop recording
-					nextPkt.IsKeyFrame && (timestamp+postRecording-now <= 0 || now-startRecording > maxRecordingPeriod-500) {
+					nextPkt.IsKeyFrame && (startRecording+postRecording-now <= 0 || now-startRecording > maxRecordingPeriod-500) {
 
 					pts := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
@@ -247,7 +242,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 
 					start = true
-					timestamp = now
 
 					// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 					// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
@@ -258,7 +252,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// - Number of changes
 					// - Token
 
-					startRecording = time.Now().UnixMilli()
+					startRecording = pkt.CurrentTime
 					startRecordingSeconds := startRecording / 1000            // convert to seconds
 					startRecordingMilliseconds := startRecording % 1000       // convert to milliseconds
 					s := strconv.FormatInt(startRecordingSeconds, 10) + "_" + // start timestamp in seconds
@@ -437,7 +431,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				var nextPkt packets.Packet
 				recordingCursor := queue.Oldest() // Start from the latest packet in the queue)
 
-				timestamp = time.Now().UnixMilli()
+				now := time.Now().UnixMilli()
+				motionTimestamp := now
 
 				start := false
 
@@ -446,7 +441,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				}
 
 				displayTime = pkt.CurrentTime
-				startRecording = pkt.CurrentTime
+				startRecording := pkt.CurrentTime
 
 				// We have more packets in the queue (which might still be older than where we close the previous recording).
 				// In that case we will use the last recording time to determine the start time of the recording, otherwise
@@ -524,21 +519,20 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + cursorError.Error())
 					}
 
-					now := time.Now().UnixMilli()
-
+					now = time.Now().UnixMilli()
 					select {
 					case motion := <-communication.HandleMotion:
-						timestamp = now
+						motionTimestamp = now
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): motion detected while recording. Expanding recording.")
 						numberOfChanges := motion.NumberOfChanges
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
 					default:
 					}
 
-					if (timestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-500) && nextPkt.IsKeyFrame {
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(timestamp+postRecording-now, 10) + " < 0")
+					if (motionTimestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-500) && nextPkt.IsKeyFrame {
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(motionTimestamp+postRecording-now, 10) + " < 0")
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-500 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-500, 10))
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(motionTimestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 						break
 					}
 					if pkt.IsKeyFrame && !start && pkt.CurrentTime >= startRecording {
