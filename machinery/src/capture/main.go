@@ -64,7 +64,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 	} else {
 		log.Log.Debug("capture.main.HandleRecordStream(): started")
 
-		preRecording := config.Capture.PreRecording * 1000
+		//preRecording := config.Capture.PreRecording * 1000
 		postRecording := config.Capture.PostRecording * 1000           // number of seconds to record.
 		maxRecordingPeriod := config.Capture.MaxLengthRecording * 1000 // maximum number of seconds to record.
 
@@ -409,15 +409,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 			log.Log.Info("capture.main.HandleRecordStream(motiondetection): Start motion based recording ")
 
-			var lastDuration int64 = 0      // last duration in milliseconds
-			var lastRecordingTime int64 = 0 // last recording time in milliseconds
+			var lastRecordingTime int64 = 0 // last recording timestamp in milliseconds
 			var displayTime int64 = 0       // display time in milliseconds
 
 			var videoTrack uint32
 			var audioTrack uint32
 
-			streams, _ := rtspClient.GetVideoStreams()
-			videoStream := streams[0] // We will use the first video stream, as we only expect one video stream.
+			//streams, _ := rtspClient.GetVideoStreams()
+			//videoStream := streams[0] // We will use the first video stream, as we only expect one video stream.
 
 			for motion := range communication.HandleMotion {
 
@@ -428,42 +427,22 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				recordingCursor := queue.Oldest() // Start from the latest packet in the queue)
 
 				timestamp = time.Now().UnixMilli()
-				startRecording = time.Now().UnixMilli() // we mark the current time when the record started.
 
-				// If we have prerecording we will substract the number of seconds.
-				// Taking into account FPS = GOP size (Keyfram interval)
-				var preRecordingDelta int64 = 0
-				if preRecording > 0 {
+				start := false
 
-					fps := videoStream.FPS
-					queueSize := queue.GetSize()
+				if cursorError == nil {
+					pkt, cursorError = recordingCursor.ReadPacket()
+				}
 
-					// Based on the GOP size and FPS we can calculate the pre-recording time.
-					// It might be that the queue size is 0, in that case we will not calculate the pre-recording time.
-					queuedAvailablePreRecording := preRecording
-					if queueSize > 0 && fps > 0 {
-						queuedAvailablePreRecording = int64(queueSize) / int64(fps) * 1000 // convert to milliseconds
-					}
-					timeBetweenNowAndLastRecording := startRecording - lastRecordingTime
-					if lastRecordingTime == 0 {
-						timeBetweenNowAndLastRecording = 0
-					}
+				displayTime = pkt.CurrentTime
+				startRecording = pkt.CurrentTime
 
-					// Might be that recordings are coming short after each other.
-					// Therefore we do some math with the current time and the last recording time.
-					if timeBetweenNowAndLastRecording >= preRecording {
-						displayTime = startRecording - preRecording + 1000
-						preRecordingDelta = preRecording
-					} else if timeBetweenNowAndLastRecording < preRecording {
-						// If the time between now and the last recording is less than the pre-recording time,
-						// we will use the pre-recording time.
-						if lastRecordingTime == 0 && queuedAvailablePreRecording < preRecording {
-							displayTime = startRecording - queuedAvailablePreRecording
-						} else {
-							preRecordingDelta = timeBetweenNowAndLastRecording
-							displayTime = startRecording - preRecordingDelta
-						}
-					}
+				// We have more packets in the queue (which might still be older than where we close the previous recording).
+				// In that case we will use the last recording time to determine the start time of the recording, otherwise
+				// we will have duplicate frames in the recording.
+				if startRecording < lastRecordingTime {
+					displayTime = lastRecordingTime
+					startRecording = lastRecordingTime
 				}
 
 				// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
@@ -527,12 +506,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 				}
 
-				start := false
-
-				if cursorError == nil {
-					pkt, cursorError = recordingCursor.ReadPacket()
-				}
-
 				for cursorError == nil {
 
 					nextPkt, cursorError = recordingCursor.ReadPacket()
@@ -551,13 +524,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					default:
 					}
 
-					if (timestamp+postRecording+(preRecording-preRecordingDelta)-now < 0 || now-startRecording > maxRecordingPeriod-preRecordingDelta) && nextPkt.IsKeyFrame {
+					if (timestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod) && nextPkt.IsKeyFrame {
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(timestamp+postRecording-now, 10) + " < 0")
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-1000 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-1000, 10))
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(timestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 						break
 					}
-					if pkt.IsKeyFrame && !start && (pkt.Time >= lastDuration || pkt.Time == 0) {
+					if pkt.IsKeyFrame && !start && pkt.CurrentTime >= startRecording {
 						// We start the recording if we have a keyframe and the last duration is 0 or less than the current packet time.
 						// It could be start we start from the beginning of the recording.
 						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): write frames")
@@ -590,8 +563,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				// Update the last duration and last recording time.
 				// This is used to determine if we need to start a new recording.
-				lastDuration = pkt.Time
-				lastRecordingTime = time.Now().UnixMilli()
+				lastRecordingTime = pkt.CurrentTime
 
 				// This will close the recording and write the last packet.
 				mp4Video.Close(&config)
