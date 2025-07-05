@@ -64,9 +64,20 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 	} else {
 		log.Log.Debug("capture.main.HandleRecordStream(): started")
 
-		//preRecording := config.Capture.PreRecording * 1000
+		preRecording := config.Capture.PreRecording * 1000
 		postRecording := config.Capture.PostRecording * 1000           // number of seconds to record.
 		maxRecordingPeriod := config.Capture.MaxLengthRecording * 1000 // maximum number of seconds to record.
+
+		// We will calculate the maxRecordingPeriod based on the preRecording and postRecording values.
+		if maxRecordingPeriod == 0 {
+			// If maxRecordingPeriod is not set, we will use the preRecording and postRecording values
+			maxRecordingPeriod = preRecording + postRecording
+		}
+
+		if maxRecordingPeriod < preRecording+postRecording {
+			log.Log.Error("capture.main.HandleRecordStream(): maxRecordingPeriod is less than preRecording + postRecording, this is not allowed. Setting maxRecordingPeriod to preRecording + postRecording.")
+			maxRecordingPeriod = preRecording + postRecording
+		}
 
 		// Synchronise the last synced time
 		now := time.Now().UnixMilli()
