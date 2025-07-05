@@ -448,6 +448,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					startRecording = lastRecordingTime
 				}
 
+				// If startRecording is 0, we will continue as it might be we are in a state of restarting the agent.
+				if startRecording == 0 {
+					log.Log.Info("capture.main.HandleRecordStream(motiondetection): startRecording is 0, we will continue as it might be we are in a state of restarting the agent.")
+					continue
+				}
+
 				// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 				// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
 				// - Timestamp
