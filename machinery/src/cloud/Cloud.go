@@ -769,7 +769,7 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 							payload, err := models.PackageMQTTMessage(configuration, message)
 							if err == nil {
 								mqttClient.Publish("kerberos/hub/"+hubKey+"/"+deviceId, 1, false, payload)
-								log.Log.Infof("cloud.HandleLiveStreamSD(): sent chunk %d/%d to MQTT topic kerberos/hub/%s", i+1, len(chunks), hubKey)
+								log.Log.Infof("cloud.HandleLiveStreamSD(): sent chunk %d/%d to MQTT topic kerberos/hub/%s/%s", i+1, len(chunks), hubKey, deviceId)
 							} else {
 								log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
 							}
