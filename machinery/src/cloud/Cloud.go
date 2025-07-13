@@ -737,7 +737,7 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 						// To avoid base64 encoding, just send the raw []byte chunks as you do here.
 						// If you want to avoid base64, make sure the receiver can handle binary payloads.
 
-						chunkSize := 2 * 1024 // 2KB chunks
+						chunkSize := 25 * 1024 // 25KB chunks
 						var chunks [][]byte
 						for i := 0; i < len(bytes); i += chunkSize {
 							end := i + chunkSize
