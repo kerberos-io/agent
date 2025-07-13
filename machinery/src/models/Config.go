@@ -47,6 +47,7 @@ type Config struct {
 	ConditionURI            string       `json:"condition_uri" bson:"condition_uri"`
 	Encryption              *Encryption  `json:"encryption,omitempty" bson:"encryption,omitempty"`
 	Signing                 *Signing     `json:"signing,omitempty" bson:"signing,omitempty"`
+	LiveviewChunking        string       `json:"liveview_chunking,omitempty" bson:"liveview_chunking,omitempty"`
 	RealtimeProcessing      string       `json:"realtimeprocessing,omitempty" bson:"realtimeprocessing,omitempty"`
 	RealtimeProcessingTopic string       `json:"realtimeprocessing_topic" bson:"realtimeprocessing_topic"`
 }
