@@ -1044,11 +1044,8 @@ func (d *Decoder) Close() {
 }
 
 func (d *Decoder) decode(nalu []byte) (image.YCbCr, error) {
-	// Create a new slice with start code + nalu data
-	// This avoids the cgo pointer issue by creating a fresh slice each time
-	naluWithStartCode := make([]byte, len(nalu)+4)
-	copy(naluWithStartCode[:4], []byte{0x00, 0x00, 0x00, 0x01})
-	copy(naluWithStartCode[4:], nalu)
+	// Prepend the NALU start code using a helper function
+	naluWithStartCode := prependNALUStartCode(nalu)
 
 	// send NALU to decoder
 	var avPacket C.AVPacket
