@@ -1,8 +1,10 @@
 package capture
 
 // #cgo pkg-config: libavcodec libavutil libswscale
+// #include <stdlib.h>
 // #include <libavcodec/avcodec.h>
 // #include <libavutil/imgutils.h>
+// #include <libavutil/hwcontext.h>
 // #include <libswscale/swscale.h>
 import "C"
 
@@ -11,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -985,10 +986,11 @@ func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
 }
 
-// h264Decoder is a wrapper around FFmpeg's H264 decoder.
+// Decoder structure with pooled buffers for better performance
 type Decoder struct {
-	codecCtx *C.AVCodecContext
-	srcFrame *C.AVFrame
+	codecCtx   *C.AVCodecContext
+	srcFrame   *C.AVFrame
+	naluBuffer []byte // Reusable buffer to avoid allocations
 }
 
 // newH264Decoder allocates a new h264Decoder.
@@ -1006,6 +1008,9 @@ func newDecoder(codecName string) (*Decoder, error) {
 		return nil, fmt.Errorf("avcodec_alloc_context3() failed")
 	}
 
+	// Optimize decoder for speed
+	codecCtx.thread_count = C.int(4) // Use multiple threads for decoding
+
 	res := C.avcodec_open2(codecCtx, codec, nil)
 	if res < 0 {
 		C.avcodec_close(codecCtx)
@@ -1019,8 +1024,9 @@ func newDecoder(codecName string) (*Decoder, error) {
 	}
 
 	return &Decoder{
-		codecCtx: codecCtx,
-		srcFrame: srcFrame,
+		codecCtx:   codecCtx,
+		srcFrame:   srcFrame,
+		naluBuffer: make([]byte, 0, 1024*64), // Pre-allocate 64KB buffer
 	}, nil
 }
 
@@ -1034,13 +1040,23 @@ func (d *Decoder) Close() {
 }
 
 func (d *Decoder) decode(nalu []byte) (image.YCbCr, error) {
-	nalu = append([]uint8{0x00, 0x00, 0x00, 0x01}, []uint8(nalu)...)
+	// Reuse buffer to avoid allocations
+	requiredSize := len(nalu) + 4
+	if cap(d.naluBuffer) < requiredSize {
+		d.naluBuffer = make([]byte, requiredSize, requiredSize*2) // Allocate with extra capacity
+	} else {
+		d.naluBuffer = d.naluBuffer[:requiredSize]
+	}
+
+	// Copy start code and NALU data
+	copy(d.naluBuffer[:4], []byte{0x00, 0x00, 0x00, 0x01})
+	copy(d.naluBuffer[4:], nalu)
 
 	// send NALU to decoder
 	var avPacket C.AVPacket
-	avPacket.data = (*C.uint8_t)(C.CBytes(nalu))
-	defer C.free(unsafe.Pointer(avPacket.data))
-	avPacket.size = C.int(len(nalu))
+	avPacket.data = (*C.uint8_t)(unsafe.Pointer(&d.naluBuffer[0]))
+	avPacket.size = C.int(len(d.naluBuffer))
+
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
 		return image.YCbCr{}, nil
@@ -1060,9 +1076,9 @@ func (d *Decoder) decode(nalu []byte) (image.YCbCr, error) {
 		cs := int(fr.linesize[1])
 
 		return image.YCbCr{
-			Y:              fromCPtr(unsafe.Pointer(fr.data[0]), ys*h),
-			Cb:             fromCPtr(unsafe.Pointer(fr.data[1]), cs*h/2),
-			Cr:             fromCPtr(unsafe.Pointer(fr.data[2]), cs*h/2),
+			Y:              unsafe.Slice((*byte)(fr.data[0]), ys*h),
+			Cb:             unsafe.Slice((*byte)(fr.data[1]), cs*h/2),
+			Cr:             unsafe.Slice((*byte)(fr.data[2]), cs*h/2),
 			YStride:        ys,
 			CStride:        cs,
 			SubsampleRatio: image.YCbCrSubsampleRatio420,
@@ -1074,13 +1090,23 @@ func (d *Decoder) decode(nalu []byte) (image.YCbCr, error) {
 }
 
 func (d *Decoder) decodeRaw(nalu []byte) (image.Gray, error) {
-	nalu = append([]uint8{0x00, 0x00, 0x00, 0x01}, []uint8(nalu)...)
+	// Reuse buffer to avoid allocations
+	requiredSize := len(nalu) + 4
+	if cap(d.naluBuffer) < requiredSize {
+		d.naluBuffer = make([]byte, requiredSize, requiredSize*2)
+	} else {
+		d.naluBuffer = d.naluBuffer[:requiredSize]
+	}
+
+	// Copy start code and NALU data
+	copy(d.naluBuffer[:4], []byte{0x00, 0x00, 0x00, 0x01})
+	copy(d.naluBuffer[4:], nalu)
 
 	// send NALU to decoder
 	var avPacket C.AVPacket
-	avPacket.data = (*C.uint8_t)(C.CBytes(nalu))
-	defer C.free(unsafe.Pointer(avPacket.data))
-	avPacket.size = C.int(len(nalu))
+	avPacket.data = (*C.uint8_t)(unsafe.Pointer(&d.naluBuffer[0]))
+	avPacket.size = C.int(len(d.naluBuffer))
+
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
 		return image.Gray{}, nil
@@ -1099,21 +1125,13 @@ func (d *Decoder) decodeRaw(nalu []byte) (image.Gray, error) {
 		ys := int(fr.linesize[0])
 
 		return image.Gray{
-			Pix:    fromCPtr(unsafe.Pointer(fr.data[0]), w*h),
+			Pix:    unsafe.Slice((*byte)(fr.data[0]), w*h),
 			Stride: ys,
 			Rect:   image.Rect(0, 0, w, h),
 		}, nil
 	}
 
 	return image.Gray{}, nil
-}
-
-func fromCPtr(buf unsafe.Pointer, size int) (ret []uint8) {
-	hdr := (*reflect.SliceHeader)((unsafe.Pointer(&ret)))
-	hdr.Cap = size
-	hdr.Len = size
-	hdr.Data = uintptr(buf)
-	return
 }
 
 func FindPCMU(desc *description.Session, isBackChannel bool) (*format.G711, *description.Media) {
