@@ -132,6 +132,7 @@ type Message struct {
 // The payload structure which is used to send over
 // and receive messages from the MQTT broker
 type Payload struct {
+	Version        string                 `json:"version"` // Version of the message, e.g. "1.0"
 	Action         string                 `json:"action"`
 	DeviceId       string                 `json:"device_id"`
 	Signature      string                 `json:"signature"`
