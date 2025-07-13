@@ -2,6 +2,7 @@ package capture
 
 // #cgo pkg-config: libavcodec libavutil libswscale
 // #include <stdlib.h>
+// #include <string.h>
 // #include <libavcodec/avcodec.h>
 // #include <libavutil/imgutils.h>
 // #include <libavutil/hwcontext.h>
@@ -13,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -894,7 +896,7 @@ func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
 	}
 	if img.Bounds().Empty() {
 		log.Log.Debug("capture.golibrtsp.DecodePacket(): empty frame")
-		return image.YCbCr{}, errors.New("Empty image")
+		return image.YCbCr{}, errors.New("empty image")
 	}
 	return img, nil
 }
@@ -920,7 +922,7 @@ func (g *Golibrtsp) DecodePacketRaw(pkt packets.Packet) (image.Gray, error) {
 	}
 	if img.Bounds().Empty() {
 		log.Log.Debug("capture.golibrtsp.DecodePacketRaw(): empty image")
-		return image.Gray{}, errors.New("Empty image")
+		return image.Gray{}, errors.New("empty image")
 	}
 
 	// Do a deep copy of the image
@@ -986,11 +988,10 @@ func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
 }
 
-// Decoder structure with pooled buffers for better performance
+// Decoder structure for H264/H265 video decoding
 type Decoder struct {
-	codecCtx   *C.AVCodecContext
-	srcFrame   *C.AVFrame
-	naluBuffer []byte // Reusable buffer to avoid allocations
+	codecCtx *C.AVCodecContext
+	srcFrame *C.AVFrame
 }
 
 // newH264Decoder allocates a new h264Decoder.
@@ -1024,9 +1025,8 @@ func newDecoder(codecName string) (*Decoder, error) {
 	}
 
 	return &Decoder{
-		codecCtx:   codecCtx,
-		srcFrame:   srcFrame,
-		naluBuffer: make([]byte, 0, 1024*64), // Pre-allocate 64KB buffer
+		codecCtx: codecCtx,
+		srcFrame: srcFrame,
 	}, nil
 }
 
@@ -1040,22 +1040,21 @@ func (d *Decoder) Close() {
 }
 
 func (d *Decoder) decode(nalu []byte) (image.YCbCr, error) {
-	// Reuse buffer to avoid allocations
-	requiredSize := len(nalu) + 4
-	if cap(d.naluBuffer) < requiredSize {
-		d.naluBuffer = make([]byte, requiredSize, requiredSize*2) // Allocate with extra capacity
-	} else {
-		d.naluBuffer = d.naluBuffer[:requiredSize]
-	}
-
-	// Copy start code and NALU data
-	copy(d.naluBuffer[:4], []byte{0x00, 0x00, 0x00, 0x01})
-	copy(d.naluBuffer[4:], nalu)
+	// Create a new slice with start code + nalu data
+	// This avoids the cgo pointer issue by creating a fresh slice each time
+	naluWithStartCode := make([]byte, len(nalu)+4)
+	copy(naluWithStartCode[:4], []byte{0x00, 0x00, 0x00, 0x01})
+	copy(naluWithStartCode[4:], nalu)
 
 	// send NALU to decoder
 	var avPacket C.AVPacket
-	avPacket.data = (*C.uint8_t)(unsafe.Pointer(&d.naluBuffer[0]))
-	avPacket.size = C.int(len(d.naluBuffer))
+	// Use runtime.Pinner to pin the memory during the CGO call
+	var pinner runtime.Pinner
+	pinner.Pin(&naluWithStartCode[0])
+	defer pinner.Unpin()
+
+	avPacket.data = (*C.uint8_t)(unsafe.Pointer(&naluWithStartCode[0]))
+	avPacket.size = C.int(len(naluWithStartCode))
 
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
@@ -1090,22 +1089,21 @@ func (d *Decoder) decode(nalu []byte) (image.YCbCr, error) {
 }
 
 func (d *Decoder) decodeRaw(nalu []byte) (image.Gray, error) {
-	// Reuse buffer to avoid allocations
-	requiredSize := len(nalu) + 4
-	if cap(d.naluBuffer) < requiredSize {
-		d.naluBuffer = make([]byte, requiredSize, requiredSize*2)
-	} else {
-		d.naluBuffer = d.naluBuffer[:requiredSize]
-	}
-
-	// Copy start code and NALU data
-	copy(d.naluBuffer[:4], []byte{0x00, 0x00, 0x00, 0x01})
-	copy(d.naluBuffer[4:], nalu)
+	// Create a new slice with start code + nalu data
+	// This avoids the cgo pointer issue by creating a fresh slice each time
+	naluWithStartCode := make([]byte, len(nalu)+4)
+	copy(naluWithStartCode[:4], []byte{0x00, 0x00, 0x00, 0x01})
+	copy(naluWithStartCode[4:], nalu)
 
 	// send NALU to decoder
 	var avPacket C.AVPacket
-	avPacket.data = (*C.uint8_t)(unsafe.Pointer(&d.naluBuffer[0]))
-	avPacket.size = C.int(len(d.naluBuffer))
+	// Use runtime.Pinner to pin the memory during the CGO call
+	var pinner runtime.Pinner
+	pinner.Pin(&naluWithStartCode[0])
+	defer pinner.Unpin()
+
+	avPacket.data = (*C.uint8_t)(unsafe.Pointer(&naluWithStartCode[0]))
+	avPacket.size = C.int(len(naluWithStartCode))
 
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
