@@ -708,8 +708,8 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 				if err == nil {
 					bytes, _ := utils.ImageToBytes(&img)
 
-					chunking := config.LiveviewChunking
-					if chunking != "true" {
+					chunking := config.Capture.LiveviewChunking
+					if chunking == "false" {
 						encoded := base64.StdEncoding.EncodeToString(bytes)
 
 						valueMap := make(map[string]interface{})

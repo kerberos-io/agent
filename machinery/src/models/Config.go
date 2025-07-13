@@ -47,7 +47,6 @@ type Config struct {
 	ConditionURI            string       `json:"condition_uri" bson:"condition_uri"`
 	Encryption              *Encryption  `json:"encryption,omitempty" bson:"encryption,omitempty"`
 	Signing                 *Signing     `json:"signing,omitempty" bson:"signing,omitempty"`
-	LiveviewChunking        string       `json:"liveview_chunking,omitempty" bson:"liveview_chunking,omitempty"`
 	RealtimeProcessing      string       `json:"realtimeprocessing,omitempty" bson:"realtimeprocessing,omitempty"`
 	RealtimeProcessingTopic string       `json:"realtimeprocessing_topic" bson:"realtimeprocessing_topic"`
 }
@@ -63,6 +62,7 @@ type Capture struct {
 	Snapshots             string      `json:"snapshots,omitempty"`
 	Motion                string      `json:"motion,omitempty"`
 	Liveview              string      `json:"liveview,omitempty"`
+	LiveviewChunking      string      `json:"liveview_chunking,omitempty" bson:"liveview_chunking,omitempty"`
 	Continuous            string      `json:"continuous,omitempty"`
 	PostRecording         int64       `json:"postrecording"`
 	PreRecording          int64       `json:"prerecording"`
