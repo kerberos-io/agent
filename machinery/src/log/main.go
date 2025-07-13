@@ -118,6 +118,16 @@ func (self *Logging) Info(sentence string) {
 	}
 }
 
+func (self *Logging) Infof(format string, args ...interface{}) {
+	switch self.Logger {
+	case "go-logging":
+		gologging.Infof(format, args...)
+	case "logrus":
+		logrus.Infof(format, args...)
+	default:
+	}
+}
+
 func (self *Logging) Warning(sentence string) {
 	switch self.Logger {
 	case "go-logging":
