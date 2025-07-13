@@ -1010,7 +1010,11 @@ func newDecoder(codecName string) (*Decoder, error) {
 	}
 
 	// Optimize decoder for speed
-	codecCtx.thread_count = C.int(4) // Use multiple threads for decoding
+	threadCount := runtime.NumCPU()
+	if threadCount < 1 {
+		threadCount = 1 // Ensure at least one thread is used
+	}
+	codecCtx.thread_count = C.int(threadCount) // Use multiple threads for decoding
 
 	res := C.avcodec_open2(codecCtx, codec, nil)
 	if res < 0 {
