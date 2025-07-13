@@ -672,6 +672,7 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 		// Check if we need to enable the live stream
 		if config.Capture.Liveview != "false" {
 
+			deviceId := config.Key
 			hubKey := ""
 			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
 				hubKey = config.S3.Publickey
@@ -706,39 +707,15 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 				img, err := rtspClient.DecodePacket(pkt)
 				if err == nil {
 					bytes, _ := utils.ImageToBytes(&img)
-					//encoded := base64.StdEncoding.EncodeToString(bytes)
 
-					// Split encoded image into chunks of 1kb
-					// This is to prevent the MQTT message to be too large.
-					// By default, bytes are not encoded to base64 here; you are splitting the raw JPEG/PNG bytes.
-					// However, in MQTT and web contexts, binary data may not be handled well, so base64 is often used.
-					// To avoid base64 encoding, just send the raw []byte chunks as you do here.
-					// If you want to avoid base64, make sure the receiver can handle binary payloads.
+					chunking := config.LiveviewChunking
+					if chunking != "true" {
+						encoded := base64.StdEncoding.EncodeToString(bytes)
 
-					chunkSize := 1 * 1024 // 1KB chunks
-					var chunks [][]byte
-					for i := 0; i < len(bytes); i += chunkSize {
-						end := i + chunkSize
-						if end > len(bytes) {
-							end = len(bytes)
-						}
-						chunk := bytes[i:end]
-						chunks = append(chunks, chunk)
-					}
-
-					log.Log.Infof("cloud.HandleLiveStreamSD(): Sending %d chunks of size %d bytes.", len(chunks), chunkSize)
-
-					timestamp := time.Now().Unix()
-					for i, chunk := range chunks {
 						valueMap := make(map[string]interface{})
-						valueMap["id"] = timestamp
-						valueMap["chunk"] = chunk
-						valueMap["chunkIndex"] = i
-						valueMap["chunkSize"] = chunkSize
-						valueMap["chunkCount"] = len(chunks)
+						valueMap["image"] = encoded
 						message := models.Message{
 							Payload: models.Payload{
-								Version:  "v1.0.0",
 								Action:   "receive-sd-stream",
 								DeviceId: configuration.Config.Key,
 								Value:    valueMap,
@@ -747,9 +724,55 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 						payload, err := models.PackageMQTTMessage(configuration, message)
 						if err == nil {
 							mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
-							log.Log.Infof("cloud.HandleLiveStreamSD(): sent chunk %d/%d to MQTT topic kerberos/hub/%s", i+1, len(chunks), hubKey)
 						} else {
 							log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
+						}
+
+					} else {
+
+						// Split encoded image into chunks of 2kb
+						// This is to prevent the MQTT message to be too large.
+						// By default, bytes are not encoded to base64 here; you are splitting the raw JPEG/PNG bytes.
+						// However, in MQTT and web contexts, binary data may not be handled well, so base64 is often used.
+						// To avoid base64 encoding, just send the raw []byte chunks as you do here.
+						// If you want to avoid base64, make sure the receiver can handle binary payloads.
+
+						chunkSize := 2 * 1024 // 2KB chunks
+						var chunks [][]byte
+						for i := 0; i < len(bytes); i += chunkSize {
+							end := i + chunkSize
+							if end > len(bytes) {
+								end = len(bytes)
+							}
+							chunk := bytes[i:end]
+							chunks = append(chunks, chunk)
+						}
+
+						log.Log.Infof("cloud.HandleLiveStreamSD(): Sending %d chunks of size %d bytes.", len(chunks), chunkSize)
+
+						timestamp := time.Now().Unix()
+						for i, chunk := range chunks {
+							valueMap := make(map[string]interface{})
+							valueMap["id"] = timestamp
+							valueMap["chunk"] = chunk
+							valueMap["chunkIndex"] = i
+							valueMap["chunkSize"] = chunkSize
+							valueMap["chunkCount"] = len(chunks)
+							message := models.Message{
+								Payload: models.Payload{
+									Version:  "v1.0.0",
+									Action:   "receive-sd-stream",
+									DeviceId: deviceId,
+									Value:    valueMap,
+								},
+							}
+							payload, err := models.PackageMQTTMessage(configuration, message)
+							if err == nil {
+								mqttClient.Publish("kerberos/hub/"+hubKey+"/"+deviceId, 1, false, payload)
+								log.Log.Infof("cloud.HandleLiveStreamSD(): sent chunk %d/%d to MQTT topic kerberos/hub/%s", i+1, len(chunks), hubKey)
+							} else {
+								log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
+							}
 						}
 					}
 				}
