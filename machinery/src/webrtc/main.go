@@ -281,7 +281,8 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				candateBinary, err := json.Marshal(candateJSON)
 				if err == nil {
 					valueMap["candidate"] = string(candateBinary)
-					valueMap["sdp"] = []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP)))
+					// SDP is not needed to be send..
+					//valueMap["sdp"] = []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP)))
 					valueMap["session_id"] = handshake.SessionID
 				} else {
 					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): something went wrong while marshalling candidate: " + err.Error())

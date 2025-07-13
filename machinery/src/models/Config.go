@@ -62,6 +62,7 @@ type Capture struct {
 	Snapshots             string      `json:"snapshots,omitempty"`
 	Motion                string      `json:"motion,omitempty"`
 	Liveview              string      `json:"liveview,omitempty"`
+	LiveviewChunking      string      `json:"liveview_chunking,omitempty" bson:"liveview_chunking,omitempty"`
 	Continuous            string      `json:"continuous,omitempty"`
 	PostRecording         int64       `json:"postrecording"`
 	PreRecording          int64       `json:"prerecording"`

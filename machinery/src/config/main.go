@@ -392,6 +392,11 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				configuration.Config.MQTTPassword = value
 				break
 
+			/* MQTT chunking of low-resolution images into multiple messages */
+			case "AGENT_CAPTURE_LIVEVIEW_CHUNKING":
+				configuration.Config.Capture.LiveviewChunking = value
+				break
+
 			/* Real-time streaming of keyframes to a MQTT topic */
 			case "AGENT_REALTIME_PROCESSING":
 				configuration.Config.RealtimeProcessing = value
