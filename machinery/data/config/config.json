@@ -26,7 +26,7 @@
 		"recording": "true",
 		"snapshots": "true",
 		"liveview": "true",
-		"liveview_chunking": "true",
+		"liveview_chunking": "false",
 		"motion": "true",
 		"postrecording": 20,
 		"prerecording": 10,
