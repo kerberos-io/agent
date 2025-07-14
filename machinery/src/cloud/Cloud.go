@@ -709,26 +709,8 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 					bytes, _ := utils.ImageToBytes(&img)
 
 					chunking := config.Capture.LiveviewChunking
-					if chunking == "false" {
-						encoded := base64.StdEncoding.EncodeToString(bytes)
 
-						valueMap := make(map[string]interface{})
-						valueMap["image"] = encoded
-						message := models.Message{
-							Payload: models.Payload{
-								Action:   "receive-sd-stream",
-								DeviceId: configuration.Config.Key,
-								Value:    valueMap,
-							},
-						}
-						payload, err := models.PackageMQTTMessage(configuration, message)
-						if err == nil {
-							mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
-						} else {
-							log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
-						}
-
-					} else {
+					if chunking == "true" {
 
 						// Split encoded image into chunks of 2kb
 						// This is to prevent the MQTT message to be too large.
@@ -770,12 +752,32 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 							if err == nil {
 								mqttClient.Publish("kerberos/hub/"+hubKey+"/"+deviceId, 1, false, payload)
 								log.Log.Infof("cloud.HandleLiveStreamSD(): sent chunk %d/%d to MQTT topic kerberos/hub/%s/%s", i+1, len(chunks), hubKey, deviceId)
+								time.Sleep(33 * time.Millisecond) // Sleep to avoid flooding the MQTT broker with messages
 							} else {
 								log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
 							}
 						}
+					} else {
+
+						valueMap := make(map[string]interface{})
+						valueMap["image"] = bytes
+						message := models.Message{
+							Payload: models.Payload{
+								Action:   "receive-sd-stream",
+								DeviceId: configuration.Config.Key,
+								Value:    valueMap,
+							},
+						}
+						payload, err := models.PackageMQTTMessage(configuration, message)
+						if err == nil {
+							mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+						} else {
+							log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
+						}
+
 					}
 				}
+				time.Sleep(1000 * time.Millisecond) // Sleep to avoid flooding the MQTT broker with messages
 			}
 
 		} else {
