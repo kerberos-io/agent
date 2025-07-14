@@ -752,6 +752,7 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 							if err == nil {
 								mqttClient.Publish("kerberos/hub/"+hubKey+"/"+deviceId, 1, false, payload)
 								log.Log.Infof("cloud.HandleLiveStreamSD(): sent chunk %d/%d to MQTT topic kerberos/hub/%s/%s", i+1, len(chunks), hubKey, deviceId)
+								time.Sleep(33 * time.Millisecond) // Sleep to avoid flooding the MQTT broker with messages
 							} else {
 								log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
 							}
@@ -776,6 +777,7 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 
 					}
 				}
+				time.Sleep(1000 * time.Millisecond) // Sleep to avoid flooding the MQTT broker with messages
 			}
 
 		} else {
