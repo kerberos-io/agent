@@ -1,8 +1,11 @@
 package capture
 
 // #cgo pkg-config: libavcodec libavutil libswscale
+// #include <stdlib.h>
+// #include <string.h>
 // #include <libavcodec/avcodec.h>
 // #include <libavutil/imgutils.h>
+// #include <libavutil/hwcontext.h>
 // #include <libswscale/swscale.h>
 import "C"
 
@@ -11,7 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"reflect"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -893,7 +896,7 @@ func (g *Golibrtsp) DecodePacket(pkt packets.Packet) (image.YCbCr, error) {
 	}
 	if img.Bounds().Empty() {
 		log.Log.Debug("capture.golibrtsp.DecodePacket(): empty frame")
-		return image.YCbCr{}, errors.New("Empty image")
+		return image.YCbCr{}, errors.New("empty image")
 	}
 	return img, nil
 }
@@ -919,7 +922,7 @@ func (g *Golibrtsp) DecodePacketRaw(pkt packets.Packet) (image.Gray, error) {
 	}
 	if img.Bounds().Empty() {
 		log.Log.Debug("capture.golibrtsp.DecodePacketRaw(): empty image")
-		return image.Gray{}, errors.New("Empty image")
+		return image.Gray{}, errors.New("empty image")
 	}
 
 	// Do a deep copy of the image
@@ -985,7 +988,7 @@ func frameLineSize(frame *C.AVFrame) *C.int {
 	return (*C.int)(unsafe.Pointer(&frame.linesize[0]))
 }
 
-// h264Decoder is a wrapper around FFmpeg's H264 decoder.
+// Decoder structure for H264/H265 video decoding
 type Decoder struct {
 	codecCtx *C.AVCodecContext
 	srcFrame *C.AVFrame
@@ -1005,6 +1008,13 @@ func newDecoder(codecName string) (*Decoder, error) {
 	if codecCtx == nil {
 		return nil, fmt.Errorf("avcodec_alloc_context3() failed")
 	}
+
+	// Optimize decoder for speed
+	threadCount := runtime.NumCPU()
+	if threadCount < 1 {
+		threadCount = 1 // Ensure at least one thread is used
+	}
+	codecCtx.thread_count = C.int(threadCount) // Use multiple threads for decoding
 
 	res := C.avcodec_open2(codecCtx, codec, nil)
 	if res < 0 {
@@ -1034,13 +1044,19 @@ func (d *Decoder) Close() {
 }
 
 func (d *Decoder) decode(nalu []byte) (image.YCbCr, error) {
-	nalu = append([]uint8{0x00, 0x00, 0x00, 0x01}, []uint8(nalu)...)
+	// Prepend the NALU start code using a helper function
+	naluWithStartCode := prependNALUStartCode(nalu)
 
 	// send NALU to decoder
 	var avPacket C.AVPacket
-	avPacket.data = (*C.uint8_t)(C.CBytes(nalu))
-	defer C.free(unsafe.Pointer(avPacket.data))
-	avPacket.size = C.int(len(nalu))
+	// Use runtime.Pinner to pin the memory during the CGO call
+	var pinner runtime.Pinner
+	pinner.Pin(&naluWithStartCode[0])
+	defer pinner.Unpin()
+
+	avPacket.data = (*C.uint8_t)(unsafe.Pointer(&naluWithStartCode[0]))
+	avPacket.size = C.int(len(naluWithStartCode))
+
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
 		return image.YCbCr{}, nil
@@ -1060,9 +1076,9 @@ func (d *Decoder) decode(nalu []byte) (image.YCbCr, error) {
 		cs := int(fr.linesize[1])
 
 		return image.YCbCr{
-			Y:              fromCPtr(unsafe.Pointer(fr.data[0]), ys*h),
-			Cb:             fromCPtr(unsafe.Pointer(fr.data[1]), cs*h/2),
-			Cr:             fromCPtr(unsafe.Pointer(fr.data[2]), cs*h/2),
+			Y:              unsafe.Slice((*byte)(fr.data[0]), ys*h),
+			Cb:             unsafe.Slice((*byte)(fr.data[1]), cs*h/2),
+			Cr:             unsafe.Slice((*byte)(fr.data[2]), cs*h/2),
 			YStride:        ys,
 			CStride:        cs,
 			SubsampleRatio: image.YCbCrSubsampleRatio420,
@@ -1074,13 +1090,22 @@ func (d *Decoder) decode(nalu []byte) (image.YCbCr, error) {
 }
 
 func (d *Decoder) decodeRaw(nalu []byte) (image.Gray, error) {
-	nalu = append([]uint8{0x00, 0x00, 0x00, 0x01}, []uint8(nalu)...)
+	// Create a new slice with start code + nalu data
+	// This avoids the cgo pointer issue by creating a fresh slice each time
+	naluWithStartCode := make([]byte, len(nalu)+4)
+	copy(naluWithStartCode[:4], []byte{0x00, 0x00, 0x00, 0x01})
+	copy(naluWithStartCode[4:], nalu)
 
 	// send NALU to decoder
 	var avPacket C.AVPacket
-	avPacket.data = (*C.uint8_t)(C.CBytes(nalu))
-	defer C.free(unsafe.Pointer(avPacket.data))
-	avPacket.size = C.int(len(nalu))
+	// Use runtime.Pinner to pin the memory during the CGO call
+	var pinner runtime.Pinner
+	pinner.Pin(&naluWithStartCode[0])
+	defer pinner.Unpin()
+
+	avPacket.data = (*C.uint8_t)(unsafe.Pointer(&naluWithStartCode[0]))
+	avPacket.size = C.int(len(naluWithStartCode))
+
 	res := C.avcodec_send_packet(d.codecCtx, &avPacket)
 	if res < 0 {
 		return image.Gray{}, nil
@@ -1099,21 +1124,13 @@ func (d *Decoder) decodeRaw(nalu []byte) (image.Gray, error) {
 		ys := int(fr.linesize[0])
 
 		return image.Gray{
-			Pix:    fromCPtr(unsafe.Pointer(fr.data[0]), w*h),
+			Pix:    unsafe.Slice((*byte)(fr.data[0]), w*h),
 			Stride: ys,
 			Rect:   image.Rect(0, 0, w, h),
 		}, nil
 	}
 
 	return image.Gray{}, nil
-}
-
-func fromCPtr(buf unsafe.Pointer, size int) (ret []uint8) {
-	hdr := (*reflect.SliceHeader)((unsafe.Pointer(&ret)))
-	hdr.Cap = size
-	hdr.Len = size
-	hdr.Data = uintptr(buf)
-	return
 }
 
 func FindPCMU(desc *description.Session, isBackChannel bool) (*format.G711, *description.Media) {
