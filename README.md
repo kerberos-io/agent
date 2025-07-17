@@ -21,7 +21,7 @@
 
 [![Slack invite](https://img.shields.io/badge/join%20kerberos.io%20on%20slack-grey?style=for-the-badge&logo=slack)](https://joinslack.kerberos.io/)
 
-[**Docker Hub**](https://hub.docker.com/r/kerberos/agent) | [**Documentation**](https://doc.kerberos.io) | [**Website**](https://kerberos.io) | [**View Demo**](https://demo.kerberos.io)
+[**Docker Hub**](https://hub.docker.com/r/kerberos/agent) | [**Documentation**](https://doc.kerberos.io) | [**Website**](https://kerberos.io) | [**View Demo**](https://demo.kerberos.io) | [VISUALISE REPO](https://repomapr.com/kerberos-io/agent)
 
 > Before you continue, this repository discusses one of the components of the Kerberos.io stack, the Kerberos Agent, in depth. If you are [looking for an end-to-end deployment guide have a look here](https://github.com/kerberos-io/deployment).
 
