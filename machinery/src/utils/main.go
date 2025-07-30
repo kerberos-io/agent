@@ -407,7 +407,7 @@ func ImageToBytes(img *image.Image) ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	w := bufio.NewWriter(buffer)
 	err := jpeg.Encode(w, *img, &jpeg.Options{Quality: 35})
-	fmt.Println("ImageToBytes() - buffer size: ", buffer.Len())
+	log.Log.Debug("ImageToBytes() - buffer size: " + strconv.Itoa(buffer.Len()))
 	return buffer.Bytes(), err
 }
 
