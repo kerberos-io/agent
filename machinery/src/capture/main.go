@@ -757,7 +757,8 @@ func Base64Image(captureDevice *Capture, communication *models.Communication) st
 				var img image.YCbCr
 				img, err = (*rtspClient).DecodePacket(pkt)
 				if err == nil {
-					bytes, _ := utils.ImageToBytes(&img)
+					imageResized, _ := utils.ResizeImage(&img, 100000)
+					bytes, _ := utils.ImageToBytes(imageResized)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 					break
 				} else {

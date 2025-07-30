@@ -21,6 +21,8 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+
+	"github.com/nfnt/resize"
 )
 
 const VERSION = "3.5.0"
@@ -401,9 +403,21 @@ func Decrypt(directoryOrFile string, symmetricKey []byte) {
 	}
 }
 
-func ImageToBytes(img image.Image) ([]byte, error) {
+func ImageToBytes(img *image.Image) ([]byte, error) {
 	buffer := new(bytes.Buffer)
 	w := bufio.NewWriter(buffer)
-	err := jpeg.Encode(w, img, &jpeg.Options{Quality: 15})
+	err := jpeg.Encode(w, *img, &jpeg.Options{Quality: 35})
+	fmt.Println("ImageToBytes() - buffer size: ", buffer.Len())
 	return buffer.Bytes(), err
+}
+
+func ResizeImage(img image.Image, maxSize uint64) (*image.Image, error) {
+	if img == nil {
+		return nil, errors.New("image is nil")
+	}
+
+	// resize to width 640 using Lanczos resampling
+	// and preserve aspect ratio
+	m := resize.Resize(640, 0, img, resize.Lanczos3)
+	return &m, nil
 }

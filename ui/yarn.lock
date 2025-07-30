@@ -1715,10 +1715,10 @@
     "@jridgewell/resolve-uri" "^3.0.3"
     "@jridgewell/sourcemap-codec" "^1.4.10"
 
-"@kerberos-io/ui@^1.71.0":
-  version "1.71.0"
-  resolved "https://registry.yarnpkg.com/@kerberos-io/ui/-/ui-1.71.0.tgz#06914c94e8b0982068d2099acf8158917a511bfc"
-  integrity sha512-pHCTn/iQTcQEPoCK82eJHGRn6BgzW3wgV4C+mNqdKOtLTquxL+vh7molEgC66tl3DGf7HyjSNa8LuoxYbt9TEg==
+"@kerberos-io/ui@^1.76.0":
+  version "1.77.0"
+  resolved "https://registry.yarnpkg.com/@kerberos-io/ui/-/ui-1.77.0.tgz#b748b2a9abf793ff2a9ba64ee41f84debc0ca9dc"
+  integrity sha512-CHh4jeLKwrYvJRL5PM3UEN4p2k1fqwMKgSF2U6IR4v0fE2FwPc/2Ry4zGk6pvLDFHbDpR9jUkHX+iNphvStoyQ==
   dependencies:
     "@emotion/react" "^11.10.4"
     "@emotion/styled" "^11.10.4"
