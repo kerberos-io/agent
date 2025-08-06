@@ -159,7 +159,7 @@ logreader:
 				var img image.YCbCr
 				img, err = (*rtspClient).DecodePacket(pkt)
 				if err == nil {
-					imageResized, _ := utils.ResizeImage(&img, 100000)
+					imageResized, _ := utils.ResizeImage(&img, 640) // Resize to 640 width
 					bytes, _ := utils.ImageToBytes(imageResized)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				} else {

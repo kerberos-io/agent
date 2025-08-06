@@ -411,13 +411,23 @@ func ImageToBytes(img *image.Image) ([]byte, error) {
 	return buffer.Bytes(), err
 }
 
-func ResizeImage(img image.Image, maxSize uint64) (*image.Image, error) {
+func ResizeImage(img image.Image, newWidth uint) (*image.Image, error) {
 	if img == nil {
 		return nil, errors.New("image is nil")
 	}
 
 	// resize to width 640 using Lanczos resampling
 	// and preserve aspect ratio
-	m := resize.Resize(640, 0, img, resize.Lanczos3)
+	m := resize.Resize(newWidth, 0, img, resize.Lanczos3)
 	return &m, nil
+}
+
+func ResizeHeightWithAspectRatio(newWidth int, width int, height int) (int, int) {
+	if newWidth <= 0 || width <= 0 || height <= 0 {
+		return width, height
+	}
+	// Calculate the new height based on the aspect ratio
+	newHeight := (newWidth * height) / width
+	// Return the new dimensions
+	return newWidth, newHeight
 }

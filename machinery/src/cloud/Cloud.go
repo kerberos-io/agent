@@ -706,7 +706,7 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 				log.Log.Info("cloud.HandleLiveStreamSD(): Sending base64 encoded images to MQTT.")
 				img, err := rtspClient.DecodePacket(pkt)
 				if err == nil {
-					imageResized, _ := utils.ResizeImage(&img, 100000)
+					imageResized, _ := utils.ResizeImage(&img, uint(config.Capture.IPCamera.BaseWidth))
 					bytes, _ := utils.ImageToBytes(imageResized)
 
 					chunking := config.Capture.LiveviewChunking
@@ -865,7 +865,7 @@ func HandleRealtimeProcessing(processingCursor *packets.QueueCursor, configurati
 				log.Log.Info("cloud.RealtimeProcessing(): Sending base64 encoded images to MQTT.")
 				img, err := rtspClient.DecodePacket(pkt)
 				if err == nil {
-					imageResized, _ := utils.ResizeImage(&img, 100000)
+					imageResized, _ := utils.ResizeImage(&img, uint(config.Capture.IPCamera.BaseWidth))
 					bytes, _ := utils.ImageToBytes(imageResized)
 					encoded := base64.StdEncoding.EncodeToString(bytes)
 
