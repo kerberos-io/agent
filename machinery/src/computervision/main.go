@@ -63,16 +63,34 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 			}
 		}
 
+		// A user might have set the base width and height for the IPCamera.
+		// This means also the polygon coordinates are set to a specific width and height (which might be different than the actual packets
+		// received from the IPCamera). So we will resize the polygon coordinates to the base width and height.
+		baseWidthRatio := 1.0
+		baseHeightRatio := 1.0
+		baseWidth := config.Capture.IPCamera.BaseWidth
+		baseHeight := config.Capture.IPCamera.BaseHeight
+		if baseWidth > 0 && baseHeight > 0 {
+			// We'll get the first image to calculate the ratio
+			img := imageArray[0]
+			if img != nil {
+				bounds := img.Bounds()
+				rows := bounds.Dy()
+				cols := bounds.Dx()
+				baseWidthRatio = float64(cols) / float64(baseWidth)
+				baseHeightRatio = float64(rows) / float64(baseHeight)
+			}
+		}
+
 		// Calculate mask
 		var polyObjects []geo.Polygon
-
 		if config.Region != nil {
 			for _, polygon := range config.Region.Polygon {
 				coords := polygon.Coordinates
 				poly := geo.Polygon{}
 				for _, c := range coords {
-					x := c.X
-					y := c.Y
+					x := c.X * baseWidthRatio
+					y := c.Y * baseHeightRatio
 					p := geo.NewPoint(x, y)
 					if !poly.Contains(p) {
 						poly.Add(p)
