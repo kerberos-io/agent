@@ -174,10 +174,15 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	configuration.Config.Capture.IPCamera.Height = height
 
 	// Set the liveview width and height, this is used for the liveview and motion regions (drawing on the hub).
-	liveviewWidth := config.Capture.IPCamera.BaseWidth
-	if liveviewWidth > 0 {
-		widthAspectRatio := float64(liveviewWidth) / float64(width)
+	baseWidth := config.Capture.IPCamera.BaseWidth
+	baseHeight := config.Capture.IPCamera.BaseHeight
+	// If the liveview height is not set, we will calculate it based on the width and aspect ratio of the camera.
+	if baseWidth > 0 && baseHeight == 0 {
+		widthAspectRatio := float64(baseWidth) / float64(width)
 		configuration.Config.Capture.IPCamera.BaseHeight = int(float64(height) * widthAspectRatio)
+	} else {
+		configuration.Config.Capture.IPCamera.BaseHeight = height
+		configuration.Config.Capture.IPCamera.BaseWidth = width
 	}
 
 	// Set the SPS and PPS values in the configuration.
@@ -236,10 +241,15 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 		// If we have a substream, we need to set the width and height of the substream. (so we will override above information)
 		// Set the liveview width and height, this is used for the liveview and motion regions (drawing on the hub).
-		liveviewWidth := config.Capture.IPCamera.BaseWidth
-		if liveviewWidth > 0 {
-			widthAspectRatio := float64(liveviewWidth) / float64(width)
+		baseWidth := config.Capture.IPCamera.BaseWidth
+		baseHeight := config.Capture.IPCamera.BaseHeight
+		// If the liveview height is not set, we will calculate it based on the width and aspect ratio of the camera.
+		if baseWidth > 0 && baseHeight == 0 {
+			widthAspectRatio := float64(baseWidth) / float64(width)
 			configuration.Config.Capture.IPCamera.BaseHeight = int(float64(height) * widthAspectRatio)
+		} else {
+			configuration.Config.Capture.IPCamera.BaseHeight = height
+			configuration.Config.Capture.IPCamera.BaseWidth = width
 		}
 	}
 

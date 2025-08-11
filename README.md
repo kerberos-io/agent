@@ -208,6 +208,8 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_REGION_POLYGON`                      | A single polygon set for motion detection: "x1,y1;x2,y2;x3,y3;...                               | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_RTSP`               | Full-HD RTSP endpoint to the camera you're targetting.                                          | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_SUB_RTSP`           | Sub-stream RTSP endpoint used for livestreaming (WebRTC).                                       | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_BASE_WIDTH`         | Force a specific width resolution for live view processing.                                     | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_BASE_HEIGHT`        | Force a specific height resolution for live view processing.                                    | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_ONVIF`              | Mark as a compliant ONVIF device.                                                               | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_ONVIF_XADDR`        | ONVIF endpoint/address running on the camera.                                                   | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_ONVIF_USERNAME`     | ONVIF username to authenticate against.                                                         | ""                             |

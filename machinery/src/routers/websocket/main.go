@@ -161,7 +161,7 @@ logreader:
 				if err == nil {
 					config := configuration.Config
 					// Resize the image to the base width and height
-					imageResized, _ := utils.ResizeImage(&img, uint(config.Capture.IPCamera.BaseHeight), uint(config.Capture.IPCamera.BaseWidth))
+					imageResized, _ := utils.ResizeImage(&img, uint(config.Capture.IPCamera.BaseWidth), uint(config.Capture.IPCamera.BaseHeight))
 					bytes, _ := utils.ImageToBytes(imageResized)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				} else {
