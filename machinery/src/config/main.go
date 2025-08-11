@@ -547,6 +547,7 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 
 	// Hardcoded values, should be configurable in the future.
 	configuration.Config.Capture.IPCamera.BaseWidth = 640
+	configuration.Config.Capture.IPCamera.BaseHeight = 0 // we might force the height to 0, so it will be calculated based on the width and aspect ratio of the camera.
 }
 
 func SaveConfig(configDirectory string, config models.Config, configuration *models.Configuration, communication *models.Communication) error {

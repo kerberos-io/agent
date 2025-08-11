@@ -713,7 +713,7 @@ func GetSnapshotRaw(c *gin.Context, captureDevice *capture.Capture, configuratio
 	image := capture.JpegImage(captureDevice, communication)
 
 	// encode image to jpeg
-	imageResized, _ := utils.ResizeImage(&image, uint(configuration.Config.Capture.IPCamera.BaseWidth))
+	imageResized, _ := utils.ResizeImage(&image, uint(configuration.Config.Capture.IPCamera.BaseWidth), uint(configuration.Config.Capture.IPCamera.BaseHeight))
 	bytes, _ := utils.ImageToBytes(imageResized)
 
 	// Return image/jpeg
