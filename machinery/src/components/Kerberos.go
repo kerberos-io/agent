@@ -371,7 +371,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	configService.OpenConfig(configDirectory, configuration)
 
 	// We will override the configuration with the environment variables
-	configService.OverrideWithEnvironmentVabriables(configuration)
+	configService.OverrideWithEnvironmentVariables(configuration)
 
 	// Here we are cleaning up everything!
 	if configuration.Config.Offline != "true" {
