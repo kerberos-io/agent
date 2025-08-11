@@ -14,7 +14,9 @@
 		"ipcamera": {
 			"rtsp": "",
 			"sub_rtsp": "",
-			"fps": ""
+			"fps": "",
+			"base_width": 640,
+			"base_height": 0
 		},
 		"usbcamera": {
 			"device": ""
