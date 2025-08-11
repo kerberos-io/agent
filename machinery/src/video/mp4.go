@@ -64,15 +64,14 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte, vpsNALUs [][]
 	init := mp4ff.NewMP4Init()
 
 	// Add a free box to the init segment
-	// Prepend a free box to the init segment with a size of 1000
-	freeBoxSize := 2048
+	// Prepend a free box to the init segment with a size of 4096 bytes, so we can overwrite it later with the actual init segment.
+	freeBoxSize := 4096
 	free := mp4ff.NewFreeBox(make([]byte, freeBoxSize))
 	init.AddChild(free)
 
 	// Create a writer
 	ofd, err := os.Create(fileName)
 	if err != nil {
-		panic(err)
 	}
 
 	// Create a buffered writer
@@ -82,7 +81,6 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte, vpsNALUs [][]
 	// so we can overwrite it later with the actual init segment.
 	err = init.Encode(bufferedWriter)
 	if err != nil {
-		panic(err)
 	}
 
 	return &MP4{
@@ -142,7 +140,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
 			err := mp4.Segment.Encode(mp4.Writer)
 			if err != nil {
-				return err
+				log.Log.Error("mp4.AddSampleToTrack(): error encoding segment: " + err.Error())
 			}
 			mp4.Segments = append(mp4.Segments, mp4.Segment)
 		}
@@ -158,6 +156,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		// Create a video fragment
 		multiTrackFragment, err := mp4ff.CreateMultiTrackFragment(uint32(mp4.SegmentCount), mp4.TrackIDs) // Assuming 1 for video track and 2 for audio track
 		if err != nil {
+			log.Log.Error("mp4.AddSampleToTrack(): error creating multi track fragment: " + err.Error())
 		}
 		mp4.MultiTrackFragment = multiTrackFragment
 		seg.AddFragment(multiTrackFragment)
@@ -175,9 +174,10 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 
 			var lengthPrefixed []byte
 			var err error
-			if mp4.VideoTrackName == "H264" || mp4.VideoTrackName == "AVC1" { // Convert Annex B to length-prefixed NAL units if H264
+			switch mp4.VideoTrackName {
+			case "H264", "AVC1": // Convert Annex B to length-prefixed NAL units if H264
 				lengthPrefixed, err = annexBToLengthPrefixed(data)
-			} else if mp4.VideoTrackName == "H265" || mp4.VideoTrackName == "HVC1" { // Convert H265 Annex B to length-prefixed NAL units
+			case "H265", "HVC1": // Convert H265 Annex B to length-prefixed NAL units
 				lengthPrefixed, err = annexBToLengthPrefixed(data)
 			}
 
@@ -187,14 +187,12 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 					log.Log.Debug("Adding sample to track " + fmt.Sprintf("%d, PTS: %d, Duration: %d, size: %d, Keyframe: %t", trackID, pts, duration, len(lengthPrefixed), isKeyframe))
 
 					mp4.LastVideoSampleDTS = duration
-					//fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d, Keyframe: %t\n", trackID, pts, duration, len(mp4.VideoFullSample.Data), isKeyframe)
 					mp4.VideoTotalDuration += duration
 					mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
 					mp4.VideoFullSample.Sample.Dur = uint32(duration)
 					err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)
 					if err != nil {
-						//log.Printf("Error adding sample to track %d: %v", trackID, err)
-						return err
+						log.Log.Error("mp4.AddSampleToTrack(): error adding sample to track " + fmt.Sprintf("%d: %v", trackID, err))
 					}
 				}
 
@@ -261,33 +259,6 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 
 func (mp4 *MP4) Close(config *models.Config) {
 
-	// Add the last sample to the track, we will predict the duration based on the last sample
-	// We are not insert the last sample as we might corrupt playback (as we do not know accurately the next PTS).
-	// In theory it means we will lose the last sample, so there is millisecond dataloss, but it is better than corrupting playback.
-	// We could this by using a delayed packet reader, and look for the next PTS (closest one), but that would require a lot of memory and CPU.
-
-	/*duration := uint64(0)
-	trackID := uint32(1)
-	if mp4.SampleType == "video" {
-		duration = mp4.LastVideoSampleDTS
-		trackID = uint32(mp4.VideoTrack)
-	} else if mp4.SampleType == "audio" {
-		duration = 21 //mp4.LastAudioSampleDTS
-
-	} else {
-		log.Println("mp4.Close(): unknown sample type, cannot calculate duration")
-	}
-
-	if duration > 0 {
-		mp4.VideoTotalDuration += duration
-		mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
-		mp4.VideoFullSample.Sample.Dur = uint32(duration)
-		err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)
-		if err != nil {
-		}
-		mp4.Segments = append(mp4.Segments, mp4.Segment)
-	}*/
-
 	if mp4.VideoTotalDuration == 0 && mp4.AudioTotalDuration == 0 {
 		log.Log.Error("mp4.Close(): no video or audio samples added, cannot create MP4 file")
 	}
@@ -296,7 +267,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 	if mp4.Segment != nil {
 		err := mp4.Segment.Encode(mp4.Writer)
 		if err != nil {
-			panic(err)
+			log.Log.Error("mp4.Close(): error encoding last segment: " + err.Error())
 		}
 	}
 
@@ -304,7 +275,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 	defer mp4.FileWriter.Close()
 
 	// Now we have all the moof and mdat boxes written to the file.
-	// We can now generate the ftyp and moov boxes, and replace it with the free box we added earlier (size of 10008 bytes).
+	// We can now generate the ftyp and moov boxes, and replace it with the free box we added earlier (size of 2048 bytes).
 	init := mp4ff.NewMP4Init()
 
 	// Create a new ftyp box
@@ -337,22 +308,21 @@ func (mp4 *MP4) Close(config *models.Config) {
 	init.Moov.AddChild(mvex)
 
 	// Add a track for the video
-	if mp4.VideoTrackName == "H264" || mp4.VideoTrackName == "AVC1" {
+	switch mp4.VideoTrackName {
+	case "H264", "AVC1":
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
 		err := init.Moov.Traks[0].SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
 		if err != nil {
-			//panic(err)
 		}
 		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
 		//init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
-	} else if mp4.VideoTrackName == "H265" || mp4.VideoTrackName == "HVC1" {
+	case "H265", "HVC1":
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
 		err := init.Moov.Traks[0].SetHEVCDescriptor("hvc1", mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
 		if err != nil {
-			//panic(err)
 		}
 		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
@@ -372,7 +342,6 @@ func (mp4 *MP4) Close(config *models.Config) {
 		// Set the audio descriptor
 		err := init.Moov.Traks[1].SetAACDescriptor(29, audioSampleRate)
 		if err != nil {
-			//panic(err)
 		}
 		init.Moov.Traks[1].Tkhd.Duration = mp4.AudioTotalDuration
 		init.Moov.Traks[1].Mdia.Hdlr.Name = "agent " + utils.VERSION
@@ -481,16 +450,15 @@ func (mp4 *MP4) Close(config *models.Config) {
 	init.AddChild(sidx)*/
 
 	// Get a bit slice writer for the init segment
-	// Get a byte buffer of 10008 bytes to write the init segment
+	// Get a byte buffer of FreeBoxSize bytes to write the init segment
 	buffer := bytes.NewBuffer(make([]byte, 0))
 	init.Encode(buffer)
 
-	// The first 10008 bytes of the file is a free box, so we can read it and replace it with the moov box.
-	// The init box might not be 10008 bytes, so we need to read the first 10008 bytes and then replace it with the moov box.
+	// The first FreeBoxSize bytes of the file is a free box, so we can read it and replace it with the moov box.
+	// The init box might not be FreeBoxSize bytes, so we need to read the first FreeBoxSize bytes and then replace it with the moov box.
 	// while the remaining bytes are for a new free box.
 	// Write the init segment at the beginning of the file, replacing the free box
 	if _, err := mp4.FileWriter.WriteAt(buffer.Bytes(), 0); err != nil {
-		panic(err)
 	}
 
 	// Calculate the remaining size for the free box
@@ -499,10 +467,10 @@ func (mp4 *MP4) Close(config *models.Config) {
 		newFreeBox := mp4ff.NewFreeBox(make([]byte, remainingSize))
 		var freeBuf bytes.Buffer
 		if err := newFreeBox.Encode(&freeBuf); err != nil {
-			panic(err)
+			log.Log.Error("mp4.Close(): error encoding free box: " + err.Error())
 		}
 		if _, err := mp4.FileWriter.WriteAt(freeBuf.Bytes(), int64(buffer.Len())); err != nil {
-			panic(err)
+			log.Log.Error("mp4.Close(): error writing free box: " + err.Error())
 		}
 	}
 }
@@ -909,7 +877,7 @@ func SampleToAACSampleIndex(sampling int) int {
 			return i
 		}
 	}
-	panic("not Found AAC Sample Index")
+	return -1
 }
 
 func AACSampleIdxToSample(idx int) int {

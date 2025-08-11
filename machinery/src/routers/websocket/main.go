@@ -49,7 +49,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func WebsocketHandler(c *gin.Context, communication *models.Communication, captureDevice *capture.Capture) {
+func WebsocketHandler(c *gin.Context, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
 	w := c.Writer
 	r := c.Request
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -112,7 +112,7 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication, captu
 
 						ctx, cancel := context.WithCancel(context.Background())
 						sockets[clientID].Cancels["stream-sd"] = cancel
-						go ForwardSDStream(ctx, clientID, sockets[clientID], communication, captureDevice)
+						go ForwardSDStream(ctx, clientID, sockets[clientID], configuration, communication, captureDevice)
 					}
 				}
 			}
@@ -131,7 +131,7 @@ func WebsocketHandler(c *gin.Context, communication *models.Communication, captu
 	}
 }
 
-func ForwardSDStream(ctx context.Context, clientID string, connection *Connection, communication *models.Communication, captureDevice *capture.Capture) {
+func ForwardSDStream(ctx context.Context, clientID string, connection *Connection, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
 
 	var queue *packets.Queue
 	var cursor *packets.QueueCursor
@@ -159,7 +159,9 @@ logreader:
 				var img image.YCbCr
 				img, err = (*rtspClient).DecodePacket(pkt)
 				if err == nil {
-					imageResized, _ := utils.ResizeImage(&img, 100000)
+					config := configuration.Config
+					// Resize the image to the base width and height
+					imageResized, _ := utils.ResizeImage(&img, uint(config.Capture.IPCamera.BaseWidth), uint(config.Capture.IPCamera.BaseHeight))
 					bytes, _ := utils.ImageToBytes(imageResized)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 				} else {

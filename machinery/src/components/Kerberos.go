@@ -173,6 +173,18 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	configuration.Config.Capture.IPCamera.Width = width
 	configuration.Config.Capture.IPCamera.Height = height
 
+	// Set the liveview width and height, this is used for the liveview and motion regions (drawing on the hub).
+	baseWidth := config.Capture.IPCamera.BaseWidth
+	baseHeight := config.Capture.IPCamera.BaseHeight
+	// If the liveview height is not set, we will calculate it based on the width and aspect ratio of the camera.
+	if baseWidth > 0 && baseHeight == 0 {
+		widthAspectRatio := float64(baseWidth) / float64(width)
+		configuration.Config.Capture.IPCamera.BaseHeight = int(float64(height) * widthAspectRatio)
+	} else {
+		configuration.Config.Capture.IPCamera.BaseHeight = height
+		configuration.Config.Capture.IPCamera.BaseWidth = width
+	}
+
 	// Set the SPS and PPS values in the configuration.
 	configuration.Config.Capture.IPCamera.SPSNALUs = [][]byte{videoStream.SPS}
 	configuration.Config.Capture.IPCamera.PPSNALUs = [][]byte{videoStream.PPS}
@@ -226,6 +238,19 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		// Set config values as well
 		configuration.Config.Capture.IPCamera.SubWidth = width
 		configuration.Config.Capture.IPCamera.SubHeight = height
+
+		// If we have a substream, we need to set the width and height of the substream. (so we will override above information)
+		// Set the liveview width and height, this is used for the liveview and motion regions (drawing on the hub).
+		baseWidth := config.Capture.IPCamera.BaseWidth
+		baseHeight := config.Capture.IPCamera.BaseHeight
+		// If the liveview height is not set, we will calculate it based on the width and aspect ratio of the camera.
+		if baseWidth > 0 && baseHeight == 0 {
+			widthAspectRatio := float64(baseWidth) / float64(width)
+			configuration.Config.Capture.IPCamera.BaseHeight = int(float64(height) * widthAspectRatio)
+		} else {
+			configuration.Config.Capture.IPCamera.BaseHeight = height
+			configuration.Config.Capture.IPCamera.BaseWidth = width
+		}
 	}
 
 	// We are creating a queue to store the RTSP frames in, these frames will be
@@ -676,7 +701,7 @@ func MakeRecording(c *gin.Context, communication *models.Communication) {
 // @Success 200
 func GetSnapshotBase64(c *gin.Context, captureDevice *capture.Capture, configuration *models.Configuration, communication *models.Communication) {
 	// We'll try to get a snapshot from the camera.
-	base64Image := capture.Base64Image(captureDevice, communication)
+	base64Image := capture.Base64Image(captureDevice, communication, configuration)
 	if base64Image != "" {
 		communication.Image = base64Image
 	}
@@ -698,7 +723,7 @@ func GetSnapshotRaw(c *gin.Context, captureDevice *capture.Capture, configuratio
 	image := capture.JpegImage(captureDevice, communication)
 
 	// encode image to jpeg
-	imageResized, _ := utils.ResizeImage(&image, 100000)
+	imageResized, _ := utils.ResizeImage(&image, uint(configuration.Config.Capture.IPCamera.BaseWidth), uint(configuration.Config.Capture.IPCamera.BaseHeight))
 	bytes, _ := utils.ImageToBytes(imageResized)
 
 	// Return image/jpeg
@@ -714,7 +739,7 @@ func GetSnapshotRaw(c *gin.Context, captureDevice *capture.Capture, configuratio
 // @Success 200
 func GetConfig(c *gin.Context, captureDevice *capture.Capture, configuration *models.Configuration, communication *models.Communication) {
 	// We'll try to get a snapshot from the camera.
-	base64Image := capture.Base64Image(captureDevice, communication)
+	base64Image := capture.Base64Image(captureDevice, communication, configuration)
 	if base64Image != "" {
 		communication.Image = base64Image
 	}

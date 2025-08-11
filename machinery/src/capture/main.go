@@ -727,7 +727,7 @@ func VerifyCamera(c *gin.Context) {
 	}
 }
 
-func Base64Image(captureDevice *Capture, communication *models.Communication) string {
+func Base64Image(captureDevice *Capture, communication *models.Communication, configuration *models.Configuration) string {
 	// We'll try to get a snapshot from the camera.
 	var queue *packets.Queue
 	var cursor *packets.QueueCursor
@@ -757,7 +757,7 @@ func Base64Image(captureDevice *Capture, communication *models.Communication) st
 				var img image.YCbCr
 				img, err = (*rtspClient).DecodePacket(pkt)
 				if err == nil {
-					imageResized, _ := utils.ResizeImage(&img, 100000)
+					imageResized, _ := utils.ResizeImage(&img, uint(configuration.Config.Capture.IPCamera.BaseWidth), uint(configuration.Config.Capture.IPCamera.BaseHeight))
 					bytes, _ := utils.ImageToBytes(imageResized)
 					encodedImage = base64.StdEncoding.EncodeToString(bytes)
 					break

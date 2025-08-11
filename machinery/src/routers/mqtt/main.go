@@ -389,14 +389,6 @@ func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload models.P
 			// Copy the config, as we don't want to share the encryption part.
 			deepCopy := configuration.Config
 
-			// We need a fix for the width and height if a substream.
-			// The ROI requires the width and height of the sub stream.
-			if configuration.Config.Capture.IPCamera.SubRTSP != "" &&
-				configuration.Config.Capture.IPCamera.SubRTSP != configuration.Config.Capture.IPCamera.RTSP {
-				deepCopy.Capture.IPCamera.Width = configuration.Config.Capture.IPCamera.SubWidth
-				deepCopy.Capture.IPCamera.Height = configuration.Config.Capture.IPCamera.SubHeight
-			}
-
 			var configMap map[string]interface{}
 			inrec, _ := json.Marshal(deepCopy)
 			json.Unmarshal(inrec, &configMap)

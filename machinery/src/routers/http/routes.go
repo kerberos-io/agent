@@ -15,7 +15,7 @@ import (
 func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) *gin.RouterGroup {
 
 	r.GET("/ws", func(c *gin.Context) {
-		websocket.WebsocketHandler(c, communication, captureDevice)
+		websocket.WebsocketHandler(c, configuration, communication, captureDevice)
 	})
 
 	// This is legacy should be removed in future! Now everything

@@ -239,7 +239,15 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 				configuration.Config.Capture.IPCamera.SubRTSP = value
 				break
 
-				/* ONVIF connnection settings */
+			/* Base width and height for the liveview and motion regions */
+			case "AGENT_CAPTURE_IPCAMERA_BASE_WIDTH":
+				configuration.Config.Capture.IPCamera.BaseWidth, _ = strconv.Atoi(value)
+				break
+			case "AGENT_CAPTURE_IPCAMERA_BASE_HEIGHT":
+				configuration.Config.Capture.IPCamera.BaseHeight, _ = strconv.Atoi(value)
+				break
+
+			/* ONVIF connnection settings */
 			case "AGENT_CAPTURE_IPCAMERA_ONVIF":
 				configuration.Config.Capture.IPCamera.ONVIF = value
 				break
