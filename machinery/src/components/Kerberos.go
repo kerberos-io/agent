@@ -180,6 +180,9 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	if baseWidth > 0 && baseHeight == 0 {
 		widthAspectRatio := float64(baseWidth) / float64(width)
 		configuration.Config.Capture.IPCamera.BaseHeight = int(float64(height) * widthAspectRatio)
+	} else if baseHeight > 0 && baseWidth > 0 {
+		configuration.Config.Capture.IPCamera.BaseHeight = baseHeight
+		configuration.Config.Capture.IPCamera.BaseWidth = baseWidth
 	} else {
 		configuration.Config.Capture.IPCamera.BaseHeight = height
 		configuration.Config.Capture.IPCamera.BaseWidth = width
@@ -247,6 +250,9 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		if baseWidth > 0 && baseHeight == 0 {
 			widthAspectRatio := float64(baseWidth) / float64(width)
 			configuration.Config.Capture.IPCamera.BaseHeight = int(float64(height) * widthAspectRatio)
+		} else if baseHeight > 0 && baseWidth > 0 {
+			configuration.Config.Capture.IPCamera.BaseHeight = baseHeight
+			configuration.Config.Capture.IPCamera.BaseWidth = baseWidth
 		} else {
 			configuration.Config.Capture.IPCamera.BaseHeight = height
 			configuration.Config.Capture.IPCamera.BaseWidth = width
