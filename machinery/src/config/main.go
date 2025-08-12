@@ -591,6 +591,10 @@ func StoreConfig(configDirectory string, config models.Config) error {
 		config.Encryption.PrivateKey = encryptionPrivateKey
 	}
 
+	// Reset the basewidth and baseheight
+	config.Capture.IPCamera.BaseWidth = 0
+	config.Capture.IPCamera.BaseHeight = 0
+
 	// Save into database
 	if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
 		// Write to mongodb
