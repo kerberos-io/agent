@@ -2,6 +2,7 @@ ui/node_modules
 ui/build
 ui/public/assets/env.js
 .DS_Store
+__debug*
 .idea
 machinery/www
 yarn.lock

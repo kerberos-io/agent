@@ -1,5 +1,5 @@
 
-FROM mcr.microsoft.com/devcontainers/go:1.24-bookworm AS build-machinery
+FROM golang:1.24.5-bullseye AS build-machinery
 LABEL AUTHOR=uug.ai
 
 ##########################################
