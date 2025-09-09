@@ -1,20 +1,43 @@
 
-ARG BASE_IMAGE_VERSION=70ec57e
-FROM kerberos/base:${BASE_IMAGE_VERSION} AS build-machinery
-LABEL AUTHOR=Kerberos.io
-
-ENV GOROOT=/usr/local/go
-ENV GOPATH=/go
-ENV PATH=$GOPATH/bin:$GOROOT/bin:/usr/local/lib:$PATH
-ENV GOSUMDB=off
+FROM mcr.microsoft.com/devcontainers/go:1.24-bookworm AS build-machinery
+LABEL AUTHOR=uug.ai
 
 ##########################################
 # Installing some additional dependencies.
 
-RUN apt-get upgrade -y && apt-get update && apt-get install -y --fix-missing --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --fix-missing --no-install-recommends \
 	git build-essential cmake pkg-config unzip libgtk2.0-dev \
-	curl ca-certificates libcurl4-openssl-dev libssl-dev libjpeg62-turbo-dev && \
+	curl ca-certificates libcurl4-openssl-dev libssl-dev libjpeg62-turbo-dev \
+	libc-ares-dev uuid-dev daemon libwebsockets-dev \
+	dh-autoreconf autotools-dev autoconf automake gcc \
+	libtool make nasm tar && \
 	rm -rf /var/lib/apt/lists/*
+
+#############################
+# Static build x264
+
+RUN git clone https://code.videolan.org/videolan/x264.git && \
+    cd x264 && git checkout 0a84d986 && \
+    ./configure --prefix=/usr/local --enable-static --enable-pic && \
+    make && \
+    make install && \
+    cd .. && rm -rf x264
+
+#################################
+# Clone and build FFMpeg & OpenCV
+
+RUN git clone https://github.com/FFmpeg/FFmpeg && \
+    cd FFmpeg && git checkout n6.0.1 && \
+    ./configure --prefix=/usr/local --target-os=linux --enable-nonfree \
+    --extra-ldflags="-latomic" \
+    --enable-avfilter \
+    --disable-zlib \
+    --enable-gpl \ 
+    --extra-libs=-latomic  \
+    --enable-static --disable-shared  && \
+    make && \
+    make install && \
+    cd .. && rm -rf FFmpeg
 
 ##############################################################################
 # Copy all the relevant source code in the Docker image, so we can build this.
