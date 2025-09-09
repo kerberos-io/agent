@@ -13,7 +13,7 @@ jobs:
       contents: write
     strategy:
       matrix:
-        architecture: [amd64, arm64, arm-v7, arm-v6]
+        architecture: [amd64, arm64, arm-v7]
     steps:
       - name: Login to DockerHub
         uses: docker/login-action@v2
