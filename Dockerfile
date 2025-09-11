@@ -16,18 +16,6 @@ RUN apt-get upgrade -y && apt-get update && apt-get install -y --fix-missing --n
 	curl ca-certificates libcurl4-openssl-dev libssl-dev libjpeg62-turbo-dev && \
 	rm -rf /var/lib/apt/lists/*
 
-############################
-# Build Golang
-RUN go version
-RUN ARCH=$(uname -m) && \
-    ARCH=$([ "$(uname -m)" = "armv7l" ] && echo "armv6l" || echo $ARCH) && \
-    ARCH=$([ "$(uname -m)" = "x86_64" ] && echo "amd64" || echo $ARCH) && \
-    ARCH=$([ "$(uname -m)" = "aarch64" ] && echo "arm64" || echo $ARCH) && \
-    wget "https://dl.google.com/go/go1.24.5.linux-$ARCH.tar.gz" && \
-    tar -xvf "go1.24.5.linux-$ARCH.tar.gz" && \
-    rm -rf go1.24.5.linux-$ARCH.tar.gz && \
-    mv go /usr/local
-
 ##############################################################################
 # Copy all the relevant source code in the Docker image, so we can build this.
 

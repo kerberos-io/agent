@@ -2,6 +2,7 @@
 ARG BASE_IMAGE_VERSION=arm64-ddbe40e
 FROM kerberos/base:${BASE_IMAGE_VERSION} AS build-machinery
 LABEL AUTHOR=uug.ai
+
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:$GOROOT/bin:/usr/local/lib:$PATH
@@ -14,18 +15,6 @@ RUN apt-get upgrade -y && apt-get update && apt-get install -y --fix-missing --n
 	git build-essential cmake pkg-config unzip libgtk2.0-dev \
 	curl ca-certificates libcurl4-openssl-dev libssl-dev libjpeg62-turbo-dev && \
 	rm -rf /var/lib/apt/lists/*
-
-############################
-# Build Golang
-
-RUN ARCH=$(uname -m) && \
-    ARCH=$([ "$(uname -m)" = "armv7l" ] && echo "armv6l" || echo $ARCH) && \
-    ARCH=$([ "$(uname -m)" = "x86_64" ] && echo "amd64" || echo $ARCH) && \
-    ARCH=$([ "$(uname -m)" = "aarch64" ] && echo "arm64" || echo $ARCH) && \
-    wget "https://dl.google.com/go/go1.24.5.linux-$ARCH.tar.gz" && \
-    tar -xvf "go1.24.5.linux-$ARCH.tar.gz" && \
-    rm -rf go1.24.5.linux-$ARCH.tar.gz && \
-    mv go /usr/local
 
 ##############################################################################
 # Copy all the relevant source code in the Docker image, so we can build this.
