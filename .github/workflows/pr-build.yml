@@ -31,7 +31,7 @@ jobs:
       - name: Strip binary
         run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: agent-${{matrix.architecture}}.tar
           path: agent-${{matrix.architecture}}.tar
@@ -60,7 +60,7 @@ jobs:
       - name: Strip binary
         run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
       - name: Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: agent-${{matrix.architecture}}.tar
           path: agent-${{matrix.architecture}}.tar
