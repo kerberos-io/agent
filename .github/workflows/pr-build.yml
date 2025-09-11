@@ -28,6 +28,14 @@ jobs:
           length: 7
       - name: Run Build
         run: docker build -t ${{matrix.architecture}} .
+      - name: Strip binary
+        run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: agent-${{matrix.architecture}}.tar
+          path: agent-${{matrix.architecture}}.tar
+          
   build-arm64:
     runs-on: ubuntu-24.04-arm 
     permissions:
@@ -49,3 +57,11 @@ jobs:
           length: 7
       - name: Run Build
         run: docker build -t ${{matrix.architecture}} -f Dockerfile.arm64 .
+      - name: Strip binary
+        run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: agent-${{matrix.architecture}}.tar
+          path: agent-${{matrix.architecture}}.tar
+
