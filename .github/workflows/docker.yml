@@ -14,7 +14,7 @@ env:
 
 jobs:
   build-amd64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     strategy:
@@ -32,53 +32,36 @@ jobs:
         id: short-sha
         with:
           length: 7
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
-      - name: Run Buildx
-        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}} --push .
-      - name: Create new and append to manifest
-        run: docker buildx imagetools create -t $REPO:${{ github.event.inputs.tag || github.ref_name }} $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
-      - name: Create new and append to manifest latest
-        run: docker buildx imagetools create -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
-        if: github.event.inputs.tag == 'test'
-      - name: Run Buildx with output
-        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{github.event.inputs.tag || github.ref_name}} --output type=tar,dest=output-${{matrix.architecture}}.tar .
+      - name: Run Build
+        run: |
+          docker build -t ${{matrix.architecture}} .
+          CID=$(docker create ${{matrix.architecture}})
+          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
+          docker rm ${CID}
       - name: Strip binary
-        run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
-      - name: Create a release
-        uses: ncipollo/release-action@v1
+        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
+      - name: Build and push Docker image
+        run: |
+          docker tag ${{matrix.architecture}} $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
+          docker push $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
+      - name: Create new manifest
+        run: docker manifest create $REPO:${{ github.event.inputs.tag || github.ref_name }} $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
+      - name: Create latest manifest
+        run: docker manifest create $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
+        if: github.event.inputs.tag == 'test'
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          latest: true
-          allowUpdates: true
-          name: ${{ github.event.inputs.tag || github.ref_name }}
-          tag: ${{ github.event.inputs.tag || github.ref_name }}
-          generateReleaseNotes: false
-          omitBodyDuringUpdate: true
-          artifacts: "agent-${{matrix.architecture}}.tar"
-      # Taken from GoReleaser's own release workflow.
-      # The available Snapcraft Action has some bugs described in the issue below.
-      # The mkdirs are a hack for https://github.com/goreleaser/goreleaser/issues/1715.
-      #- name: Setup Snapcraft
-      #  run: |
-      #    sudo apt-get update
-      #    sudo apt-get -yq --no-install-suggests --no-install-recommends install snapcraft
-      #    mkdir -p $HOME/.cache/snapcraft/download
-      #    mkdir -p $HOME/.cache/snapcraft/stage-packages
-      #- name: Use Snapcraft
-      #  run: tar -xf agent-${{matrix.architecture}}.tar && snapcraft
-  build-other:
-    runs-on: ubuntu-latest
+          name: agent-${{matrix.architecture}}.tar
+          path: agent-${{matrix.architecture}}.tar
+          
+  build-arm64:
+    runs-on: ubuntu-24.04-arm 
     permissions:
       contents: write
-    needs: build-amd64
     strategy:
       matrix:
-        architecture: [arm64, arm-v7, arm-v6]
-        #architecture: [arm64, arm-v7]
+        architecture: [arm64]
     steps:
       - name: Login to DockerHub
         uses: docker/login-action@v2
@@ -91,23 +74,55 @@ jobs:
         id: short-sha
         with:
           length: 7
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-      - name: Available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
-      - name: Run Buildx
-        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}} --push .
-      - name: Create new and append to manifest
-        run: docker buildx imagetools create --append -t $REPO:${{ github.event.inputs.tag || github.ref_name }} $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
-      - name: Create new and append to manifest latest
-        run: docker buildx imagetools create --append -t $REPO:latest $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
-        if: github.event.inputs.tag == 'test'
-      - name: Run Buildx with output
-        run: docker buildx build --platform linux/$(echo ${{matrix.architecture}} | tr - /) -t $REPO-arch:arch-$(echo ${{matrix.architecture}} | tr / -)-${{github.event.inputs.tag || github.ref_name}} --output type=tar,dest=output-${{matrix.architecture}}.tar .
+      - name: Run Build
+        run: |
+          docker build -t ${{matrix.architecture}} -f Dockerfile.arm64 .
+          CID=$(docker create ${{matrix.architecture}})
+          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
+          docker rm ${CID}
       - name: Strip binary
-        run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
+        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
+      - name: Build and push Docker image
+        run: |
+          docker tag ${{matrix.architecture}} $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
+          docker push $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-${{matrix.architecture}}.tar
+          path: agent-${{matrix.architecture}}.tar
+
+  create-manifest:
+    runs-on: ubuntu-24.04
+    needs: [build-amd64, build-arm64]
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Create and push multi-arch manifest
+        run: |
+          docker manifest create $REPO:${{ github.event.inputs.tag || github.ref_name }} \
+            $REPO-arch:arch-amd64-${{github.event.inputs.tag || github.ref_name}} \
+            $REPO-arch:arch-arm64-${{github.event.inputs.tag || github.ref_name}}
+          docker manifest push $REPO:${{ github.event.inputs.tag || github.ref_name }}
+      - name: Create and push latest manifest
+        run: |
+          docker manifest create $REPO:latest \
+            $REPO-arch:arch-amd64-${{github.event.inputs.tag || github.ref_name}} \
+            $REPO-arch:arch-arm64-${{github.event.inputs.tag || github.ref_name}}
+          docker manifest push $REPO:latest
+        if: github.event.inputs.tag == 'test'
+
+  create-release:
+    runs-on: ubuntu-24.04
+    needs: [build-amd64, build-arm64]
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
       - name: Create a release
         uses: ncipollo/release-action@v1
         with:
@@ -117,4 +132,4 @@ jobs:
           tag: ${{ github.event.inputs.tag || github.ref_name }}
           generateReleaseNotes: false
           omitBodyDuringUpdate: true
-          artifacts: "agent-${{matrix.architecture}}.tar"
+          artifacts: "agent-*.tar/agent-*.tar"
