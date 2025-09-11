@@ -18,7 +18,7 @@ RUN apt-get upgrade -y && apt-get update && apt-get install -y --fix-missing --n
 
 ############################
 # Build Golang
-
+RUN go version
 RUN ARCH=$(uname -m) && \
     ARCH=$([ "$(uname -m)" = "armv7l" ] && echo "armv6l" || echo $ARCH) && \
     ARCH=$([ "$(uname -m)" = "x86_64" ] && echo "amd64" || echo $ARCH) && \
