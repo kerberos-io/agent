@@ -1,5 +1,5 @@
 
-ARG BASE_IMAGE_VERSION=amd64-ddbe40e
+ARG BASE_IMAGE_VERSION=arm64-ddbe40e
 FROM kerberos/base:${BASE_IMAGE_VERSION} AS build-machinery
 LABEL AUTHOR=uug.ai
 
