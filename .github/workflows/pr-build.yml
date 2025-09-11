@@ -27,9 +27,13 @@ jobs:
         with:
           length: 7
       - name: Run Build
-        run: docker build -t ${{matrix.architecture}} .
+        run: |
+          docker build -t ${{matrix.architecture}} .
+          CID=$(docker create ${{matrix.architecture}})
+          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
+          docker rm ${CID}
       - name: Strip binary
-        run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
+        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -56,9 +60,13 @@ jobs:
         with:
           length: 7
       - name: Run Build
-        run: docker build -t ${{matrix.architecture}} -f Dockerfile.arm64 .
+        run: |
+          docker build -t ${{matrix.architecture}} -f Dockerfile.arm64 .
+          CID=$(docker create ${{matrix.architecture}})
+          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
+          docker rm ${CID}
       - name: Strip binary
-        run: mkdir -p output/ && tar -xf output-${{matrix.architecture}}.tar -C output && rm output-${{matrix.architecture}}.tar && cd output/ && tar -cf ../agent-${{matrix.architecture}}.tar -C home/agent . && rm -rf output
+        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
