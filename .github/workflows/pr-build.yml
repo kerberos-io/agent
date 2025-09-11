@@ -48,4 +48,4 @@ jobs:
         with:
           length: 7
       - name: Run Build
-        run: docker build -t ${{matrix.architecture}} .
+        run: docker build -t ${{matrix.architecture}} -f Dockerfile.arm64 .
