@@ -74,7 +74,7 @@ jobs:
           path: agent-${{matrix.architecture}}.tar
           
   build-darwin:
-    runs-on: ubuntu-24.04-arm
+    runs-on: macos-26
     permissions:
       contents: write
     strategy:
@@ -97,7 +97,6 @@ jobs:
       - name: Build Darwin binary with Docker
         run: |
           docker build -f Dockerfile.arm64 \
-            --build-arg GOOS=darwin \
             -t darwin-${{matrix.architecture}} .
           CID=$(docker create darwin-${{matrix.architecture}})
           docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
