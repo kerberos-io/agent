@@ -1,0 +1,55 @@
+# Multi-platform build Dockerfile with GOOS/GOARCH arguments
+ARG GOOS=linux
+ARG GOARCH=amd64
+ARG BASE_IMAGE_VERSION=amd64-ddbe40e
+
+# Use golang official image for cross-compilation
+FROM golang:1.24-alpine AS build-machinery
+LABEL AUTHOR=uug.ai
+
+ARG GOOS
+ARG GOARCH
+
+ENV CGO_ENABLED=0
+ENV GOOS=${GOOS}
+ENV GOARCH=${GOARCH}
+ENV GOSUMDB=off
+
+##########################################
+# Installing some additional dependencies.
+
+RUN apk add --no-cache git build-base
+
+##############################################################################
+# Copy all the relevant source code in the Docker image, so we can build this.
+
+WORKDIR /go/src/github.com/kerberos-io/agent
+COPY machinery ./machinery
+RUN rm -rf ./machinery/.env
+
+##################################################################
+# Get the latest commit hash, so we know which version we're running
+COPY .git ./.git
+RUN cd .git && git log --format="%H" -n 1 | head -c7 > ../machinery/version
+RUN cat ./machinery/version
+
+##################
+# Build Machinery
+
+RUN cd machinery && \
+	go mod download && \
+	go build -tags timetzdata,netgo,osusergo --ldflags '-s -w' -o agent main.go && \
+	mkdir -p /agent && \
+	mv agent /agent/ && \
+	mv version /agent/ && \
+	cp -r data /agent/ && \
+	mkdir -p /agent/data/cloud && \
+	mkdir -p /agent/data/snapshots && \
+	mkdir -p /agent/data/log && \
+	mkdir -p /agent/data/recordings && \
+	mkdir -p /agent/data/capture-test && \
+	mkdir -p /agent/data/config
+
+# Final stage - minimal runtime
+FROM scratch
+COPY --from=build-machinery /agent /home/agent

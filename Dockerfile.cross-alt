@@ -1,0 +1,61 @@
+# Alternative: Modify existing Dockerfile to support cross-compilation
+ARG BASE_IMAGE_VERSION=amd64-ddbe40e
+ARG GOOS=linux
+ARG GOARCH=amd64
+
+FROM kerberos/base:${BASE_IMAGE_VERSION} AS build-machinery
+LABEL AUTHOR=uug.ai
+
+ARG GOOS
+ARG GOARCH
+
+ENV GOROOT=/usr/local/go
+ENV GOPATH=/go
+ENV PATH=$GOPATH/bin:$GOROOT/bin:/usr/local/lib:$PATH
+ENV GOSUMDB=off
+ENV GOOS=${GOOS}
+ENV GOARCH=${GOARCH}
+
+# For cross-compilation, disable CGO when building for different platforms
+# Enable CGO only for native linux builds
+ENV CGO_ENABLED=0
+
+##########################################
+# Installing some additional dependencies.
+
+RUN apt-get upgrade -y && apt-get update && apt-get install -y --fix-missing --no-install-recommends \
+	git build-essential cmake pkg-config unzip libgtk2.0-dev \
+	curl ca-certificates libcurl4-openssl-dev libssl-dev libjpeg62-turbo-dev && \
+	rm -rf /var/lib/apt/lists/*
+
+##############################################################################
+# Copy all the relevant source code in the Docker image, so we can build this.
+
+RUN mkdir -p /go/src/github.com/kerberos-io/agent
+COPY machinery /go/src/github.com/kerberos-io/agent/machinery
+RUN rm -rf /go/src/github.com/kerberos-io/agent/machinery/.env
+
+##################################################################
+# Get the latest commit hash, so we know which version we're running
+COPY .git /go/src/github.com/kerberos-io/agent/.git
+RUN cd /go/src/github.com/kerberos-io/agent/.git && git log --format="%H" -n 1 | head -c7 > /go/src/github.com/kerberos-io/agent/machinery/version
+RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
+
+##################
+# Build Machinery
+
+RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
+	go mod download && \
+	go build -tags timetzdata,netgo,osusergo --ldflags '-s -w' -o main main.go && \
+	mkdir -p /agent && \
+	mv main /agent && \
+	mv version /agent && \
+	mv data /agent && \
+	mkdir -p /agent/data/cloud && \
+	mkdir -p /agent/data/snapshots && \
+	mkdir -p /agent/data/log && \
+	mkdir -p /agent/data/recordings && \
+	mkdir -p /agent/data/capture-test && \
+	mkdir -p /agent/data/config
+
+# Continue with the rest of your existing Dockerfile...
