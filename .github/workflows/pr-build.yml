@@ -81,13 +81,8 @@ jobs:
       matrix:
         architecture: [arm64]
     steps:
-      - name: Install docker # Taken from https://github.com/actions/virtual-environments/issues/1143#issuecomment-652264388
-        run: |
-          mkdir -p ~/.docker/machine/cache
-          curl -Lo ~/.docker/machine/cache/boot2docker.iso https://github.com/boot2docker/boot2docker/releases/download/v19.03.12/boot2docker.iso
-          brew install docker docker-machine
-          docker-machine create --driver default
-          docker-machine env default
+      - name: Setup Docker on macOS
+        uses: douglascamata/setup-docker-macos-action@v1.0.0
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
