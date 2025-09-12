@@ -32,6 +32,9 @@ RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
 ##################
 # Build Machinery
 
+ARG GOOS=linux
+ENV GOOS=${GOOS}
+
 RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go mod download && \
 	go build -tags timetzdata,netgo,osusergo --ldflags '-s -w -extldflags "-static -latomic"' main.go && \
