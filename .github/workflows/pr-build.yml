@@ -97,8 +97,6 @@ jobs:
         id: short-sha
         with:
           length: 7
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
       - name: Build Darwin binary with Docker
         run: |
           docker build -f Dockerfile.arm64 \
