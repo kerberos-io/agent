@@ -74,13 +74,18 @@ jobs:
           path: agent-${{matrix.architecture}}.tar
           
   build-darwin:
-    runs-on: macos-15
+    runs-on: macos-26
     permissions:
       contents: write
     strategy:
       matrix:
         architecture: [arm64]
     steps:
+      - name: Install docker # Taken from https://github.com/actions/virtual-environments/issues/1143#issuecomment-652264388
+        run: |
+          mkdir -p ~/.docker/machine/cache
+          curl -Lo ~/.docker/machine/cache/boot2docker.iso https://github.com/boot2docker/boot2docker/releases/download/v19.03.12/boot2docker.iso
+          brew install docker docker-machine
       - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
