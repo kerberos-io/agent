@@ -74,7 +74,7 @@ jobs:
           path: agent-${{matrix.architecture}}.tar
           
   build-darwin:
-    runs-on: macos-13-xlarge
+    runs-on: macos-13
     permissions:
       contents: write
     strategy:
