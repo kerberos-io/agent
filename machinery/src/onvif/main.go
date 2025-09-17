@@ -16,7 +16,8 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/onvif"
 	"github.com/kerberos-io/onvif/device"
-	"github.com/kerberos-io/onvif/deviceio"
+
+	//"github.com/kerberos-io/onvif/deviceio"
 	"github.com/kerberos-io/onvif/event"
 	"github.com/kerberos-io/onvif/media"
 	"github.com/kerberos-io/onvif/ptz"
@@ -1207,8 +1208,9 @@ func GetDigitalInputs(dev *onvif.Device) (device.GetDigitalInputsResponse, error
 
 	// We'll try to receive the relay outputs from the server
 	var digitalinputs device.GetDigitalInputsResponse
+	var err error
 
-	var b []byte
+	/*var b []byte
 	resp, err := dev.CallMethod(deviceio.GetDigitalInputs{})
 	if resp != nil {
 		b, err = io.ReadAll(resp.Body)
@@ -1229,7 +1231,7 @@ func GetDigitalInputs(dev *onvif.Device) (device.GetDigitalInputsResponse, error
 				}
 			}
 		}
-	}
+	}*/
 	return digitalinputs, err
 }
 
