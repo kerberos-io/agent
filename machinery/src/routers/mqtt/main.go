@@ -534,7 +534,7 @@ func HandleNavigatePTZ(mqttClient mqtt.Client, hubKey string, payload models.Pay
 }
 
 func HandleTriggerRelay(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
-	value := payload.Value
+	/*value := payload.Value
 	jsonData, _ := json.Marshal(value)
 	var triggerRelayPayload models.TriggerRelay
 	json.Unmarshal(jsonData, &triggerRelayPayload)
@@ -561,7 +561,7 @@ func HandleTriggerRelay(mqttClient mqtt.Client, hubKey string, payload models.Pa
 		} else {
 			log.Log.Info("routers.mqtt.main.HandleTriggerRelay(): received trigger, but camera is not connected.")
 		}
-	}
+	}*/
 }
 
 func DisconnectMQTT(mqttClient mqtt.Client, config *models.Config) {
