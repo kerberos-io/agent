@@ -99,6 +99,18 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			videoCodec = videoStreams[0].Name
 		}
 
+		// Get metadata from the camera, which we can include in the recording.
+		// - Camera resolution
+		// - Camera fps
+		fps := 0.0
+		cameraWidth := 0
+		cameraHeight := 0
+
+		fps = videoStreams[0].FPS
+		cameraWidth = videoStreams[0].Width
+		cameraHeight = videoStreams[0].Height
+		cameraResolution := strconv.Itoa(cameraWidth) + "x" + strconv.Itoa(cameraHeight)
+
 		// Check if continuous recording.
 		if config.Capture.Continuous == "true" {
 
@@ -178,7 +190,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							config.Name + "_" +
 							"0-0-0-0" + "_" + // region coordinates, we
 							"-1" + "_" + // token
-							strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording
+							strconv.FormatInt(int64(duration), 10) + "_" + // + "_" + // duration of recording
+							strconv.FormatInt(int64(fps), 10) + "_" + // frames per second
+							cameraResolution
 							//utils.VERSION // version of the agent
 
 						oldName := name
@@ -359,7 +373,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							config.Name + "_" +
 							"0-0-0-0" + "_" + // region coordinates, we
 							"-1" + "_" + // token
-							strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording
+							strconv.FormatInt(int64(duration), 10) + "_" + // + "_" + // duration of recording
+							strconv.FormatInt(int64(fps), 10) + "_" + // frames per second
+							cameraResolution
 							//utils.VERSION // version of the agent
 
 						oldName := name
@@ -589,7 +605,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						config.Name + "_" +
 						motionRectangleString + "_" +
 						strconv.Itoa(numberOfChanges) + "_" + // number of changes
-						strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording in milliseconds
+						strconv.FormatInt(int64(duration), 10) + "_" + // + "_" + // duration of recording
+						strconv.FormatInt(int64(fps), 10) + "_" + // frames per second
+						cameraResolution
 						//utils.VERSION // version of the agent
 
 					oldName := name
