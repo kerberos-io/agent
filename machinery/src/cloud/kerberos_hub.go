@@ -99,12 +99,14 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 		return false, true, errors.New(errorMessage)
 	}
 	req.Header.Set("Content-Type", "video/mp4")
+
 	req.Header.Set("X-Kerberos-Storage-FileName", fileName)
 	req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
 	req.Header.Set("X-Kerberos-Storage-Device", config.Key)
 	req.Header.Set("X-Kerberos-Hub-PublicKey", config.HubKey)
 	req.Header.Set("X-Kerberos-Hub-PrivateKey", config.HubPrivateKey)
 	req.Header.Set("X-Kerberos-Hub-Region", config.S3.Region)
+
 	resp, err = client.Do(req)
 	if resp != nil {
 		defer resp.Body.Close()

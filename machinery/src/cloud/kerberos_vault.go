@@ -59,7 +59,7 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 	}
 
 	// We need to check if we are in a retry timeout.
-	if kstorageRetryTimeout <= time.Now().Unix() {
+	if kstorageRetryTimeout < time.Now().Unix() {
 
 		req, err := http.NewRequest("POST", config.KStorage.URI+"/storage", file)
 		if err != nil {
@@ -69,21 +69,21 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 		}
 		// Legacy headers should be removed.
 		req.Header.Set("X-Kerberos-Storage-CloudKey", publicKey)
-		req.Header.Set("X-Kerberos-Storage-AccessKey", config.KStorageSecondary.AccessKey)
-		req.Header.Set("X-Kerberos-Storage-SecretAccessKey", config.KStorageSecondary.SecretAccessKey)
-		req.Header.Set("X-Kerberos-Storage-Provider", config.KStorageSecondary.Provider)
+		req.Header.Set("X-Kerberos-Storage-AccessKey", config.KStorage.AccessKey)
+		req.Header.Set("X-Kerberos-Storage-SecretAccessKey", config.KStorage.SecretAccessKey)
+		req.Header.Set("X-Kerberos-Storage-Provider", config.KStorage.Provider)
 		req.Header.Set("X-Kerberos-Storage-FileName", fileName)
 		req.Header.Set("X-Kerberos-Storage-Device", config.Key)
 		req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
-		req.Header.Set("X-Kerberos-Storage-Directory", config.KStorageSecondary.Directory)
+		req.Header.Set("X-Kerberos-Storage-Directory", config.KStorage.Directory)
 
 		// Hub information
 		req.Header.Set("X-Hub-PublicKey", publicKey)
 		// Vault information
-		req.Header.Set("X-Vault-Account-AccessKey", config.KStorageSecondary.AccessKey)
-		req.Header.Set("X-Vault-Account-SecretKey", config.KStorageSecondary.SecretAccessKey)
-		req.Header.Set("X-Vault-Provider", config.KStorageSecondary.Provider)
-		req.Header.Set("X-Vault-Directory", config.KStorageSecondary.Directory)
+		req.Header.Set("X-Vault-Account-AccessKey", config.KStorage.AccessKey)
+		req.Header.Set("X-Vault-Account-SecretKey", config.KStorage.SecretAccessKey)
+		req.Header.Set("X-Vault-Provider", config.KStorage.Provider)
+		req.Header.Set("X-Vault-Directory", config.KStorage.Directory)
 		// Agent information (about the agent itself as the file being uploaded).
 		req.Header.Set("X-Agent-Key", config.Key)
 		req.Header.Set("X-Agent-Device", "IPCamera")
@@ -91,6 +91,7 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 		req.Header.Set("X-Agent-File-FPS", "15")
 		req.Header.Set("X-Agent-File-Resolution", "640x480")
 		req.Header.Set("X-Agent-File-Format", "mp4")
+		req.Header.Set("X-Agent-File-Duration", "mp4")
 
 		var client *http.Client
 		if os.Getenv("AGENT_TLS_INSECURE") == "true" {

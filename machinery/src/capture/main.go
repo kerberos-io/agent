@@ -608,7 +608,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						strconv.FormatInt(int64(duration), 10) + "_" + // + "_" + // duration of recording
 						strconv.FormatInt(int64(fps), 10) + "_" + // frames per second
 						cameraResolution
-						//utils.VERSION // version of the agent
 
 					oldName := name
 					name = s + ".mp4"
