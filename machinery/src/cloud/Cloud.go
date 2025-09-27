@@ -78,33 +78,38 @@ func HandleUpload(configDirectory string, configuration *models.Configuration, c
 					}
 
 					fileName := f.Name()
+
+					// The fileName contains a few important pieces of information separated by underscores.
+					// We will create a new Media object that explains the file structure.
+
 					uploaded := false
 					configured := false
 					err = nil
-					if config.Cloud == "s3" || config.Cloud == "kerberoshub" {
+					switch config.Cloud {
+					case "s3", "kerberoshub":
 						uploaded, configured, err = UploadKerberosHub(configuration, fileName)
-					} else if config.Cloud == "kstorage" || config.Cloud == "kerberosvault" {
+					case "kstorage", "kerberosvault":
 						uploaded, configured, err = UploadKerberosVault(configuration, fileName)
-					} else if config.Cloud == "dropbox" {
+					case "dropbox":
 						uploaded, configured, err = UploadDropbox(configuration, fileName)
-					} else if config.Cloud == "gdrive" {
+					case "gdrive":
 						// Todo: implement gdrive upload
-					} else if config.Cloud == "onedrive" {
+					case "onedrive":
 						// Todo: implement onedrive upload
-					} else if config.Cloud == "minio" {
+					case "minio":
 						// Todo: implement minio upload
-					} else if config.Cloud == "webdav" {
+					case "webdav":
 						// Todo: implement webdav upload
-					} else if config.Cloud == "ftp" {
+					case "ftp":
 						// Todo: implement ftp upload
-					} else if config.Cloud == "sftp" {
+					case "sftp":
 						// Todo: implement sftp upload
-					} else if config.Cloud == "aws" {
+					case "aws":
 						// Todo: need to be updated, was previously used for hub.
 						uploaded, configured, err = UploadS3(configuration, fileName)
-					} else if config.Cloud == "azure" {
+					case "azure":
 						// Todo: implement azure upload
-					} else if config.Cloud == "google" {
+					case "google":
 						// Todo: implement google upload
 					}
 					// And so on... (have a look here -> https://github.com/kerberos-io/agent/issues/95)
