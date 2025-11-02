@@ -13,14 +13,15 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/conditions"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
-	"github.com/kerberos-io/agent/machinery/src/models"
+	modelsOld "github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/video"
+	models "github.com/uug-ai/models/pkg/models"
 	"go.opentelemetry.io/otel/trace"
 )
 
-func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
+func CleanupRecordingDirectory(configDirectory string, configuration *modelsOld.Configuration) {
 	autoClean := configuration.Config.AutoClean
 	if autoClean == "true" {
 		maxSize := configuration.Config.MaxDirectorySize
@@ -54,7 +55,7 @@ func CleanupRecordingDirectory(configDirectory string, configuration *models.Con
 	}
 }
 
-func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient) {
+func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *modelsOld.Configuration, communication *modelsOld.Communication, rtspClient RTSPClient) {
 
 	config := configuration.Config
 	loc, _ := time.LoadLocation(config.Timezone)
@@ -184,6 +185,15 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						// Update the name with the duration in milliseconds.
 						startRecordingSeconds := startRecording / 1000      // convert to seconds
 						startRecordingMilliseconds := startRecording % 1000 // convert to milliseconds
+
+						recordingName := models.NewAgentMedia(
+							models.WithName(s),
+							models.WithDuration(duration),
+							models.WithStartTime(startRecording),
+							models.WithFPS(fps),
+							models.WithResolution(cameraResolution),
+						)
+
 						s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
 							strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" +
 							strconv.FormatInt(startRecordingMilliseconds, 10) + "_" +
@@ -665,17 +675,17 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 // @ID verify-camera
 // @Tags camera
 // @Param streamType path string true "Stream Type" Enums(primary, secondary)
-// @Param cameraStreams body models.CameraStreams true "Camera Streams"
+// @Param cameraStreams body modelsOld.CameraStreams true "Camera Streams"
 // @Summary Validate a specific RTSP profile camera connection.
 // @Description This method will validate a specific profile connection from an RTSP camera, and try to get the codec.
-// @Success 200 {object} models.APIResponse
+// @Success 200 {object} modelsOld.APIResponse
 func VerifyCamera(c *gin.Context) {
 
 	// Start OpenTelemetry tracing
 	ctxVerifyCamera, span := tracer.Start(context.Background(), "VerifyCamera", trace.WithSpanKind(trace.SpanKindServer))
 	defer span.End()
 
-	var cameraStreams models.CameraStreams
+	var cameraStreams modelsOld.CameraStreams
 	err := c.BindJSON(&cameraStreams)
 
 	// Should return in 5 seconds.
@@ -718,33 +728,33 @@ func VerifyCamera(c *gin.Context) {
 			err := rtspClient.Close(ctxVerifyCamera)
 			if err == nil {
 				if videoIdx > -1 {
-					c.JSON(200, models.APIResponse{
+					c.JSON(200, modelsOld.APIResponse{
 						Message: "All good, detected a H264 codec.",
 						Data:    streams,
 					})
 				} else {
-					c.JSON(400, models.APIResponse{
+					c.JSON(400, modelsOld.APIResponse{
 						Message: "Stream doesn't have a H264 codec, we only support H264 so far.",
 					})
 				}
 			} else {
-				c.JSON(400, models.APIResponse{
+				c.JSON(400, modelsOld.APIResponse{
 					Message: "Something went wrong while closing the connection " + err.Error(),
 				})
 			}
 		} else {
-			c.JSON(400, models.APIResponse{
+			c.JSON(400, modelsOld.APIResponse{
 				Message: err.Error(),
 			})
 		}
 	} else {
-		c.JSON(400, models.APIResponse{
+		c.JSON(400, modelsOld.APIResponse{
 			Message: "Something went wrong while receiving the config " + err.Error(),
 		})
 	}
 }
 
-func Base64Image(captureDevice *Capture, communication *models.Communication, configuration *models.Configuration) string {
+func Base64Image(captureDevice *Capture, communication *modelsOld.Communication, configuration *modelsOld.Configuration) string {
 	// We'll try to get a snapshot from the camera.
 	var queue *packets.Queue
 	var cursor *packets.QueueCursor
@@ -790,7 +800,7 @@ func Base64Image(captureDevice *Capture, communication *models.Communication, co
 	return encodedImage
 }
 
-func JpegImage(captureDevice *Capture, communication *models.Communication) image.YCbCr {
+func JpegImage(captureDevice *Capture, communication *modelsOld.Communication) image.YCbCr {
 	// We'll try to get a snapshot from the camera.
 	var queue *packets.Queue
 	var cursor *packets.QueueCursor
