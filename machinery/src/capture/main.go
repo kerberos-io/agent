@@ -17,7 +17,6 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/video"
-	models "github.com/uug-ai/models/pkg/models"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -140,6 +139,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			recordingStatus := "idle"
 			recordingCursor := queue.Oldest()
 
+			//var media models.Media
+
 			if cursorError == nil {
 				pkt, cursorError = recordingCursor.ReadPacket()
 			}
@@ -186,13 +187,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						startRecordingSeconds := startRecording / 1000      // convert to seconds
 						startRecordingMilliseconds := startRecording % 1000 // convert to milliseconds
 
-						recordingName := models.NewAgentMedia(
-							models.WithName(s),
-							models.WithDuration(duration),
-							models.WithStartTime(startRecording),
-							models.WithFPS(fps),
-							models.WithResolution(cameraResolution),
-						)
+						/*media := models.Media{
+							Name:     s,
+							Duration: duration,
+						}*/
 
 						s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
 							strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" +
