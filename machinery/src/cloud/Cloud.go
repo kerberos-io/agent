@@ -403,7 +403,6 @@ loop:
 						onvifEventsList = []byte("[]")
 					}
 				}*/
-				onvifPresetsList = []byte("[]")
 				onvifEventsList = []byte("[]")
 			} else {
 				log.Log.Error("cloud.HandleHeartBeat(): error while connecting to ONVIF device: " + err.Error())
