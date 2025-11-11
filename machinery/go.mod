@@ -21,7 +21,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/kellydunn/golang-geo v0.7.0
 	github.com/kerberos-io/joy4 v1.0.64
-	github.com/kerberos-io/onvif v1.0.0
+	github.com/kerberos-io/onvif v0.0.7
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pion/interceptor v0.1.37
