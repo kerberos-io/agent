@@ -2,7 +2,6 @@ package http
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
 )
@@ -44,15 +43,14 @@ func LoginToOnvif(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, capabilities, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			// Get token from the first profile
 			token, err := onvif.GetTokenFromProfile(device, 0)
 			if err == nil {
 				c.JSON(200, gin.H{
-					"device":       device,
-					"capabilities": capabilities,
-					"token":        token,
+					"device": device,
+					"token":  token,
 				})
 			} else {
 				c.JSON(400, gin.H{
@@ -98,11 +96,9 @@ func GetOnvifCapabilities(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		_, capabilities, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		_, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			c.JSON(200, gin.H{
-				"capabilities": capabilities,
-			})
+			c.JSON(200, gin.H{})
 		} else {
 			c.JSON(400, gin.H{
 				"data": "Something went wrong: " + err.Error(),
@@ -142,7 +138,7 @@ func DoOnvifPanTilt(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 
 		if err == nil {
 			// Get token from the first profile
@@ -216,7 +212,7 @@ func DoOnvifZoom(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 
 		if err == nil {
 			// Get token from the first profile
@@ -289,7 +285,7 @@ func GetOnvifPresets(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			presets, err := onvif.GetPresetsFromDevice(device)
 			if err == nil {
@@ -340,7 +336,7 @@ func GoToOnvifPreset(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			err := onvif.GoToPresetFromDevice(device, onvifPreset.Preset)
 			if err == nil {
@@ -377,7 +373,7 @@ func GoToOnvifPreset(c *gin.Context) {
 // @Description Will get the digital inputs from the ONVIF device.
 // @Success 200 {object} models.APIResponse
 func DoGetDigitalInputs(c *gin.Context) {
-	var onvifCredentials models.OnvifCredentials
+	/*var onvifCredentials models.OnvifCredentials
 	err := c.BindJSON(&onvifCredentials)
 
 	if err == nil && onvifCredentials.ONVIFXAddr != "" {
@@ -395,7 +391,7 @@ func DoGetDigitalInputs(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 
 		onvifInputs, _ := onvif.GetDigitalInputs(device)
 		if err == nil {
@@ -450,7 +446,7 @@ func DoGetDigitalInputs(c *gin.Context) {
 		c.JSON(400, gin.H{
 			"data": "Something went wrong: " + err.Error(),
 		})
-	}
+	}*/
 }
 
 // DoGetRelayOutputs godoc
@@ -466,7 +462,7 @@ func DoGetDigitalInputs(c *gin.Context) {
 // @Description Will get the relay outputs from the ONVIF device.
 // @Success 200 {object} models.APIResponse
 func DoGetRelayOutputs(c *gin.Context) {
-	var onvifCredentials models.OnvifCredentials
+	/*var onvifCredentials models.OnvifCredentials
 	err := c.BindJSON(&onvifCredentials)
 
 	if err == nil && onvifCredentials.ONVIFXAddr != "" {
@@ -484,7 +480,7 @@ func DoGetRelayOutputs(c *gin.Context) {
 		}
 
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		_, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		_, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
 			// Get the digital inputs and outputs from the device
 			inputOutputs, err := onvif.GetInputOutputs()
@@ -519,7 +515,7 @@ func DoGetRelayOutputs(c *gin.Context) {
 		c.JSON(400, gin.H{
 			"data": "Something went wrong: " + err.Error(),
 		})
-	}
+	}*/
 }
 
 // DoTriggerRelayOutput godoc
@@ -536,7 +532,7 @@ func DoGetRelayOutputs(c *gin.Context) {
 // @Description Will trigger the relay output from the ONVIF device.
 // @Success 200 {object} models.APIResponse
 func DoTriggerRelayOutput(c *gin.Context) {
-	var onvifCredentials models.OnvifCredentials
+	/*var onvifCredentials models.OnvifCredentials
 	err := c.BindJSON(&onvifCredentials)
 
 	// Get the output from the url
@@ -586,5 +582,5 @@ func DoTriggerRelayOutput(c *gin.Context) {
 		c.JSON(400, gin.H{
 			"data": msg,
 		})
-	}
+	}*/
 }

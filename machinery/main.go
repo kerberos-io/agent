@@ -10,7 +10,6 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/components"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"github.com/kerberos-io/agent/machinery/src/onvif"
 
 	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/routers"
@@ -90,12 +89,12 @@ func main() {
 
 	case "discover":
 		// Convert duration to int
-		timeout, err := time.ParseDuration(timeout + "ms")
+		/*timeout, err := time.ParseDuration(timeout + "ms")
 		if err != nil {
 			log.Log.Fatal("main.Main(): could not parse timeout: " + err.Error())
 			return
 		}
-		onvif.Discover(timeout)
+		onvif.Discover(timeout)*/
 
 	case "decrypt":
 		log.Log.Info("main.Main(): Decrypting: " + flag.Arg(0) + " with key: " + flag.Arg(1))

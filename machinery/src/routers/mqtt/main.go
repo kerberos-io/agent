@@ -389,14 +389,6 @@ func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload models.P
 			// Copy the config, as we don't want to share the encryption part.
 			deepCopy := configuration.Config
 
-			// We need a fix for the width and height if a substream.
-			// The ROI requires the width and height of the sub stream.
-			if configuration.Config.Capture.IPCamera.SubRTSP != "" &&
-				configuration.Config.Capture.IPCamera.SubRTSP != configuration.Config.Capture.IPCamera.RTSP {
-				deepCopy.Capture.IPCamera.Width = configuration.Config.Capture.IPCamera.SubWidth
-				deepCopy.Capture.IPCamera.Height = configuration.Config.Capture.IPCamera.SubHeight
-			}
-
 			var configMap map[string]interface{}
 			inrec, _ := json.Marshal(deepCopy)
 			json.Unmarshal(inrec, &configMap)
@@ -542,7 +534,7 @@ func HandleNavigatePTZ(mqttClient mqtt.Client, hubKey string, payload models.Pay
 }
 
 func HandleTriggerRelay(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
-	value := payload.Value
+	/*value := payload.Value
 	jsonData, _ := json.Marshal(value)
 	var triggerRelayPayload models.TriggerRelay
 	json.Unmarshal(jsonData, &triggerRelayPayload)
@@ -569,7 +561,7 @@ func HandleTriggerRelay(mqttClient mqtt.Client, hubKey string, payload models.Pa
 		} else {
 			log.Log.Info("routers.mqtt.main.HandleTriggerRelay(): received trigger, but camera is not connected.")
 		}
-	}
+	}*/
 }
 
 func DisconnectMQTT(mqttClient mqtt.Client, config *models.Config) {

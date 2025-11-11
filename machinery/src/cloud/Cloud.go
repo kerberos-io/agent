@@ -234,7 +234,7 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 
 	// Create a loop pull point address, which we will use to retrieve async events
 	// As you'll read below camera manufactures are having different implementations of events.
-	var pullPointAddressLoopState string
+	/*var pullPointAddressLoopState string
 	if configuration.Config.Capture.IPCamera.ONVIFXAddr != "" {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
@@ -244,7 +244,7 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 				log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 			}
 		}
-	}
+	}*/
 
 loop:
 	for {
@@ -261,7 +261,7 @@ loop:
 		var onvifEventsList []byte
 		if config.Capture.IPCamera.ONVIFXAddr != "" {
 			cameraConfiguration := configuration.Config.Capture.IPCamera
-			device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+			device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 			if err == nil {
 				// We will try to retrieve the PTZ configurations from the device.
 				onvifEnabled = "true"
@@ -306,7 +306,7 @@ loop:
 				//      - In this scenario we are creating a new subscription to retrieve the initial (current) state of the inputs and outputs.
 
 				// Get a new pull point address, to get the initiatal state of the inputs and outputs.
-				pullPointAddressInitialState, err := onvif.CreatePullPointSubscription(device)
+				/*pullPointAddressInitialState, err := onvif.CreatePullPointSubscription(device)
 				if err != nil {
 					log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 				}
@@ -402,7 +402,9 @@ loop:
 						log.Log.Error("cloud.HandleHeartBeat(): error while marshalling events: " + err.Error())
 						onvifEventsList = []byte("[]")
 					}
-				}
+				}*/
+				onvifPresetsList = []byte("[]")
+				onvifEventsList = []byte("[]")
 			} else {
 				log.Log.Error("cloud.HandleHeartBeat(): error while connecting to ONVIF device: " + err.Error())
 				onvifPresetsList = []byte("[]")
@@ -647,13 +649,13 @@ loop:
 		}
 	}
 
-	if pullPointAddressLoopState != "" {
+	/*if pullPointAddressLoopState != "" {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err != nil {
 			onvif.UnsubscribePullPoint(device, pullPointAddressLoopState)
 		}
-	}
+	}*/
 
 	log.Log.Debug("cloud.HandleHeartBeat(): finished")
 }
