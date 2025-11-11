@@ -234,17 +234,17 @@ func HandleHeartBeat(configuration *models.Configuration, communication *models.
 
 	// Create a loop pull point address, which we will use to retrieve async events
 	// As you'll read below camera manufactures are having different implementations of events.
-	var pullPointAddressLoopState string
+	/*var pullPointAddressLoopState string
 	if configuration.Config.Capture.IPCamera.ONVIFXAddr != "" {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err != nil {
 			pullPointAddressLoopState, err = onvif.CreatePullPointSubscription(device)
 			if err != nil {
 				log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 			}
 		}
-	}
+	}*/
 
 loop:
 	for {
@@ -261,7 +261,7 @@ loop:
 		var onvifEventsList []byte
 		if config.Capture.IPCamera.ONVIFXAddr != "" {
 			cameraConfiguration := configuration.Config.Capture.IPCamera
-			device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+			device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 			if err == nil {
 				// We will try to retrieve the PTZ configurations from the device.
 				onvifEnabled = "true"
@@ -306,7 +306,7 @@ loop:
 				//      - In this scenario we are creating a new subscription to retrieve the initial (current) state of the inputs and outputs.
 
 				// Get a new pull point address, to get the initiatal state of the inputs and outputs.
-				pullPointAddressInitialState, err := onvif.CreatePullPointSubscription(device)
+				/*pullPointAddressInitialState, err := onvif.CreatePullPointSubscription(device)
 				if err != nil {
 					log.Log.Error("cloud.HandleHeartBeat(): error while creating pull point subscription: " + err.Error())
 				}
@@ -402,7 +402,10 @@ loop:
 						log.Log.Error("cloud.HandleHeartBeat(): error while marshalling events: " + err.Error())
 						onvifEventsList = []byte("[]")
 					}
-				}
+				}*/
+
+				onvifEventsList = []byte("[]")
+
 			} else {
 				log.Log.Error("cloud.HandleHeartBeat(): error while connecting to ONVIF device: " + err.Error())
 				onvifPresetsList = []byte("[]")
@@ -647,13 +650,13 @@ loop:
 		}
 	}
 
-	if pullPointAddressLoopState != "" {
+	/*if pullPointAddressLoopState != "" {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
-		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+		device, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err != nil {
 			onvif.UnsubscribePullPoint(device, pullPointAddressLoopState)
 		}
-	}
+	}*/
 
 	log.Log.Debug("cloud.HandleHeartBeat(): finished")
 }
@@ -672,6 +675,7 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 		// Check if we need to enable the live stream
 		if config.Capture.Liveview != "false" {
 
+			deviceId := config.Key
 			hubKey := ""
 			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
 				hubKey = config.S3.Publickey
@@ -705,25 +709,79 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 				log.Log.Info("cloud.HandleLiveStreamSD(): Sending base64 encoded images to MQTT.")
 				img, err := rtspClient.DecodePacket(pkt)
 				if err == nil {
-					bytes, _ := utils.ImageToBytes(&img)
-					encoded := base64.StdEncoding.EncodeToString(bytes)
+					imageResized, _ := utils.ResizeImage(&img, uint(config.Capture.IPCamera.BaseWidth), uint(config.Capture.IPCamera.BaseHeight))
+					bytes, _ := utils.ImageToBytes(imageResized)
 
-					valueMap := make(map[string]interface{})
-					valueMap["image"] = encoded
-					message := models.Message{
-						Payload: models.Payload{
-							Action:   "receive-sd-stream",
-							DeviceId: configuration.Config.Key,
-							Value:    valueMap,
-						},
-					}
-					payload, err := models.PackageMQTTMessage(configuration, message)
-					if err == nil {
-						mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+					chunking := config.Capture.LiveviewChunking
+
+					if chunking == "true" {
+
+						// Split encoded image into chunks of 2kb
+						// This is to prevent the MQTT message to be too large.
+						// By default, bytes are not encoded to base64 here; you are splitting the raw JPEG/PNG bytes.
+						// However, in MQTT and web contexts, binary data may not be handled well, so base64 is often used.
+						// To avoid base64 encoding, just send the raw []byte chunks as you do here.
+						// If you want to avoid base64, make sure the receiver can handle binary payloads.
+
+						chunkSize := 25 * 1024 // 25KB chunks
+						var chunks [][]byte
+						for i := 0; i < len(bytes); i += chunkSize {
+							end := i + chunkSize
+							if end > len(bytes) {
+								end = len(bytes)
+							}
+							chunk := bytes[i:end]
+							chunks = append(chunks, chunk)
+						}
+
+						log.Log.Infof("cloud.HandleLiveStreamSD(): Sending %d chunks of size %d bytes.", len(chunks), chunkSize)
+
+						timestamp := time.Now().Unix()
+						for i, chunk := range chunks {
+							valueMap := make(map[string]interface{})
+							valueMap["id"] = timestamp
+							valueMap["chunk"] = chunk
+							valueMap["chunkIndex"] = i
+							valueMap["chunkSize"] = chunkSize
+							valueMap["chunkCount"] = len(chunks)
+							message := models.Message{
+								Payload: models.Payload{
+									Version:  "v1.0.0",
+									Action:   "receive-sd-stream",
+									DeviceId: deviceId,
+									Value:    valueMap,
+								},
+							}
+							payload, err := models.PackageMQTTMessage(configuration, message)
+							if err == nil {
+								mqttClient.Publish("kerberos/hub/"+hubKey+"/"+deviceId, 1, false, payload)
+								log.Log.Infof("cloud.HandleLiveStreamSD(): sent chunk %d/%d to MQTT topic kerberos/hub/%s/%s", i+1, len(chunks), hubKey, deviceId)
+								time.Sleep(33 * time.Millisecond) // Sleep to avoid flooding the MQTT broker with messages
+							} else {
+								log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
+							}
+						}
 					} else {
-						log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
+
+						valueMap := make(map[string]interface{})
+						valueMap["image"] = bytes
+						message := models.Message{
+							Payload: models.Payload{
+								Action:   "receive-sd-stream",
+								DeviceId: configuration.Config.Key,
+								Value:    valueMap,
+							},
+						}
+						payload, err := models.PackageMQTTMessage(configuration, message)
+						if err == nil {
+							mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+						} else {
+							log.Log.Info("cloud.HandleLiveStreamSD(): something went wrong while sending acknowledge config to hub: " + string(payload))
+						}
+
 					}
 				}
+				time.Sleep(1000 * time.Millisecond) // Sleep to avoid flooding the MQTT broker with messages
 			}
 
 		} else {
@@ -810,7 +868,8 @@ func HandleRealtimeProcessing(processingCursor *packets.QueueCursor, configurati
 				log.Log.Info("cloud.RealtimeProcessing(): Sending base64 encoded images to MQTT.")
 				img, err := rtspClient.DecodePacket(pkt)
 				if err == nil {
-					bytes, _ := utils.ImageToBytes(&img)
+					imageResized, _ := utils.ResizeImage(&img, uint(config.Capture.IPCamera.BaseWidth), uint(config.Capture.IPCamera.BaseHeight))
+					bytes, _ := utils.ImageToBytes(imageResized)
 					encoded := base64.StdEncoding.EncodeToString(bytes)
 
 					valueMap := make(map[string]interface{})
