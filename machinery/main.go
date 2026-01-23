@@ -101,31 +101,35 @@ func main() {
 	switch action {
 
 	case "version":
-		log.Log.Info("main.Main(): You are currrently running Kerberos Agent " + VERSION)
-
+		{
+			log.Log.Info("main.Main(): You are currrently running Kerberos Agent " + VERSION)
+		}
 	case "discover":
-		// Convert duration to int
-		timeout, err := time.ParseDuration(timeout + "ms")
-		if err != nil {
-			log.Log.Fatal("main.Main(): could not parse timeout: " + err.Error())
-			return
+		{
+			// Convert duration to int
+			timeout, err := time.ParseDuration(timeout + "ms")
+			if err != nil {
+				log.Log.Fatal("main.Main(): could not parse timeout: " + err.Error())
+				return
+			}
+			onvif.Discover(timeout)
 		}
-		onvif.Discover(timeout)
-
 	case "decrypt":
-		log.Log.Info("main.Main(): Decrypting: " + flag.Arg(0) + " with key: " + flag.Arg(1))
-		symmetricKey := []byte(flag.Arg(1))
+		{
+			log.Log.Info("main.Main(): Decrypting: " + flag.Arg(0) + " with key: " + flag.Arg(1))
+			symmetricKey := []byte(flag.Arg(1))
 
-		if symmetricKey == nil || len(symmetricKey) == 0 {
-			log.Log.Fatal("main.Main(): symmetric key should not be empty")
-			return
-		}
-		if len(symmetricKey) != 32 {
-			log.Log.Fatal("main.Main(): symmetric key should be 32 bytes")
-			return
-		}
+			if len(symmetricKey) == 0 {
+				log.Log.Fatal("main.Main(): symmetric key should not be empty")
+				return
+			}
+			if len(symmetricKey) != 32 {
+				log.Log.Fatal("main.Main(): symmetric key should be 32 bytes")
+				return
+			}
 
-		utils.Decrypt(flag.Arg(0), symmetricKey)
+			utils.Decrypt(flag.Arg(0), symmetricKey)
+		}
 
 	case "run":
 		{
@@ -213,6 +217,8 @@ func main() {
 			routers.StartWebserver(configDirectory, &configuration, &communication, &capture)
 		}
 	default:
-		log.Log.Error("main.Main(): Sorry I don't understand :(")
+		{
+			log.Log.Error("main.Main(): Sorry I don't understand :(")
+		}
 	}
 }
