@@ -804,6 +804,12 @@ func HandleLiveStreamHD(livestreamCursor *packets.QueueCursor, configuration *mo
 			streams, _ := rtspClient.GetStreams()
 			videoTrack := webrtc.NewVideoTrack(streams)
 			audioTrack := webrtc.NewAudioTrack(streams)
+
+			if videoTrack == nil && audioTrack == nil {
+				log.Log.Error("cloud.HandleLiveStreamHD(): failed to create both video and audio tracks")
+				return
+			}
+
 			go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, videoTrack, audioTrack, rtspClient)
 
 			if config.Capture.ForwardWebRTC == "true" {

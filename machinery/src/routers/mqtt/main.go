@@ -123,7 +123,6 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 			opts.SetClientID(mqttClientID)
 			log.Log.Info("routers.mqtt.main.ConfigureMQTT(): Set ClientID " + mqttClientID)
 			rand.Seed(time.Now().UnixNano())
-			webrtc.CandidateArrays = make(map[string](chan string))
 
 			opts.OnConnect = func(c mqtt.Client) {
 				// We managed to connect to the MQTT broker, hurray!
