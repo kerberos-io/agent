@@ -67,14 +67,27 @@ type MP4 struct {
 	SampleType          string            // Type of the sample (e.g., "video", "audio", "subtitle")
 }
 
-// NewMP4 creates a new MP4 object
-func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte, vpsNALUs [][]byte) *MP4 {
+// NewMP4 creates a new MP4 object.
+// maxDurationSec is the maximum expected recording duration in seconds,
+// used to calculate the free-box placeholder size for ftyp+moov+sidx.
+func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte, vpsNALUs [][]byte, maxDurationSec int64) *MP4 {
 
-	// Reserve space at the start of the file for the ftyp + moov boxes.
-	// We write a free box as a placeholder that will be overwritten at close
-	// with the actual init segment. 8KB is generous enough for ftyp + moov
-	// with video + audio tracks, mvex, and a UUID signature box.
-	freeBoxSize := 8192
+	// Calculate the placeholder size needed at the start of the file.
+	// Components:
+	//   ftyp:  ~32 bytes
+	//   moov:  ~1500 bytes (mvhd + mvex + video trak + audio trak + UUID)
+	//   sidx:  24 bytes fixed + 12 bytes per segment reference
+	// Segments are ~FragmentDurationMs each, so:
+	//   numSegments = ceil(maxDurationSec * 1000 / FragmentDurationMs) + 1 (safety margin)
+	//   sidxSize    = 24 + 12 * numSegments
+	baseSize := int64(2560) // ftyp + moov + extra headroom for large UUID signatures
+	numSegments := int64(0)
+	if maxDurationSec > 0 {
+		// Use integer ceiling division to avoid underestimating the number of segments.
+		numSegments = ((maxDurationSec*1000)+FragmentDurationMs-1)/FragmentDurationMs + 1
+	}
+	sidxSize := int64(24 + 12*numSegments)
+	freeBoxSize := int(baseSize + sidxSize)
 	free := mp4ff.NewFreeBox(make([]byte, freeBoxSize))
 
 	// Create a writer
@@ -533,13 +546,43 @@ func (mp4 *MP4) Close(config *models.Config) {
 		init.AddChild(sidx)
 	}
 
-	// Encode the ftyp + moov init segment into a buffer so we know its size.
+	// Encode the ftyp + moov + sidx into a buffer to measure the total size.
+	// Then compute the correct sidx.FirstOffset (the gap between the end of
+	// the sidx box and the first moof, occupied by the trailing free box)
+	// and re-encode with the corrected value.
 	var initBuf bytes.Buffer
 	if err := init.Encode(&initBuf); err != nil {
 		log.Log.Error("mp4.Close(): error encoding init segment: " + err.Error())
 	}
 
 	initSize := int64(initBuf.Len())
+
+	// The sidx.FirstOffset is defined as the distance (in bytes) from the
+	// anchor point (first byte after the sidx box) to the first byte of
+	// the first referenced moof/mdat. Since sidx is the last box in init,
+	// the anchor point is at initSize, and the first moof is at FreeBoxSize.
+	if len(mp4.SegmentDurations) > 0 {
+		if mp4.FreeBoxSize < initSize {
+			// Avoid computing a negative offset and wrapping it to uint64.
+			log.Log.Error("mp4.Close(): FreeBoxSize is smaller than initSize; skipping sidx FirstOffset adjustment")
+		} else {
+			firstOffset := uint64(mp4.FreeBoxSize - initSize)
+			// Find the sidx we added and update its FirstOffset
+			for _, child := range init.Children {
+				if sidxBox, ok := child.(*mp4ff.SidxBox); ok {
+					sidxBox.FirstOffset = firstOffset
+					break
+				}
+			}
+			// Re-encode with the corrected FirstOffset (same size, no layout change)
+			initBuf.Reset()
+			if err := init.Encode(&initBuf); err != nil {
+				log.Log.Error("mp4.Close(): error re-encoding init segment: " + err.Error())
+			}
+			initSize = int64(initBuf.Len())
+		}
+	}
+
 	if initSize > mp4.FreeBoxSize {
 		log.Log.Error(fmt.Sprintf("mp4.Close(): init segment (%d bytes) exceeds reserved space (%d bytes), file may be corrupt", initSize, mp4.FreeBoxSize))
 	}
