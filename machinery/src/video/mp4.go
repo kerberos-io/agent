@@ -361,8 +361,8 @@ func (mp4 *MP4) Close(config *models.Config) {
 		if err != nil {
 		}
 		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
-		init.Moov.Traks[0].Tkhd.Width = uint32(mp4.width) << 16
-		init.Moov.Traks[0].Tkhd.Height = uint32(mp4.height) << 16
+		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
+		init.Moov.Traks[0].Tkhd.Height = mp4ff.Fixed32(uint32(mp4.height) << 16)
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
 		init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
 	case "H265", "HVC1":
@@ -372,8 +372,8 @@ func (mp4 *MP4) Close(config *models.Config) {
 		if err != nil {
 		}
 		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
-		init.Moov.Traks[0].Tkhd.Width = uint32(mp4.width) << 16
-		init.Moov.Traks[0].Tkhd.Height = uint32(mp4.height) << 16
+		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
+		init.Moov.Traks[0].Tkhd.Height = mp4ff.Fixed32(uint32(mp4.height) << 16)
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
 		init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
 	}
