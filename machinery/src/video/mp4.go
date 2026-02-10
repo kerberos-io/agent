@@ -533,13 +533,38 @@ func (mp4 *MP4) Close(config *models.Config) {
 		init.AddChild(sidx)
 	}
 
-	// Encode the ftyp + moov init segment into a buffer so we know its size.
+	// Encode the ftyp + moov + sidx into a buffer to measure the total size.
+	// Then compute the correct sidx.FirstOffset (the gap between the end of
+	// the sidx box and the first moof, occupied by the trailing free box)
+	// and re-encode with the corrected value.
 	var initBuf bytes.Buffer
 	if err := init.Encode(&initBuf); err != nil {
 		log.Log.Error("mp4.Close(): error encoding init segment: " + err.Error())
 	}
 
 	initSize := int64(initBuf.Len())
+
+	// The sidx.FirstOffset is defined as the distance (in bytes) from the
+	// anchor point (first byte after the sidx box) to the first byte of
+	// the first referenced moof/mdat. Since sidx is the last box in init,
+	// the anchor point is at initSize, and the first moof is at FreeBoxSize.
+	if len(mp4.SegmentDurations) > 0 {
+		firstOffset := uint64(mp4.FreeBoxSize - initSize)
+		// Find the sidx we added and update its FirstOffset
+		for _, child := range init.Children {
+			if sidxBox, ok := child.(*mp4ff.SidxBox); ok {
+				sidxBox.FirstOffset = firstOffset
+				break
+			}
+		}
+		// Re-encode with the corrected FirstOffset (same size, no layout change)
+		initBuf.Reset()
+		if err := init.Encode(&initBuf); err != nil {
+			log.Log.Error("mp4.Close(): error re-encoding init segment: " + err.Error())
+		}
+		initSize = int64(initBuf.Len())
+	}
+
 	if initSize > mp4.FreeBoxSize {
 		log.Log.Error(fmt.Sprintf("mp4.Close(): init segment (%d bytes) exceeds reserved space (%d bytes), file may be corrupt", initSize, mp4.FreeBoxSize))
 	}
