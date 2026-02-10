@@ -78,12 +78,13 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte, vpsNALUs [][]
 	//   moov:  ~1500 bytes (mvhd + mvex + video trak + audio trak + UUID)
 	//   sidx:  24 bytes fixed + 12 bytes per segment reference
 	// Segments are ~FragmentDurationMs each, so:
-	//   numSegments = maxDurationSec * 1000 / FragmentDurationMs
+	//   numSegments = ceil(maxDurationSec * 1000 / FragmentDurationMs) + 1 (safety margin)
 	//   sidxSize    = 24 + 12 * numSegments
 	baseSize := int64(2048) // ftyp + moov + headroom
 	numSegments := int64(0)
 	if maxDurationSec > 0 {
-		numSegments = (maxDurationSec*1000)/FragmentDurationMs + 1
+		// Use integer ceiling division to avoid underestimating the number of segments.
+		numSegments = ((maxDurationSec*1000)+FragmentDurationMs-1)/FragmentDurationMs + 1
 	}
 	sidxSize := int64(24 + 12*numSegments)
 	freeBoxSize := int(baseSize + sidxSize)
