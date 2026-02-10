@@ -263,6 +263,47 @@ func (mp4 *MP4) Close(config *models.Config) {
 		log.Log.Error("mp4.Close(): no video or audio samples added, cannot create MP4 file")
 	}
 
+	// Add final pending samples before closing
+	if mp4.Segment != nil {
+		// Add final video sample if pending
+		if mp4.VideoFullSample != nil {
+			duration := mp4.LastVideoSampleDTS
+			if duration == 0 {
+				duration = 33 // Default ~30fps frame duration
+			}
+			mp4.VideoTotalDuration += duration
+			mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
+			mp4.VideoFullSample.Sample.Dur = uint32(duration)
+			err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, uint32(mp4.VideoTrack))
+			if err != nil {
+				log.Log.Error("mp4.Close(): error adding final video sample: " + err.Error())
+			}
+			mp4.VideoFullSample = nil
+		}
+
+		// Add final audio sample if pending
+		if mp4.AudioFullSample != nil && mp4.AudioTrack > 0 {
+			SplitAACFrame(mp4.AudioFullSample.Data, func(started bool, aac []byte) {
+				sampleToAdd := *mp4.AudioFullSample
+				dts := mp4.LastAudioSampleDTS
+				if dts == 0 {
+					dts = 1024 // Default AAC frame duration
+				}
+				mp4.AudioTotalDuration += dts
+				mp4.AudioPTS += dts
+				sampleToAdd.Data = aac[7:]
+				sampleToAdd.DecodeTime = mp4.AudioPTS - dts
+				sampleToAdd.Sample.Dur = uint32(dts)
+				sampleToAdd.Sample.Size = uint32(len(aac[7:]))
+				err := mp4.MultiTrackFragment.AddFullSampleToTrack(sampleToAdd, uint32(mp4.AudioTrack))
+				if err != nil {
+					log.Log.Error("mp4.Close(): error adding final audio sample: " + err.Error())
+				}
+			})
+			mp4.AudioFullSample = nil
+		}
+	}
+
 	// Encode the last segment
 	if mp4.Segment != nil {
 		err := mp4.Segment.Encode(mp4.Writer)
@@ -272,6 +313,10 @@ func (mp4 *MP4) Close(config *models.Config) {
 	}
 
 	mp4.Writer.Flush()
+	// Ensure all data is written to disk
+	if err := mp4.FileWriter.Sync(); err != nil {
+		log.Log.Error("mp4.Close(): error syncing file: " + err.Error())
+	}
 	defer mp4.FileWriter.Close()
 
 	// Now we have all the moof and mdat boxes written to the file.
@@ -316,8 +361,10 @@ func (mp4 *MP4) Close(config *models.Config) {
 		if err != nil {
 		}
 		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
+		init.Moov.Traks[0].Tkhd.Width = uint32(mp4.width) << 16
+		init.Moov.Traks[0].Tkhd.Height = uint32(mp4.height) << 16
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
-		//init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
+		init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
 	case "H265", "HVC1":
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
@@ -325,8 +372,10 @@ func (mp4 *MP4) Close(config *models.Config) {
 		if err != nil {
 		}
 		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
+		init.Moov.Traks[0].Tkhd.Width = uint32(mp4.width) << 16
+		init.Moov.Traks[0].Tkhd.Height = uint32(mp4.height) << 16
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
-		//init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
+		init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
 	}
 
 	// Try adding audio track if available
@@ -345,7 +394,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 		}
 		init.Moov.Traks[1].Tkhd.Duration = mp4.AudioTotalDuration
 		init.Moov.Traks[1].Mdia.Hdlr.Name = "agent " + utils.VERSION
-		//init.Moov.Traks[1].Mdia.Mdhd.Duration = mp4.AudioTotalDuration
+		init.Moov.Traks[1].Mdia.Mdhd.Duration = mp4.AudioTotalDuration
 	}
 
 	// Try adding subtitle track if available
