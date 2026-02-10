@@ -80,7 +80,7 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte, vpsNALUs [][]
 	// Segments are ~FragmentDurationMs each, so:
 	//   numSegments = ceil(maxDurationSec * 1000 / FragmentDurationMs) + 1 (safety margin)
 	//   sidxSize    = 24 + 12 * numSegments
-	baseSize := int64(2048) // ftyp + moov + headroom
+	baseSize := int64(2560) // ftyp + moov + extra headroom for large UUID signatures
 	numSegments := int64(0)
 	if maxDurationSec > 0 {
 		// Use integer ceiling division to avoid underestimating the number of segments.
