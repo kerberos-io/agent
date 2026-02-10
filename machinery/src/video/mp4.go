@@ -67,14 +67,26 @@ type MP4 struct {
 	SampleType          string            // Type of the sample (e.g., "video", "audio", "subtitle")
 }
 
-// NewMP4 creates a new MP4 object
-func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte, vpsNALUs [][]byte) *MP4 {
+// NewMP4 creates a new MP4 object.
+// maxDurationSec is the maximum expected recording duration in seconds,
+// used to calculate the free-box placeholder size for ftyp+moov+sidx.
+func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte, vpsNALUs [][]byte, maxDurationSec int64) *MP4 {
 
-	// Reserve space at the start of the file for the ftyp + moov boxes.
-	// We write a free box as a placeholder that will be overwritten at close
-	// with the actual init segment. 8KB is generous enough for ftyp + moov
-	// with video + audio tracks, mvex, and a UUID signature box.
-	freeBoxSize := 8192
+	// Calculate the placeholder size needed at the start of the file.
+	// Components:
+	//   ftyp:  ~32 bytes
+	//   moov:  ~1500 bytes (mvhd + mvex + video trak + audio trak + UUID)
+	//   sidx:  24 bytes fixed + 12 bytes per segment reference
+	// Segments are ~FragmentDurationMs each, so:
+	//   numSegments = maxDurationSec * 1000 / FragmentDurationMs
+	//   sidxSize    = 24 + 12 * numSegments
+	baseSize := int64(2048) // ftyp + moov + headroom
+	numSegments := int64(0)
+	if maxDurationSec > 0 {
+		numSegments = (maxDurationSec*1000)/FragmentDurationMs + 1
+	}
+	sidxSize := int64(24 + 12*numSegments)
+	freeBoxSize := int(baseSize + sidxSize)
 	free := mp4ff.NewFreeBox(make([]byte, freeBoxSize))
 
 	// Create a writer
