@@ -29,39 +29,42 @@ const FragmentDurationMs = 3000
 
 type MP4 struct {
 	// FileName is the name of the file
-	FileName           string
-	width              int
-	height             int
-	Segments           []*mp4ff.MediaSegment // List of media segments
-	Segment            *mp4ff.MediaSegment
-	MultiTrackFragment *mp4ff.Fragment
-	TrackIDs           []uint32
-	FileWriter         *os.File
-	Writer             *bufio.Writer
-	SegmentCount       int
-	SampleCount        int
-	StartPTS           uint64
-	VideoTotalDuration uint64
-	AudioTotalDuration uint64
-	AudioPTS           uint64
-	Start              bool
-	SPSNALUs           [][]byte // SPS NALUs for H264
-	PPSNALUs           [][]byte // PPS NALUs for H264
-	VPSNALUs           [][]byte // VPS NALUs for H264
-	FreeBoxSize        int64
-	FragmentStartPTS   uint64            // PTS at the start of the current fragment
-	MoofBoxes          int64             // Number of moof boxes in the file
-	MoofBoxSizes       []int64           // Sizes of each moof box
-	StartTime          uint64            // Start time of the MP4 file
-	VideoTrackName     string            // Name of the video track
-	VideoTrack         int               // Track ID for the video track
-	AudioTrackName     string            // Name of the audio track
-	AudioTrack         int               // Track ID for the audio track
-	VideoFullSample    *mp4ff.FullSample // Full sample for video track
-	AudioFullSample    *mp4ff.FullSample // Full sample for audio track
-	LastAudioSampleDTS uint64            // Last PTS for audio sample
-	LastVideoSampleDTS uint64            // Last PTS for video sample
-	SampleType         string            // Type of the sample (e.g., "video", "audio", "subtitle")
+	FileName            string
+	width               int
+	height              int
+	Segments            []*mp4ff.MediaSegment // List of media segments
+	Segment             *mp4ff.MediaSegment
+	MultiTrackFragment  *mp4ff.Fragment
+	TrackIDs            []uint32
+	FileWriter          *os.File
+	Writer              *bufio.Writer
+	SegmentCount        int
+	SampleCount         int
+	StartPTS            uint64
+	VideoTotalDuration  uint64
+	AudioTotalDuration  uint64
+	AudioPTS            uint64
+	Start               bool
+	SPSNALUs            [][]byte // SPS NALUs for H264
+	PPSNALUs            [][]byte // PPS NALUs for H264
+	VPSNALUs            [][]byte // VPS NALUs for H264
+	FreeBoxSize         int64
+	FragmentStartRawPTS uint64            // Raw PTS for timing when to flush fragments
+	FragmentStartDTS    uint64            // Accumulated VideoTotalDuration at fragment start (matches tfdt)
+	MoofBoxes           int64             // Number of moof boxes in the file
+	MoofBoxSizes        []int64           // Sizes of each moof box
+	SegmentDurations    []uint64          // Duration of each segment in timescale units
+	SegmentBaseDecTimes []uint64          // Base decode time of each segment
+	StartTime           uint64            // Start time of the MP4 file
+	VideoTrackName      string            // Name of the video track
+	VideoTrack          int               // Track ID for the video track
+	AudioTrackName      string            // Name of the audio track
+	AudioTrack          int               // Track ID for the audio track
+	VideoFullSample     *mp4ff.FullSample // Full sample for video track
+	AudioFullSample     *mp4ff.FullSample // Full sample for audio track
+	LastAudioSampleDTS  uint64            // Last PTS for audio sample
+	LastVideoSampleDTS  uint64            // Last PTS for video sample
+	SampleType          string            // Type of the sample (e.g., "video", "audio", "subtitle")
 }
 
 // NewMP4 creates a new MP4 object
@@ -143,7 +146,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		// of content has been accumulated, resulting in ~3 second fragments.
 		elapsed := uint64(0)
 		if mp4.Start {
-			elapsed = pts - mp4.FragmentStartPTS
+			elapsed = pts - mp4.FragmentStartRawPTS
 		}
 		shouldFlush := !mp4.Start || elapsed >= FragmentDurationMs
 
@@ -152,6 +155,12 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			if mp4.Start {
 				mp4.MoofBoxes = mp4.MoofBoxes + 1
 				mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
+				// Track the segment's duration and base decode time for sidx.
+				// Use accumulated VideoTotalDuration which matches the tfdt values
+				// in the trun boxes, NOT raw PTS from the camera.
+				segDuration := mp4.VideoTotalDuration - mp4.FragmentStartDTS
+				mp4.SegmentDurations = append(mp4.SegmentDurations, segDuration)
+				mp4.SegmentBaseDecTimes = append(mp4.SegmentBaseDecTimes, mp4.FragmentStartDTS)
 				err := mp4.Segment.Encode(mp4.Writer)
 				if err != nil {
 					log.Log.Error("mp4.AddSampleToTrack(): error encoding segment: " + err.Error())
@@ -180,7 +189,8 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 
 			// Set the start PTS for the next segment
 			mp4.StartPTS = pts
-			mp4.FragmentStartPTS = pts
+			mp4.FragmentStartRawPTS = pts
+			mp4.FragmentStartDTS = mp4.VideoTotalDuration
 		}
 	}
 
@@ -322,6 +332,17 @@ func (mp4 *MP4) Close(config *models.Config) {
 
 	// Encode the last segment
 	if mp4.Segment != nil {
+		// Track the last segment's size, duration and base decode time.
+		// Use accumulated VideoTotalDuration which matches tfdt values.
+		mp4.MoofBoxes = mp4.MoofBoxes + 1
+		mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
+		lastSegDuration := mp4.VideoTotalDuration - mp4.FragmentStartDTS
+		if lastSegDuration == 0 {
+			lastSegDuration = mp4.LastVideoSampleDTS
+		}
+		mp4.SegmentDurations = append(mp4.SegmentDurations, lastSegDuration)
+		mp4.SegmentBaseDecTimes = append(mp4.SegmentBaseDecTimes, mp4.FragmentStartDTS)
+
 		err := mp4.Segment.Encode(mp4.Writer)
 		if err != nil {
 			log.Log.Error("mp4.Close(): error encoding last segment: " + err.Error())
@@ -488,31 +509,29 @@ func (mp4 *MP4) Close(config *models.Config) {
 		}
 	}
 
-	// We will also calculate the SIDX box, which is a segment index box that contains information about the segments in the file.
-	// This is useful for seeking in the file, and for streaming the file.
-	/*sidx := &mp4ff.SidxBox{
-		Version:                  0,
-		Flags:                    0,
-		ReferenceID:              0,
-		Timescale:                videoTimescale,
-		EarliestPresentationTime: 0,
-		FirstOffset:              0,
-		SidxRefs:                 make([]mp4ff.SidxRef, 0),
+	// Build a Segment Index (sidx) box so players can seek directly to any
+	// fragment without scanning the entire file.
+	if len(mp4.SegmentDurations) > 0 {
+		sidx := &mp4ff.SidxBox{
+			Version:                  1,
+			Flags:                    0,
+			ReferenceID:              uint32(mp4.VideoTrack),
+			Timescale:                videoTimescale,
+			EarliestPresentationTime: 0,
+			FirstOffset:              0,
+			SidxRefs:                 make([]mp4ff.SidxRef, 0, len(mp4.SegmentDurations)),
+		}
+		for i, dur := range mp4.SegmentDurations {
+			sidx.SidxRefs = append(sidx.SidxRefs, mp4ff.SidxRef{
+				ReferenceType:      0, // media reference
+				ReferencedSize:     uint32(mp4.MoofBoxSizes[i]),
+				SubSegmentDuration: uint32(dur),
+				StartsWithSAP:      1,
+				SAPType:            1,
+			})
+		}
+		init.AddChild(sidx)
 	}
-	referenceTrak := init.Moov.Trak
-	trex, ok := init.Moov.Mvex.GetTrex(referenceTrak.Tkhd.TrackID)
-	if !ok {
-		// We have an issue.
-	}
-
-	segDatas, err := findSegmentData(mp4.Segments, referenceTrak, trex)
-	if err != nil {
-		// We have an issue.
-	}
-	fillSidx(sidx, referenceTrak, segDatas, true)
-
-	// Add the SIDX box to the moov box
-	init.AddChild(sidx)*/
 
 	// Encode the ftyp + moov init segment into a buffer so we know its size.
 	var initBuf bytes.Buffer
@@ -548,76 +567,6 @@ func (mp4 *MP4) Close(config *models.Config) {
 		log.Log.Error("mp4.Close(): error syncing file: " + err.Error())
 	}
 	mp4.FileWriter.Close()
-}
-
-type segData struct {
-	startPos         uint64
-	presentationTime uint64
-	baseDecodeTime   uint64
-	dur              uint32
-	size             uint32
-}
-
-func fillSidx(sidx *mp4ff.SidxBox, refTrak *mp4ff.TrakBox, segDatas []segData, nonZeroEPT bool) {
-	ept := uint64(0)
-	if nonZeroEPT {
-		ept = segDatas[0].presentationTime
-	}
-	sidx.Version = 1
-	sidx.Timescale = refTrak.Mdia.Mdhd.Timescale
-	sidx.ReferenceID = 1
-	sidx.EarliestPresentationTime = ept
-	sidx.FirstOffset = 0
-	sidx.SidxRefs = make([]mp4ff.SidxRef, 0, len(segDatas))
-
-	for _, segData := range segDatas {
-		size := segData.size
-		sidx.SidxRefs = append(sidx.SidxRefs, mp4ff.SidxRef{
-			ReferencedSize:     size,
-			SubSegmentDuration: segData.dur,
-			StartsWithSAP:      1,
-			SAPType:            1,
-		})
-	}
-}
-
-// findSegmentData returns a slice of segment media data using a reference track.
-func findSegmentData(segs []*mp4ff.MediaSegment, refTrak *mp4ff.TrakBox, trex *mp4ff.TrexBox) ([]segData, error) {
-	segDatas := make([]segData, 0, len(segs))
-	for _, seg := range segs {
-		var firstCompositionTimeOffest int64
-		dur := uint32(0)
-		var baseTime uint64
-		for fIdx, frag := range seg.Fragments {
-			for _, traf := range frag.Moof.Trafs {
-				tfhd := traf.Tfhd
-				if tfhd.TrackID == refTrak.Tkhd.TrackID { // Find track that gives sidx time values
-					if fIdx == 0 {
-						baseTime = traf.Tfdt.BaseMediaDecodeTime()
-					}
-					for i, trun := range traf.Truns {
-						trun.AddSampleDefaultValues(tfhd, trex)
-						samples := trun.GetSamples()
-						for j, sample := range samples {
-							if fIdx == 0 && i == 0 && j == 0 {
-								firstCompositionTimeOffest = int64(sample.CompositionTimeOffset)
-							}
-							dur += sample.Dur
-						}
-					}
-				}
-			}
-		}
-		sd := segData{
-			startPos:         seg.StartPos,
-			presentationTime: uint64(int64(baseTime) + firstCompositionTimeOffest),
-			baseDecodeTime:   baseTime,
-			dur:              dur,
-			size:             uint32(seg.Size()),
-		}
-		segDatas = append(segDatas, sd)
-	}
-	return segDatas, nil
 }
 
 // annexBToLengthPrefixed converts Annex B formatted H264 data (with start codes)
