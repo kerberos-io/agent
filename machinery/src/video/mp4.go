@@ -22,6 +22,11 @@ import (
 
 var LastPTS uint64 = 0 // Last PTS for the current segment
 
+// FragmentDurationMs is the target duration for each fragment in milliseconds.
+// Fragments will be flushed at the first keyframe after this duration has elapsed,
+// resulting in ~3 second fragments (assuming a typical GOP interval).
+const FragmentDurationMs = 3000
+
 type MP4 struct {
 	// FileName is the name of the file
 	FileName           string
@@ -44,6 +49,7 @@ type MP4 struct {
 	PPSNALUs           [][]byte // PPS NALUs for H264
 	VPSNALUs           [][]byte // VPS NALUs for H264
 	FreeBoxSize        int64
+	FragmentStartPTS   uint64            // PTS at the start of the current fragment
 	MoofBoxes          int64             // Number of moof boxes in the file
 	MoofBoxSizes       []int64           // Sizes of each moof box
 	StartTime          uint64            // Start time of the MP4 file
@@ -61,13 +67,12 @@ type MP4 struct {
 // NewMP4 creates a new MP4 object
 func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte, vpsNALUs [][]byte) *MP4 {
 
-	init := mp4ff.NewMP4Init()
-
-	// Add a free box to the init segment
-	// Prepend a free box to the init segment with a size of 4096 bytes, so we can overwrite it later with the actual init segment.
-	freeBoxSize := 4096
+	// Reserve space at the start of the file for the ftyp + moov boxes.
+	// We write a free box as a placeholder that will be overwritten at close
+	// with the actual init segment. 8KB is generous enough for ftyp + moov
+	// with video + audio tracks, mvex, and a UUID signature box.
+	freeBoxSize := 8192
 	free := mp4ff.NewFreeBox(make([]byte, freeBoxSize))
-	init.AddChild(free)
 
 	// Create a writer
 	ofd, err := os.Create(fileName)
@@ -77,16 +82,15 @@ func NewMP4(fileName string, spsNALUs [][]byte, ppsNALUs [][]byte, vpsNALUs [][]
 	// Create a buffered writer
 	bufferedWriter := bufio.NewWriterSize(ofd, 64*1024) // 64KB buffer
 
-	// We will write the empty init segment to the file
-	// so we can overwrite it later with the actual init segment.
-	err = init.Encode(bufferedWriter)
+	// Write the free box placeholder at the start of the file
+	err = free.Encode(bufferedWriter)
 	if err != nil {
 	}
 
 	return &MP4{
 		FileName:    fileName,
 		StartTime:   uint64(time.Now().Unix()),
-		FreeBoxSize: int64(freeBoxSize),
+		FreeBoxSize: int64(freeBoxSize) + 8, // payload + 8 byte box header
 		FileWriter:  ofd,
 		Writer:      bufferedWriter,
 		SPSNALUs:    spsNALUs,
@@ -134,38 +138,50 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 
 	if isKeyframe {
 
-		// Write the segment to the file
+		// Determine whether to start a new fragment.
+		// We only flush at a keyframe boundary once at least FragmentDurationMs
+		// of content has been accumulated, resulting in ~3 second fragments.
+		elapsed := uint64(0)
 		if mp4.Start {
-			mp4.MoofBoxes = mp4.MoofBoxes + 1
-			mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
-			err := mp4.Segment.Encode(mp4.Writer)
-			if err != nil {
-				log.Log.Error("mp4.AddSampleToTrack(): error encoding segment: " + err.Error())
+			elapsed = pts - mp4.FragmentStartPTS
+		}
+		shouldFlush := !mp4.Start || elapsed >= FragmentDurationMs
+
+		if shouldFlush {
+			// Write the previous segment to the file
+			if mp4.Start {
+				mp4.MoofBoxes = mp4.MoofBoxes + 1
+				mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
+				err := mp4.Segment.Encode(mp4.Writer)
+				if err != nil {
+					log.Log.Error("mp4.AddSampleToTrack(): error encoding segment: " + err.Error())
+				}
+				mp4.Segments = append(mp4.Segments, mp4.Segment)
 			}
-			mp4.Segments = append(mp4.Segments, mp4.Segment)
+
+			mp4.Start = true
+
+			// Increment the segment count
+			mp4.SegmentCount = mp4.SegmentCount + 1
+
+			// Create a new media segment
+			seg := mp4ff.NewMediaSegment()
+
+			// Create a video fragment
+			multiTrackFragment, err := mp4ff.CreateMultiTrackFragment(uint32(mp4.SegmentCount), mp4.TrackIDs)
+			if err != nil {
+				log.Log.Error("mp4.AddSampleToTrack(): error creating multi track fragment: " + err.Error())
+			}
+			mp4.MultiTrackFragment = multiTrackFragment
+			seg.AddFragment(multiTrackFragment)
+
+			// Set to MP4 struct
+			mp4.Segment = seg
+
+			// Set the start PTS for the next segment
+			mp4.StartPTS = pts
+			mp4.FragmentStartPTS = pts
 		}
-
-		mp4.Start = true
-
-		// Increment the segment count
-		mp4.SegmentCount = mp4.SegmentCount + 1
-
-		// Create a new media segment
-		seg := mp4ff.NewMediaSegment()
-
-		// Create a video fragment
-		multiTrackFragment, err := mp4ff.CreateMultiTrackFragment(uint32(mp4.SegmentCount), mp4.TrackIDs) // Assuming 1 for video track and 2 for audio track
-		if err != nil {
-			log.Log.Error("mp4.AddSampleToTrack(): error creating multi track fragment: " + err.Error())
-		}
-		mp4.MultiTrackFragment = multiTrackFragment
-		seg.AddFragment(multiTrackFragment)
-
-		// Set to MP4 struct
-		mp4.Segment = seg
-
-		// Set the start PTS for the next segment
-		mp4.StartPTS = pts
 	}
 
 	if mp4.Start {
@@ -313,14 +329,14 @@ func (mp4 *MP4) Close(config *models.Config) {
 	}
 
 	mp4.Writer.Flush()
-	// Ensure all data is written to disk
+	// Ensure all segment data is on disk before we overwrite the placeholder at offset 0.
 	if err := mp4.FileWriter.Sync(); err != nil {
 		log.Log.Error("mp4.Close(): error syncing file: " + err.Error())
 	}
-	defer mp4.FileWriter.Close()
 
 	// Now we have all the moof and mdat boxes written to the file.
-	// We can now generate the ftyp and moov boxes, and replace it with the free box we added earlier (size of 2048 bytes).
+	// We build the ftyp + moov init segment and write it at the start,
+	// overwriting the free box placeholder we reserved in NewMP4.
 	init := mp4ff.NewMP4Init()
 
 	// Create a new ftyp box
@@ -498,30 +514,40 @@ func (mp4 *MP4) Close(config *models.Config) {
 	// Add the SIDX box to the moov box
 	init.AddChild(sidx)*/
 
-	// Get a bit slice writer for the init segment
-	// Get a byte buffer of FreeBoxSize bytes to write the init segment
-	buffer := bytes.NewBuffer(make([]byte, 0))
-	init.Encode(buffer)
-
-	// The first FreeBoxSize bytes of the file is a free box, so we can read it and replace it with the moov box.
-	// The init box might not be FreeBoxSize bytes, so we need to read the first FreeBoxSize bytes and then replace it with the moov box.
-	// while the remaining bytes are for a new free box.
-	// Write the init segment at the beginning of the file, replacing the free box
-	if _, err := mp4.FileWriter.WriteAt(buffer.Bytes(), 0); err != nil {
+	// Encode the ftyp + moov init segment into a buffer so we know its size.
+	var initBuf bytes.Buffer
+	if err := init.Encode(&initBuf); err != nil {
+		log.Log.Error("mp4.Close(): error encoding init segment: " + err.Error())
 	}
 
-	// Calculate the remaining size for the free box
-	remainingSize := mp4.FreeBoxSize - int64(buffer.Len())
-	if remainingSize > 0 {
-		newFreeBox := mp4ff.NewFreeBox(make([]byte, remainingSize))
+	initSize := int64(initBuf.Len())
+	if initSize > mp4.FreeBoxSize {
+		log.Log.Error(fmt.Sprintf("mp4.Close(): init segment (%d bytes) exceeds reserved space (%d bytes), file may be corrupt", initSize, mp4.FreeBoxSize))
+	}
+
+	// Write the init segment at the beginning of the file, overwriting the free box placeholder.
+	if _, err := mp4.FileWriter.WriteAt(initBuf.Bytes(), 0); err != nil {
+		log.Log.Error("mp4.Close(): error writing init segment: " + err.Error())
+	}
+
+	// Fill any remaining reserved space with a new (smaller) free box so
+	// the byte offsets of the moof/mdat boxes that follow are preserved.
+	remainingSize := mp4.FreeBoxSize - initSize
+	if remainingSize >= 8 { // minimum box size is 8 bytes (header only)
+		newFree := mp4ff.NewFreeBox(make([]byte, remainingSize-8))
 		var freeBuf bytes.Buffer
-		if err := newFreeBox.Encode(&freeBuf); err != nil {
+		if err := newFree.Encode(&freeBuf); err != nil {
 			log.Log.Error("mp4.Close(): error encoding free box: " + err.Error())
 		}
-		if _, err := mp4.FileWriter.WriteAt(freeBuf.Bytes(), int64(buffer.Len())); err != nil {
+		if _, err := mp4.FileWriter.WriteAt(freeBuf.Bytes(), initSize); err != nil {
 			log.Log.Error("mp4.Close(): error writing free box: " + err.Error())
 		}
 	}
+
+	if err := mp4.FileWriter.Sync(); err != nil {
+		log.Log.Error("mp4.Close(): error syncing file: " + err.Error())
+	}
+	mp4.FileWriter.Close()
 }
 
 type segData struct {
