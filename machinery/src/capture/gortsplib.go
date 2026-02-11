@@ -637,10 +637,13 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 				// Frame is complete — update per-stream FPS from PTS.
 				if okPTS {
-					if ft := g.fpsTrackers[g.VideoH264Index]; ft != nil {
-						if ptsFPS := ft.update(pts); ptsFPS > 0 && ptsFPS <= 120 {
-							g.Streams[g.VideoH264Index].FPS = ptsFPS
-						}
+					ft := g.fpsTrackers[g.VideoH264Index]
+					if ft == nil {
+						ft = newFPSTracker(30)
+						g.fpsTrackers[g.VideoH264Index] = ft
+					}
+					if ptsFPS := ft.update(pts); ptsFPS > 0 && ptsFPS <= 120 {
+						g.Streams[g.VideoH264Index].FPS = ptsFPS
 					}
 				}
 
@@ -654,8 +657,10 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				nonIDRPresent := false
 				idrPresent := false
 
+				var naluTypes []string
 				for _, nalu := range au {
 					typ := h264.NALUType(nalu[0] & 0x1F)
+					naluTypes = append(naluTypes, fmt.Sprintf("%s(%d,sz=%d)", typ.String(), int(typ), len(nalu)))
 					switch typ {
 					case h264.NALUTypeAccessUnitDelimiter:
 						continue
@@ -700,6 +705,11 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 				if len(filteredAU) <= 1 || (!nonIDRPresent && !idrPresent) {
 					return
+				}
+
+				if idrPresent {
+					log.Log.Debug(fmt.Sprintf("capture.golibrtsp.Start(%s): IDR frame NALUs: [%s]",
+						streamType, fmt.Sprintf("%v", naluTypes)))
 				}
 
 				// Convert to packet.
@@ -817,10 +827,13 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 				// Frame is complete — update per-stream FPS from PTS.
 				if okPTS {
-					if ft := g.fpsTrackers[g.VideoH265Index]; ft != nil {
-						if ptsFPS := ft.update(pts); ptsFPS > 0 && ptsFPS <= 120 {
-							g.Streams[g.VideoH265Index].FPS = ptsFPS
-						}
+					ft := g.fpsTrackers[g.VideoH265Index]
+					if ft == nil {
+						ft = newFPSTracker(30)
+						g.fpsTrackers[g.VideoH265Index] = ft
+					}
+					if ptsFPS := ft.update(pts); ptsFPS > 0 && ptsFPS <= 120 {
+						g.Streams[g.VideoH265Index].FPS = ptsFPS
 					}
 				}
 

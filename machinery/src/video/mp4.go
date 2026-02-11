@@ -189,6 +189,11 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 
 func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64) error {
 
+	if isKeyframe && trackID == uint32(mp4.VideoTrack) {
+		log.Log.Debug(fmt.Sprintf("mp4.AddSampleToTrack(): KEYFRAME received - track=%d, PTS=%d, size=%d, sampleCount=%d",
+			trackID, pts, len(data), mp4.SampleCount))
+	}
+
 	if isKeyframe {
 
 		// Determine whether to start a new fragment.
