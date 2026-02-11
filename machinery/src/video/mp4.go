@@ -150,6 +150,43 @@ func (mp4 *MP4) AddAudioTrack(codec string) uint32 {
 func (mp4 *MP4) AddMediaSegment(segNr int) {
 }
 
+// flushPendingVideoSample writes the pending video sample to the current fragment.
+// If nextPTS is provided (non-zero), it calculates duration from the PTS difference.
+// If nextPTS is 0 (e.g., at Close time), it uses the last known duration.
+// Returns true if a sample was flushed, false if there was no pending sample.
+func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
+	if mp4.VideoFullSample == nil || mp4.MultiTrackFragment == nil {
+		return false
+	}
+
+	var duration uint64
+	if nextPTS > 0 && nextPTS > mp4.VideoFullSample.DecodeTime {
+		duration = nextPTS - mp4.VideoFullSample.DecodeTime
+	} else {
+		// No valid nextPTS (Close case) or PTS went backwards (jitter/discontinuity)
+		if nextPTS > 0 {
+			log.Log.Warn(fmt.Sprintf("mp4.flushPendingVideoSample(): video PTS went backwards or zero duration (nextPTS=%d, prevDTS=%d), using last known duration", nextPTS, mp4.VideoFullSample.DecodeTime))
+		}
+		duration = mp4.LastVideoSampleDTS
+		if duration == 0 {
+			duration = 33 // Default ~30fps frame duration
+		}
+	}
+
+	mp4.LastVideoSampleDTS = duration
+	mp4.VideoTotalDuration += duration
+	mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
+	mp4.VideoFullSample.Sample.Dur = uint32(duration)
+
+	err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, uint32(mp4.VideoTrack))
+	if err != nil {
+		log.Log.Error("mp4.flushPendingVideoSample(): error adding sample: " + err.Error())
+	}
+
+	mp4.VideoFullSample = nil
+	return true
+}
+
 func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64) error {
 
 	if isKeyframe {
@@ -169,17 +206,8 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 				// IMPORTANT: Add any pending video sample to the current segment BEFORE flushing.
 				// This ensures the segment contains all frames up to (but not including) this keyframe,
 				// and the new segment will start cleanly with this keyframe.
-				if mp4.VideoFullSample != nil && trackID == uint32(mp4.VideoTrack) {
-					duration := pts - mp4.VideoFullSample.DecodeTime
-					mp4.LastVideoSampleDTS = duration
-					mp4.VideoTotalDuration += duration
-					mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
-					mp4.VideoFullSample.Sample.Dur = uint32(duration)
-					err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, uint32(mp4.VideoTrack))
-					if err != nil {
-						log.Log.Error("mp4.AddSampleToTrack(): error adding pending sample before flush: " + err.Error())
-					}
-					mp4.VideoFullSample = nil // Clear pending sample, it's now in this segment
+				if trackID == uint32(mp4.VideoTrack) {
+					mp4.flushPendingVideoSample(pts)
 				}
 
 				mp4.MoofBoxes = mp4.MoofBoxes + 1
@@ -237,18 +265,10 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			}
 
 			if err == nil {
+				// Flush previous pending sample before storing the new one
 				if mp4.VideoFullSample != nil {
-					duration := pts - mp4.VideoFullSample.DecodeTime
-					log.Log.Debug("Adding sample to track " + fmt.Sprintf("%d, PTS: %d, Duration: %d, size: %d, Keyframe: %t", trackID, pts, duration, len(lengthPrefixed), isKeyframe))
-
-					mp4.LastVideoSampleDTS = duration
-					mp4.VideoTotalDuration += duration
-					mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
-					mp4.VideoFullSample.Sample.Dur = uint32(duration)
-					err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, trackID)
-					if err != nil {
-						log.Log.Error("mp4.AddSampleToTrack(): error adding sample to track " + fmt.Sprintf("%d: %v", trackID, err))
-					}
+					log.Log.Debug("Adding sample to track " + fmt.Sprintf("%d, PTS: %d, size: %d, Keyframe: %t", trackID, pts, len(lengthPrefixed), isKeyframe))
+					mp4.flushPendingVideoSample(pts)
 				}
 
 				// Set the sample data
@@ -320,21 +340,8 @@ func (mp4 *MP4) Close(config *models.Config) {
 
 	// Add final pending samples before closing
 	if mp4.Segment != nil {
-		// Add final video sample if pending
-		if mp4.VideoFullSample != nil {
-			duration := mp4.LastVideoSampleDTS
-			if duration == 0 {
-				duration = 33 // Default ~30fps frame duration
-			}
-			mp4.VideoTotalDuration += duration
-			mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
-			mp4.VideoFullSample.Sample.Dur = uint32(duration)
-			err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, uint32(mp4.VideoTrack))
-			if err != nil {
-				log.Log.Error("mp4.Close(): error adding final video sample: " + err.Error())
-			}
-			mp4.VideoFullSample = nil
-		}
+		// Add final video sample if pending (pass 0 as nextPTS to use last known duration)
+		mp4.flushPendingVideoSample(0)
 
 		// Add final audio sample if pending
 		if mp4.AudioFullSample != nil && mp4.AudioTrack > 0 {
