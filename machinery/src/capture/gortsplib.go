@@ -1271,11 +1271,10 @@ func WriteMPEG4Audio(forma *format.MPEG4Audio, aus [][]byte) ([]byte, error) {
 
 // Initialize FPS calculation buffers
 func (g *Golibrtsp) initFPSCalculation() {
-	// Create per-stream FPS trackers so H264 and H265 PTS samples
-	// never interleave (each stream gets its own ring buffer).
-	g.fpsTrackers = make(map[int8]*fpsTracker)
-	for idx := range g.Streams {
-		g.fpsTrackers[int8(idx)] = newFPSTracker(30)
+	// Ensure the per-stream FPS trackers map exists. Individual trackers
+	// can be created lazily when a given stream index is first used.
+	if g.fpsTrackers == nil {
+		g.fpsTrackers = make(map[int8]*fpsTracker)
 	}
 
 	// Initialize I-frame interval tracking
