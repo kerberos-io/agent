@@ -165,7 +165,7 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 	} else {
 		// No valid nextPTS (Close case) or PTS went backwards (jitter/discontinuity)
 		if nextPTS > 0 {
-			log.Log.Warn(fmt.Sprintf("mp4.flushPendingVideoSample(): video PTS went backwards or zero duration (nextPTS=%d, prevDTS=%d), using last known duration", nextPTS, mp4.VideoFullSample.DecodeTime))
+			log.Log.Warning(fmt.Sprintf("mp4.flushPendingVideoSample(): video PTS went backwards or zero duration (nextPTS=%d, prevDTS=%d), using last known duration", nextPTS, mp4.VideoFullSample.DecodeTime))
 		}
 		duration = mp4.LastVideoSampleDTS
 		if duration == 0 {
