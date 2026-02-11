@@ -29,42 +29,46 @@ const FragmentDurationMs = 3000
 
 type MP4 struct {
 	// FileName is the name of the file
-	FileName            string
-	width               int
-	height              int
-	Segments            []*mp4ff.MediaSegment // List of media segments
-	Segment             *mp4ff.MediaSegment
-	MultiTrackFragment  *mp4ff.Fragment
-	TrackIDs            []uint32
-	FileWriter          *os.File
-	Writer              *bufio.Writer
-	SegmentCount        int
-	SampleCount         int
-	StartPTS            uint64
-	VideoTotalDuration  uint64
-	AudioTotalDuration  uint64
-	AudioPTS            uint64
-	Start               bool
-	SPSNALUs            [][]byte // SPS NALUs for H264
-	PPSNALUs            [][]byte // PPS NALUs for H264
-	VPSNALUs            [][]byte // VPS NALUs for H264
-	FreeBoxSize         int64
-	FragmentStartRawPTS uint64            // Raw PTS for timing when to flush fragments
-	FragmentStartDTS    uint64            // Accumulated VideoTotalDuration at fragment start (matches tfdt)
-	MoofBoxes           int64             // Number of moof boxes in the file
-	MoofBoxSizes        []int64           // Sizes of each moof box
-	SegmentDurations    []uint64          // Duration of each segment in timescale units
-	SegmentBaseDecTimes []uint64          // Base decode time of each segment
-	StartTime           uint64            // Start time of the MP4 file
-	VideoTrackName      string            // Name of the video track
-	VideoTrack          int               // Track ID for the video track
-	AudioTrackName      string            // Name of the audio track
-	AudioTrack          int               // Track ID for the audio track
-	VideoFullSample     *mp4ff.FullSample // Full sample for video track
-	AudioFullSample     *mp4ff.FullSample // Full sample for audio track
-	LastAudioSampleDTS  uint64            // Last PTS for audio sample
-	LastVideoSampleDTS  uint64            // Last PTS for video sample
-	SampleType          string            // Type of the sample (e.g., "video", "audio", "subtitle")
+	FileName                string
+	width                   int
+	height                  int
+	Segments                []*mp4ff.MediaSegment // List of media segments
+	Segment                 *mp4ff.MediaSegment
+	MultiTrackFragment      *mp4ff.Fragment
+	TrackIDs                []uint32
+	FileWriter              *os.File
+	Writer                  *bufio.Writer
+	SegmentCount            int
+	SampleCount             int
+	StartPTS                uint64
+	VideoTotalDuration      uint64
+	AudioTotalDuration      uint64
+	AudioPTS                uint64
+	Start                   bool
+	SPSNALUs                [][]byte // SPS NALUs for H264
+	PPSNALUs                [][]byte // PPS NALUs for H264
+	VPSNALUs                [][]byte // VPS NALUs for H264
+	FreeBoxSize             int64
+	FragmentStartRawPTS     uint64            // Raw PTS for timing when to flush fragments
+	FragmentStartDTS        uint64            // Accumulated VideoTotalDuration at fragment start (matches tfdt)
+	MoofBoxes               int64             // Number of moof boxes in the file
+	MoofBoxSizes            []int64           // Sizes of each moof box
+	SegmentDurations        []uint64          // Duration of each segment in timescale units
+	SegmentBaseDecTimes     []uint64          // Base decode time of each segment
+	StartTime               uint64            // Start time of the MP4 file
+	VideoTrackName          string            // Name of the video track
+	VideoTrack              int               // Track ID for the video track
+	AudioTrackName          string            // Name of the audio track
+	AudioTrack              int               // Track ID for the audio track
+	VideoFullSample         *mp4ff.FullSample // Full sample for video track
+	AudioFullSample         *mp4ff.FullSample // Full sample for audio track
+	LastAudioSampleDTS      uint64            // Last PTS for audio sample
+	LastVideoSampleDTS      uint64            // Last PTS for video sample
+	SampleType              string            // Type of the sample (e.g., "video", "audio", "subtitle")
+	TotalKeyframesReceived  int               // Total keyframes received by AddSampleToTrack
+	TotalKeyframesWritten   int               // Total keyframes written to trun boxes
+	FragmentKeyframeCount   int               // Keyframes in the current fragment
+	PendingSampleIsKeyframe bool              // Whether the pending video sample is a keyframe
 }
 
 // NewMP4 creates a new MP4 object.
@@ -178,20 +182,33 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 	mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
 	mp4.VideoFullSample.Sample.Dur = uint32(duration)
 
+	isKF := mp4.PendingSampleIsKeyframe
 	err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, uint32(mp4.VideoTrack))
 	if err != nil {
 		log.Log.Error("mp4.flushPendingVideoSample(): error adding sample: " + err.Error())
 	}
+	if isKF {
+		mp4.TotalKeyframesWritten++
+		mp4.FragmentKeyframeCount++
+		log.Log.Debug(fmt.Sprintf("mp4.flushPendingVideoSample(): KEYFRAME WRITTEN to trun - totalWritten=%d, fragmentKF=%d, flags=0x%08x, dur=%d, DTS=%d",
+			mp4.TotalKeyframesWritten, mp4.FragmentKeyframeCount, mp4.VideoFullSample.Sample.Flags, duration, mp4.VideoFullSample.DecodeTime))
+	}
 
 	mp4.VideoFullSample = nil
+	mp4.PendingSampleIsKeyframe = false
 	return true
 }
 
 func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64) error {
 
 	if isKeyframe && trackID == uint32(mp4.VideoTrack) {
-		log.Log.Debug(fmt.Sprintf("mp4.AddSampleToTrack(): KEYFRAME received - track=%d, PTS=%d, size=%d, sampleCount=%d",
-			trackID, pts, len(data), mp4.SampleCount))
+		mp4.TotalKeyframesReceived++
+		elapsedDbg := uint64(0)
+		if mp4.Start {
+			elapsedDbg = pts - mp4.FragmentStartRawPTS
+		}
+		log.Log.Debug(fmt.Sprintf("mp4.AddSampleToTrack(): KEYFRAME #%d received - PTS=%d, size=%d, elapsed=%dms, started=%t, segment=%d, fragKF=%d",
+			mp4.TotalKeyframesReceived, pts, len(data), elapsedDbg, mp4.Start, mp4.SegmentCount, mp4.FragmentKeyframeCount))
 	}
 
 	if isKeyframe {
@@ -215,6 +232,8 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 					mp4.flushPendingVideoSample(pts)
 				}
 
+				log.Log.Debug(fmt.Sprintf("mp4.AddSampleToTrack(): FLUSHING segment #%d - keyframes_in_fragment=%d, totalKF_received=%d, totalKF_written=%d",
+					mp4.SegmentCount, mp4.FragmentKeyframeCount, mp4.TotalKeyframesReceived, mp4.TotalKeyframesWritten))
 				mp4.MoofBoxes = mp4.MoofBoxes + 1
 				mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
 				// Track the segment's duration and base decode time for sidx.
@@ -253,6 +272,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			mp4.StartPTS = pts
 			mp4.FragmentStartRawPTS = pts
 			mp4.FragmentStartDTS = mp4.VideoTotalDuration
+			mp4.FragmentKeyframeCount = 0 // Reset keyframe counter for new fragment
 		}
 	}
 
@@ -290,6 +310,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 					CompositionTimeOffset: 0, // No composition time offset for video
 				}
 				mp4.VideoFullSample = &fullSample
+				mp4.PendingSampleIsKeyframe = isKeyframe
 				mp4.SampleType = "video"
 			}
 		} else if trackID == uint32(mp4.AudioTrack) {
@@ -338,6 +359,9 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 }
 
 func (mp4 *MP4) Close(config *models.Config) {
+
+	log.Log.Info(fmt.Sprintf("mp4.Close(): KEYFRAME SUMMARY - totalReceived=%d, totalWritten=%d, segments=%d, lastFragmentKF=%d",
+		mp4.TotalKeyframesReceived, mp4.TotalKeyframesWritten, mp4.SegmentCount, mp4.FragmentKeyframeCount))
 
 	if mp4.VideoTotalDuration == 0 && mp4.AudioTotalDuration == 0 {
 		log.Log.Error("mp4.Close(): no video or audio samples added, cannot create MP4 file")
