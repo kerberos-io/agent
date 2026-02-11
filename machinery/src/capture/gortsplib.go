@@ -558,12 +558,6 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					return
 				}
 
-				// Calculate FPS from PTS on every video frame
-				ptsFPS := g.calculateFPSFromPTS(pts)
-				if ptsFPS > 0 && ptsFPS <= 120 {
-					g.Streams[g.VideoH264Index].FPS = ptsFPS
-				}
-
 				// Extract access units from RTP packets
 				// We need to do this, because the decoder expects a full
 				// access unit. Once we have a full access unit, we can
@@ -574,6 +568,12 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 						log.Log.Error("capture.golibrtsp.Start(): " + errDecode.Error())
 					}
 					return
+				}
+
+				// Calculate FPS from PTS after successful frame decode
+				ptsFPS := g.calculateFPSFromPTS(pts)
+				if ptsFPS > 0 && ptsFPS <= 120 {
+					g.Streams[g.VideoH264Index].FPS = ptsFPS
 				}
 
 				// We'll need to read out a few things.
@@ -736,12 +736,6 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					return
 				}
 
-				// Calculate FPS from PTS on every video frame
-				ptsFPS := g.calculateFPSFromPTS(pts)
-				if ptsFPS > 0 && ptsFPS <= 120 {
-					g.Streams[g.VideoH265Index].FPS = ptsFPS
-				}
-
 				// Extract access units from RTP packets
 				// We need to do this, because the decoder expects a full
 				// access unit. Once we have a full access unit, we can
@@ -752,6 +746,12 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 						log.Log.Error("capture.golibrtsp.Start(): " + errDecode.Error())
 					}
 					return
+				}
+
+				// Calculate FPS from PTS after successful frame decode
+				ptsFPS := g.calculateFPSFromPTS(pts)
+				if ptsFPS > 0 && ptsFPS <= 120 {
+					g.Streams[g.VideoH265Index].FPS = ptsFPS
 				}
 
 				filteredAU = [][]byte{
