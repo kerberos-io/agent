@@ -166,6 +166,22 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		if shouldFlush {
 			// Write the previous segment to the file
 			if mp4.Start {
+				// IMPORTANT: Add any pending video sample to the current segment BEFORE flushing.
+				// This ensures the segment contains all frames up to (but not including) this keyframe,
+				// and the new segment will start cleanly with this keyframe.
+				if mp4.VideoFullSample != nil && trackID == uint32(mp4.VideoTrack) {
+					duration := pts - mp4.VideoFullSample.DecodeTime
+					mp4.LastVideoSampleDTS = duration
+					mp4.VideoTotalDuration += duration
+					mp4.VideoFullSample.DecodeTime = mp4.VideoTotalDuration - duration
+					mp4.VideoFullSample.Sample.Dur = uint32(duration)
+					err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, uint32(mp4.VideoTrack))
+					if err != nil {
+						log.Log.Error("mp4.AddSampleToTrack(): error adding pending sample before flush: " + err.Error())
+					}
+					mp4.VideoFullSample = nil // Clear pending sample, it's now in this segment
+				}
+
 				mp4.MoofBoxes = mp4.MoofBoxes + 1
 				mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
 				// Track the segment's duration and base decode time for sidx.
