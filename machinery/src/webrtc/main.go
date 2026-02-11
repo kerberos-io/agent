@@ -49,6 +49,7 @@ type peerConnectionWrapper struct {
 	conn      *pionWebRTC.PeerConnection
 	cancelCtx context.CancelFunc
 	done      chan struct{}
+	closeOnce sync.Once
 }
 
 var globalConnectionManager = NewConnectionManager()
@@ -339,18 +340,20 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 				switch connectionState {
 				case pionWebRTC.PeerConnectionStateDisconnected, pionWebRTC.PeerConnectionStateClosed:
-					count := globalConnectionManager.DecrementPeerCount()
-					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Peer disconnected. Active peers: " + string(rune(count)))
+					wrapper.closeOnce.Do(func() {
+						count := globalConnectionManager.DecrementPeerCount()
+						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Peer disconnected. Active peers: " + string(rune(count)))
 
-					// Clean up resources
-					globalConnectionManager.CloseCandidateChannel(sessionKey)
+						// Clean up resources
+						globalConnectionManager.CloseCandidateChannel(sessionKey)
 
-					if err := peerConnection.Close(); err != nil {
-						log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error closing peer connection: " + err.Error())
-					}
+						if err := peerConnection.Close(); err != nil {
+							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error closing peer connection: " + err.Error())
+						}
 
-					globalConnectionManager.RemovePeerConnection(handshake.SessionID)
-					close(wrapper.done)
+						globalConnectionManager.RemovePeerConnection(handshake.SessionID)
+						close(wrapper.done)
+					})
 
 				case pionWebRTC.PeerConnectionStateConnected:
 					count := globalConnectionManager.IncrementPeerCount()
