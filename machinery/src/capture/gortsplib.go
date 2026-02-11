@@ -85,14 +85,8 @@ type Golibrtsp struct {
 
 	Streams []packets.Stream
 
-	// FPS calculation fields
-	lastFrameTime    time.Time
-	frameTimeBuffer  []time.Duration
-	frameBufferSize  int
-	frameBufferIndex int
-	fpsMutex         sync.Mutex
-	lastPTS          time.Duration // last RTP PTS for PTS-based FPS calculation
-	hasPTS           bool          // whether lastPTS has been set
+	// Per-stream FPS calculation (keyed by stream index)
+	fpsTrackers map[int8]*fpsTracker
 
 	// I-frame interval tracking fields
 	packetsSinceLastKeyframe int
@@ -101,6 +95,78 @@ type Golibrtsp struct {
 	keyframeBufferSize       int
 	keyframeBufferIndex      int
 	keyframeMutex            sync.Mutex
+}
+
+// fpsTracker holds per-stream state for PTS-based FPS calculation.
+// Each video stream (H264 / H265) gets its own tracker so PTS
+// samples from different codecs never interleave.
+type fpsTracker struct {
+	mu              sync.Mutex
+	lastPTS         time.Duration
+	hasPTS          bool
+	frameTimeBuffer []time.Duration
+	bufferSize      int
+	bufferIndex     int
+	cachedFPS       float64 // latest computed FPS
+}
+
+func newFPSTracker(bufferSize int) *fpsTracker {
+	return &fpsTracker{
+		frameTimeBuffer: make([]time.Duration, bufferSize),
+		bufferSize:      bufferSize,
+	}
+}
+
+// update records a new PTS sample and returns the latest FPS estimate.
+// It must be called once per complete decoded frame (after Decode()
+// succeeds), not on every RTP packet fragment.
+func (ft *fpsTracker) update(pts time.Duration) float64 {
+	ft.mu.Lock()
+	defer ft.mu.Unlock()
+
+	if !ft.hasPTS {
+		ft.lastPTS = pts
+		ft.hasPTS = true
+		return 0
+	}
+
+	interval := pts - ft.lastPTS
+	ft.lastPTS = pts
+
+	// Skip invalid intervals (zero, negative, or very large which
+	// indicate a PTS discontinuity or wrap).
+	if interval <= 0 || interval > 5*time.Second {
+		return ft.cachedFPS
+	}
+
+	ft.frameTimeBuffer[ft.bufferIndex] = interval
+	ft.bufferIndex = (ft.bufferIndex + 1) % ft.bufferSize
+
+	var totalInterval time.Duration
+	validSamples := 0
+	for _, iv := range ft.frameTimeBuffer {
+		if iv > 0 {
+			totalInterval += iv
+			validSamples++
+		}
+	}
+	if validSamples == 0 {
+		return ft.cachedFPS
+	}
+	avgInterval := totalInterval / time.Duration(validSamples)
+	if avgInterval == 0 {
+		return ft.cachedFPS
+	}
+
+	ft.cachedFPS = float64(time.Second) / float64(avgInterval)
+	return ft.cachedFPS
+}
+
+// fps returns the most recent FPS estimate without recording a new sample.
+func (ft *fpsTracker) fps() float64 {
+	ft.mu.Lock()
+	defer ft.mu.Unlock()
+	return ft.cachedFPS
 }
 
 // Init function
@@ -550,30 +616,32 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 			if len(rtppkt.Payload) > 0 {
 
-				// decode timestamp
-				pts, ok := g.Client.PacketPTS(g.VideoH264Media, rtppkt)
-				pts2, ok := g.Client.PacketPTS2(g.VideoH264Media, rtppkt)
-				if !ok {
-					log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
+				// decode timestamps — validate each call separately
+				pts, okPTS := g.Client.PacketPTS(g.VideoH264Media, rtppkt)
+				pts2, okPTS2 := g.Client.PacketPTS2(g.VideoH264Media, rtppkt)
+				if !okPTS2 {
+					log.Log.Debug("capture.golibrtsp.Start(): unable to get PTS2 from PacketPTS2")
 					return
 				}
 
-				// Calculate FPS from PTS on every video frame
-				ptsFPS := g.calculateFPSFromPTS(pts)
-				if ptsFPS > 0 && ptsFPS <= 120 {
-					g.Streams[g.VideoH264Index].FPS = ptsFPS
-				}
-
-				// Extract access units from RTP packets
-				// We need to do this, because the decoder expects a full
-				// access unit. Once we have a full access unit, we can
-				// decode it, and know if it's a keyframe or not.
+				// Extract access units from RTP packets.
+				// We need a complete access unit to determine whether
+				// this is a keyframe.
 				au, errDecode := g.VideoH264Decoder.Decode(rtppkt)
 				if errDecode != nil {
 					if errDecode != rtph264.ErrNonStartingPacketAndNoPrevious && errDecode != rtph264.ErrMorePacketsNeeded {
 						log.Log.Error("capture.golibrtsp.Start(): " + errDecode.Error())
 					}
 					return
+				}
+
+				// Frame is complete — update per-stream FPS from PTS.
+				if okPTS {
+					if ft := g.fpsTrackers[g.VideoH264Index]; ft != nil {
+						if ptsFPS := ft.update(pts); ptsFPS > 0 && ptsFPS <= 120 {
+							g.Streams[g.VideoH264Index].FPS = ptsFPS
+						}
+					}
 				}
 
 				// We'll need to read out a few things.
@@ -728,30 +796,32 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 			if len(rtppkt.Payload) > 0 {
 
-				// decode timestamp
-				pts, ok := g.Client.PacketPTS(g.VideoH265Media, rtppkt)
-				pts2, ok := g.Client.PacketPTS2(g.VideoH265Media, rtppkt)
-				if !ok {
-					log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
+				// decode timestamps — validate each call separately
+				pts, okPTS := g.Client.PacketPTS(g.VideoH265Media, rtppkt)
+				pts2, okPTS2 := g.Client.PacketPTS2(g.VideoH265Media, rtppkt)
+				if !okPTS2 {
+					log.Log.Debug("capture.golibrtsp.Start(): unable to get PTS")
 					return
 				}
 
-				// Calculate FPS from PTS on every video frame
-				ptsFPS := g.calculateFPSFromPTS(pts)
-				if ptsFPS > 0 && ptsFPS <= 120 {
-					g.Streams[g.VideoH265Index].FPS = ptsFPS
-				}
-
-				// Extract access units from RTP packets
-				// We need to do this, because the decoder expects a full
-				// access unit. Once we have a full access unit, we can
-				// decode it, and know if it's a keyframe or not.
+				// Extract access units from RTP packets.
+				// We need a complete access unit to determine whether
+				// this is a keyframe.
 				au, errDecode := g.VideoH265Decoder.Decode(rtppkt)
 				if errDecode != nil {
 					if errDecode != rtph265.ErrNonStartingPacketAndNoPrevious && errDecode != rtph265.ErrMorePacketsNeeded {
 						log.Log.Error("capture.golibrtsp.Start(): " + errDecode.Error())
 					}
 					return
+				}
+
+				// Frame is complete — update per-stream FPS from PTS.
+				if okPTS {
+					if ft := g.fpsTrackers[g.VideoH265Index]; ft != nil {
+						if ptsFPS := ft.update(pts); ptsFPS > 0 && ptsFPS <= 120 {
+							g.Streams[g.VideoH265Index].FPS = ptsFPS
+						}
+					}
 				}
 
 				filteredAU = [][]byte{
@@ -1201,12 +1271,11 @@ func WriteMPEG4Audio(forma *format.MPEG4Audio, aus [][]byte) ([]byte, error) {
 
 // Initialize FPS calculation buffers
 func (g *Golibrtsp) initFPSCalculation() {
-	g.frameBufferSize = 30 // Store last 30 frame intervals
-	g.frameTimeBuffer = make([]time.Duration, g.frameBufferSize)
-	g.frameBufferIndex = 0
-	g.lastFrameTime = time.Time{}
-	g.lastPTS = 0
-	g.hasPTS = false
+	// Ensure the per-stream FPS trackers map exists. Individual trackers
+	// can be created lazily when a given stream index is first used.
+	if g.fpsTrackers == nil {
+		g.fpsTrackers = make(map[int8]*fpsTracker)
+	}
 
 	// Initialize I-frame interval tracking
 	g.keyframeBufferSize = 10 // Store last 10 keyframe intervals
@@ -1216,60 +1285,9 @@ func (g *Golibrtsp) initFPSCalculation() {
 	g.lastKeyframePacketCount = 0
 }
 
-// Calculate FPS from RTP PTS differences between consecutive frames.
-// This is called for every video frame (not just keyframes) so it
-// accurately measures the actual frame rate of the video stream.
-func (g *Golibrtsp) calculateFPSFromPTS(pts time.Duration) float64 {
-	g.fpsMutex.Lock()
-	defer g.fpsMutex.Unlock()
-
-	if !g.hasPTS {
-		g.lastPTS = pts
-		g.hasPTS = true
-		return 0
-	}
-
-	// Calculate PTS difference between consecutive frames
-	interval := pts - g.lastPTS
-	g.lastPTS = pts
-
-	// Skip invalid intervals (negative, zero, or very large which
-	// indicate a PTS discontinuity or wrap)
-	if interval <= 0 || interval > 5*time.Second {
-		return 0
-	}
-
-	// Store the interval
-	g.frameTimeBuffer[g.frameBufferIndex] = interval
-	g.frameBufferIndex = (g.frameBufferIndex + 1) % g.frameBufferSize
-
-	// Calculate average FPS from stored intervals
-	var totalInterval time.Duration
-	validSamples := 0
-
-	for _, iv := range g.frameTimeBuffer {
-		if iv > 0 {
-			totalInterval += iv
-			validSamples++
-		}
-	}
-
-	if validSamples == 0 {
-		return 0
-	}
-
-	avgInterval := totalInterval / time.Duration(validSamples)
-	if avgInterval == 0 {
-		return 0
-	}
-
-	return float64(time.Second) / float64(avgInterval)
-}
-
 // Get enhanced FPS information from SPS with fallback to PTS-based calculation.
-// The PTS-based FPS is computed per-frame in calculateFPSFromPTS and stored in
-// the stream's FPS field, so by the time this is called we already have a good
-// estimate.
+// The PTS-based FPS is computed per completed frame via fpsTracker.update(),
+// so by the time this is called we already have a good estimate.
 func (g *Golibrtsp) getEnhancedFPS(sps *h264.SPS, streamIndex int8) float64 {
 	// First try to get FPS from SPS VUI parameters
 	spsFPS := sps.FPS()
@@ -1281,10 +1299,12 @@ func (g *Golibrtsp) getEnhancedFPS(sps *h264.SPS, streamIndex int8) float64 {
 	}
 
 	// Fallback to PTS-based FPS (already calculated per-frame)
-	ptsFPS := g.getPTSBasedFPS()
-	if ptsFPS > 0 && ptsFPS <= 120 {
-		log.Log.Debug(fmt.Sprintf("capture.golibrtsp.getEnhancedFPS(): PTS FPS: %.2f", ptsFPS))
-		return ptsFPS
+	if ft := g.fpsTrackers[streamIndex]; ft != nil {
+		ptsFPS := ft.fps()
+		if ptsFPS > 0 && ptsFPS <= 120 {
+			log.Log.Debug(fmt.Sprintf("capture.golibrtsp.getEnhancedFPS(): PTS FPS: %.2f", ptsFPS))
+			return ptsFPS
+		}
 	}
 
 	// Return SPS FPS even if it seems unreasonable, or default
@@ -1293,33 +1313,6 @@ func (g *Golibrtsp) getEnhancedFPS(sps *h264.SPS, streamIndex int8) float64 {
 	}
 
 	return 25.0 // Default fallback FPS
-}
-
-// getPTSBasedFPS returns the current PTS-based FPS estimate.
-func (g *Golibrtsp) getPTSBasedFPS() float64 {
-	g.fpsMutex.Lock()
-	defer g.fpsMutex.Unlock()
-
-	var totalInterval time.Duration
-	validSamples := 0
-
-	for _, iv := range g.frameTimeBuffer {
-		if iv > 0 {
-			totalInterval += iv
-			validSamples++
-		}
-	}
-
-	if validSamples == 0 {
-		return 0
-	}
-
-	avgInterval := totalInterval / time.Duration(validSamples)
-	if avgInterval == 0 {
-		return 0
-	}
-
-	return float64(time.Second) / float64(avgInterval)
 }
 
 // Track I-frame intervals by counting packets between keyframes
