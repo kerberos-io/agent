@@ -620,7 +620,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				pts, okPTS := g.Client.PacketPTS(g.VideoH264Media, rtppkt)
 				pts2, okPTS2 := g.Client.PacketPTS2(g.VideoH264Media, rtppkt)
 				if !okPTS2 {
-					log.Log.Debug("capture.golibrtsp.Start(): unable to get PTS")
+					log.Log.Debug("capture.golibrtsp.Start(): unable to get PTS2 from PacketPTS2")
 					return
 				}
 
