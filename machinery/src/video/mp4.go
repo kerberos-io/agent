@@ -503,7 +503,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 		// mdhd.Duration MUST be 0 for fragmented MP4. QuickTime adds mdhd.Duration
 		// to the fragment durations (mehd/sidx), so setting it non-zero doubles the
 		// reported duration. Leave it at 0 so the player derives duration from fragments.
-		//init.Moov.Traks[0].Mdia.Mdhd.Duration = 0 // default, left as-is
+		init.Moov.Traks[0].Mdia.Mdhd.Duration = 0
 		init.Moov.Traks[0].Mdia.Mdhd.CreationTime = macTime
 		init.Moov.Traks[0].Mdia.Mdhd.ModificationTime = macTime
 	case "H265", "HVC1":
@@ -519,7 +519,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 		init.Moov.Traks[0].Tkhd.ModificationTime = macTime
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
 		// mdhd.Duration MUST be 0 for fragmented MP4 (see H264 case above).
-		//init.Moov.Traks[0].Mdia.Mdhd.Duration = 0 // default, left as-is
+		init.Moov.Traks[0].Mdia.Mdhd.Duration = 0
 		init.Moov.Traks[0].Mdia.Mdhd.CreationTime = macTime
 		init.Moov.Traks[0].Mdia.Mdhd.ModificationTime = macTime
 	}
@@ -543,7 +543,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 		init.Moov.Traks[1].Tkhd.ModificationTime = macTime
 		init.Moov.Traks[1].Mdia.Hdlr.Name = "agent " + utils.VERSION
 		// mdhd.Duration MUST be 0 for fragmented MP4 (see video track comment).
-		//init.Moov.Traks[1].Mdia.Mdhd.Duration = 0 // default, left as-is
+		init.Moov.Traks[1].Mdia.Mdhd.Duration = 0
 		init.Moov.Traks[1].Mdia.Mdhd.CreationTime = macTime
 		init.Moov.Traks[1].Mdia.Mdhd.ModificationTime = macTime
 	}
