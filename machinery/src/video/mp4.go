@@ -440,6 +440,19 @@ func (mp4 *MP4) Close(config *models.Config) {
 	moov := mp4ff.NewMoovBox()
 	init.AddChild(moov)
 
+	// Compute the actual video duration by summing segment durations.
+	// This must exactly match the sum of sample durations in the trun boxes
+	// that were written to the file, ensuring QuickTime (which strictly trusts
+	// header durations) displays the correct value.
+	var actualVideoDuration uint64
+	for _, d := range mp4.SegmentDurations {
+		actualVideoDuration += d
+	}
+	if actualVideoDuration != mp4.VideoTotalDuration {
+		log.Log.Warning(fmt.Sprintf("mp4.Close(): duration mismatch: accumulated VideoTotalDuration=%d, sum of segment durations=%d (diff=%d ms)",
+			mp4.VideoTotalDuration, actualVideoDuration, int64(mp4.VideoTotalDuration)-int64(actualVideoDuration)))
+	}
+
 	// Set the creation time and modification time for the moov box.
 	// QuickTime requires timestamps in Mac HFS format (seconds since 1904-01-01),
 	// so we convert from Unix epoch by adding MacEpochOffset.
@@ -447,13 +460,21 @@ func (mp4 *MP4) Close(config *models.Config) {
 	audioTimescale := uint32(1000)
 	macTime := mp4.StartTime + MacEpochOffset
 	nextTrackID := uint32(len(mp4.TrackIDs) + 1)
+
+	// mvhd.Duration must be the duration of the longest track.
+	// Start with video; if audio is longer, we update below.
+	movDuration := actualVideoDuration
+	if mp4.AudioTotalDuration > movDuration {
+		movDuration = mp4.AudioTotalDuration
+	}
+
 	mvhd := &mp4ff.MvhdBox{
 		Version:          0,
 		Flags:            0,
 		CreationTime:     macTime,
 		ModificationTime: macTime,
 		Timescale:        videoTimescale,
-		Duration:         mp4.VideoTotalDuration,
+		Duration:         movDuration,
 		Rate:             0x00010000, // 1.0 playback speed (16.16 fixed point)
 		Volume:           0x0100,     // 1.0 full volume (8.8 fixed point)
 		NextTrackID:      nextTrackID,
@@ -462,7 +483,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 
 	// Set the total duration in the moov box
 	mvex := mp4ff.NewMvexBox()
-	mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: int64(mp4.VideoTotalDuration)})
+	mvex.AddChild(&mp4ff.MehdBox{FragmentDuration: int64(movDuration)})
 	init.Moov.AddChild(mvex)
 
 	// Add a track for the video
@@ -473,13 +494,16 @@ func (mp4 *MP4) Close(config *models.Config) {
 		err := init.Moov.Traks[0].SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
 		if err != nil {
 		}
-		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
+		init.Moov.Traks[0].Tkhd.Duration = actualVideoDuration
 		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
 		init.Moov.Traks[0].Tkhd.Height = mp4ff.Fixed32(uint32(mp4.height) << 16)
 		init.Moov.Traks[0].Tkhd.CreationTime = macTime
 		init.Moov.Traks[0].Tkhd.ModificationTime = macTime
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
-		init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
+		// mdhd.Duration MUST be 0 for fragmented MP4. QuickTime adds mdhd.Duration
+		// to the fragment durations (mehd/sidx), so setting it non-zero doubles the
+		// reported duration. Leave it at 0 so the player derives duration from fragments.
+		//init.Moov.Traks[0].Mdia.Mdhd.Duration = 0 // default, left as-is
 		init.Moov.Traks[0].Mdia.Mdhd.CreationTime = macTime
 		init.Moov.Traks[0].Mdia.Mdhd.ModificationTime = macTime
 	case "H265", "HVC1":
@@ -488,13 +512,14 @@ func (mp4 *MP4) Close(config *models.Config) {
 		err := init.Moov.Traks[0].SetHEVCDescriptor("hvc1", mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
 		if err != nil {
 		}
-		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
+		init.Moov.Traks[0].Tkhd.Duration = actualVideoDuration
 		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
 		init.Moov.Traks[0].Tkhd.Height = mp4ff.Fixed32(uint32(mp4.height) << 16)
 		init.Moov.Traks[0].Tkhd.CreationTime = macTime
 		init.Moov.Traks[0].Tkhd.ModificationTime = macTime
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
-		init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
+		// mdhd.Duration MUST be 0 for fragmented MP4 (see H264 case above).
+		//init.Moov.Traks[0].Mdia.Mdhd.Duration = 0 // default, left as-is
 		init.Moov.Traks[0].Mdia.Mdhd.CreationTime = macTime
 		init.Moov.Traks[0].Mdia.Mdhd.ModificationTime = macTime
 	}
@@ -517,7 +542,8 @@ func (mp4 *MP4) Close(config *models.Config) {
 		init.Moov.Traks[1].Tkhd.CreationTime = macTime
 		init.Moov.Traks[1].Tkhd.ModificationTime = macTime
 		init.Moov.Traks[1].Mdia.Hdlr.Name = "agent " + utils.VERSION
-		init.Moov.Traks[1].Mdia.Mdhd.Duration = mp4.AudioTotalDuration
+		// mdhd.Duration MUST be 0 for fragmented MP4 (see video track comment).
+		//init.Moov.Traks[1].Mdia.Mdhd.Duration = 0 // default, left as-is
 		init.Moov.Traks[1].Mdia.Mdhd.CreationTime = macTime
 		init.Moov.Traks[1].Mdia.Mdhd.ModificationTime = macTime
 	}
@@ -550,9 +576,11 @@ func (mp4 *MP4) Close(config *models.Config) {
 	// and encrypted with the public key.
 
 	fingerprint := fmt.Sprintf("%d", init.Moov.Mvhd.CreationTime) + "_" +
-		fmt.Sprintf("%d", init.Moov.Mvhd.Duration) + "_" +
-		init.Moov.Trak.Mdia.Hdlr.Name + "_" +
-		fmt.Sprintf("%d", mp4.MoofBoxes) + "_" // Number of moof boxes
+		fmt.Sprintf("%d", init.Moov.Mvhd.Duration) + "_"
+	if init.Moov.Trak != nil {
+		fingerprint += init.Moov.Trak.Mdia.Hdlr.Name + "_"
+	}
+	fingerprint += fmt.Sprintf("%d", mp4.MoofBoxes) + "_" // Number of moof boxes
 
 	for i, size := range mp4.MoofBoxSizes {
 		fingerprint += fmt.Sprintf("%d", size)
@@ -566,7 +594,10 @@ func (mp4 *MP4) Close(config *models.Config) {
 	}
 
 	// Load the private key from the configuration
-	privateKey := config.Signing.PrivateKey
+	var privateKey string
+	if config.Signing != nil {
+		privateKey = config.Signing.PrivateKey
+	}
 	r := strings.NewReader(privateKey)
 	pemBytes, _ := ioutil.ReadAll(r)
 	block, _ := pem.Decode(pemBytes)
