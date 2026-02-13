@@ -34,7 +34,7 @@ jobs:
           length: 7
       - name: Run Build
         run: |
-          docker build -t ${{matrix.architecture}} .
+          docker build --build-arg VERSION=${{github.event.inputs.tag || github.ref_name}} -t ${{matrix.architecture}} .
           CID=$(docker create ${{matrix.architecture}})
           docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
           docker rm ${CID}
@@ -71,7 +71,7 @@ jobs:
           length: 7
       - name: Run Build
         run: |
-          docker build -t ${{matrix.architecture}} -f Dockerfile.arm64 .
+          docker build --build-arg VERSION=${{github.event.inputs.tag || github.ref_name}} -t ${{matrix.architecture}} -f Dockerfile.arm64 .
           CID=$(docker create ${{matrix.architecture}})
           docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
           docker rm ${CID}

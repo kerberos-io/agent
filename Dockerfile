@@ -1,5 +1,6 @@
 
 ARG BASE_IMAGE_VERSION=amd64-ddbe40e
+ARG VERSION=0.0.0
 FROM kerberos/base:${BASE_IMAGE_VERSION} AS build-machinery
 LABEL AUTHOR=uug.ai
 
@@ -34,7 +35,8 @@ RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
 
 RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go mod download && \
-	go build -tags timetzdata,netgo,osusergo --ldflags '-s -w -extldflags "-static -latomic"' main.go && \
+	VERSION=$(cd /go/src/github.com/kerberos-io/agent && git describe --tags --always 2>/dev/null || echo "${VERSION}") && \
+	go build -tags timetzdata,netgo,osusergo --ldflags "-s -w -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${VERSION} -extldflags '-static -latomic'" main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv version /agent && \
