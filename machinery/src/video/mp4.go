@@ -22,6 +22,10 @@ import (
 
 var LastPTS uint64 = 0 // Last PTS for the current segment
 
+// MacEpochOffset is the number of seconds between Mac HFS epoch (1904-01-01)
+// and Unix epoch (1970-01-01). QuickTime requires timestamps in Mac HFS format.
+const MacEpochOffset uint64 = 2082844800
+
 // FragmentDurationMs is the target duration for each fragment in milliseconds.
 // Fragments will be flushed at the first keyframe after this duration has elapsed,
 // resulting in ~3 second fragments (assuming a typical GOP interval).
@@ -436,16 +440,23 @@ func (mp4 *MP4) Close(config *models.Config) {
 	moov := mp4ff.NewMoovBox()
 	init.AddChild(moov)
 
-	// Set the creation time and modification time for the moov box
+	// Set the creation time and modification time for the moov box.
+	// QuickTime requires timestamps in Mac HFS format (seconds since 1904-01-01),
+	// so we convert from Unix epoch by adding MacEpochOffset.
 	videoTimescale := uint32(1000)
 	audioTimescale := uint32(1000)
+	macTime := mp4.StartTime + MacEpochOffset
+	nextTrackID := uint32(len(mp4.TrackIDs) + 1)
 	mvhd := &mp4ff.MvhdBox{
 		Version:          0,
 		Flags:            0,
-		CreationTime:     mp4.StartTime,
-		ModificationTime: mp4.StartTime,
+		CreationTime:     macTime,
+		ModificationTime: macTime,
 		Timescale:        videoTimescale,
 		Duration:         mp4.VideoTotalDuration,
+		Rate:             0x00010000, // 1.0 playback speed (16.16 fixed point)
+		Volume:           0x0100,     // 1.0 full volume (8.8 fixed point)
+		NextTrackID:      nextTrackID,
 	}
 	init.Moov.AddChild(mvhd)
 
@@ -465,8 +476,12 @@ func (mp4 *MP4) Close(config *models.Config) {
 		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
 		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
 		init.Moov.Traks[0].Tkhd.Height = mp4ff.Fixed32(uint32(mp4.height) << 16)
+		init.Moov.Traks[0].Tkhd.CreationTime = macTime
+		init.Moov.Traks[0].Tkhd.ModificationTime = macTime
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
 		init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
+		init.Moov.Traks[0].Mdia.Mdhd.CreationTime = macTime
+		init.Moov.Traks[0].Mdia.Mdhd.ModificationTime = macTime
 	case "H265", "HVC1":
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
@@ -476,8 +491,12 @@ func (mp4 *MP4) Close(config *models.Config) {
 		init.Moov.Traks[0].Tkhd.Duration = mp4.VideoTotalDuration
 		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
 		init.Moov.Traks[0].Tkhd.Height = mp4ff.Fixed32(uint32(mp4.height) << 16)
+		init.Moov.Traks[0].Tkhd.CreationTime = macTime
+		init.Moov.Traks[0].Tkhd.ModificationTime = macTime
 		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
 		init.Moov.Traks[0].Mdia.Mdhd.Duration = mp4.VideoTotalDuration
+		init.Moov.Traks[0].Mdia.Mdhd.CreationTime = macTime
+		init.Moov.Traks[0].Mdia.Mdhd.ModificationTime = macTime
 	}
 
 	// Try adding audio track if available
@@ -495,8 +514,12 @@ func (mp4 *MP4) Close(config *models.Config) {
 		if err != nil {
 		}
 		init.Moov.Traks[1].Tkhd.Duration = mp4.AudioTotalDuration
+		init.Moov.Traks[1].Tkhd.CreationTime = macTime
+		init.Moov.Traks[1].Tkhd.ModificationTime = macTime
 		init.Moov.Traks[1].Mdia.Hdlr.Name = "agent " + utils.VERSION
 		init.Moov.Traks[1].Mdia.Mdhd.Duration = mp4.AudioTotalDuration
+		init.Moov.Traks[1].Mdia.Mdhd.CreationTime = macTime
+		init.Moov.Traks[1].Mdia.Mdhd.ModificationTime = macTime
 	}
 
 	// Try adding subtitle track if available
