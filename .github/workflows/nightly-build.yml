@@ -1,12 +1,14 @@
-name: Docker nightly build
+name: Nightly build
 
 on:
   # Triggers the workflow every day at 9PM (CET).
   schedule:
     - cron: "0 22 * * *"
+  # Allows manual triggering from the Actions tab.
+  workflow_dispatch:
 
 jobs:
-  build-amd64:
+  nightly-build-amd64:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -18,7 +20,9 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Checkout
-        run: git clone https://github.com/kerberos-io/agent && cd agent
+        uses: actions/checkout@v4
+        with:
+          ref: master
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
@@ -26,10 +30,10 @@ jobs:
       - name: Available platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
       - name: Run Buildx
-        run: cd agent && docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push .
+        run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push .
       - name: Create new and append to manifest
-        run: cd agent && docker buildx imagetools create -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
-  build-other:
+        run: docker buildx imagetools create -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+  nightly-build-other:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -41,7 +45,9 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Checkout
-        run: git clone https://github.com/kerberos-io/agent && cd agent
+        uses: actions/checkout@v4
+        with:
+          ref: master
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
@@ -49,6 +55,6 @@ jobs:
       - name: Available platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
       - name: Run Buildx
-        run: cd agent && docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push .
+        run: docker buildx build --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push .
       - name: Create new and append to manifest
-        run: cd agent && docker buildx imagetools create --append -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+        run: docker buildx imagetools create --append -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
