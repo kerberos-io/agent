@@ -699,6 +699,7 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 				}
 
 				if now-lastLivestreamRequest > 3 {
+					time.Sleep(100 * time.Millisecond)
 					continue
 				}
 
