@@ -15,3 +15,4 @@ machinery/init-dev.sh
 machinery/.env.local
 machinery/vendor
 deployments/docker/private-docker-compose.yaml
+video.mp4
