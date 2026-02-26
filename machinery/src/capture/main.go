@@ -279,6 +279,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					ppsNALUS := configuration.Config.Capture.IPCamera.PPSNALUs
 					vpsNALUS := configuration.Config.Capture.IPCamera.VPSNALUs
 
+					if len(spsNALUS) == 0 || len(ppsNALUS) == 0 {
+						log.Log.Warning("capture.main.HandleRecordStream(continuous): missing SPS/PPS at recording start")
+					}
 					// Create a video file, and set the dimensions.
 					mp4Video = video.NewMP4(fullName, spsNALUS, ppsNALUS, vpsNALUS, configuration.Config.Capture.MaxLengthRecording)
 					mp4Video.SetWidth(width)
@@ -499,6 +502,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				ppsNALUS := configuration.Config.Capture.IPCamera.PPSNALUs
 				vpsNALUS := configuration.Config.Capture.IPCamera.VPSNALUs
 
+				if len(spsNALUS) == 0 || len(ppsNALUS) == 0 {
+					log.Log.Warning("capture.main.HandleRecordStream(motiondetection): missing SPS/PPS at recording start")
+				}
 				// Create a video file, and set the dimensions.
 				mp4Video := video.NewMP4(fullName, spsNALUS, ppsNALUS, vpsNALUS, configuration.Config.Capture.MaxLengthRecording)
 				mp4Video.SetWidth(width)

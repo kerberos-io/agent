@@ -695,12 +695,35 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 							g.Streams[g.VideoH264Index].FPS = fps
 							log.Log.Debug(fmt.Sprintf("capture.golibrtsp.Start(%s): Final FPS=%.2f", streamType, fps))
 							g.VideoH264Forma.SPS = nalu
+							if streamType == "main" && len(nalu) > 0 {
+								// Fallback: store SPS from in-band NALUs when SDP was missing it.
+								configuration.Config.Capture.IPCamera.SPSNALUs = [][]byte{nalu}
+							}
 
 						}
 					case h264.NALUTypePPS:
 						g.VideoH264Forma.PPS = nalu
+						if streamType == "main" && len(nalu) > 0 {
+							// Fallback: store PPS from in-band NALUs when SDP was missing it.
+							configuration.Config.Capture.IPCamera.PPSNALUs = [][]byte{nalu}
+						}
 					}
 					filteredAU = append(filteredAU, nalu)
+				}
+
+				if idrPresent && streamType == "main" {
+					// Ensure config has parameter sets before recordings start.
+					if len(configuration.Config.Capture.IPCamera.SPSNALUs) == 0 && len(g.VideoH264Forma.SPS) > 0 {
+						configuration.Config.Capture.IPCamera.SPSNALUs = [][]byte{g.VideoH264Forma.SPS}
+						log.Log.Warning("capture.golibrtsp.Start(main): fallback SPS set from keyframe")
+					}
+					if len(configuration.Config.Capture.IPCamera.PPSNALUs) == 0 && len(g.VideoH264Forma.PPS) > 0 {
+						configuration.Config.Capture.IPCamera.PPSNALUs = [][]byte{g.VideoH264Forma.PPS}
+						log.Log.Warning("capture.golibrtsp.Start(main): fallback PPS set from keyframe")
+					}
+					if len(configuration.Config.Capture.IPCamera.SPSNALUs) == 0 || len(configuration.Config.Capture.IPCamera.PPSNALUs) == 0 {
+						log.Log.Warning("capture.golibrtsp.Start(main): SPS/PPS still missing after IDR keyframe")
+					}
 				}
 
 				if len(filteredAU) <= 1 || (!nonIDRPresent && !idrPresent) {
