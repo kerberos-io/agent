@@ -158,6 +158,68 @@ func (mp4 *MP4) AddAudioTrack(codec string) uint32 {
 func (mp4 *MP4) AddMediaSegment(segNr int) {
 }
 
+// updateVideoParameterSetsFromAnnexB inspects Annex B data to fill missing SPS/PPS/VPS.
+func (mp4 *MP4) updateVideoParameterSetsFromAnnexB(data []byte) {
+	if len(data) == 0 {
+		return
+	}
+
+	needSPS := len(mp4.SPSNALUs) == 0
+	needPPS := len(mp4.PPSNALUs) == 0
+	needVPS := len(mp4.VPSNALUs) == 0
+	if !(needSPS || needPPS || needVPS) {
+		return
+	}
+
+	for _, nalu := range splitNALUs(data) {
+		nalu = removeAnnexBStartCode(nalu)
+		if len(nalu) == 0 {
+			continue
+		}
+
+		switch mp4.VideoTrackName {
+		case "H264", "AVC1":
+			nalType := nalu[0] & 0x1F
+			switch nalType {
+			case 7: // SPS
+				if needSPS {
+					mp4.SPSNALUs = [][]byte{nalu}
+					needSPS = false
+					log.Log.Warning("mp4.updateVideoParameterSetsFromAnnexB(): SPS recovered from in-band NALU")
+				}
+			case 8: // PPS
+				if needPPS {
+					mp4.PPSNALUs = [][]byte{nalu}
+					needPPS = false
+					log.Log.Warning("mp4.updateVideoParameterSetsFromAnnexB(): PPS recovered from in-band NALU")
+				}
+			}
+		case "H265", "HVC1":
+			nalType := (nalu[0] >> 1) & 0x3F
+			switch nalType {
+			case 32: // VPS
+				if needVPS {
+					mp4.VPSNALUs = [][]byte{nalu}
+					needVPS = false
+					log.Log.Warning("mp4.updateVideoParameterSetsFromAnnexB(): VPS recovered from in-band NALU")
+				}
+			case 33: // SPS
+				if needSPS {
+					mp4.SPSNALUs = [][]byte{nalu}
+					needSPS = false
+					log.Log.Warning("mp4.updateVideoParameterSetsFromAnnexB(): SPS recovered from in-band NALU")
+				}
+			case 34: // PPS
+				if needPPS {
+					mp4.PPSNALUs = [][]byte{nalu}
+					needPPS = false
+					log.Log.Warning("mp4.updateVideoParameterSetsFromAnnexB(): PPS recovered from in-band NALU")
+				}
+			}
+		}
+	}
+}
+
 // flushPendingVideoSample writes the pending video sample to the current fragment.
 // If nextPTS is provided (non-zero), it calculates duration from the PTS difference.
 // If nextPTS is 0 (e.g., at Close time), it uses the last known duration.
@@ -283,6 +345,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 	if mp4.Start {
 
 		if trackID == uint32(mp4.VideoTrack) {
+			mp4.updateVideoParameterSetsFromAnnexB(data)
 
 			var lengthPrefixed []byte
 			var err error
@@ -493,6 +556,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 		includePS := true
 		err := init.Moov.Traks[0].SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
 		if err != nil {
+			log.Log.Error("mp4.Close(): error setting AVC descriptor: " + err.Error())
 		}
 		init.Moov.Traks[0].Tkhd.Duration = actualVideoDuration
 		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
@@ -511,6 +575,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 		includePS := true
 		err := init.Moov.Traks[0].SetHEVCDescriptor("hvc1", mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
 		if err != nil {
+			log.Log.Error("mp4.Close(): error setting HEVC descriptor: " + err.Error())
 		}
 		init.Moov.Traks[0].Tkhd.Duration = actualVideoDuration
 		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
