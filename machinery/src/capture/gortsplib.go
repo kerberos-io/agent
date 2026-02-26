@@ -721,6 +721,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 						configuration.Config.Capture.IPCamera.PPSNALUs = [][]byte{g.VideoH264Forma.PPS}
 						log.Log.Warning("capture.golibrtsp.Start(main): fallback PPS set from keyframe")
 					}
+					if len(configuration.Config.Capture.IPCamera.SPSNALUs) == 0 || len(configuration.Config.Capture.IPCamera.PPSNALUs) == 0 {
+						log.Log.Warning("capture.golibrtsp.Start(main): SPS/PPS still missing after IDR keyframe")
+					}
 				}
 
 				if len(filteredAU) <= 1 || (!nonIDRPresent && !idrPresent) {
