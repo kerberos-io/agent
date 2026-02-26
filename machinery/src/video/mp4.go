@@ -431,7 +431,12 @@ func (mp4 *MP4) Close(config *models.Config) {
 		mp4.TotalKeyframesReceived, mp4.TotalKeyframesWritten, mp4.SegmentCount, mp4.FragmentKeyframeCount))
 
 	if mp4.VideoTotalDuration == 0 && mp4.AudioTotalDuration == 0 {
-		log.Log.Error("mp4.Close(): no video or audio samples added, cannot create MP4 file")
+		log.Log.Error("mp4.Close(): no video or audio samples added, removing empty MP4 file")
+		mp4.Writer.Flush()
+		_ = mp4.FileWriter.Sync()
+		_ = mp4.FileWriter.Close()
+		_ = os.Remove(mp4.FileName)
+		return
 	}
 
 	// Add final pending samples before closing
@@ -554,7 +559,9 @@ func (mp4 *MP4) Close(config *models.Config) {
 	case "H264", "AVC1":
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
-		err := init.Moov.Traks[0].SetAVCDescriptor("avc1", mp4.SPSNALUs, mp4.PPSNALUs, includePS)
+		spsNALUs := sanitizeParameterSets(mp4.SPSNALUs)
+		ppsNALUs := sanitizeParameterSets(mp4.PPSNALUs)
+		err := init.Moov.Traks[0].SetAVCDescriptor("avc1", spsNALUs, ppsNALUs, includePS)
 		if err != nil {
 			log.Log.Error("mp4.Close(): error setting AVC descriptor: " + err.Error())
 		}
@@ -573,7 +580,10 @@ func (mp4 *MP4) Close(config *models.Config) {
 	case "H265", "HVC1":
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
-		err := init.Moov.Traks[0].SetHEVCDescriptor("hvc1", mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs, [][]byte{}, includePS)
+		vpsNALUs := sanitizeParameterSets(mp4.VPSNALUs)
+		spsNALUs := sanitizeParameterSets(mp4.SPSNALUs)
+		ppsNALUs := sanitizeParameterSets(mp4.PPSNALUs)
+		err := init.Moov.Traks[0].SetHEVCDescriptor("hvc1", vpsNALUs, spsNALUs, ppsNALUs, [][]byte{}, includePS)
 		if err != nil {
 			log.Log.Error("mp4.Close(): error setting HEVC descriptor: " + err.Error())
 		}
@@ -589,8 +599,8 @@ func (mp4 *MP4) Close(config *models.Config) {
 		init.Moov.Traks[0].Mdia.Mdhd.ModificationTime = macTime
 	}
 
-	// Try adding audio track if available
-	if mp4.AudioTrackName == "AAC" || mp4.AudioTrackName == "MP4A" {
+	// Try adding audio track if available and samples were recorded.
+	if (mp4.AudioTrackName == "AAC" || mp4.AudioTrackName == "MP4A") && mp4.AudioTotalDuration > 0 {
 		// Add an audio track to the moov box
 		init.AddEmptyTrack(audioTimescale, "audio", "und")
 
@@ -826,6 +836,22 @@ func removeAnnexBStartCode(nalu []byte) []byte {
 		}
 	}
 	return nalu
+}
+
+// sanitizeParameterSets removes Annex B start codes and drops empty NALUs.
+func sanitizeParameterSets(nalus [][]byte) [][]byte {
+	if len(nalus) == 0 {
+		return nalus
+	}
+	clean := make([][]byte, 0, len(nalus))
+	for _, nalu := range nalus {
+		trimmed := removeAnnexBStartCode(nalu)
+		if len(trimmed) == 0 {
+			continue
+		}
+		clean = append(clean, trimmed)
+	}
+	return clean
 }
 
 // splitNALUs splits Annex B data into raw NAL units without start codes.

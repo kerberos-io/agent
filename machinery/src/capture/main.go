@@ -159,6 +159,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 
 					// Close mp4
+					if len(mp4Video.SPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.SPSNALUs) > 0 {
+						mp4Video.SPSNALUs = configuration.Config.Capture.IPCamera.SPSNALUs
+					}
+					if len(mp4Video.PPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.PPSNALUs) > 0 {
+						mp4Video.PPSNALUs = configuration.Config.Capture.IPCamera.PPSNALUs
+					}
+					if len(mp4Video.VPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.VPSNALUs) > 0 {
+						mp4Video.VPSNALUs = configuration.Config.Capture.IPCamera.VPSNALUs
+					}
+					if (videoCodec == "H264" && (len(mp4Video.SPSNALUs) == 0 || len(mp4Video.PPSNALUs) == 0)) ||
+						(videoCodec == "H265" && (len(mp4Video.VPSNALUs) == 0 || len(mp4Video.SPSNALUs) == 0 || len(mp4Video.PPSNALUs) == 0)) {
+						log.Log.Warning("capture.main.HandleRecordStream(continuous): closing MP4 without full parameter sets, moov may be incomplete")
+					}
 					mp4Video.Close(&config)
 					log.Log.Info("capture.main.HandleRecordStream(continuous): recording finished: file save: " + name)
 
@@ -580,6 +593,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				lastRecordingTime = pkt.CurrentTime
 
 				// This will close the recording and write the last packet.
+				if len(mp4Video.SPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.SPSNALUs) > 0 {
+					mp4Video.SPSNALUs = configuration.Config.Capture.IPCamera.SPSNALUs
+				}
+				if len(mp4Video.PPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.PPSNALUs) > 0 {
+					mp4Video.PPSNALUs = configuration.Config.Capture.IPCamera.PPSNALUs
+				}
+				if len(mp4Video.VPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.VPSNALUs) > 0 {
+					mp4Video.VPSNALUs = configuration.Config.Capture.IPCamera.VPSNALUs
+				}
+				if (videoCodec == "H264" && (len(mp4Video.SPSNALUs) == 0 || len(mp4Video.PPSNALUs) == 0)) ||
+					(videoCodec == "H265" && (len(mp4Video.VPSNALUs) == 0 || len(mp4Video.SPSNALUs) == 0 || len(mp4Video.PPSNALUs) == 0)) {
+					log.Log.Warning("capture.main.HandleRecordStream(motiondetection): closing MP4 without full parameter sets, moov may be incomplete")
+				}
 				mp4Video.Close(&config)
 				log.Log.Info("capture.main.HandleRecordStream(motiondetection): file save: " + name)
 
