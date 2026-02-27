@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Eyevinn/mp4ff/avc"
 	mp4ff "github.com/Eyevinn/mp4ff/mp4"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -564,6 +565,11 @@ func (mp4 *MP4) Close(config *models.Config) {
 		err := init.Moov.Traks[0].SetAVCDescriptor("avc1", spsNALUs, ppsNALUs, includePS)
 		if err != nil {
 			log.Log.Error("mp4.Close(): error setting AVC descriptor: " + err.Error())
+			if fallbackErr := addAVCDescriptorFallback(init.Moov.Traks[0], spsNALUs, ppsNALUs, uint16(mp4.width), uint16(mp4.height)); fallbackErr != nil {
+				log.Log.Error("mp4.Close(): error setting AVC descriptor fallback: " + fallbackErr.Error())
+			} else {
+				log.Log.Warning("mp4.Close(): AVC descriptor fallback used due to SPS parse error")
+			}
 		}
 		init.Moov.Traks[0].Tkhd.Duration = actualVideoDuration
 		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
@@ -950,6 +956,57 @@ func formatNaluDebug(nalus [][]byte) string {
 		parts = append(parts, fmt.Sprintf("len=%d head=%x", len(nalu), nalu[:max]))
 	}
 	return strings.Join(parts, "; ")
+}
+
+func addAVCDescriptorFallback(trak *mp4ff.TrakBox, spsNALUs, ppsNALUs [][]byte, width, height uint16) error {
+	if trak == nil || trak.Mdia == nil || trak.Mdia.Minf == nil || trak.Mdia.Minf.Stbl == nil || trak.Mdia.Minf.Stbl.Stsd == nil {
+		return fmt.Errorf("missing trak stsd")
+	}
+	if len(spsNALUs) == 0 {
+		return fmt.Errorf("no SPS NALU available")
+	}
+	decConfRec, err := buildAVCDecConfRecFromSPS(spsNALUs, ppsNALUs)
+	if err != nil {
+		return err
+	}
+	if width == 0 && trak.Tkhd != nil {
+		width = uint16(uint32(trak.Tkhd.Width) >> 16)
+	}
+	if height == 0 && trak.Tkhd != nil {
+		height = uint16(uint32(trak.Tkhd.Height) >> 16)
+	}
+	if width > 0 && height > 0 && trak.Tkhd != nil {
+		trak.Tkhd.Width = mp4ff.Fixed32(uint32(width) << 16)
+		trak.Tkhd.Height = mp4ff.Fixed32(uint32(height) << 16)
+	}
+	avcC := &mp4ff.AvcCBox{DecConfRec: *decConfRec}
+	avcx := mp4ff.CreateVisualSampleEntryBox("avc1", width, height, avcC)
+	trak.Mdia.Minf.Stbl.Stsd.AddChild(avcx)
+	return nil
+}
+
+func buildAVCDecConfRecFromSPS(spsNALUs, ppsNALUs [][]byte) (*avc.DecConfRec, error) {
+	if len(spsNALUs) == 0 {
+		return nil, fmt.Errorf("no SPS NALU available")
+	}
+	sps := spsNALUs[0]
+	if len(sps) < 4 {
+		return nil, fmt.Errorf("SPS too short: len=%d", len(sps))
+	}
+	// SPS NALU: byte 0 is NAL header, next 3 bytes are profile/compat/level.
+	dec := &avc.DecConfRec{
+		AVCProfileIndication: sps[1],
+		ProfileCompatibility: sps[2],
+		AVCLevelIndication:   sps[3],
+		SPSnalus:             spsNALUs,
+		PPSnalus:             ppsNALUs,
+		ChromaFormat:         1,
+		BitDepthLumaMinus1:   0,
+		BitDepthChromaMinus1: 0,
+		NumSPSExt:            0,
+		NoTrailingInfo:       true,
+	}
+	return dec, nil
 }
 
 // splitNALUs splits Annex B data into raw NAL units without start codes.
