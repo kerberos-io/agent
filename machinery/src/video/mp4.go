@@ -559,8 +559,8 @@ func (mp4 *MP4) Close(config *models.Config) {
 	case "H264", "AVC1":
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
-		spsNALUs := sanitizeParameterSets(mp4.SPSNALUs)
-		ppsNALUs := sanitizeParameterSets(mp4.PPSNALUs)
+		spsNALUs, ppsNALUs := normalizeH264ParameterSets(mp4.SPSNALUs, mp4.PPSNALUs)
+		log.Log.Debug("mp4.Close(): AVC parameter sets: SPS=" + formatNaluDebug(spsNALUs) + ", PPS=" + formatNaluDebug(ppsNALUs))
 		err := init.Moov.Traks[0].SetAVCDescriptor("avc1", spsNALUs, ppsNALUs, includePS)
 		if err != nil {
 			log.Log.Error("mp4.Close(): error setting AVC descriptor: " + err.Error())
@@ -580,9 +580,8 @@ func (mp4 *MP4) Close(config *models.Config) {
 	case "H265", "HVC1":
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
-		vpsNALUs := sanitizeParameterSets(mp4.VPSNALUs)
-		spsNALUs := sanitizeParameterSets(mp4.SPSNALUs)
-		ppsNALUs := sanitizeParameterSets(mp4.PPSNALUs)
+		vpsNALUs, spsNALUs, ppsNALUs := normalizeH265ParameterSets(mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs)
+		log.Log.Debug("mp4.Close(): HEVC parameter sets: VPS=" + formatNaluDebug(vpsNALUs) + ", SPS=" + formatNaluDebug(spsNALUs) + ", PPS=" + formatNaluDebug(ppsNALUs))
 		err := init.Moov.Traks[0].SetHEVCDescriptor("hvc1", vpsNALUs, spsNALUs, ppsNALUs, [][]byte{}, includePS)
 		if err != nil {
 			log.Log.Error("mp4.Close(): error setting HEVC descriptor: " + err.Error())
@@ -852,6 +851,105 @@ func sanitizeParameterSets(nalus [][]byte) [][]byte {
 		clean = append(clean, trimmed)
 	}
 	return clean
+}
+
+// normalizeH264ParameterSets splits Annex B blobs and extracts SPS/PPS NALUs.
+func normalizeH264ParameterSets(spsIn [][]byte, ppsIn [][]byte) ([][]byte, [][]byte) {
+	all := make([][]byte, 0, len(spsIn)+len(ppsIn))
+	all = append(all, spsIn...)
+	all = append(all, ppsIn...)
+	var spsOut [][]byte
+	var ppsOut [][]byte
+	for _, blob := range all {
+		for _, nalu := range splitParamSetNALUs(blob) {
+			nalu = removeAnnexBStartCode(nalu)
+			if len(nalu) == 0 {
+				continue
+			}
+			typ := nalu[0] & 0x1F
+			switch typ {
+			case 7:
+				spsOut = append(spsOut, nalu)
+			case 8:
+				ppsOut = append(ppsOut, nalu)
+			}
+		}
+	}
+	if len(spsOut) == 0 {
+		spsOut = sanitizeParameterSets(spsIn)
+	}
+	if len(ppsOut) == 0 {
+		ppsOut = sanitizeParameterSets(ppsIn)
+	}
+	return spsOut, ppsOut
+}
+
+// normalizeH265ParameterSets splits Annex B blobs and extracts VPS/SPS/PPS NALUs.
+func normalizeH265ParameterSets(vpsIn [][]byte, spsIn [][]byte, ppsIn [][]byte) ([][]byte, [][]byte, [][]byte) {
+	all := make([][]byte, 0, len(vpsIn)+len(spsIn)+len(ppsIn))
+	all = append(all, vpsIn...)
+	all = append(all, spsIn...)
+	all = append(all, ppsIn...)
+	var vpsOut [][]byte
+	var spsOut [][]byte
+	var ppsOut [][]byte
+	for _, blob := range all {
+		for _, nalu := range splitParamSetNALUs(blob) {
+			nalu = removeAnnexBStartCode(nalu)
+			if len(nalu) == 0 {
+				continue
+			}
+			typ := (nalu[0] >> 1) & 0x3F
+			switch typ {
+			case 32:
+				vpsOut = append(vpsOut, nalu)
+			case 33:
+				spsOut = append(spsOut, nalu)
+			case 34:
+				ppsOut = append(ppsOut, nalu)
+			}
+		}
+	}
+	if len(vpsOut) == 0 {
+		vpsOut = sanitizeParameterSets(vpsIn)
+	}
+	if len(spsOut) == 0 {
+		spsOut = sanitizeParameterSets(spsIn)
+	}
+	if len(ppsOut) == 0 {
+		ppsOut = sanitizeParameterSets(ppsIn)
+	}
+	return vpsOut, spsOut, ppsOut
+}
+
+// splitParamSetNALUs splits Annex B parameter set blobs; raw NALUs are returned as-is.
+func splitParamSetNALUs(blob []byte) [][]byte {
+	if len(blob) == 0 {
+		return nil
+	}
+	if findStartCode(blob, 0) >= 0 {
+		return splitNALUs(blob)
+	}
+	return [][]byte{blob}
+}
+
+func formatNaluDebug(nalus [][]byte) string {
+	if len(nalus) == 0 {
+		return "none"
+	}
+	parts := make([]string, 0, len(nalus))
+	for _, nalu := range nalus {
+		if len(nalu) == 0 {
+			parts = append(parts, "len=0")
+			continue
+		}
+		max := 8
+		if len(nalu) < max {
+			max = len(nalu)
+		}
+		parts = append(parts, fmt.Sprintf("len=%d head=%x", len(nalu), nalu[:max]))
+	}
+	return strings.Join(parts, "; ")
 }
 
 // splitNALUs splits Annex B data into raw NAL units without start codes.
