@@ -551,7 +551,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					default:
 					}
 
-					if (motionTimestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-500) && nextPkt.IsKeyFrame {
+					if start && (motionTimestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-500) && nextPkt.IsKeyFrame {
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(motionTimestamp+postRecording-now, 10) + " < 0")
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-500 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-500, 10))
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(motionTimestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
@@ -561,6 +561,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						// We start the recording if we have a keyframe and the last duration is 0 or less than the current packet time.
 						// It could be start we start from the beginning of the recording.
 						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): write frames")
+						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): recording started on keyframe")
 						start = true
 					}
 					if start {
