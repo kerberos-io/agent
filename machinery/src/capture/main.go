@@ -518,21 +518,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				if len(spsNALUS) == 0 || len(ppsNALUS) == 0 {
 					log.Log.Warning("capture.main.HandleRecordStream(motiondetection): missing SPS/PPS at recording start")
 				}
-				// Create a video file, and set the dimensions.
-				mp4Video := video.NewMP4(fullName, spsNALUS, ppsNALUS, vpsNALUS, configuration.Config.Capture.MaxLengthRecording)
-				mp4Video.SetWidth(width)
-				mp4Video.SetHeight(height)
-
-				if videoCodec == "H264" {
-					videoTrack = mp4Video.AddVideoTrack("H264")
-				} else if videoCodec == "H265" {
-					videoTrack = mp4Video.AddVideoTrack("H265")
-				}
-				if audioCodec == "AAC" {
-					audioTrack = mp4Video.AddAudioTrack("AAC")
-				} else if audioCodec == "PCM_MULAW" {
-					log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
-				}
+				// Create the MP4 only once the first keyframe arrives.
+				var mp4Video *video.MP4
 
 				for cursorError == nil {
 
@@ -562,20 +549,43 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						// It could be start we start from the beginning of the recording.
 						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): write frames")
 						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): recording started on keyframe")
+
+						// Align duration timers with the first keyframe.
+						startRecording = pkt.CurrentTime
+
+						// Create a video file, and set the dimensions.
+						mp4Video = video.NewMP4(fullName, spsNALUS, ppsNALUS, vpsNALUS, configuration.Config.Capture.MaxLengthRecording)
+						mp4Video.SetWidth(width)
+						mp4Video.SetHeight(height)
+
+						if videoCodec == "H264" {
+							videoTrack = mp4Video.AddVideoTrack("H264")
+						} else if videoCodec == "H265" {
+							videoTrack = mp4Video.AddVideoTrack("H265")
+						}
+						if audioCodec == "AAC" {
+							audioTrack = mp4Video.AddAudioTrack("AAC")
+						} else if audioCodec == "PCM_MULAW" {
+							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
+						}
 						start = true
 					}
 					if start {
 						pts := convertPTS(pkt.TimeLegacy)
 						if pkt.IsVideo {
 							log.Log.Debug("capture.main.HandleRecordStream(motiondetection): add video sample")
-							if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
+							if mp4Video != nil {
+								if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
+									log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
+								}
 							}
 						} else if pkt.IsAudio {
 							log.Log.Debug("capture.main.HandleRecordStream(motiondetection): add audio sample")
 							if pkt.Codec == "AAC" {
-								if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-									log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
+								if mp4Video != nil {
+									if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
+										log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
+									}
 								}
 							} else if pkt.Codec == "PCM_MULAW" {
 								// TODO: transcode to AAC, some work to do..
@@ -592,6 +602,11 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// Update the last duration and last recording time.
 				// This is used to determine if we need to start a new recording.
 				lastRecordingTime = pkt.CurrentTime
+
+				if mp4Video == nil {
+					log.Log.Warning("capture.main.HandleRecordStream(motiondetection): recording closed without keyframe; no MP4 created")
+					continue
+				}
 
 				// This will close the recording and write the last packet.
 				if len(mp4Video.SPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.SPSNALUs) > 0 {
