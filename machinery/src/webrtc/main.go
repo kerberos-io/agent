@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	//"github.com/izern/go-fdkaac/fdkaac"
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -640,7 +641,12 @@ func NewVideoBroadcaster(streams []packets.Stream) *TrackBroadcaster {
 }
 
 func NewAudioBroadcaster(streams []packets.Stream) *TrackBroadcaster {
+	var audioCodecNames []string
+	hasAAC := false
 	for _, s := range streams {
+		if s.IsAudio {
+			audioCodecNames = append(audioCodecNames, s.Name)
+		}
 		switch s.Name {
 		case "OPUS":
 			return NewTrackBroadcaster(pionWebRTC.MimeTypeOpus, "audio", trackStreamID)
@@ -648,9 +654,18 @@ func NewAudioBroadcaster(streams []packets.Stream) *TrackBroadcaster {
 			return NewTrackBroadcaster(pionWebRTC.MimeTypePCMU, "audio", trackStreamID)
 		case "PCM_ALAW":
 			return NewTrackBroadcaster(pionWebRTC.MimeTypePCMA, "audio", trackStreamID)
+		case "AAC":
+			hasAAC = true
 		}
 	}
-	log.Log.Error("webrtc.main.NewAudioBroadcaster(): no supported audio codec found")
+	if hasAAC {
+		log.Log.Info("webrtc.main.NewAudioBroadcaster(): AAC detected, creating PCMU audio track for transcoded output")
+		return NewTrackBroadcaster(pionWebRTC.MimeTypePCMU, "audio", trackStreamID)
+	} else if len(audioCodecNames) > 0 {
+		log.Log.Error(fmt.Sprintf("webrtc.main.NewAudioBroadcaster(): no supported audio codec found (detected: %s; supported: OPUS, PCM_MULAW, PCM_ALAW)", strings.Join(audioCodecNames, ", ")))
+	} else {
+		log.Log.Info("webrtc.main.NewAudioBroadcaster(): no audio stream found in camera feed")
+	}
 	return nil
 }
 
@@ -666,18 +681,33 @@ func NewVideoTrack(streams []packets.Stream) *pionWebRTC.TrackLocalStaticSample 
 
 func NewAudioTrack(streams []packets.Stream) *pionWebRTC.TrackLocalStaticSample {
 	var mimeType string
+	var audioCodecNames []string
+	hasAAC := false
 	for _, stream := range streams {
+		if stream.IsAudio {
+			audioCodecNames = append(audioCodecNames, stream.Name)
+		}
 		if stream.Name == "OPUS" {
 			mimeType = pionWebRTC.MimeTypeOpus
 		} else if stream.Name == "PCM_MULAW" {
 			mimeType = pionWebRTC.MimeTypePCMU
 		} else if stream.Name == "PCM_ALAW" {
 			mimeType = pionWebRTC.MimeTypePCMA
+		} else if stream.Name == "AAC" {
+			hasAAC = true
 		}
 	}
 	if mimeType == "" {
-		log.Log.Error("webrtc.main.NewAudioTrack(): no supported audio codec found")
-		return nil
+		if hasAAC {
+			mimeType = pionWebRTC.MimeTypePCMU
+			log.Log.Info("webrtc.main.NewAudioTrack(): AAC detected, creating PCMU audio track for transcoded output")
+		} else if len(audioCodecNames) > 0 {
+			log.Log.Error(fmt.Sprintf("webrtc.main.NewAudioTrack(): no supported audio codec found (detected: %s; supported: OPUS, PCM_MULAW, PCM_ALAW)", strings.Join(audioCodecNames, ", ")))
+			return nil
+		} else {
+			log.Log.Info("webrtc.main.NewAudioTrack(): no audio stream found in camera feed")
+			return nil
+		}
 	}
 	outboundAudioTrack, err := pionWebRTC.NewTrackLocalStaticSample(pionWebRTC.RTPCodecCapability{MimeType: mimeType}, "audio", trackStreamID)
 	if err != nil {
@@ -696,6 +726,11 @@ type streamState struct {
 	receivedKeyFrame bool
 	lastAudioSample  *pionMedia.Sample
 	lastVideoSample  *pionMedia.Sample
+	audioPacketsSeen int64
+	aacPacketsSeen   int64
+	audioSamplesSent int64
+	aacNoOutput      int64
+	aacErrors        int64
 }
 
 // codecSupport tracks which codecs are available in the stream
@@ -843,22 +878,54 @@ func processVideoPacket(pkt packets.Packet, state *streamState, videoBroadcaster
 	state.lastVideoSample = &sample
 }
 
-// processAudioPacket processes an audio packet and writes samples to the broadcaster
-func processAudioPacket(pkt packets.Packet, state *streamState, audioBroadcaster *TrackBroadcaster, hasAAC bool) {
+// processAudioPacket processes an audio packet and writes samples to the broadcaster.
+// When the packet carries AAC and a transcoder is provided, the audio is transcoded
+// to G.711 µ-law on the fly so it can be sent over a PCMU WebRTC track.
+func processAudioPacket(pkt packets.Packet, state *streamState, audioBroadcaster *TrackBroadcaster, transcoder *AACTranscoder) {
 	if audioBroadcaster == nil {
 		return
 	}
 
-	if hasAAC {
-		// AAC transcoding not yet implemented
-		// TODO: Implement AAC to PCM_MULAW transcoding
-		return
+	state.audioPacketsSeen++
+
+	audioData := pkt.Data
+
+	if pkt.Codec == "AAC" {
+		state.aacPacketsSeen++
+		if transcoder == nil {
+			state.aacErrors++
+			if state.aacErrors <= 3 || state.aacErrors%100 == 0 {
+				log.Log.Warning(fmt.Sprintf("webrtc.main.processAudioPacket(): AAC packet dropped because transcoder is nil (aac_packets=%d, input_bytes=%d)", state.aacPacketsSeen, len(pkt.Data)))
+			}
+			return // no transcoder – silently drop
+		}
+		pcmu, err := transcoder.Transcode(pkt.Data)
+		if err != nil {
+			state.aacErrors++
+			log.Log.Error("webrtc.main.processAudioPacket(): AAC transcode error: " + err.Error())
+			return
+		}
+		if len(pcmu) == 0 {
+			state.aacNoOutput++
+			if state.aacNoOutput <= 5 || state.aacNoOutput%100 == 0 {
+				log.Log.Info(fmt.Sprintf("webrtc.main.processAudioPacket(): AAC packet produced no PCMU output yet (aac_packets=%d, no_output=%d, input_bytes=%d)", state.aacPacketsSeen, state.aacNoOutput, len(pkt.Data)))
+			}
+			return // decoder still buffering
+		}
+		if state.aacPacketsSeen <= 5 || state.aacPacketsSeen%100 == 0 {
+			log.Log.Info(fmt.Sprintf("webrtc.main.processAudioPacket(): AAC transcoded to PCMU (aac_packets=%d, input_bytes=%d, output_bytes=%d, peers=%d)", state.aacPacketsSeen, len(pkt.Data), len(pcmu), audioBroadcaster.PeerCount()))
+		}
+		audioData = pcmu
 	}
 
-	sample := pionMedia.Sample{Data: pkt.Data, PacketTimestamp: sampleTimestamp(pkt)}
+	sample := pionMedia.Sample{Data: audioData, PacketTimestamp: sampleTimestamp(pkt)}
 
 	if state.lastAudioSample != nil {
 		state.lastAudioSample.Duration = sampleDuration(pkt, state.lastAudioSample.PacketTimestamp, 20*time.Millisecond)
+		state.audioSamplesSent++
+		if state.audioSamplesSent <= 5 || state.audioSamplesSent%100 == 0 {
+			log.Log.Info(fmt.Sprintf("webrtc.main.processAudioPacket(): queueing audio sample (samples=%d, codec=%s, bytes=%d, duration_ms=%d, peers=%d)", state.audioSamplesSent, pkt.Codec, len(state.lastAudioSample.Data), state.lastAudioSample.Duration.Milliseconds(), audioBroadcaster.PeerCount()))
+		}
 		audioBroadcaster.WriteSample(*state.lastAudioSample)
 	}
 
@@ -892,8 +959,22 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 		return
 	}
 
+	// Create AAC transcoder if needed (AAC → G.711 µ-law).
+	var aacTranscoder *AACTranscoder
+	if codecs.hasAAC && audioBroadcaster != nil {
+		log.Log.Info(fmt.Sprintf("webrtc.main.WriteToTrack(): AAC audio detected, creating transcoder (audio_peers=%d)", audioBroadcaster.PeerCount()))
+		t, err := NewAACTranscoder()
+		if err != nil {
+			log.Log.Error("webrtc.main.WriteToTrack(): failed to create AAC transcoder: " + err.Error())
+		} else {
+			aacTranscoder = t
+			log.Log.Info("webrtc.main.WriteToTrack(): AAC transcoder created successfully")
+			defer aacTranscoder.Close()
+		}
+	}
+
 	if config.Capture.TranscodingWebRTC == "true" {
-		log.Log.Info("webrtc.main.WriteToTrack(): transcoding enabled but not yet implemented")
+		log.Log.Info("webrtc.main.WriteToTrack(): transcoding config enabled")
 	}
 
 	// Initialize streaming state
@@ -903,6 +984,12 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 	}
 
 	defer func() {
+		log.Log.Info(fmt.Sprintf("webrtc.main.WriteToTrack(): audio summary packets=%d aac_packets=%d sent=%d aac_no_output=%d aac_errors=%d peers=%d", state.audioPacketsSeen, state.aacPacketsSeen, state.audioSamplesSent, state.aacNoOutput, state.aacErrors, func() int {
+			if audioBroadcaster == nil {
+				return 0
+			}
+			return audioBroadcaster.PeerCount()
+		}()))
 		writeFinalSamples(state, videoBroadcaster, audioBroadcaster)
 		log.Log.Info("webrtc.main.WriteToTrack(): stopped writing to track")
 	}()
@@ -971,7 +1058,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 		if pkt.IsVideo {
 			processVideoPacket(pkt, state, videoBroadcaster, config)
 		} else if pkt.IsAudio {
-			processAudioPacket(pkt, state, audioBroadcaster, codecs.hasAAC)
+			processAudioPacket(pkt, state, audioBroadcaster, aacTranscoder)
 		}
 	}
 }
