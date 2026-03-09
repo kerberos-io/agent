@@ -41,16 +41,10 @@ class Dashboard extends React.Component {
     this.handleLiveviewLoad = this.handleLiveviewLoad.bind(this);
   }
 
-  handleLiveviewLoad() {
-    this.setState({
-      liveviewLoaded: true,
-    });
-  }
-
   componentDidMount() {
     const liveview = document.getElementsByClassName('videocard-video');
     if (liveview && liveview.length > 0) {
-      this.liveviewElement = liveview[0];
+      [this.liveviewElement] = liveview;
       this.liveviewElement.addEventListener('load', this.handleLiveviewLoad);
     }
     this.initialiseLiveview();
@@ -75,6 +69,12 @@ class Dashboard extends React.Component {
       message_type: 'stop-sd',
     };
     dispatchSend(message);
+  }
+
+  handleLiveviewLoad() {
+    this.setState({
+      liveviewLoaded: true,
+    });
   }
 
   handleClose() {

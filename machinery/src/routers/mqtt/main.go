@@ -90,12 +90,16 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 
 		// Some extra options to make sure the connection behaves
 		// properly. More information here: github.com/eclipse/paho.mqtt.golang.
-		opts.SetCleanSession(true)
+		opts.SetCleanSession(false)
+		opts.SetResumeSubs(true)
+		opts.SetStore(mqtt.NewMemoryStore())
 		opts.SetConnectRetry(true)
 		opts.SetAutoReconnect(true)
 		opts.SetConnectRetryInterval(5 * time.Second)
+		opts.SetMaxReconnectInterval(1 * time.Minute)
 		opts.SetKeepAlive(30 * time.Second)
 		opts.SetPingTimeout(10 * time.Second)
+		opts.SetWriteTimeout(10 * time.Second)
 		opts.SetOrderMatters(false)
 		opts.SetConnectTimeout(30 * time.Second)
 		opts.SetConnectionLostHandler(func(client mqtt.Client, err error) {
@@ -107,6 +111,9 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 		})
 		opts.SetReconnectingHandler(func(client mqtt.Client, options *mqtt.ClientOptions) {
 			log.Log.Warning("routers.mqtt.main.ConfigureMQTT(): reconnecting to MQTT broker")
+		})
+		opts.SetOnConnectHandler(func(c mqtt.Client) {
+			log.Log.Info("routers.mqtt.main.ConfigureMQTT(): MQTT session is online")
 		})
 
 		hubKey := ""
@@ -150,6 +157,8 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 		if token := mqc.Connect(); token.WaitTimeout(30 * time.Second) {
 			if token.Error() != nil {
 				log.Log.Error("routers.mqtt.main.ConfigureMQTT(): unable to establish mqtt broker connection, error was: " + token.Error().Error())
+			} else {
+				log.Log.Info("routers.mqtt.main.ConfigureMQTT(): initial MQTT connection established")
 			}
 		} else {
 			log.Log.Error("routers.mqtt.main.ConfigureMQTT(): timed out while establishing mqtt broker connection")
