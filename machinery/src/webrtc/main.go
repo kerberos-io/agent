@@ -89,22 +89,41 @@ func (cm *ConnectionManager) CloseCandidateChannel(sessionKey string) {
 }
 
 // AddPeerConnection adds a peer connection to the manager
-func (cm *ConnectionManager) AddPeerConnection(sessionID string, wrapper *peerConnectionWrapper) {
+func (cm *ConnectionManager) AddPeerConnection(sessionKey string, wrapper *peerConnectionWrapper) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	cm.peerConnections[sessionID] = wrapper
+	cm.peerConnections[sessionKey] = wrapper
 }
 
 // RemovePeerConnection removes a peer connection from the manager
-func (cm *ConnectionManager) RemovePeerConnection(sessionID string) {
+func (cm *ConnectionManager) RemovePeerConnection(sessionKey string) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
 
-	if wrapper, exists := cm.peerConnections[sessionID]; exists {
+	if wrapper, exists := cm.peerConnections[sessionKey]; exists {
 		if wrapper.cancelCtx != nil {
 			wrapper.cancelCtx()
 		}
-		delete(cm.peerConnections, sessionID)
+		delete(cm.peerConnections, sessionKey)
+	}
+}
+
+// QueueCandidate safely queues a candidate for a session without racing with channel closure.
+func (cm *ConnectionManager) QueueCandidate(sessionKey string, candidate string) bool {
+	cm.mu.Lock()
+	defer cm.mu.Unlock()
+
+	ch, exists := cm.candidateChannels[sessionKey]
+	if !exists {
+		ch = make(chan string, candidateChannelBuffer)
+		cm.candidateChannels[sessionKey] = ch
+	}
+
+	select {
+	case ch <- candidate:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -123,7 +142,7 @@ func (cm *ConnectionManager) DecrementPeerCount() int64 {
 	return atomic.AddInt64(&cm.peerConnectionCount, -1)
 }
 
-func cleanupPeerConnection(sessionID string, sessionKey string, wrapper *peerConnectionWrapper) {
+func cleanupPeerConnection(sessionKey string, wrapper *peerConnectionWrapper) {
 	wrapper.closeOnce.Do(func() {
 		if wrapper.connected.Swap(false) {
 			count := globalConnectionManager.DecrementPeerCount()
@@ -138,7 +157,7 @@ func cleanupPeerConnection(sessionID string, sessionKey string, wrapper *peerCon
 			}
 		}
 
-		globalConnectionManager.RemovePeerConnection(sessionID)
+		globalConnectionManager.RemovePeerConnection(sessionKey)
 		close(wrapper.done)
 	})
 }
@@ -182,14 +201,25 @@ func (w WebRTC) CreateOffer(sd []byte) pionWebRTC.SessionDescription {
 }
 
 func RegisterCandidates(key string, candidate models.ReceiveHDCandidatesPayload) {
-	ch := globalConnectionManager.GetOrCreateCandidateChannel(key)
-
 	log.Log.Info("webrtc.main.RegisterCandidates(): " + candidate.Candidate)
-	select {
-	case ch <- candidate.Candidate:
-	default:
+	if !globalConnectionManager.QueueCandidate(key, candidate.Candidate) {
 		log.Log.Info("webrtc.main.RegisterCandidates(): channel is full, dropping candidate")
 	}
+}
+
+func decodeICECandidate(candidate string) (pionWebRTC.ICECandidateInit, error) {
+	if candidate == "" {
+		return pionWebRTC.ICECandidateInit{}, io.EOF
+	}
+
+	var candidateInit pionWebRTC.ICECandidateInit
+	if err := json.Unmarshal([]byte(candidate), &candidateInit); err == nil {
+		if candidateInit.Candidate != "" {
+			return candidateInit, nil
+		}
+	}
+
+	return pionWebRTC.ICECandidateInit{Candidate: candidate}, nil
 }
 
 func RegisterDefaultInterceptors(mediaEngine *pionWebRTC.MediaEngine, interceptorRegistry *interceptor.Registry) error {
@@ -294,7 +324,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			if videoTrack != nil {
 				if videoSender, err = peerConnection.AddTrack(videoTrack); err != nil {
 					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding video track: " + err.Error())
-					cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
+					cleanupPeerConnection(sessionKey, wrapper)
 					return
 				}
 			} else {
@@ -327,7 +357,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			if audioTrack != nil {
 				if audioSender, err = peerConnection.AddTrack(audioTrack); err != nil {
 					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding audio track: " + err.Error())
-					cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
+					cleanupPeerConnection(sessionKey, wrapper)
 					return
 				}
 			} else {
@@ -361,7 +391,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 				switch connectionState {
 				case pionWebRTC.PeerConnectionStateDisconnected, pionWebRTC.PeerConnectionStateClosed, pionWebRTC.PeerConnectionStateFailed:
-					cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
+					cleanupPeerConnection(sessionKey, wrapper)
 
 				case pionWebRTC.PeerConnectionStateConnected:
 					if wrapper.connected.CompareAndSwap(false, true) {
@@ -386,33 +416,21 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 							return
 						}
 						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Received candidate from channel: " + candidate)
-						if candidateErr := peerConnection.AddICECandidate(pionWebRTC.ICECandidateInit{Candidate: candidate}); candidateErr != nil {
+						candidateInit, decodeErr := decodeICECandidate(candidate)
+						if decodeErr != nil {
+							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error decoding candidate: " + decodeErr.Error())
+							continue
+						}
+						if candidateErr := peerConnection.AddICECandidate(candidateInit); candidateErr != nil {
 							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding candidate: " + candidateErr.Error())
 						}
 					}
 				}
 			}()
 
-			offer := w.CreateOffer(sd)
-			if err = peerConnection.SetRemoteDescription(offer); err != nil {
-				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting remote description: " + err.Error())
-				cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
-				return
-			}
-
-			answer, err := peerConnection.CreateAnswer(nil)
-			if err != nil {
-				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while creating answer: " + err.Error())
-				cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
-				return
-			} else if err = peerConnection.SetLocalDescription(answer); err != nil {
-				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting local description: " + err.Error())
-				cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
-				return
-			}
-
 			// When an ICE candidate is available send to the other peer using the signaling server (MQTT).
-			// The other peer will add this candidate by calling AddICECandidate
+			// The other peer will add this candidate by calling AddICECandidate.
+			// This handler must be registered before setting the local description, otherwise early candidates can be missed.
 			var hasRelayCandidates bool
 			peerConnection.OnICECandidate(func(candidate *pionWebRTC.ICECandidate) {
 
@@ -457,8 +475,6 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				candateBinary, err := json.Marshal(candidateJSON)
 				if err == nil {
 					valueMap["candidate"] = string(candateBinary)
-					// SDP is not needed to be send..
-					//valueMap["sdp"] = []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP)))
 					valueMap["session_id"] = handshake.SessionID
 					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): sending " + candidateType + " candidate to hub")
 				} else {
@@ -482,8 +498,26 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				}
 			})
 
+			offer := w.CreateOffer(sd)
+			if err = peerConnection.SetRemoteDescription(offer); err != nil {
+				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting remote description: " + err.Error())
+				cleanupPeerConnection(sessionKey, wrapper)
+				return
+			}
+
+			answer, err := peerConnection.CreateAnswer(nil)
+			if err != nil {
+				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while creating answer: " + err.Error())
+				cleanupPeerConnection(sessionKey, wrapper)
+				return
+			} else if err = peerConnection.SetLocalDescription(answer); err != nil {
+				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting local description: " + err.Error())
+				cleanupPeerConnection(sessionKey, wrapper)
+				return
+			}
+
 			// Store peer connection in manager
-			globalConnectionManager.AddPeerConnection(handshake.SessionID, wrapper)
+			globalConnectionManager.AddPeerConnection(sessionKey, wrapper)
 
 			//  Create a config map
 			valueMap := make(map[string]interface{})
@@ -509,7 +543,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 		}
 	} else {
 		globalConnectionManager.CloseCandidateChannel(sessionKey)
-		log.Log.Error("Initializwebrtc.main.InitializeWebRTCConnection()eWebRTCConnection: NewPeerConnection failed: " + err.Error())
+		log.Log.Error("webrtc.main.InitializeWebRTCConnection(): failed to decode remote session description: " + err.Error())
 	}
 }
 
