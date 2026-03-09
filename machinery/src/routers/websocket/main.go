@@ -6,6 +6,7 @@ import (
 	"image"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -14,6 +15,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
+	"github.com/kerberos-io/agent/machinery/src/webrtc"
 )
 
 type Message struct {
@@ -26,6 +28,23 @@ type Connection struct {
 	Socket  *websocket.Conn
 	mu      sync.Mutex
 	Cancels map[string]context.CancelFunc
+}
+
+func writeWebRTCError(connection *Connection, clientID string, sessionID string, errorMessage string) {
+	if connection == nil {
+		return
+	}
+
+	if err := connection.WriteJson(Message{
+		ClientID:    clientID,
+		MessageType: "webrtc-error",
+		Message: map[string]string{
+			"session_id": sessionID,
+			"message":    errorMessage,
+		},
+	}); err != nil {
+		log.Log.Error("routers.websocket.main.writeWebRTCError(): " + err.Error())
+	}
 }
 
 // Concurrency handling - sending messages
@@ -115,6 +134,82 @@ func WebsocketHandler(c *gin.Context, configuration *models.Configuration, commu
 						go ForwardSDStream(ctx, clientID, sockets[clientID], configuration, communication, captureDevice)
 					}
 				}
+
+			case "stream-hd":
+				sessionID := message.Message["session_id"]
+				sessionDescription := message.Message["sdp"]
+
+				if sessionID == "" || sessionDescription == "" {
+					writeWebRTCError(sockets[clientID], clientID, sessionID, "missing session_id or sdp")
+					break
+				}
+
+				if !communication.CameraConnected {
+					writeWebRTCError(sockets[clientID], clientID, sessionID, "camera is not connected")
+					break
+				}
+
+				if communication.HandleLiveHDHandshake == nil {
+					writeWebRTCError(sockets[clientID], clientID, sessionID, "webrtc liveview is not available")
+					break
+				}
+
+				handshake := models.LiveHDHandshake{
+					Payload: models.RequestHDStreamPayload{
+						Timestamp:          time.Now().Unix(),
+						SessionID:          sessionID,
+						SessionDescription: sessionDescription,
+					},
+					Signaling: &models.LiveHDSignalingCallbacks{
+						SendAnswer: func(callbackSessionID string, sdp string) error {
+							return sockets[clientID].WriteJson(Message{
+								ClientID:    clientID,
+								MessageType: "webrtc-answer",
+								Message: map[string]string{
+									"session_id": callbackSessionID,
+									"sdp":        sdp,
+								},
+							})
+						},
+						SendCandidate: func(callbackSessionID string, candidate string) error {
+							return sockets[clientID].WriteJson(Message{
+								ClientID:    clientID,
+								MessageType: "webrtc-candidate",
+								Message: map[string]string{
+									"session_id": callbackSessionID,
+									"candidate":  candidate,
+								},
+							})
+						},
+						SendError: func(callbackSessionID string, errorMessage string) error {
+							writeWebRTCError(sockets[clientID], clientID, callbackSessionID, errorMessage)
+							return nil
+						},
+					},
+				}
+
+				communication.HandleLiveHDHandshake <- handshake
+
+			case "webrtc-candidate":
+				sessionID := message.Message["session_id"]
+				candidate := message.Message["candidate"]
+
+				if sessionID == "" || candidate == "" {
+					writeWebRTCError(sockets[clientID], clientID, sessionID, "missing session_id or candidate")
+					break
+				}
+
+				if !communication.CameraConnected {
+					writeWebRTCError(sockets[clientID], clientID, sessionID, "camera is not connected")
+					break
+				}
+
+				key := configuration.Config.Key + "/" + sessionID
+				go webrtc.RegisterCandidates(key, models.ReceiveHDCandidatesPayload{
+					Timestamp: time.Now().Unix(),
+					SessionID: sessionID,
+					Candidate: candidate,
+				})
 			}
 
 			err = conn.ReadJSON(&message)

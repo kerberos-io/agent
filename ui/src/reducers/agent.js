@@ -123,16 +123,12 @@ const agent = (
       };
 
     case 'GET_EVENTS':
-      const { timestamp_offset_end } = action.filter;
       const { events } = action;
       return {
         ...state,
         eventsLoaded: events.length,
-        events:
-          timestamp_offset_end === 0
-            ? [...events]
-            : [...state.events, ...events],
-        eventfilter: action.eventfilter,
+        events: action.append ? [...state.events, ...events] : [...events],
+        eventfilter: action.filter,
       };
 
     default:

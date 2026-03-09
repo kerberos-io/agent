@@ -27,7 +27,8 @@ import (
 
 // VERSION is the agent version. It defaults to "0.0.0" for local dev builds
 // and is overridden at build time via:
-//   go build -ldflags "-X github.com/kerberos-io/agent/machinery/src/utils.VERSION=v1.2.3"
+//
+//	go build -ldflags "-X github.com/kerberos-io/agent/machinery/src/utils.VERSION=v1.2.3"
 var VERSION = "0.0.0"
 
 const letterBytes = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -197,6 +198,13 @@ func GetMediaFormatted(files []os.FileInfo, recordingDirectory string, configura
 			timestamp := fileParts[0]
 			timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
 			if err == nil {
+
+				if eventFilter.TimestampOffsetStart > 0 {
+					// TimestampOffsetStart represents the newest lower bound to include.
+					if timestampInt < eventFilter.TimestampOffsetStart {
+						continue
+					}
+				}
 
 				// If we have an offset we will check if we should skip or not
 				if eventFilter.TimestampOffsetEnd > 0 {

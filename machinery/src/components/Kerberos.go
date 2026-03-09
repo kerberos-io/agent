@@ -21,6 +21,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	routers "github.com/kerberos-io/agent/machinery/src/routers/mqtt"
 	"github.com/kerberos-io/agent/machinery/src/utils"
+	"github.com/kerberos-io/agent/machinery/src/webrtc"
 	"github.com/tevino/abool"
 )
 
@@ -303,7 +304,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	}
 
 	// Handle livestream HD (high resolution over WEBRTC)
-	communication.HandleLiveHDHandshake = make(chan models.RequestHDStreamPayload, 10)
+	communication.HandleLiveHDHandshake = make(chan models.LiveHDHandshake, 100)
 	if subStreamEnabled {
 		livestreamHDCursor := subQueue.Latest()
 		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspSubClient)
@@ -552,6 +553,11 @@ func GetDashboard(c *gin.Context, configDirectory string, configuration *models.
 	// The total number of recordings stored in the directory.
 	recordingDirectory := configDirectory + "/data/recordings"
 	numberOfRecordings := utils.NumberOfMP4sInDirectory(recordingDirectory)
+	activeWebRTCReaders := webrtc.GetActivePeerConnectionCount()
+	pendingWebRTCHandshakes := 0
+	if communication.HandleLiveHDHandshake != nil {
+		pendingWebRTCHandshakes = len(communication.HandleLiveHDHandshake)
+	}
 
 	// All days stored in this agent.
 	days := []string{}
@@ -574,6 +580,8 @@ func GetDashboard(c *gin.Context, configDirectory string, configuration *models.
 		"cameraOnline":       cameraIsOnline,
 		"cloudOnline":        cloudIsOnline,
 		"numberOfRecordings": numberOfRecordings,
+		"webrtcReaders":      activeWebRTCReaders,
+		"webrtcPending":      pendingWebRTCHandshakes,
 		"days":               days,
 		"latestEvents":       latestEvents,
 	})

@@ -90,9 +90,10 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 
 		// Some extra options to make sure the connection behaves
 		// properly. More information here: github.com/eclipse/paho.mqtt.golang.
-		opts.SetCleanSession(true)
-		//opts.SetResumeSubs(true)
-		//opts.SetStore(mqtt.NewMemoryStore())
+		//opts.SetCleanSession(true)
+		opts.SetCleanSession(false)
+		opts.SetResumeSubs(true)
+		opts.SetStore(mqtt.NewMemoryStore())
 		opts.SetConnectRetry(true)
 		opts.SetAutoReconnect(true)
 		opts.SetConnectRetryInterval(5 * time.Second)
@@ -537,9 +538,13 @@ func HandleRequestHDStream(mqttClient mqtt.Client, hubKey string, payload models
 		if communication.CameraConnected {
 			// Set the Hub key, so we can send back the answer.
 			requestHDStreamPayload.HubKey = hubKey
-			select {
-			case communication.HandleLiveHDHandshake <- requestHDStreamPayload:
-			default:
+			if communication.HandleLiveHDHandshake == nil {
+				log.Log.Error("routers.mqtt.main.HandleRequestHDStream(): handshake channel is nil, dropping request")
+				return
+			}
+
+			communication.HandleLiveHDHandshake <- models.LiveHDHandshake{
+				Payload: requestHDStreamPayload,
 			}
 			log.Log.Info("routers.mqtt.main.HandleRequestHDStream(): received request to setup webrtc.")
 		} else {
