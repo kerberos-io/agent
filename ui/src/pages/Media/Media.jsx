@@ -133,7 +133,10 @@ class Media extends React.Component {
     const { appliedFilter } = this.state;
 
     return {
-      timestamp_offset_start: this.getTimestampFromInput(startDateTime, 'start'),
+      timestamp_offset_start: this.getTimestampFromInput(
+        startDateTime,
+        'start'
+      ),
       timestamp_offset_end: this.getTimestampFromInput(endDateTime, 'end'),
       number_of_elements: appliedFilter.number_of_elements,
     };
@@ -145,8 +148,12 @@ class Media extends React.Component {
     const normalizedValue = normalizeInputValue(value);
     const nextStartDateTime =
       field === 'startDateTime' ? normalizedValue : startDateTime;
-    const nextEndDateTime = field === 'endDateTime' ? normalizedValue : endDateTime;
-    const nextFilter = this.buildEventFilter(nextStartDateTime, nextEndDateTime);
+    const nextEndDateTime =
+      field === 'endDateTime' ? normalizedValue : endDateTime;
+    const nextFilter = this.buildEventFilter(
+      nextStartDateTime,
+      nextEndDateTime
+    );
     const shouldApplyFilter =
       (nextStartDateTime === '' || nextStartDateTime.length === 16) &&
       (nextEndDateTime === '' || nextEndDateTime.length === 16);
@@ -154,7 +161,9 @@ class Media extends React.Component {
     this.setState(
       {
         [field]: normalizedValue,
-        appliedFilter: shouldApplyFilter ? nextFilter : this.state.appliedFilter,
+        appliedFilter: shouldApplyFilter
+          ? nextFilter
+          : this.state.appliedFilter,
         isScrolling: false,
       },
       () => {
