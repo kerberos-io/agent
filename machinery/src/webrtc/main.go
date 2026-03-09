@@ -48,13 +48,16 @@ type ConnectionManager struct {
 
 // peerConnectionWrapper wraps a peer connection with additional metadata
 type peerConnectionWrapper struct {
-	conn            *pionWebRTC.PeerConnection
-	cancelCtx       context.CancelFunc
-	done            chan struct{}
-	closeOnce       sync.Once
-	connected       atomic.Bool
-	disconnectMu    sync.Mutex
-	disconnectTimer *time.Timer
+	conn             *pionWebRTC.PeerConnection
+	cancelCtx        context.CancelFunc
+	done             chan struct{}
+	closeOnce        sync.Once
+	connected        atomic.Bool
+	disconnectMu     sync.Mutex
+	disconnectTimer  *time.Timer
+	sessionKey       string
+	videoBroadcaster *TrackBroadcaster
+	audioBroadcaster *TrackBroadcaster
 }
 
 var globalConnectionManager = NewConnectionManager()
@@ -153,6 +156,15 @@ func cleanupPeerConnection(sessionKey string, wrapper *peerConnectionWrapper) {
 			log.Log.Info("webrtc.main.cleanupPeerConnection(): Peer disconnected. Active peers: " + strconv.FormatInt(count, 10))
 		}
 
+		// Remove per-peer tracks from broadcasters so the fan-out stops
+		// writing to this peer immediately.
+		if wrapper.videoBroadcaster != nil {
+			wrapper.videoBroadcaster.RemovePeer(sessionKey)
+		}
+		if wrapper.audioBroadcaster != nil {
+			wrapper.audioBroadcaster.RemovePeer(sessionKey)
+		}
+
 		globalConnectionManager.CloseCandidateChannel(sessionKey)
 
 		if wrapper.conn != nil {
@@ -239,7 +251,7 @@ func RegisterDefaultInterceptors(mediaEngine *pionWebRTC.MediaEngine, intercepto
 	return nil
 }
 
-func InitializeWebRTCConnection(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, handshake models.RequestHDStreamPayload) {
+func InitializeWebRTCConnection(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoBroadcaster *TrackBroadcaster, audioBroadcaster *TrackBroadcaster, handshake models.RequestHDStreamPayload) {
 
 	config := configuration.Config
 	deviceKey := config.Key
@@ -319,14 +331,25 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			// Create context for this connection
 			ctx, cancel := context.WithCancel(context.Background())
 			wrapper := &peerConnectionWrapper{
-				conn:      peerConnection,
-				cancelCtx: cancel,
-				done:      make(chan struct{}),
+				conn:             peerConnection,
+				cancelCtx:        cancel,
+				done:             make(chan struct{}),
+				sessionKey:       sessionKey,
+				videoBroadcaster: videoBroadcaster,
+				audioBroadcaster: audioBroadcaster,
 			}
 
+			// Create a per-peer video track from the broadcaster so writes
+			// to this peer are independent and non-blocking.
 			var videoSender *pionWebRTC.RTPSender = nil
-			if videoTrack != nil {
-				if videoSender, err = peerConnection.AddTrack(videoTrack); err != nil {
+			if videoBroadcaster != nil {
+				peerVideoTrack, trackErr := videoBroadcaster.AddPeer(sessionKey)
+				if trackErr != nil {
+					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error creating per-peer video track: " + trackErr.Error())
+					cleanupPeerConnection(sessionKey, wrapper)
+					return
+				}
+				if videoSender, err = peerConnection.AddTrack(peerVideoTrack); err != nil {
 					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding video track: " + err.Error())
 					cleanupPeerConnection(sessionKey, wrapper)
 					return
@@ -357,9 +380,16 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				}()
 			}
 
+			// Create a per-peer audio track from the broadcaster.
 			var audioSender *pionWebRTC.RTPSender = nil
-			if audioTrack != nil {
-				if audioSender, err = peerConnection.AddTrack(audioTrack); err != nil {
+			if audioBroadcaster != nil {
+				peerAudioTrack, trackErr := audioBroadcaster.AddPeer(sessionKey)
+				if trackErr != nil {
+					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error creating per-peer audio track: " + trackErr.Error())
+					cleanupPeerConnection(sessionKey, wrapper)
+					return
+				}
+				if audioSender, err = peerConnection.AddTrack(peerAudioTrack); err != nil {
 					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding audio track: " + err.Error())
 					cleanupPeerConnection(sessionKey, wrapper)
 					return
@@ -598,6 +628,32 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 	}
 }
 
+func NewVideoBroadcaster(streams []packets.Stream) *TrackBroadcaster {
+	// Verify H264 is available (same check as NewVideoTrack)
+	for _, s := range streams {
+		if s.Name == "H264" {
+			return NewTrackBroadcaster(pionWebRTC.MimeTypeH264, "video", trackStreamID)
+		}
+	}
+	log.Log.Error("webrtc.main.NewVideoBroadcaster(): no H264 stream found")
+	return nil
+}
+
+func NewAudioBroadcaster(streams []packets.Stream) *TrackBroadcaster {
+	for _, s := range streams {
+		switch s.Name {
+		case "OPUS":
+			return NewTrackBroadcaster(pionWebRTC.MimeTypeOpus, "audio", trackStreamID)
+		case "PCM_MULAW":
+			return NewTrackBroadcaster(pionWebRTC.MimeTypePCMU, "audio", trackStreamID)
+		case "PCM_ALAW":
+			return NewTrackBroadcaster(pionWebRTC.MimeTypePCMA, "audio", trackStreamID)
+		}
+	}
+	log.Log.Error("webrtc.main.NewAudioBroadcaster(): no supported audio codec found")
+	return nil
+}
+
 func NewVideoTrack(streams []packets.Stream) *pionWebRTC.TrackLocalStaticSample {
 	mimeType := pionWebRTC.MimeTypeH264
 	outboundVideoTrack, err := pionWebRTC.NewTrackLocalStaticSample(pionWebRTC.RTPCodecCapability{MimeType: mimeType}, "video", trackStreamID)
@@ -711,17 +767,13 @@ func updateStreamState(communication *models.Communication, state *streamState) 
 }
 
 // writeFinalSamples writes any remaining buffered samples
-func writeFinalSamples(state *streamState, videoTrack, audioTrack *pionWebRTC.TrackLocalStaticSample) {
-	if state.lastVideoSample != nil && videoTrack != nil {
-		if err := videoTrack.WriteSample(*state.lastVideoSample); err != nil && err != io.ErrClosedPipe {
-			log.Log.Error("webrtc.main.writeFinalSamples(): error writing final video sample: " + err.Error())
-		}
+func writeFinalSamples(state *streamState, videoBroadcaster, audioBroadcaster *TrackBroadcaster) {
+	if state.lastVideoSample != nil && videoBroadcaster != nil {
+		videoBroadcaster.WriteSample(*state.lastVideoSample)
 	}
 
-	if state.lastAudioSample != nil && audioTrack != nil {
-		if err := audioTrack.WriteSample(*state.lastAudioSample); err != nil && err != io.ErrClosedPipe {
-			log.Log.Error("webrtc.main.writeFinalSamples(): error writing final audio sample: " + err.Error())
-		}
+	if state.lastAudioSample != nil && audioBroadcaster != nil {
+		audioBroadcaster.WriteSample(*state.lastAudioSample)
 	}
 }
 
@@ -760,9 +812,9 @@ func sampleDuration(current packets.Packet, previousTimestamp uint32, fallback t
 	return fallback
 }
 
-// processVideoPacket processes a video packet and writes samples to the track
-func processVideoPacket(pkt packets.Packet, state *streamState, videoTrack *pionWebRTC.TrackLocalStaticSample, config models.Config) {
-	if videoTrack == nil {
+// processVideoPacket processes a video packet and writes samples to the broadcaster
+func processVideoPacket(pkt packets.Packet, state *streamState, videoBroadcaster *TrackBroadcaster, config models.Config) {
+	if videoBroadcaster == nil {
 		return
 	}
 
@@ -785,18 +837,15 @@ func processVideoPacket(pkt packets.Packet, state *streamState, videoTrack *pion
 
 	if state.lastVideoSample != nil {
 		state.lastVideoSample.Duration = sampleDuration(pkt, state.lastVideoSample.PacketTimestamp, 33*time.Millisecond)
-
-		if err := videoTrack.WriteSample(*state.lastVideoSample); err != nil && err != io.ErrClosedPipe {
-			log.Log.Error("webrtc.main.processVideoPacket(): error writing video sample: " + err.Error())
-		}
+		videoBroadcaster.WriteSample(*state.lastVideoSample)
 	}
 
 	state.lastVideoSample = &sample
 }
 
-// processAudioPacket processes an audio packet and writes samples to the track
-func processAudioPacket(pkt packets.Packet, state *streamState, audioTrack *pionWebRTC.TrackLocalStaticSample, hasAAC bool) {
-	if audioTrack == nil {
+// processAudioPacket processes an audio packet and writes samples to the broadcaster
+func processAudioPacket(pkt packets.Packet, state *streamState, audioBroadcaster *TrackBroadcaster, hasAAC bool) {
+	if audioBroadcaster == nil {
 		return
 	}
 
@@ -810,10 +859,7 @@ func processAudioPacket(pkt packets.Packet, state *streamState, audioTrack *pion
 
 	if state.lastAudioSample != nil {
 		state.lastAudioSample.Duration = sampleDuration(pkt, state.lastAudioSample.PacketTimestamp, 20*time.Millisecond)
-
-		if err := audioTrack.WriteSample(*state.lastAudioSample); err != nil && err != io.ErrClosedPipe {
-			log.Log.Error("webrtc.main.processAudioPacket(): error writing audio sample: " + err.Error())
-		}
+		audioBroadcaster.WriteSample(*state.lastAudioSample)
 	}
 
 	state.lastAudioSample = &sample
@@ -828,13 +874,13 @@ func shouldDropPacketForLatency(pkt packets.Packet) bool {
 	return age > maxLivePacketAge
 }
 
-func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, rtspClient capture.RTSPClient) {
+func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoBroadcaster *TrackBroadcaster, audioBroadcaster *TrackBroadcaster, rtspClient capture.RTSPClient) {
 
 	config := configuration.Config
 
-	// Check if at least one track is available
-	if videoTrack == nil && audioTrack == nil {
-		log.Log.Error("webrtc.main.WriteToTrack(): both video and audio tracks are nil, cannot proceed")
+	// Check if at least one broadcaster is available
+	if videoBroadcaster == nil && audioBroadcaster == nil {
+		log.Log.Error("webrtc.main.WriteToTrack(): both video and audio broadcasters are nil, cannot proceed")
 		return
 	}
 
@@ -857,7 +903,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 	}
 
 	defer func() {
-		writeFinalSamples(state, videoTrack, audioTrack)
+		writeFinalSamples(state, videoBroadcaster, audioBroadcaster)
 		log.Log.Info("webrtc.main.WriteToTrack(): stopped writing to track")
 	}()
 
@@ -923,9 +969,9 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 
 		// Process video or audio packets
 		if pkt.IsVideo {
-			processVideoPacket(pkt, state, videoTrack, config)
+			processVideoPacket(pkt, state, videoBroadcaster, config)
 		} else if pkt.IsAudio {
-			processAudioPacket(pkt, state, audioTrack, codecs.hasAAC)
+			processAudioPacket(pkt, state, audioBroadcaster, codecs.hasAAC)
 		}
 	}
 }
