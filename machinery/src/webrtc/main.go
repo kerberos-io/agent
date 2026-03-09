@@ -29,9 +29,10 @@ const (
 	rtcpBufferSize         = 1500
 
 	// Timeouts and intervals
-	keepAliveTimeout = 15 * time.Second
-	defaultTimeout   = 10 * time.Second
-	maxLivePacketAge = 1500 * time.Millisecond
+	keepAliveTimeout      = 15 * time.Second
+	defaultTimeout        = 10 * time.Second
+	maxLivePacketAge      = 1500 * time.Millisecond
+	disconnectGracePeriod = 5 * time.Second
 
 	// Track identifiers
 	trackStreamID = "kerberos-stream"
@@ -47,11 +48,13 @@ type ConnectionManager struct {
 
 // peerConnectionWrapper wraps a peer connection with additional metadata
 type peerConnectionWrapper struct {
-	conn      *pionWebRTC.PeerConnection
-	cancelCtx context.CancelFunc
-	done      chan struct{}
-	closeOnce sync.Once
-	connected atomic.Bool
+	conn            *pionWebRTC.PeerConnection
+	cancelCtx       context.CancelFunc
+	done            chan struct{}
+	closeOnce       sync.Once
+	connected       atomic.Bool
+	disconnectMu    sync.Mutex
+	disconnectTimer *time.Timer
 }
 
 var globalConnectionManager = NewConnectionManager()
@@ -387,14 +390,61 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				}()
 			}
 
+			// Log ICE connection state changes for diagnostics
+			peerConnection.OnICEConnectionStateChange(func(iceState pionWebRTC.ICEConnectionState) {
+				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): ICE connection state changed to: " + iceState.String() +
+					" (session: " + handshake.SessionID + ")")
+			})
+
 			peerConnection.OnConnectionStateChange(func(connectionState pionWebRTC.PeerConnectionState) {
-				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): connection state changed to: " + connectionState.String())
+				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): connection state changed to: " + connectionState.String() +
+					" (session: " + handshake.SessionID + ")")
 
 				switch connectionState {
-				case pionWebRTC.PeerConnectionStateDisconnected, pionWebRTC.PeerConnectionStateClosed, pionWebRTC.PeerConnectionStateFailed:
+				case pionWebRTC.PeerConnectionStateDisconnected:
+					// Disconnected is a transient state that can recover.
+					// Start a grace period timer; if we don't recover, then cleanup.
+					wrapper.disconnectMu.Lock()
+					if wrapper.disconnectTimer == nil {
+						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): peer disconnected, waiting " +
+							disconnectGracePeriod.String() + " for recovery (session: " + handshake.SessionID + ")")
+						wrapper.disconnectTimer = time.AfterFunc(disconnectGracePeriod, func() {
+							log.Log.Info("webrtc.main.InitializeWebRTCConnection(): disconnect grace period expired, closing connection (session: " + handshake.SessionID + ")")
+							cleanupPeerConnection(sessionKey, wrapper)
+						})
+					}
+					wrapper.disconnectMu.Unlock()
+
+				case pionWebRTC.PeerConnectionStateFailed:
+					// Stop any pending disconnect timer
+					wrapper.disconnectMu.Lock()
+					if wrapper.disconnectTimer != nil {
+						wrapper.disconnectTimer.Stop()
+						wrapper.disconnectTimer = nil
+					}
+					wrapper.disconnectMu.Unlock()
+					cleanupPeerConnection(sessionKey, wrapper)
+
+				case pionWebRTC.PeerConnectionStateClosed:
+					// Stop any pending disconnect timer
+					wrapper.disconnectMu.Lock()
+					if wrapper.disconnectTimer != nil {
+						wrapper.disconnectTimer.Stop()
+						wrapper.disconnectTimer = nil
+					}
+					wrapper.disconnectMu.Unlock()
 					cleanupPeerConnection(sessionKey, wrapper)
 
 				case pionWebRTC.PeerConnectionStateConnected:
+					// Cancel any pending disconnect timer — connection recovered
+					wrapper.disconnectMu.Lock()
+					if wrapper.disconnectTimer != nil {
+						wrapper.disconnectTimer.Stop()
+						wrapper.disconnectTimer = nil
+						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): connection recovered from disconnected state (session: " + handshake.SessionID + ")")
+					}
+					wrapper.disconnectMu.Unlock()
+
 					if wrapper.connected.CompareAndSwap(false, true) {
 						count := globalConnectionManager.IncrementPeerCount()
 						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Peer connected. Active peers: " + strconv.FormatInt(count, 10))
