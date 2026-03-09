@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { withTranslation } from 'react-i18next';
 import {
   Breadcrumb,
+  ControlBar,
   VideoCard,
   Button,
   Modal,
@@ -16,14 +17,53 @@ import { getEvents } from '../../actions/agent';
 import config from '../../config';
 import './Media.scss';
 
+function formatDateTimeLocal(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function getDefaultTimeWindow() {
+  const endDate = new Date();
+  const startDate = new Date(endDate.getTime() - 60 * 60 * 1000);
+
+  return {
+    startDateTime: formatDateTimeLocal(startDate),
+    endDateTime: formatDateTimeLocal(endDate),
+    timestamp_offset_start: Math.floor(startDate.getTime() / 1000),
+    timestamp_offset_end: Math.floor(endDate.getTime() / 1000) + 59,
+  };
+}
+
+function normalizeInputValue(valueOrEvent) {
+  if (valueOrEvent && valueOrEvent.target) {
+    return valueOrEvent.target.value;
+  }
+
+  return valueOrEvent;
+}
+
 // eslint-disable-next-line react/prefer-stateless-function
 class Media extends React.Component {
   constructor() {
     super();
-    this.state = {
-      timestamp_offset_start: 0,
-      timestamp_offset_end: 0,
+
+    const defaultTimeWindow = getDefaultTimeWindow();
+
+    const initialFilter = {
+      timestamp_offset_start: defaultTimeWindow.timestamp_offset_start,
+      timestamp_offset_end: defaultTimeWindow.timestamp_offset_end,
       number_of_elements: 12,
+    };
+
+    this.state = {
+      appliedFilter: initialFilter,
+      startDateTime: defaultTimeWindow.startDateTime,
+      endDateTime: defaultTimeWindow.endDateTime,
       isScrolling: false,
       open: false,
       currentRecording: '',
@@ -32,7 +72,8 @@ class Media extends React.Component {
 
   componentDidMount() {
     const { dispatchGetEvents } = this.props;
-    dispatchGetEvents(this.state);
+    const { appliedFilter } = this.state;
+    dispatchGetEvents(appliedFilter);
     document.addEventListener('scroll', this.trackScrolling);
   }
 
@@ -49,28 +90,97 @@ class Media extends React.Component {
 
   trackScrolling = () => {
     const { events, dispatchGetEvents } = this.props;
-    const { isScrolling } = this.state;
+    const { isScrolling, appliedFilter } = this.state;
     const wrappedElement = document.getElementById('loader');
-    if (!isScrolling && this.isBottom(wrappedElement)) {
-      this.setState({
-        isScrolling: true,
-      });
-      // Get last element
-      const lastElement = events[events.length - 1];
-      if (lastElement) {
-        this.setState({
+    if (!wrappedElement || isScrolling || !this.isBottom(wrappedElement)) {
+      return;
+    }
+
+    this.setState({
+      isScrolling: true,
+    });
+
+    // Get last element
+    const lastElement = events[events.length - 1];
+    if (lastElement) {
+      dispatchGetEvents(
+        {
+          ...appliedFilter,
           timestamp_offset_end: parseInt(lastElement.timestamp, 10),
-        });
-        dispatchGetEvents(this.state, () => {
+        },
+        () => {
           setTimeout(() => {
             this.setState({
               isScrolling: false,
             });
           }, 1000);
-        });
-      }
+        },
+        () => {
+          this.setState({
+            isScrolling: false,
+          });
+        },
+        true
+      );
+    } else {
+      this.setState({
+        isScrolling: false,
+      });
     }
   };
+
+  buildEventFilter(startDateTime, endDateTime) {
+    const { appliedFilter } = this.state;
+
+    return {
+      timestamp_offset_start: this.getTimestampFromInput(startDateTime, 'start'),
+      timestamp_offset_end: this.getTimestampFromInput(endDateTime, 'end'),
+      number_of_elements: appliedFilter.number_of_elements,
+    };
+  }
+
+  handleDateFilterChange(field, value) {
+    const { dispatchGetEvents } = this.props;
+    const { startDateTime, endDateTime } = this.state;
+    const normalizedValue = normalizeInputValue(value);
+    const nextStartDateTime =
+      field === 'startDateTime' ? normalizedValue : startDateTime;
+    const nextEndDateTime = field === 'endDateTime' ? normalizedValue : endDateTime;
+    const nextFilter = this.buildEventFilter(nextStartDateTime, nextEndDateTime);
+    const shouldApplyFilter =
+      (nextStartDateTime === '' || nextStartDateTime.length === 16) &&
+      (nextEndDateTime === '' || nextEndDateTime.length === 16);
+
+    this.setState(
+      {
+        [field]: normalizedValue,
+        appliedFilter: shouldApplyFilter ? nextFilter : this.state.appliedFilter,
+        isScrolling: false,
+      },
+      () => {
+        if (shouldApplyFilter) {
+          dispatchGetEvents(nextFilter);
+        }
+      }
+    );
+  }
+
+  getTimestampFromInput(value, boundary) {
+    if (!value) {
+      return 0;
+    }
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 0;
+    }
+
+    const seconds = Math.floor(date.getTime() / 1000);
+    if (boundary === 'end') {
+      return seconds + 59;
+    }
+    return seconds;
+  }
 
   isBottom(el) {
     return el.getBoundingClientRect().bottom + 50 <= window.innerHeight;
@@ -85,7 +195,9 @@ class Media extends React.Component {
 
   render() {
     const { events, eventsLoaded, t } = this.props;
-    const { isScrolling, open, currentRecording } = this.state;
+    const { isScrolling, open, currentRecording, startDateTime, endDateTime } =
+      this.state;
+
     return (
       <div id="media">
         <Breadcrumb
@@ -101,6 +213,37 @@ class Media extends React.Component {
             />
           </Link>
         </Breadcrumb>
+
+        <div className="media-control-bar">
+          <ControlBar>
+            <div className="media-filters">
+              <div className="media-filters__field">
+                <label htmlFor="recordings-start-time">Start time</label>
+                <input
+                  className="media-filters__input"
+                  id="recordings-start-time"
+                  type="datetime-local"
+                  value={startDateTime}
+                  onChange={(value) =>
+                    this.handleDateFilterChange('startDateTime', value)
+                  }
+                />
+              </div>
+              <div className="media-filters__field">
+                <label htmlFor="recordings-end-time">End time</label>
+                <input
+                  className="media-filters__input"
+                  id="recordings-end-time"
+                  type="datetime-local"
+                  value={endDateTime}
+                  onChange={(value) =>
+                    this.handleDateFilterChange('endDateTime', value)
+                  }
+                />
+              </div>
+            </div>
+          </ControlBar>
+        </div>
 
         <div className="stats grid-container --four-columns">
           {events.map((event) => (
@@ -123,6 +266,11 @@ class Media extends React.Component {
             </div>
           ))}
         </div>
+        {events.length === 0 && eventsLoaded === 0 && (
+          <div className="media-empty-state">
+            No recordings found in the selected time range.
+          </div>
+        )}
         {open && (
           <Modal>
             <ModalHeader
@@ -182,13 +330,13 @@ const mapStateToProps = (state /* , ownProps */) => ({
 });
 
 const mapDispatchToProps = (dispatch) => ({
-  dispatchGetEvents: (eventFilter, success, error) =>
-    dispatch(getEvents(eventFilter, success, error)),
+  dispatchGetEvents: (eventFilter, success, error, append) =>
+    dispatch(getEvents(eventFilter, success, error, append)),
 });
 
 Media.propTypes = {
   t: PropTypes.func.isRequired,
-  events: PropTypes.objectOf(PropTypes.object).isRequired,
+  events: PropTypes.arrayOf(PropTypes.object).isRequired,
   eventsLoaded: PropTypes.number.isRequired,
   dispatchGetEvents: PropTypes.func.isRequired,
 };

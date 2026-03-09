@@ -542,7 +542,9 @@ func HandleRequestHDStream(mqttClient mqtt.Client, hubKey string, payload models
 				return
 			}
 
-			communication.HandleLiveHDHandshake <- requestHDStreamPayload
+			communication.HandleLiveHDHandshake <- models.LiveHDHandshake{
+				Payload: requestHDStreamPayload,
+			}
 			log.Log.Info("routers.mqtt.main.HandleRequestHDStream(): received request to setup webrtc.")
 		} else {
 			log.Log.Info("routers.mqtt.main.HandleRequestHDStream(): received request to setup webrtc, but camera is not connected.")

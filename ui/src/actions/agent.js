@@ -194,7 +194,7 @@ export const getDashboardInformation = (onSuccess, onError) => {
   };
 };
 
-export const getEvents = (eventfilter, onSuccess, onError) => {
+export const getEvents = (eventfilter, onSuccess, onError, append = false) => {
   return (dispatch) => {
     doGetEvents(
       eventfilter,
@@ -203,6 +203,7 @@ export const getEvents = (eventfilter, onSuccess, onError) => {
           type: 'GET_EVENTS',
           events: data.events,
           filter: eventfilter,
+          append,
         });
         if (onSuccess) {
           onSuccess();

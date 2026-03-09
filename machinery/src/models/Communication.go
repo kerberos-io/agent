@@ -8,6 +8,17 @@ import (
 	"github.com/tevino/abool"
 )
 
+type LiveHDSignalingCallbacks struct {
+	SendAnswer    func(sessionID string, sdp string) error
+	SendCandidate func(sessionID string, candidate string) error
+	SendError     func(sessionID string, message string) error
+}
+
+type LiveHDHandshake struct {
+	Payload   RequestHDStreamPayload
+	Signaling *LiveHDSignalingCallbacks
+}
+
 // The communication struct that is managing
 // all the communication between the different goroutines.
 type Communication struct {
@@ -27,7 +38,7 @@ type Communication struct {
 	HandleHeartBeat       chan string
 	HandleLiveSD          chan int64
 	HandleLiveHDKeepalive chan string
-	HandleLiveHDHandshake chan RequestHDStreamPayload
+	HandleLiveHDHandshake chan LiveHDHandshake
 	HandleLiveHDPeers     chan string
 	HandleONVIF           chan OnvifAction
 	IsConfiguring         *abool.AtomicBool
