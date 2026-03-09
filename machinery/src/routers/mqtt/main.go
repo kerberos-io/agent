@@ -90,9 +90,9 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 
 		// Some extra options to make sure the connection behaves
 		// properly. More information here: github.com/eclipse/paho.mqtt.golang.
-		opts.SetCleanSession(false)
-		opts.SetResumeSubs(true)
-		opts.SetStore(mqtt.NewMemoryStore())
+		opts.SetCleanSession(true)
+		//opts.SetResumeSubs(true)
+		//opts.SetStore(mqtt.NewMemoryStore())
 		opts.SetConnectRetry(true)
 		opts.SetAutoReconnect(true)
 		opts.SetConnectRetryInterval(5 * time.Second)
