@@ -50,6 +50,7 @@ type peerConnectionWrapper struct {
 	cancelCtx context.CancelFunc
 	done      chan struct{}
 	closeOnce sync.Once
+	connected atomic.Bool
 }
 
 var globalConnectionManager = NewConnectionManager()
@@ -120,6 +121,26 @@ func (cm *ConnectionManager) IncrementPeerCount() int64 {
 // DecrementPeerCount atomically decrements the peer connection count
 func (cm *ConnectionManager) DecrementPeerCount() int64 {
 	return atomic.AddInt64(&cm.peerConnectionCount, -1)
+}
+
+func cleanupPeerConnection(sessionID string, sessionKey string, wrapper *peerConnectionWrapper) {
+	wrapper.closeOnce.Do(func() {
+		if wrapper.connected.Swap(false) {
+			count := globalConnectionManager.DecrementPeerCount()
+			log.Log.Info("webrtc.main.cleanupPeerConnection(): Peer disconnected. Active peers: " + strconv.FormatInt(count, 10))
+		}
+
+		globalConnectionManager.CloseCandidateChannel(sessionKey)
+
+		if wrapper.conn != nil {
+			if err := wrapper.conn.Close(); err != nil {
+				log.Log.Error("webrtc.main.cleanupPeerConnection(): error closing peer connection: " + err.Error())
+			}
+		}
+
+		globalConnectionManager.RemovePeerConnection(sessionID)
+		close(wrapper.done)
+	})
 }
 
 type WebRTC struct {
@@ -273,7 +294,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			if videoTrack != nil {
 				if videoSender, err = peerConnection.AddTrack(videoTrack); err != nil {
 					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding video track: " + err.Error())
-					cancel()
+					cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
 					return
 				}
 			} else {
@@ -306,7 +327,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			if audioTrack != nil {
 				if audioSender, err = peerConnection.AddTrack(audioTrack); err != nil {
 					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding audio track: " + err.Error())
-					cancel()
+					cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
 					return
 				}
 			} else {
@@ -339,28 +360,14 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): connection state changed to: " + connectionState.String())
 
 				switch connectionState {
-				case pionWebRTC.PeerConnectionStateDisconnected, pionWebRTC.PeerConnectionStateClosed:
-					wrapper.closeOnce.Do(func() {
-						count := globalConnectionManager.DecrementPeerCount()
-						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Peer disconnected. Active peers: " + string(rune(count)))
-
-						// Clean up resources
-						globalConnectionManager.CloseCandidateChannel(sessionKey)
-
-						if err := peerConnection.Close(); err != nil {
-							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error closing peer connection: " + err.Error())
-						}
-
-						globalConnectionManager.RemovePeerConnection(handshake.SessionID)
-						close(wrapper.done)
-					})
+				case pionWebRTC.PeerConnectionStateDisconnected, pionWebRTC.PeerConnectionStateClosed, pionWebRTC.PeerConnectionStateFailed:
+					cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
 
 				case pionWebRTC.PeerConnectionStateConnected:
-					count := globalConnectionManager.IncrementPeerCount()
-					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Peer connected. Active peers: " + string(rune(count)))
-
-				case pionWebRTC.PeerConnectionStateFailed:
-					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): ICE connection failed")
+					if wrapper.connected.CompareAndSwap(false, true) {
+						count := globalConnectionManager.IncrementPeerCount()
+						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Peer connected. Active peers: " + strconv.FormatInt(count, 10))
+					}
 				}
 			})
 
@@ -389,13 +396,19 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			offer := w.CreateOffer(sd)
 			if err = peerConnection.SetRemoteDescription(offer); err != nil {
 				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting remote description: " + err.Error())
+				cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
+				return
 			}
 
 			answer, err := peerConnection.CreateAnswer(nil)
 			if err != nil {
 				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while creating answer: " + err.Error())
+				cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
+				return
 			} else if err = peerConnection.SetLocalDescription(answer); err != nil {
 				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting local description: " + err.Error())
+				cleanupPeerConnection(handshake.SessionID, sessionKey, wrapper)
+				return
 			}
 
 			// When an ICE candidate is available send to the other peer using the signaling server (MQTT).
@@ -472,31 +485,30 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			// Store peer connection in manager
 			globalConnectionManager.AddPeerConnection(handshake.SessionID, wrapper)
 
-			if err == nil {
-				//  Create a config map
-				valueMap := make(map[string]interface{})
-				valueMap["sdp"] = []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP)))
-				valueMap["session_id"] = handshake.SessionID
-				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Send SDP answer")
+			//  Create a config map
+			valueMap := make(map[string]interface{})
+			valueMap["sdp"] = []byte(base64.StdEncoding.EncodeToString([]byte(answer.SDP)))
+			valueMap["session_id"] = handshake.SessionID
+			log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Send SDP answer")
 
-				// We'll send the candidate to the hub
-				message := models.Message{
-					Payload: models.Payload{
-						Action:   "receive-hd-answer",
-						DeviceId: configuration.Config.Key,
-						Value:    valueMap,
-					},
-				}
-				payload, err := models.PackageMQTTMessage(configuration, message)
-				if err == nil {
-					token := mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
-					token.Wait()
-				} else {
-					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): while packaging mqtt message: " + err.Error())
-				}
+			// We'll send the candidate to the hub
+			message := models.Message{
+				Payload: models.Payload{
+					Action:   "receive-hd-answer",
+					DeviceId: configuration.Config.Key,
+					Value:    valueMap,
+				},
+			}
+			payload, err := models.PackageMQTTMessage(configuration, message)
+			if err == nil {
+				token := mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
+				token.Wait()
+			} else {
+				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): while packaging mqtt message: " + err.Error())
 			}
 		}
 	} else {
+		globalConnectionManager.CloseCandidateChannel(sessionKey)
 		log.Log.Error("Initializwebrtc.main.InitializeWebRTCConnection()eWebRTCConnection: NewPeerConnection failed: " + err.Error())
 	}
 }
