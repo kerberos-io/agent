@@ -303,7 +303,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	}
 
 	// Handle livestream HD (high resolution over WEBRTC)
-	communication.HandleLiveHDHandshake = make(chan models.RequestHDStreamPayload, 10)
+	communication.HandleLiveHDHandshake = make(chan models.RequestHDStreamPayload, 100)
 	if subStreamEnabled {
 		livestreamHDCursor := subQueue.Latest()
 		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspSubClient)

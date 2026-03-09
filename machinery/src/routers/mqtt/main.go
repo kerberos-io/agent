@@ -537,10 +537,12 @@ func HandleRequestHDStream(mqttClient mqtt.Client, hubKey string, payload models
 		if communication.CameraConnected {
 			// Set the Hub key, so we can send back the answer.
 			requestHDStreamPayload.HubKey = hubKey
-			select {
-			case communication.HandleLiveHDHandshake <- requestHDStreamPayload:
-			default:
+			if communication.HandleLiveHDHandshake == nil {
+				log.Log.Error("routers.mqtt.main.HandleRequestHDStream(): handshake channel is nil, dropping request")
+				return
 			}
+
+			communication.HandleLiveHDHandshake <- requestHDStreamPayload
 			log.Log.Info("routers.mqtt.main.HandleRequestHDStream(): received request to setup webrtc.")
 		} else {
 			log.Log.Info("routers.mqtt.main.HandleRequestHDStream(): received request to setup webrtc, but camera is not connected.")

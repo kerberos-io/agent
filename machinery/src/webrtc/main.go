@@ -252,6 +252,24 @@ func RegisterDefaultInterceptors(mediaEngine *pionWebRTC.MediaEngine, intercepto
 	return nil
 }
 
+func publishSignalingMessageAsync(mqttClient mqtt.Client, topic string, payload []byte, description string) {
+	if mqttClient == nil {
+		log.Log.Error("webrtc.main.publishSignalingMessageAsync(): mqtt client is nil for " + description)
+		return
+	}
+
+	token := mqttClient.Publish(topic, 2, false, payload)
+	go func() {
+		if !token.WaitTimeout(5 * time.Second) {
+			log.Log.Warning("webrtc.main.publishSignalingMessageAsync(): timed out publishing " + description)
+			return
+		}
+		if err := token.Error(); err != nil {
+			log.Log.Error("webrtc.main.publishSignalingMessageAsync(): failed publishing " + description + ": " + err.Error())
+		}
+	}()
+}
+
 func InitializeWebRTCConnection(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoBroadcaster *TrackBroadcaster, audioBroadcaster *TrackBroadcaster, handshake models.RequestHDStreamPayload) {
 
 	config := configuration.Config
@@ -483,33 +501,6 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				}
 			})
 
-			go func() {
-				defer func() {
-					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): candidate processor stopped for session: " + handshake.SessionID)
-				}()
-
-				// Iterate over the candidates and send them to the remote client
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case candidate, ok := <-candidateChannel:
-						if !ok {
-							return
-						}
-						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Received candidate from channel: " + candidate)
-						candidateInit, decodeErr := decodeICECandidate(candidate)
-						if decodeErr != nil {
-							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error decoding candidate: " + decodeErr.Error())
-							continue
-						}
-						if candidateErr := peerConnection.AddICECandidate(candidateInit); candidateErr != nil {
-							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding candidate: " + candidateErr.Error())
-						}
-					}
-				}
-			}()
-
 			// When an ICE candidate is available send to the other peer using the signaling server (MQTT).
 			// The other peer will add this candidate by calling AddICECandidate.
 			// This handler must be registered before setting the local description, otherwise early candidates can be missed.
@@ -573,8 +564,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				}
 				payload, err := models.PackageMQTTMessage(configuration, message)
 				if err == nil {
-					token := mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
-					token.Wait()
+					publishSignalingMessageAsync(mqttClient, "kerberos/hub/"+hubKey, payload, "ICE candidate for session "+handshake.SessionID)
 				} else {
 					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): while packaging mqtt message: " + err.Error())
 				}
@@ -586,6 +576,35 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				cleanupPeerConnection(sessionKey, wrapper)
 				return
 			}
+
+			go func() {
+				defer func() {
+					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): candidate processor stopped for session: " + handshake.SessionID)
+				}()
+
+				// Process remote candidates only after the remote description is set.
+				// MQTT can deliver candidates before the SDP offer handling completes,
+				// and Pion rejects AddICECandidate calls until SetRemoteDescription succeeds.
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case candidate, ok := <-candidateChannel:
+						if !ok {
+							return
+						}
+						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Received candidate from channel: " + candidate)
+						candidateInit, decodeErr := decodeICECandidate(candidate)
+						if decodeErr != nil {
+							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error decoding candidate: " + decodeErr.Error())
+							continue
+						}
+						if candidateErr := peerConnection.AddICECandidate(candidateInit); candidateErr != nil {
+							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding candidate: " + candidateErr.Error())
+						}
+					}
+				}
+			}()
 
 			answer, err := peerConnection.CreateAnswer(nil)
 			if err != nil {
@@ -617,8 +636,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			}
 			payload, err := models.PackageMQTTMessage(configuration, message)
 			if err == nil {
-				token := mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
-				token.Wait()
+				publishSignalingMessageAsync(mqttClient, "kerberos/hub/"+hubKey, payload, "SDP answer for session "+handshake.SessionID)
 			} else {
 				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): while packaging mqtt message: " + err.Error())
 			}
