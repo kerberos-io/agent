@@ -2,7 +2,6 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { Link, withRouter } from 'react-router-dom';
 import { withTranslation } from 'react-i18next';
-import uuid from 'uuidv4';
 import { send } from '@giantmachines/redux-websocket';
 import { connect } from 'react-redux';
 import { interval } from 'rxjs';
@@ -28,6 +27,22 @@ import './Dashboard.scss';
 import ReactTooltip from 'react-tooltip';
 import config from '../../config';
 import { getConfig } from '../../actions/agent';
+
+function createUUID() {
+  if (
+    typeof window !== 'undefined' &&
+    window.crypto &&
+    typeof window.crypto.randomUUID === 'function'
+  ) {
+    return window.crypto.randomUUID();
+  }
+
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (char) => {
+    const random = Math.floor(Math.random() * 16);
+    const value = char === 'x' ? random : 8 + Math.floor(random / 4);
+    return value.toString(16);
+  });
+}
 
 // eslint-disable-next-line react/prefer-stateless-function
 class Dashboard extends React.Component {
@@ -271,7 +286,7 @@ class Dashboard extends React.Component {
           await this.flushPendingRemoteCandidates();
         } catch (error) {
           this.fallbackToSDLiveview(
-            `Unable to apply WebRTC answer: ${error.message}`,
+            `Unable to apply WebRTC answer: ${error.message}`
           );
         }
         break;
@@ -289,7 +304,7 @@ class Dashboard extends React.Component {
           }
         } catch (error) {
           this.fallbackToSDLiveview(
-            `Unable to apply WebRTC candidate: ${error.message}`,
+            `Unable to apply WebRTC candidate: ${error.message}`
           );
         }
         break;
@@ -297,7 +312,7 @@ class Dashboard extends React.Component {
 
       case 'webrtc-error':
         this.fallbackToSDLiveview(
-          message.message || 'The agent could not start the WebRTC liveview.',
+          message.message || 'The agent could not start the WebRTC liveview.'
         );
         break;
 
@@ -324,7 +339,7 @@ class Dashboard extends React.Component {
       });
     } catch (error) {
       this.fallbackToSDLiveview(
-        `Unable to initialise WebRTC liveview: ${error.message}`,
+        `Unable to initialise WebRTC liveview: ${error.message}`
       );
     }
   }
@@ -344,7 +359,7 @@ class Dashboard extends React.Component {
         await this.webrtcPeerConnection.addIceCandidate(candidateInit);
       } catch (error) {
         this.fallbackToSDLiveview(
-          `Unable to add remote ICE candidate: ${error.message}`,
+          `Unable to add remote ICE candidate: ${error.message}`
         );
         return;
       }
@@ -358,12 +373,12 @@ class Dashboard extends React.Component {
 
     this.stopSDLiveview();
 
-    this.webrtcClientId = uuid();
-    this.webrtcSessionId = uuid();
+    this.webrtcClientId = createUUID();
+    this.webrtcSessionId = createUUID();
     this.pendingRemoteCandidates = [];
 
     this.webrtcPeerConnection = new window.RTCPeerConnection(
-      this.buildPeerConnectionConfig(),
+      this.buildPeerConnectionConfig()
     );
 
     this.webrtcPeerConnection.ontrack = (event) => {
@@ -406,7 +421,7 @@ class Dashboard extends React.Component {
         connectionState === 'closed'
       ) {
         this.fallbackToSDLiveview(
-          `WebRTC connection ${connectionState}, falling back to SD liveview.`,
+          `WebRTC connection ${connectionState}, falling back to SD liveview.`
         );
       }
     };
@@ -430,7 +445,7 @@ class Dashboard extends React.Component {
       const { liveviewLoaded } = this.state;
       if (!liveviewLoaded) {
         this.fallbackToSDLiveview(
-          'WebRTC connection timed out, falling back to SD liveview.',
+          'WebRTC connection timed out, falling back to SD liveview.'
         );
       }
     }, 10000);
