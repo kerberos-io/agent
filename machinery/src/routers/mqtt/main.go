@@ -169,6 +169,12 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 	return nil
 }
 
+// maxSignalingAge is the maximum age of a WebRTC signaling message (request-hd-stream,
+// receive-hd-candidates) before it is considered stale and discarded. With CleanSession=false
+// the MQTT broker may replay queued messages from previous sessions; this prevents the agent
+// from setting up peer connections for viewers that are no longer waiting.
+const maxSignalingAge = 30 * time.Second
+
 func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 	if hubKey == "" {
 		log.Log.Info("routers.mqtt.main.MQTTListenerHandler(): no hub key provided, not subscribing to kerberos/hub/{hubkey}")
@@ -274,6 +280,18 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 
 				// We'll find out which message we received, and act accordingly.
 				log.Log.Info("routers.mqtt.main.MQTTListenerHandler(): received message with action: " + payload.Action)
+
+				// For time-sensitive WebRTC signaling messages, discard stale ones that may
+				// have been queued by the broker while CleanSession=false.
+				if payload.Action == "request-hd-stream" || payload.Action == "receive-hd-candidates" {
+					messageAge := time.Since(time.Unix(message.Timestamp, 0))
+					if messageAge > maxSignalingAge {
+						log.Log.Info("routers.mqtt.main.MQTTListenerHandler(): discarding stale " + payload.Action +
+							" message (age: " + messageAge.Round(time.Second).String() + ")")
+						return
+					}
+				}
+
 				switch payload.Action {
 				case "record":
 					go HandleRecording(mqttClient, hubKey, payload, configuration, communication)
