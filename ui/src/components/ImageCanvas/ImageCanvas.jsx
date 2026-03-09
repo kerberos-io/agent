@@ -7,6 +7,7 @@ import './ImageCanvas.css';
 
 class ImageCanvas extends React.Component {
   componentDidMount() {
+    this.isUnmounted = false;
     this.width = 0;
     this.height = 0;
 
@@ -58,6 +59,9 @@ class ImageCanvas extends React.Component {
 
     const { image } = this.props;
     this.loadImage(image, (img) => {
+      if (this.isUnmounted || !this.editor) {
+        return;
+      }
       if (this.width !== img.width || this.height !== img.height) {
         this.width = img.width;
         this.height = img.height;
@@ -71,6 +75,9 @@ class ImageCanvas extends React.Component {
   componentDidUpdate() {
     const { image } = this.props;
     this.loadImage(image, (img) => {
+      if (this.isUnmounted || !this.editor) {
+        return;
+      }
       if (this.width !== img.width || this.height !== img.height) {
         this.width = img.width;
         this.height = img.height;
@@ -82,11 +89,57 @@ class ImageCanvas extends React.Component {
     });
   }
 
+  componentWillUnmount() {
+    this.isUnmounted = true;
+
+    if (this.pendingImage) {
+      this.pendingImage.onload = null;
+      this.pendingImage.src = '';
+      this.pendingImage = null;
+    }
+
+    if (this.editor) {
+      this.editor.onSelectionEnd = null;
+      this.editor.onRegionMoveEnd = null;
+      this.editor.onRegionDelete = null;
+
+      if (this.editor.RM) {
+        this.editor.RM.deleteAllRegions();
+      }
+
+      if (typeof this.editor.dispose === 'function') {
+        this.editor.dispose();
+      } else if (typeof this.editor.destroy === 'function') {
+        this.editor.destroy();
+      }
+
+      this.editor = null;
+    }
+
+    if (this.toolbarContainer) {
+      this.toolbarContainer.innerHTML = '';
+      this.toolbarContainer = null;
+    }
+
+    if (this.editorContainer) {
+      this.editorContainer.innerHTML = '';
+      this.editorContainer = null;
+    }
+  }
+
   loadData = (image) => {
+    if (!this.editor) {
+      return;
+    }
+
     const w = image.width;
     const h = image.height;
 
     this.editor.addContentSource(image).then(() => {
+      if (this.isUnmounted || !this.editor) {
+        return;
+      }
+
       // Add exisiting polygons
       this.editor.RM.deleteAllRegions();
       const { polygons } = this.props;
@@ -152,11 +205,19 @@ class ImageCanvas extends React.Component {
 
   // eslint-disable-next-line class-methods-use-this
   loadImage = (path, onready) => {
+    if (this.pendingImage) {
+      this.pendingImage.onload = null;
+    }
+
     const image = new Image();
-    image.src = path;
-    image.addEventListener('load', (e) => {
+    this.pendingImage = image;
+    image.onload = (e) => {
+      if (this.pendingImage === image) {
+        this.pendingImage = null;
+      }
       onready(e.target);
-    });
+    };
+    image.src = path;
   };
 
   // eslint-disable-next-line class-methods-use-this

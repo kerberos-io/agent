@@ -159,7 +159,10 @@ class Settings extends React.Component {
 
   componentWillUnmount() {
     document.removeEventListener('keydown', this.escFunction, false);
-    clearInterval(this.interval);
+    if (this.requestStreamSubscription) {
+      this.requestStreamSubscription.unsubscribe();
+      this.requestStreamSubscription = null;
+    }
 
     const { dispatchSend } = this.props;
     const message = {

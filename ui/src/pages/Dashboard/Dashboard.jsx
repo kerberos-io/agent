@@ -38,16 +38,20 @@ class Dashboard extends React.Component {
       initialised: false,
     };
     this.initialiseLiveview = this.initialiseLiveview.bind(this);
+    this.handleLiveviewLoad = this.handleLiveviewLoad.bind(this);
+  }
+
+  handleLiveviewLoad() {
+    this.setState({
+      liveviewLoaded: true,
+    });
   }
 
   componentDidMount() {
     const liveview = document.getElementsByClassName('videocard-video');
     if (liveview && liveview.length > 0) {
-      liveview[0].addEventListener('load', () => {
-        this.setState({
-          liveviewLoaded: true,
-        });
-      });
+      this.liveviewElement = liveview[0];
+      this.liveviewElement.addEventListener('load', this.handleLiveviewLoad);
     }
     this.initialiseLiveview();
   }
@@ -57,13 +61,14 @@ class Dashboard extends React.Component {
   }
 
   componentWillUnmount() {
-    const liveview = document.getElementsByClassName('videocard-video');
-    if (liveview && liveview.length > 0) {
-      liveview[0].remove();
+    if (this.liveviewElement) {
+      this.liveviewElement.removeEventListener('load', this.handleLiveviewLoad);
+      this.liveviewElement = null;
     }
 
     if (this.requestStreamSubscription) {
       this.requestStreamSubscription.unsubscribe();
+      this.requestStreamSubscription = null;
     }
     const { dispatchSend } = this.props;
     const message = {

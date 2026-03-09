@@ -92,8 +92,22 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 		// properly. More information here: github.com/eclipse/paho.mqtt.golang.
 		opts.SetCleanSession(true)
 		opts.SetConnectRetry(true)
-		//opts.SetAutoReconnect(true)
+		opts.SetAutoReconnect(true)
+		opts.SetConnectRetryInterval(5 * time.Second)
+		opts.SetKeepAlive(30 * time.Second)
+		opts.SetPingTimeout(10 * time.Second)
+		opts.SetOrderMatters(false)
 		opts.SetConnectTimeout(30 * time.Second)
+		opts.SetConnectionLostHandler(func(client mqtt.Client, err error) {
+			if err != nil {
+				log.Log.Error("routers.mqtt.main.ConfigureMQTT(): MQTT connection lost: " + err.Error())
+			} else {
+				log.Log.Error("routers.mqtt.main.ConfigureMQTT(): MQTT connection lost")
+			}
+		})
+		opts.SetReconnectingHandler(func(client mqtt.Client, options *mqtt.ClientOptions) {
+			log.Log.Warning("routers.mqtt.main.ConfigureMQTT(): reconnecting to MQTT broker")
+		})
 
 		hubKey := ""
 		// This is the old way ;)
@@ -133,10 +147,12 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 			}
 		}
 		mqc := mqtt.NewClient(opts)
-		if token := mqc.Connect(); token.WaitTimeout(3 * time.Second) {
+		if token := mqc.Connect(); token.WaitTimeout(30 * time.Second) {
 			if token.Error() != nil {
 				log.Log.Error("routers.mqtt.main.ConfigureMQTT(): unable to establish mqtt broker connection, error was: " + token.Error().Error())
 			}
+		} else {
+			log.Log.Error("routers.mqtt.main.ConfigureMQTT(): timed out while establishing mqtt broker connection")
 		}
 		return mqc
 	}
@@ -149,7 +165,7 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 		log.Log.Info("routers.mqtt.main.MQTTListenerHandler(): no hub key provided, not subscribing to kerberos/hub/{hubkey}")
 	} else {
 		agentListener := fmt.Sprintf("kerberos/agent/%s", hubKey)
-		mqttClient.Subscribe(agentListener, 1, func(c mqtt.Client, msg mqtt.Message) {
+		token := mqttClient.Subscribe(agentListener, 1, func(c mqtt.Client, msg mqtt.Message) {
 
 			// Decode the message, we are expecting following format.
 			// {
@@ -276,6 +292,16 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 
 			}
 		})
+
+		if token.WaitTimeout(10 * time.Second) {
+			if token.Error() != nil {
+				log.Log.Error("routers.mqtt.main.MQTTListenerHandler(): failed to subscribe to " + agentListener + ": " + token.Error().Error())
+			} else {
+				log.Log.Info("routers.mqtt.main.MQTTListenerHandler(): subscribed to " + agentListener)
+			}
+		} else {
+			log.Log.Error("routers.mqtt.main.MQTTListenerHandler(): timed out while subscribing to " + agentListener)
+		}
 	}
 }
 
