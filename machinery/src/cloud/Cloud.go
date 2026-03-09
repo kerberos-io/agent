@@ -800,17 +800,19 @@ func HandleLiveStreamHD(livestreamCursor *packets.QueueCursor, configuration *mo
 		// Check if we need to enable the live stream
 		if config.Capture.Liveview != "false" {
 
-			// Should create a track here.
+			// Create per-peer broadcasters instead of shared tracks.
+			// Each viewer gets its own track with independent, non-blocking writes
+			// so a slow/congested peer cannot stall the others.
 			streams, _ := rtspClient.GetStreams()
-			videoTrack := webrtc.NewVideoTrack(streams)
-			audioTrack := webrtc.NewAudioTrack(streams)
+			videoBroadcaster := webrtc.NewVideoBroadcaster(streams)
+			audioBroadcaster := webrtc.NewAudioBroadcaster(streams)
 
-			if videoTrack == nil && audioTrack == nil {
-				log.Log.Error("cloud.HandleLiveStreamHD(): failed to create both video and audio tracks")
+			if videoBroadcaster == nil && audioBroadcaster == nil {
+				log.Log.Error("cloud.HandleLiveStreamHD(): failed to create both video and audio broadcasters")
 				return
 			}
 
-			go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, videoTrack, audioTrack, rtspClient)
+			go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, videoBroadcaster, audioBroadcaster, rtspClient)
 
 			if config.Capture.ForwardWebRTC == "true" {
 
@@ -818,7 +820,7 @@ func HandleLiveStreamHD(livestreamCursor *packets.QueueCursor, configuration *mo
 				log.Log.Info("cloud.HandleLiveStreamHD(): Waiting for peer connections.")
 				for handshake := range communication.HandleLiveHDHandshake {
 					log.Log.Info("cloud.HandleLiveStreamHD(): setting up a peer connection.")
-					go webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, videoTrack, audioTrack, handshake)
+					go webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, videoBroadcaster, audioBroadcaster, handshake)
 				}
 			}
 
