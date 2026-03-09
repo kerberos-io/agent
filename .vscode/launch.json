@@ -14,7 +14,7 @@
                 "-action",
                 "run",
                 "-port",
-                "8087"
+                "8080"
             ],
             "envFile": "${workspaceFolder}/machinery/.env.local",
             "buildFlags": "--tags dynamic",
