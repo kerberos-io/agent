@@ -31,6 +31,7 @@ const (
 	// Timeouts and intervals
 	keepAliveTimeout = 15 * time.Second
 	defaultTimeout   = 10 * time.Second
+	maxLivePacketAge = 1500 * time.Millisecond
 
 	// Track identifiers
 	trackStreamID = "kerberos-stream"
@@ -585,6 +586,7 @@ type streamState struct {
 	lastKeepAlive    int64
 	peerCount        int64
 	start            bool
+	catchingUp       bool
 	receivedKeyFrame bool
 	lastAudioSample  *pionMedia.Sample
 	lastVideoSample  *pionMedia.Sample
@@ -673,6 +675,41 @@ func writeFinalSamples(state *streamState, videoTrack, audioTrack *pionWebRTC.Tr
 	}
 }
 
+func sampleTimestamp(pkt packets.Packet) uint32 {
+	if pkt.TimeLegacy > 0 {
+		return uint32(pkt.TimeLegacy.Milliseconds())
+	}
+
+	if pkt.Time > 0 {
+		return uint32(pkt.Time)
+	}
+
+	return 0
+}
+
+func sampleDuration(current packets.Packet, previousTimestamp uint32, fallback time.Duration) time.Duration {
+	if current.TimeLegacy > 0 {
+		currentDurationMs := current.TimeLegacy.Milliseconds()
+		previousDurationMs := int64(previousTimestamp)
+		if currentDurationMs > previousDurationMs {
+			duration := time.Duration(currentDurationMs-previousDurationMs) * time.Millisecond
+			if duration > 0 {
+				return duration
+			}
+		}
+	}
+
+	currentTimestamp := sampleTimestamp(current)
+	if currentTimestamp > previousTimestamp {
+		duration := time.Duration(currentTimestamp-previousTimestamp) * time.Millisecond
+		if duration > 0 {
+			return duration
+		}
+	}
+
+	return fallback
+}
+
 // processVideoPacket processes a video packet and writes samples to the track
 func processVideoPacket(pkt packets.Packet, state *streamState, videoTrack *pionWebRTC.TrackLocalStaticSample, config models.Config) {
 	if videoTrack == nil {
@@ -688,7 +725,7 @@ func processVideoPacket(pkt packets.Packet, state *streamState, videoTrack *pion
 		return
 	}
 
-	sample := pionMedia.Sample{Data: pkt.Data, PacketTimestamp: uint32(pkt.Time)}
+	sample := pionMedia.Sample{Data: pkt.Data, PacketTimestamp: sampleTimestamp(pkt)}
 
 	if config.Capture.ForwardWebRTC == "true" {
 		// Remote forwarding not yet implemented
@@ -697,8 +734,7 @@ func processVideoPacket(pkt packets.Packet, state *streamState, videoTrack *pion
 	}
 
 	if state.lastVideoSample != nil {
-		duration := sample.PacketTimestamp - state.lastVideoSample.PacketTimestamp
-		state.lastVideoSample.Duration = time.Duration(duration) * time.Millisecond
+		state.lastVideoSample.Duration = sampleDuration(pkt, state.lastVideoSample.PacketTimestamp, 33*time.Millisecond)
 
 		if err := videoTrack.WriteSample(*state.lastVideoSample); err != nil && err != io.ErrClosedPipe {
 			log.Log.Error("webrtc.main.processVideoPacket(): error writing video sample: " + err.Error())
@@ -720,11 +756,10 @@ func processAudioPacket(pkt packets.Packet, state *streamState, audioTrack *pion
 		return
 	}
 
-	sample := pionMedia.Sample{Data: pkt.Data, PacketTimestamp: uint32(pkt.Time)}
+	sample := pionMedia.Sample{Data: pkt.Data, PacketTimestamp: sampleTimestamp(pkt)}
 
 	if state.lastAudioSample != nil {
-		duration := sample.PacketTimestamp - state.lastAudioSample.PacketTimestamp
-		state.lastAudioSample.Duration = time.Duration(duration) * time.Millisecond
+		state.lastAudioSample.Duration = sampleDuration(pkt, state.lastAudioSample.PacketTimestamp, 20*time.Millisecond)
 
 		if err := audioTrack.WriteSample(*state.lastAudioSample); err != nil && err != io.ErrClosedPipe {
 			log.Log.Error("webrtc.main.processAudioPacket(): error writing audio sample: " + err.Error())
@@ -732,6 +767,15 @@ func processAudioPacket(pkt packets.Packet, state *streamState, audioTrack *pion
 	}
 
 	state.lastAudioSample = &sample
+}
+
+func shouldDropPacketForLatency(pkt packets.Packet) bool {
+	if pkt.CurrentTime == 0 {
+		return false
+	}
+
+	age := time.Since(time.UnixMilli(pkt.CurrentTime))
+	return age > maxLivePacketAge
 }
 
 func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, videoTrack *pionWebRTC.TrackLocalStaticSample, audioTrack *pionWebRTC.TrackLocalStaticSample, rtspClient capture.RTSPClient) {
@@ -791,6 +835,31 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 		if len(pkt.Data) == 0 || pkt.Data == nil {
 			state.receivedKeyFrame = false
 			continue
+		}
+
+		// Keep live WebRTC close to realtime.
+		// If audio+video load makes this consumer fall behind, skip old packets and
+		// wait for a recent keyframe before resuming video.
+		if shouldDropPacketForLatency(pkt) {
+			if !state.catchingUp {
+				log.Log.Warning("webrtc.main.WriteToTrack(): stream is lagging behind, dropping old packets until the next recent keyframe")
+			}
+			state.catchingUp = true
+			state.start = false
+			state.receivedKeyFrame = false
+			state.lastAudioSample = nil
+			state.lastVideoSample = nil
+			continue
+		}
+
+		if state.catchingUp {
+			if !(pkt.IsVideo && pkt.IsKeyFrame) {
+				continue
+			}
+			state.catchingUp = false
+			state.start = false
+			state.receivedKeyFrame = false
+			log.Log.Info("webrtc.main.WriteToTrack(): caught up with live stream at a recent keyframe")
 		}
 
 		// Wait for first keyframe before processing
