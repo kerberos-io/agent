@@ -271,7 +271,7 @@ class Dashboard extends React.Component {
           await this.flushPendingRemoteCandidates();
         } catch (error) {
           this.fallbackToSDLiveview(
-            `Unable to apply WebRTC answer: ${error.message}`
+            `Unable to apply WebRTC answer: ${error.message}`,
           );
         }
         break;
@@ -289,7 +289,7 @@ class Dashboard extends React.Component {
           }
         } catch (error) {
           this.fallbackToSDLiveview(
-            `Unable to apply WebRTC candidate: ${error.message}`
+            `Unable to apply WebRTC candidate: ${error.message}`,
           );
         }
         break;
@@ -297,7 +297,7 @@ class Dashboard extends React.Component {
 
       case 'webrtc-error':
         this.fallbackToSDLiveview(
-          message.message || 'The agent could not start the WebRTC liveview.'
+          message.message || 'The agent could not start the WebRTC liveview.',
         );
         break;
 
@@ -324,7 +324,7 @@ class Dashboard extends React.Component {
       });
     } catch (error) {
       this.fallbackToSDLiveview(
-        `Unable to initialise WebRTC liveview: ${error.message}`
+        `Unable to initialise WebRTC liveview: ${error.message}`,
       );
     }
   }
@@ -344,7 +344,7 @@ class Dashboard extends React.Component {
         await this.webrtcPeerConnection.addIceCandidate(candidateInit);
       } catch (error) {
         this.fallbackToSDLiveview(
-          `Unable to add remote ICE candidate: ${error.message}`
+          `Unable to add remote ICE candidate: ${error.message}`,
         );
         return;
       }
@@ -363,7 +363,7 @@ class Dashboard extends React.Component {
     this.pendingRemoteCandidates = [];
 
     this.webrtcPeerConnection = new window.RTCPeerConnection(
-      this.buildPeerConnectionConfig()
+      this.buildPeerConnectionConfig(),
     );
 
     this.webrtcPeerConnection.ontrack = (event) => {
@@ -406,7 +406,7 @@ class Dashboard extends React.Component {
         connectionState === 'closed'
       ) {
         this.fallbackToSDLiveview(
-          `WebRTC connection ${connectionState}, falling back to SD liveview.`
+          `WebRTC connection ${connectionState}, falling back to SD liveview.`,
         );
       }
     };
@@ -430,7 +430,7 @@ class Dashboard extends React.Component {
       const { liveviewLoaded } = this.state;
       if (!liveviewLoaded) {
         this.fallbackToSDLiveview(
-          'WebRTC connection timed out, falling back to SD liveview.'
+          'WebRTC connection timed out, falling back to SD liveview.',
         );
       }
     }, 10000);
