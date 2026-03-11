@@ -65,6 +65,7 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 
 ### Contributing
 
+1. [Security vulnerability reporting](#security-vulnerability-reporting)
 1. [Contribute with Codespaces](#contribute-with-codespaces)
 2. [Develop and build](#develop-and-build)
 3. [Building from source](#building-from-source)
@@ -300,6 +301,10 @@ If we talk about video encoders and decoders (codecs) there are 2 major video co
   - Not supported in technologies such as WebRTC
 
 Conclusion: depending on the use case you might choose one over the other, and you can use both at the same time. For example you can use H264 (main stream) for livestreaming, and H265 (sub stream) for recording. If you wish to play recordings in a cross-platform and cross-browser environment, you might opt for H264 for better support.
+
+## Security vulnerability reporting
+
+If you found a potential security vulnerability, please use the private channels described in [SECURITY.md](SECURITY.md). Avoid opening public GitHub issues for sensitive findings.
 
 ## Contribute with Codespaces
 
