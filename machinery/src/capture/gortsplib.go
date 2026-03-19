@@ -340,6 +340,40 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	}
 
 	// Look for audio stream.
+	// find the LPCM media and format
+	audioFormaLPCM, audioMediLPCM := FindLPCM(desc, false)
+	g.AudioLPCMMedia = audioMediLPCM
+	g.AudioLPCMForma = audioFormaLPCM
+	if audioMediLPCM == nil {
+		log.Log.Debug("capture.golibrtsp.Connect(LPCM): " + "audio media not found")
+	} else {
+		_, err = g.Client.Setup(desc.BaseURL, audioMediLPCM, 0, 0)
+		if err != nil {
+			log.Log.Error("capture.golibrtsp.Connect(LPCM): " + err.Error())
+		} else {
+			audiortpDec, err := audioFormaLPCM.CreateDecoder()
+			if err != nil {
+				log.Log.Error("capture.golibrtsp.Connect(LPCM): " + err.Error())
+			} else {
+				g.AudioLPCMDecoder = audiortpDec
+				streamIndex := len(g.Streams)
+				g.Streams = append(g.Streams, packets.Stream{
+					Index:         streamIndex,
+					Name:          "LPCM",
+					IsVideo:       false,
+					IsAudio:       true,
+					IsBackChannel: false,
+					SampleRate:    audioFormaLPCM.SampleRate,
+					Channels:      audioFormaLPCM.ChannelCount,
+					BitDepth:      audioFormaLPCM.BitDepth,
+				})
+
+				g.AudioLPCMIndex = int8(len(g.Streams)) - 1
+			}
+		}
+	}
+
+	// Look for audio stream.
 	// find the G711 media and format
 	audioForma, audioMedi := FindPCMU(desc, false)
 	g.AudioG711Media = audioMedi
@@ -367,6 +401,8 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 					IsVideo:       false,
 					IsAudio:       true,
 					IsBackChannel: false,
+					SampleRate:    defaultPCMUSampleRate,
+					Channels:      defaultPCMUChannels,
 				})
 
 				// Set the index for the audio
@@ -509,6 +545,8 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 				IsVideo:       false,
 				IsAudio:       true,
 				IsBackChannel: true,
+				SampleRate:    defaultPCMUSampleRate,
+				Channels:      defaultPCMUChannels,
 			})
 			// Set the index for the audio
 			g.AudioG711IndexBackChannel = int8(len(g.Streams)) - 1
@@ -520,6 +558,39 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 // Start the RTSP client, and start reading packets.
 func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) (err error) {
 	log.Log.Debug("capture.golibrtsp.Start(): started")
+
+	// called when a MULAW audio RTP packet arrives
+	if g.AudioLPCMMedia != nil && g.AudioLPCMForma != nil {
+		g.Client.OnPacketRTP(g.AudioLPCMMedia, g.AudioLPCMForma, func(rtppkt *rtp.Packet) {
+			pts, ok := g.Client.PacketPTS(g.AudioLPCMMedia, rtppkt)
+			pts2, ok := g.Client.PacketPTS2(g.AudioLPCMMedia, rtppkt)
+			if !ok {
+				log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
+				return
+			}
+
+			op, err := g.AudioLPCMDecoder.Decode(rtppkt)
+			if err != nil {
+				log.Log.Error("capture.golibrtsp.Start(): " + err.Error())
+				return
+			}
+
+			pkt := packets.Packet{
+				IsKeyFrame:      false,
+				Packet:          rtppkt,
+				Data:            op,
+				Time:            pts2,
+				TimeLegacy:      pts,
+				CompositionTime: pts2,
+				CurrentTime:     time.Now().UnixMilli(),
+				Idx:             g.AudioLPCMIndex,
+				IsVideo:         false,
+				IsAudio:         true,
+				Codec:           "LPCM",
+			}
+			queue.WritePacket(pkt)
+		})
+	}
 
 	// called when a MULAW audio RTP packet arrives
 	if g.AudioG711Media != nil && g.AudioG711Forma != nil {
@@ -1251,6 +1322,21 @@ func FindPCMU(desc *description.Session, isBackChannel bool) (*format.G711, *des
 				if g711, ok := forma.(*format.G711); ok {
 					if g711.MULaw {
 						return g711, media
+					}
+				}
+			}
+		}
+	}
+	return nil, nil
+}
+
+func FindLPCM(desc *description.Session, isBackChannel bool) (*format.LPCM, *description.Media) {
+	for _, media := range desc.Medias {
+		if media.IsBackChannel == isBackChannel {
+			for _, forma := range media.Formats {
+				if lpcm, ok := forma.(*format.LPCM); ok {
+					if lpcm.SampleRate > 0 && lpcm.ChannelCount > 0 && lpcm.BitDepth > 0 {
+						return lpcm, media
 					}
 				}
 			}

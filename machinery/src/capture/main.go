@@ -87,13 +87,31 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 		// We only expect one audio and one video codec.
 		// If there are multiple audio or video streams, we will use the first one.
 		audioCodec := ""
+		audioBitDepth := 0
 		videoCodec := ""
+		configuredAudioSampleRate := config.Capture.IPCamera.SampleRate
+		configuredAudioChannels := config.Capture.IPCamera.Channels
 		audioStreams, _ := rtspClient.GetAudioStreams()
 		videoStreams, _ := rtspClient.GetVideoStreams()
 		if len(audioStreams) > 0 {
 			audioCodec = audioStreams[0].Name
-			config.Capture.IPCamera.SampleRate = audioStreams[0].SampleRate
-			config.Capture.IPCamera.Channels = audioStreams[0].Channels
+			resolvedSampleRate := audioStreams[0].SampleRate
+			resolvedChannels := audioStreams[0].Channels
+
+			if audioCodec == "LPCM" {
+				if configuredAudioSampleRate > 0 && configuredAudioSampleRate != resolvedSampleRate {
+					log.Log.Warning("capture.main.HandleRecordStream(): LPCM sample rate mismatch between configuration and RTSP stream; using configured value " + strconv.Itoa(configuredAudioSampleRate) + " instead of detected value " + strconv.Itoa(resolvedSampleRate))
+					resolvedSampleRate = configuredAudioSampleRate
+				}
+				if configuredAudioChannels > 0 && configuredAudioChannels != resolvedChannels {
+					log.Log.Warning("capture.main.HandleRecordStream(): LPCM channel count mismatch between configuration and RTSP stream; using configured value " + strconv.Itoa(configuredAudioChannels) + " instead of detected value " + strconv.Itoa(resolvedChannels))
+					resolvedChannels = configuredAudioChannels
+				}
+			}
+
+			config.Capture.IPCamera.SampleRate = resolvedSampleRate
+			config.Capture.IPCamera.Channels = resolvedChannels
+			audioBitDepth = audioStreams[0].BitDepth
 		}
 		if len(videoStreams) > 0 {
 			videoCodec = videoStreams[0].Name
@@ -105,13 +123,15 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			//var cws *cacheWriterSeeker
 			var mp4Video *video.MP4
 			var videoTrack uint32
-			var audioTrack uint32
+			var audioWriter *recordingAudioWriter
 			var name string
 
 			// Do not do anything!
 			log.Log.Info("capture.main.HandleRecordStream(continuous): start recording")
 
 			start := false
+			rolloverRequested := false
+			rolloverMaxLogged := false
 
 			// If continuous record the full length
 			postRecording = maxRecordingPeriod
@@ -135,28 +155,41 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				nextPkt, cursorError = recordingCursor.ReadPacket()
 
-				now := time.Now().UnixMilli()
+				packetTime := pkt.CurrentTime
+				hardMaxReached := packetTime-startRecording > maxRecordingPeriod-500
+				postRecordingElapsed := startRecording+postRecording-packetTime <= 0
+				if start && (postRecordingElapsed || hardMaxReached) {
+					rolloverRequested = true
+					if hardMaxReached && !rolloverMaxLogged {
+						log.Log.Info("capture.main.HandleRecordStream(continuous): max recording period reached, waiting for next keyframe to roll over without dropping frames")
+						rolloverMaxLogged = true
+					}
+				}
 
-				if start && // If already recording and current frame is a keyframe and we should stop recording
-					nextPkt.IsKeyFrame && (startRecording+postRecording-now <= 0 || now-startRecording > maxRecordingPeriod-500) {
+				closeOnCurrentKeyframe := rolloverRequested && pkt.IsKeyFrame && pkt.CurrentTime > startRecording
+				closeOnNextKeyframe := rolloverRequested && nextPkt.IsKeyFrame
 
-					pts := convertPTS(pkt.TimeLegacy)
-					if pkt.IsVideo {
-						// Write the last packet
-						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-						}
-					} else if pkt.IsAudio {
-						// Write the last packet
-						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
+				if start && (closeOnCurrentKeyframe || closeOnNextKeyframe) {
+
+					if !closeOnCurrentKeyframe {
+						pts := convertPTS(pkt.TimeLegacy)
+						if pkt.IsVideo {
+							// Write the last packet before the rollover keyframe.
+							if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 							}
-						} else if pkt.Codec == "PCM_MULAW" {
-							// TODO: transcode to AAC, some work to do..
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
+						} else if pkt.IsAudio {
+							if err := audioWriter.WritePacket(pkt); err != nil {
+								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+							}
 						}
 					}
+
+					if err := audioWriter.Flush(); err != nil {
+						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+					}
+					audioWriter.Close()
+					audioWriter = nil
 
 					// Close mp4
 					if len(mp4Video.SPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.SPSNALUs) > 0 {
@@ -177,6 +210,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					// Cleanup muxer
 					start = false
+					rolloverRequested = false
+					rolloverMaxLogged = false
 
 					// Update the name of the recording with the duration.
 					// We will update the name of the recording with the duration in milliseconds.
@@ -305,11 +340,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					} else if videoCodec == "H265" {
 						videoTrack = mp4Video.AddVideoTrack("H265")
 					}
-					if audioCodec == "AAC" {
-						audioTrack = mp4Video.AddAudioTrack("AAC")
-					} else if audioCodec == "PCM_MULAW" {
-						log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
-					}
+					audioWriter = newRecordingAudioWriter(mp4Video, audioCodec, config.Capture.IPCamera.SampleRate, config.Capture.IPCamera.Channels, audioBitDepth, "capture.main.HandleRecordStream(continuous)")
 
 					pts := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
@@ -317,15 +348,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
-						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-							}
-						} else if pkt.Codec == "PCM_MULAW" {
-							// TODO: transcode to AAC, some work to do..
-							// We might need to use ffmpeg to transcode the audio to AAC.
-							// For now we will skip the audio track.
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
+						if err := audioWriter.WritePacket(pkt); err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					}
 					recordingStatus = "started"
@@ -339,13 +363,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
-						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-							}
-						} else if pkt.Codec == "PCM_MULAW" {
-							// TODO: transcode to AAC, some work to do..
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
+						if err := audioWriter.WritePacket(pkt); err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					}
 				}
@@ -355,6 +374,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			// We might have interrupted the recording while restarting the agent.
 			// If this happens we need to check to properly close the recording.
 			if cursorError != nil {
+				if audioWriter != nil {
+					audioWriter.Close()
+					audioWriter = nil
+				}
 				if recordingStatus == "started" {
 
 					log.Log.Info("capture.main.HandleRecordStream(continuous): Recording finished: file save: " + name)
@@ -434,7 +457,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var displayTime int64 = 0       // display time in milliseconds
 
 			var videoTrack uint32
-			var audioTrack uint32
 
 			for motion := range communication.HandleMotion {
 
@@ -448,6 +470,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				motionTimestamp := now
 
 				start := false
+				rolloverRequested := false
+				rolloverMaxLogged := false
 
 				if cursorError == nil {
 					pkt, cursorError = recordingCursor.ReadPacket()
@@ -520,6 +544,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				}
 				// Create the MP4 only once the first keyframe arrives.
 				var mp4Video *video.MP4
+				var audioWriter *recordingAudioWriter
 
 				for cursorError == nil {
 
@@ -528,20 +553,33 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + cursorError.Error())
 					}
 
-					now = time.Now().UnixMilli()
 					select {
 					case motion := <-communication.HandleMotion:
-						motionTimestamp = now
+						motionTimestamp = pkt.CurrentTime
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): motion detected while recording. Expanding recording.")
 						numberOfChanges := motion.NumberOfChanges
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
 					default:
 					}
 
-					if start && (motionTimestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-500) && nextPkt.IsKeyFrame {
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(motionTimestamp+postRecording-now, 10) + " < 0")
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-500 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-500, 10))
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(motionTimestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
+					packetTime := pkt.CurrentTime
+					hardMaxReached := packetTime-startRecording > maxRecordingPeriod-500
+					postRecordingElapsed := motionTimestamp+postRecording-packetTime < 0
+					if start && (postRecordingElapsed || hardMaxReached) {
+						rolloverRequested = true
+						if hardMaxReached && !rolloverMaxLogged {
+							log.Log.Info("capture.main.HandleRecordStream(motiondetection): max recording period reached, waiting for next keyframe to close without dropping frames")
+							rolloverMaxLogged = true
+						}
+					}
+
+					closeOnCurrentKeyframe := rolloverRequested && pkt.IsKeyFrame && pkt.CurrentTime > startRecording
+					closeOnNextKeyframe := rolloverRequested && nextPkt.IsKeyFrame
+
+					if start && (closeOnCurrentKeyframe || closeOnNextKeyframe) {
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-packetTime < 0  - " + strconv.FormatInt(motionTimestamp+postRecording-packetTime, 10) + " < 0")
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): packetTime-startRecording > maxRecordingPeriod-500 - " + strconv.FormatInt(packetTime-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-500, 10))
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(motionTimestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", packetTime: " + strconv.FormatInt(packetTime, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 						break
 					}
 					if pkt.IsKeyFrame && !start && pkt.CurrentTime >= startRecording {
@@ -550,7 +588,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): write frames")
 						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): recording started on keyframe")
 
-						// Align duration timers with the first keyframe.
+						// Align duration timers with the first keyframe so audio/video start together.
 						startRecording = pkt.CurrentTime
 
 						// Create a video file, and set the dimensions.
@@ -563,11 +601,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						} else if videoCodec == "H265" {
 							videoTrack = mp4Video.AddVideoTrack("H265")
 						}
-						if audioCodec == "AAC" {
-							audioTrack = mp4Video.AddAudioTrack("AAC")
-						} else if audioCodec == "PCM_MULAW" {
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
-						}
+						audioWriter = newRecordingAudioWriter(mp4Video, audioCodec, config.Capture.IPCamera.SampleRate, config.Capture.IPCamera.Channels, audioBitDepth, "capture.main.HandleRecordStream(motiondetection)")
 						start = true
 					}
 					if start {
@@ -581,17 +615,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							}
 						} else if pkt.IsAudio {
 							log.Log.Debug("capture.main.HandleRecordStream(motiondetection): add audio sample")
-							if pkt.Codec == "AAC" {
-								if mp4Video != nil {
-									if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-										log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
-									}
+							if mp4Video != nil {
+								if err := audioWriter.WritePacket(pkt); err != nil {
+									log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
 								}
-							} else if pkt.Codec == "PCM_MULAW" {
-								// TODO: transcode to AAC, some work to do..
-								// We might need to use ffmpeg to transcode the audio to AAC.
-								// For now we will skip the audio track.
-								log.Log.Debug("capture.main.HandleRecordStream(motiondetection): no AAC audio codec detected, skipping audio track.")
 							}
 						}
 					}
@@ -604,9 +631,17 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				lastRecordingTime = pkt.CurrentTime
 
 				if mp4Video == nil {
+					if audioWriter != nil {
+						audioWriter.Close()
+					}
 					log.Log.Warning("capture.main.HandleRecordStream(motiondetection): recording closed without keyframe; no MP4 created")
 					continue
 				}
+
+				if err := audioWriter.Flush(); err != nil {
+					log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
+				}
+				audioWriter.Close()
 
 				// This will close the recording and write the last packet.
 				if len(mp4Video.SPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.SPSNALUs) > 0 {

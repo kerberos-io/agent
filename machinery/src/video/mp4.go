@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Eyevinn/mp4ff/aac"
 	"github.com/Eyevinn/mp4ff/avc"
 	mp4ff "github.com/Eyevinn/mp4ff/mp4"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
@@ -46,9 +47,12 @@ type MP4 struct {
 	SegmentCount            int
 	SampleCount             int
 	StartPTS                uint64
+	MediaStartPTS           uint64
 	VideoTotalDuration      uint64
 	AudioTotalDuration      uint64
 	AudioPTS                uint64
+	AudioSampleRate         uint32
+	AudioChannels           uint16
 	Start                   bool
 	SPSNALUs                [][]byte // SPS NALUs for H264
 	PPSNALUs                [][]byte // PPS NALUs for H264
@@ -266,6 +270,49 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 	return true
 }
 
+func (mp4 *MP4) alignAudioTimeline(rawPTS uint64) {
+	if mp4 == nil || mp4.AudioSampleRate == 0 || mp4.AudioPTS != 0 {
+		return
+	}
+	if rawPTS <= mp4.MediaStartPTS {
+		return
+	}
+
+	offsetMs := rawPTS - mp4.MediaStartPTS
+	mp4.AudioPTS = (offsetMs*uint64(mp4.AudioSampleRate) + 500) / 1000
+}
+
+func (mp4 *MP4) appendPendingAudioSample(trackID uint32) {
+	if mp4 == nil || mp4.AudioFullSample == nil {
+		return
+	}
+
+	SplitAACFrame(mp4.AudioFullSample.Data, func(started bool, aac []byte) {
+		sampleToAdd := *mp4.AudioFullSample
+		dts := aacFrameDurationSamples(aac)
+		if dts == 0 {
+			dts = mp4.LastAudioSampleDTS
+			if dts == 0 {
+				dts = 1024
+			}
+		}
+
+		mp4.alignAudioTimeline(sampleToAdd.DecodeTime)
+		mp4.LastAudioSampleDTS = dts
+		sampleToAdd.Data = aac[7:]
+		sampleToAdd.DecodeTime = mp4.AudioPTS
+		sampleToAdd.Sample.Dur = uint32(dts)
+		sampleToAdd.Sample.Size = uint32(len(aac[7:]))
+		mp4.AudioTotalDuration += dts
+		mp4.AudioPTS += dts
+
+		err := mp4.MultiTrackFragment.AddFullSampleToTrack(sampleToAdd, trackID)
+		if err != nil {
+			log.Log.Error("mp4.appendPendingAudioSample(): error adding sample to track " + fmt.Sprintf("%d: %v", trackID, err))
+		}
+	})
+}
+
 func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64) error {
 
 	if isKeyframe && trackID == uint32(mp4.VideoTrack) {
@@ -320,6 +367,9 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 
 			// Increment the segment count
 			mp4.SegmentCount = mp4.SegmentCount + 1
+			if mp4.MediaStartPTS == 0 {
+				mp4.MediaStartPTS = pts
+			}
 
 			// Create a new media segment
 			seg := mp4ff.NewMediaSegment()
@@ -383,29 +433,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			}
 		} else if trackID == uint32(mp4.AudioTrack) {
 			if mp4.AudioFullSample != nil {
-				SplitAACFrame(mp4.AudioFullSample.Data, func(started bool, aac []byte) {
-					sampleToAdd := *mp4.AudioFullSample
-					dts := pts - mp4.AudioFullSample.DecodeTime
-					if pts < mp4.AudioFullSample.DecodeTime {
-						//log.Printf("Warning: PTS %d is less than previous sample's DecodeTime %d, resetting AudioFullSample", pts, mp4.AudioFullSample.DecodeTime)
-						dts = 1
-					}
-					if started {
-						dts = 1
-					}
-					mp4.LastAudioSampleDTS = dts
-					//fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, dts, len(aac[7:]))
-					mp4.AudioTotalDuration += dts
-					mp4.AudioPTS += dts
-					sampleToAdd.Data = aac[7:] // Remove the ADTS header (first 7 bytes)
-					sampleToAdd.DecodeTime = mp4.AudioPTS - dts
-					sampleToAdd.Sample.Dur = uint32(dts)
-					sampleToAdd.Sample.Size = uint32(len(aac[7:]))
-					err := mp4.MultiTrackFragment.AddFullSampleToTrack(sampleToAdd, trackID)
-					if err != nil {
-						log.Log.Error("mp4.AddSampleToTrack(): error adding sample to track " + fmt.Sprintf("%d: %v", trackID, err))
-					}
-				})
+				mp4.appendPendingAudioSample(trackID)
 			}
 
 			// Set the sample data
@@ -417,6 +445,12 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 				Size:                  uint32(len(fullSample.Data)),
 				Flags:                 0,
 				CompositionTimeOffset: 0, // No composition time offset for audio
+			}
+			if mp4.AudioSampleRate == 0 {
+				mp4.AudioSampleRate = aacSampleRate(data)
+			}
+			if mp4.AudioChannels == 0 {
+				mp4.AudioChannels = aacChannelCount(data)
 			}
 			mp4.AudioFullSample = &fullSample
 			mp4.SampleType = "audio"
@@ -447,23 +481,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 
 		// Add final audio sample if pending
 		if mp4.AudioFullSample != nil && mp4.AudioTrack > 0 {
-			SplitAACFrame(mp4.AudioFullSample.Data, func(started bool, aac []byte) {
-				sampleToAdd := *mp4.AudioFullSample
-				dts := mp4.LastAudioSampleDTS
-				if dts == 0 {
-					dts = 1024 // Default AAC frame duration
-				}
-				mp4.AudioTotalDuration += dts
-				mp4.AudioPTS += dts
-				sampleToAdd.Data = aac[7:]
-				sampleToAdd.DecodeTime = mp4.AudioPTS - dts
-				sampleToAdd.Sample.Dur = uint32(dts)
-				sampleToAdd.Sample.Size = uint32(len(aac[7:]))
-				err := mp4.MultiTrackFragment.AddFullSampleToTrack(sampleToAdd, uint32(mp4.AudioTrack))
-				if err != nil {
-					log.Log.Error("mp4.Close(): error adding final audio sample: " + err.Error())
-				}
-			})
+			mp4.appendPendingAudioSample(uint32(mp4.AudioTrack))
 			mp4.AudioFullSample = nil
 		}
 	}
@@ -526,15 +544,26 @@ func (mp4 *MP4) Close(config *models.Config) {
 	// QuickTime requires timestamps in Mac HFS format (seconds since 1904-01-01),
 	// so we convert from Unix epoch by adding MacEpochOffset.
 	videoTimescale := uint32(1000)
-	audioTimescale := uint32(1000)
+	audioTimescale := mp4.AudioSampleRate
+	if audioTimescale == 0 {
+		if config.Capture.IPCamera.SampleRate > 0 {
+			audioTimescale = uint32(config.Capture.IPCamera.SampleRate)
+		} else {
+			audioTimescale = uint32(1000)
+		}
+	}
 	macTime := mp4.StartTime + MacEpochOffset
 	nextTrackID := uint32(len(mp4.TrackIDs) + 1)
+	audioMovieDuration := mp4.AudioTotalDuration
+	if audioTimescale != 0 && audioTimescale != videoTimescale {
+		audioMovieDuration = (mp4.AudioTotalDuration*uint64(videoTimescale) + uint64(audioTimescale/2)) / uint64(audioTimescale)
+	}
 
 	// mvhd.Duration must be the duration of the longest track.
 	// Start with video; if audio is longer, we update below.
 	movDuration := actualVideoDuration
-	if mp4.AudioTotalDuration > movDuration {
-		movDuration = mp4.AudioTotalDuration
+	if audioMovieDuration > movDuration {
+		movDuration = audioMovieDuration
 	}
 
 	mvhd := &mp4ff.MvhdBox{
@@ -609,16 +638,23 @@ func (mp4 *MP4) Close(config *models.Config) {
 		// Add an audio track to the moov box
 		init.AddEmptyTrack(audioTimescale, "audio", "und")
 
-		// Check if the same sample rate is set, otherwise we default to 48000
-		audioSampleRate := 48000
-		if config.Capture.IPCamera.SampleRate > 0 {
-			audioSampleRate = config.Capture.IPCamera.SampleRate
+		audioSampleRate := int(audioTimescale)
+		if audioSampleRate == 0 {
+			audioSampleRate = 48000
 		}
-		// Set the audio descriptor
-		err := init.Moov.Traks[1].SetAACDescriptor(29, audioSampleRate)
+		audioChannels := mp4.AudioChannels
+		if audioChannels == 0 {
+			if config.Capture.IPCamera.Channels > 0 {
+				audioChannels = uint16(config.Capture.IPCamera.Channels)
+			} else {
+				audioChannels = 1
+			}
+		}
+		// Set the audio descriptor to match the AAC-LC stream actually produced by ffmpeg/camera.
+		err := setAACLCDescriptor(init.Moov.Traks[1], audioSampleRate, audioChannels)
 		if err != nil {
 		}
-		init.Moov.Traks[1].Tkhd.Duration = mp4.AudioTotalDuration
+		init.Moov.Traks[1].Tkhd.Duration = audioMovieDuration
 		init.Moov.Traks[1].Tkhd.CreationTime = macTime
 		init.Moov.Traks[1].Tkhd.ModificationTime = macTime
 		init.Moov.Traks[1].Mdia.Hdlr.Name = "agent " + utils.VERSION
@@ -1261,7 +1297,7 @@ func (frame *ADTS_Frame_Header) Decode(aac []byte) {
 	frame.Fix_Header.Profile = aac[2] >> 6 & 0x03
 	frame.Fix_Header.Sampling_frequency_index = aac[2] >> 2 & 0x0F
 	frame.Fix_Header.Private_bit = aac[2] >> 1 & 0x01
-	frame.Fix_Header.Channel_configuration = (aac[2] & 0x01 << 2) | (aac[3] >> 6)
+	frame.Fix_Header.Channel_configuration = ((aac[2] & 0x01) << 2) | (aac[3] >> 6)
 	frame.Fix_Header.Originalorcopy = aac[3] >> 5 & 0x01
 	frame.Fix_Header.Home = aac[3] >> 4 & 0x01
 	frame.Variable_Header.Copyright_identification_bit = aac[3] >> 3 & 0x01
@@ -1301,6 +1337,89 @@ func SampleToAACSampleIndex(sampling int) int {
 
 func AACSampleIdxToSample(idx int) int {
 	return AAC_Sampling_Idx[idx]
+}
+
+func aacFrameDurationSamples(aac []byte) uint64 {
+	if len(aac) < 7 {
+		return 0
+	}
+
+	var header ADTS_Frame_Header
+	header.Decode(aac)
+
+	rawBlocks := uint64(header.Variable_Header.Number_of_raw_data_blocks_in_frame) + 1
+	return rawBlocks * 1024
+}
+
+func aacSampleRate(aac []byte) uint32 {
+	if len(aac) < 7 {
+		return 0
+	}
+
+	var header ADTS_Frame_Header
+	header.Decode(aac)
+
+	sampleRateIdx := int(header.Fix_Header.Sampling_frequency_index)
+	if sampleRateIdx < 0 || sampleRateIdx >= len(AAC_Sampling_Idx) {
+		return 0
+	}
+
+	sampleRate := AACSampleIdxToSample(sampleRateIdx)
+	if sampleRate <= 0 {
+		return 0
+	}
+
+	return uint32(sampleRate)
+}
+
+func aacChannelCount(aacBytes []byte) uint16 {
+	if len(aacBytes) < 7 {
+		return 0
+	}
+
+	var header ADTS_Frame_Header
+	header.Decode(aacBytes)
+	if header.Fix_Header.Channel_configuration == 0 {
+		return 0
+	}
+
+	return uint16(header.Fix_Header.Channel_configuration)
+}
+
+func AACSampleRateFromADTS(aac []byte) uint32 {
+	return aacSampleRate(aac)
+}
+
+func AACChannelCountFromADTS(aac []byte) uint16 {
+	return aacChannelCount(aac)
+}
+
+func setAACLCDescriptor(trak *mp4ff.TrakBox, sampleRate int, channels uint16) error {
+	if trak == nil {
+		return errors.New("nil trak for AAC descriptor")
+	}
+	if sampleRate <= 0 {
+		return errors.New("invalid AAC sample rate")
+	}
+	if channels == 0 {
+		channels = 1
+	}
+
+	asc := &aac.AudioSpecificConfig{
+		ObjectType:           aac.AAClc,
+		ChannelConfiguration: byte(channels),
+		SamplingFrequency:    sampleRate,
+	}
+
+	buf := &bytes.Buffer{}
+	if err := asc.Encode(buf); err != nil {
+		return err
+	}
+
+	esds := mp4ff.CreateEsdsBox(buf.Bytes())
+	mp4a := mp4ff.CreateAudioSampleEntryBox("mp4a", channels, 16, uint16(sampleRate), esds)
+	trak.Mdia.Minf.Stbl.Stsd.AddChild(mp4a)
+	return nil
 }
 
 // +--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
