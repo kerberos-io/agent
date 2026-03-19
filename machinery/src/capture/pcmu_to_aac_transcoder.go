@@ -44,6 +44,9 @@ type ffmpegToAACTranscoder struct {
 	closed      bool
 	stdinClosed bool
 	closeOnce   sync.Once
+	stdoutDone  chan struct{}
+	waitDone    chan struct{}
+	waitErr     error
 }
 
 func newFFmpegToAACTranscoder(inputFormat string, sampleRate int, channels int) (*ffmpegToAACTranscoder, error) {
@@ -88,13 +91,16 @@ func newFFmpegToAACTranscoder(inputFormat string, sampleRate int, channels int) 
 	}
 
 	t := &ffmpegToAACTranscoder{
-		cmd:    cmd,
-		stdin:  stdin,
-		stdout: stdout,
-		stderr: stderr,
+		cmd:        cmd,
+		stdin:      stdin,
+		stdout:     stdout,
+		stderr:     stderr,
+		stdoutDone: make(chan struct{}),
+		waitDone:   make(chan struct{}),
 	}
 
 	go func() {
+		defer close(t.stdoutDone)
 		buf := make([]byte, 4096)
 		for {
 			n, readErr := stdout.Read(buf)
@@ -110,6 +116,11 @@ func newFFmpegToAACTranscoder(inputFormat string, sampleRate int, channels int) 
 				return
 			}
 		}
+	}()
+
+	go func() {
+		t.waitErr = cmd.Wait()
+		close(t.waitDone)
 	}()
 
 	log.Log.Info("capture.audio_to_aac: " + strings.ToUpper(inputFormat) + " -> AAC transcoder initialised (ffmpeg process)")
@@ -161,17 +172,10 @@ func (t *ffmpegToAACTranscoder) Transcode(input []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	deadline := time.Now().Add(75 * time.Millisecond)
-	for {
-		data := t.readAvailable()
-		if len(data) > 0 {
-			return data, nil
-		}
-		if time.Now().After(deadline) {
-			return nil, nil
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+	// Do not block the recording loop waiting for the encoder to emit output.
+	// FFmpeg can buffer for a while, and polling here per RTP packet causes the
+	// recorder to fall behind real time and drop trailing media before close.
+	return t.readAvailable(), nil
 }
 
 func (t *ffmpegToAACTranscoder) Flush() ([]byte, error) {
@@ -193,23 +197,37 @@ func (t *ffmpegToAACTranscoder) Flush() ([]byte, error) {
 	}
 	t.mu.Unlock()
 
-	deadline := time.Now().Add(750 * time.Millisecond)
-	previousLen := -1
-	stableReads := 0
-	for {
-		buffered := t.bufferedLen()
-		if buffered == previousLen {
-			stableReads++
-		} else {
-			stableReads = 0
-			previousLen = buffered
+	processExited := false
+	readerFinished := false
+	deadline := time.Now().Add(3 * time.Second)
+	for !processExited || !readerFinished {
+		if !processExited {
+			select {
+			case <-t.waitDone:
+				processExited = true
+			default:
+			}
+		}
+		if !readerFinished {
+			select {
+			case <-t.stdoutDone:
+				readerFinished = true
+			default:
+			}
 		}
 
-		if stableReads >= 3 || time.Now().After(deadline) {
+		if processExited && readerFinished {
+			break
+		}
+		if time.Now().After(deadline) {
 			break
 		}
 
 		time.Sleep(15 * time.Millisecond)
+	}
+
+	if processExited && t.waitErr != nil {
+		return t.readAvailable(), t.waitErr
 	}
 
 	return t.readAvailable(), nil
@@ -229,13 +247,21 @@ func (t *ffmpegToAACTranscoder) Close() {
 		}
 		t.mu.Unlock()
 
-		if t.stdout != nil {
-			_ = t.stdout.Close()
+		processExited := false
+		select {
+		case <-t.waitDone:
+			processExited = true
+		case <-time.After(250 * time.Millisecond):
 		}
 
-		if t.cmd != nil && t.cmd.Process != nil {
-			_ = t.cmd.Process.Kill()
-			_, _ = t.cmd.Process.Wait()
+		if !processExited {
+			if t.stdout != nil {
+				_ = t.stdout.Close()
+			}
+			if t.cmd != nil && t.cmd.Process != nil {
+				_ = t.cmd.Process.Kill()
+				<-t.waitDone
+			}
 		}
 
 		if stderr := t.stderrString(); stderr != "" {

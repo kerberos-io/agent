@@ -155,9 +155,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				nextPkt, cursorError = recordingCursor.ReadPacket()
 
-				now := time.Now().UnixMilli()
-				hardMaxReached := now-startRecording > maxRecordingPeriod-500
-				postRecordingElapsed := startRecording+postRecording-now <= 0
+				packetTime := pkt.CurrentTime
+				hardMaxReached := packetTime-startRecording > maxRecordingPeriod-500
+				postRecordingElapsed := startRecording+postRecording-packetTime <= 0
 				if start && (postRecordingElapsed || hardMaxReached) {
 					rolloverRequested = true
 					if hardMaxReached && !rolloverMaxLogged {
@@ -166,18 +166,22 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 				}
 
-				if start && // If already recording and current frame is a keyframe and we should stop recording
-					rolloverRequested && nextPkt.IsKeyFrame {
+				closeOnCurrentKeyframe := rolloverRequested && pkt.IsKeyFrame && pkt.CurrentTime > startRecording
+				closeOnNextKeyframe := rolloverRequested && nextPkt.IsKeyFrame
 
-					pts := convertPTS(pkt.TimeLegacy)
-					if pkt.IsVideo {
-						// Write the last packet
-						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-						}
-					} else if pkt.IsAudio {
-						if err := audioWriter.WritePacket(pkt); err != nil {
-							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+				if start && (closeOnCurrentKeyframe || closeOnNextKeyframe) {
+
+					if !closeOnCurrentKeyframe {
+						pts := convertPTS(pkt.TimeLegacy)
+						if pkt.IsVideo {
+							// Write the last packet before the rollover keyframe.
+							if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
+								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+							}
+						} else if pkt.IsAudio {
+							if err := audioWriter.WritePacket(pkt); err != nil {
+								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+							}
 						}
 					}
 
@@ -549,18 +553,18 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + cursorError.Error())
 					}
 
-					now = time.Now().UnixMilli()
 					select {
 					case motion := <-communication.HandleMotion:
-						motionTimestamp = now
+						motionTimestamp = pkt.CurrentTime
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): motion detected while recording. Expanding recording.")
 						numberOfChanges := motion.NumberOfChanges
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
 					default:
 					}
 
-					hardMaxReached := now-startRecording > maxRecordingPeriod-500
-					postRecordingElapsed := motionTimestamp+postRecording-now < 0
+					packetTime := pkt.CurrentTime
+					hardMaxReached := packetTime-startRecording > maxRecordingPeriod-500
+					postRecordingElapsed := motionTimestamp+postRecording-packetTime < 0
 					if start && (postRecordingElapsed || hardMaxReached) {
 						rolloverRequested = true
 						if hardMaxReached && !rolloverMaxLogged {
@@ -569,10 +573,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					if start && rolloverRequested && nextPkt.IsKeyFrame {
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(motionTimestamp+postRecording-now, 10) + " < 0")
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-500 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-500, 10))
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(motionTimestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
+					closeOnCurrentKeyframe := rolloverRequested && pkt.IsKeyFrame && pkt.CurrentTime > startRecording
+					closeOnNextKeyframe := rolloverRequested && nextPkt.IsKeyFrame
+
+					if start && (closeOnCurrentKeyframe || closeOnNextKeyframe) {
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-packetTime < 0  - " + strconv.FormatInt(motionTimestamp+postRecording-packetTime, 10) + " < 0")
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): packetTime-startRecording > maxRecordingPeriod-500 - " + strconv.FormatInt(packetTime-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-500, 10))
+						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(motionTimestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", packetTime: " + strconv.FormatInt(packetTime, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 						break
 					}
 					if pkt.IsKeyFrame && !start && pkt.CurrentTime >= startRecording {
