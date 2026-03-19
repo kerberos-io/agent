@@ -47,6 +47,7 @@ type MP4 struct {
 	SegmentCount            int
 	SampleCount             int
 	StartPTS                uint64
+	MediaStartPTS           uint64
 	VideoTotalDuration      uint64
 	AudioTotalDuration      uint64
 	AudioPTS                uint64
@@ -269,6 +270,49 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 	return true
 }
 
+func (mp4 *MP4) alignAudioTimeline(rawPTS uint64) {
+	if mp4 == nil || mp4.AudioSampleRate == 0 || mp4.AudioPTS != 0 {
+		return
+	}
+	if rawPTS <= mp4.MediaStartPTS {
+		return
+	}
+
+	offsetMs := rawPTS - mp4.MediaStartPTS
+	mp4.AudioPTS = (offsetMs*uint64(mp4.AudioSampleRate) + 500) / 1000
+}
+
+func (mp4 *MP4) appendPendingAudioSample(trackID uint32) {
+	if mp4 == nil || mp4.AudioFullSample == nil {
+		return
+	}
+
+	SplitAACFrame(mp4.AudioFullSample.Data, func(started bool, aac []byte) {
+		sampleToAdd := *mp4.AudioFullSample
+		dts := aacFrameDurationSamples(aac)
+		if dts == 0 {
+			dts = mp4.LastAudioSampleDTS
+			if dts == 0 {
+				dts = 1024
+			}
+		}
+
+		mp4.alignAudioTimeline(sampleToAdd.DecodeTime)
+		mp4.LastAudioSampleDTS = dts
+		sampleToAdd.Data = aac[7:]
+		sampleToAdd.DecodeTime = mp4.AudioPTS
+		sampleToAdd.Sample.Dur = uint32(dts)
+		sampleToAdd.Sample.Size = uint32(len(aac[7:]))
+		mp4.AudioTotalDuration += dts
+		mp4.AudioPTS += dts
+
+		err := mp4.MultiTrackFragment.AddFullSampleToTrack(sampleToAdd, trackID)
+		if err != nil {
+			log.Log.Error("mp4.appendPendingAudioSample(): error adding sample to track " + fmt.Sprintf("%d: %v", trackID, err))
+		}
+	})
+}
+
 func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64) error {
 
 	if isKeyframe && trackID == uint32(mp4.VideoTrack) {
@@ -323,6 +367,9 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 
 			// Increment the segment count
 			mp4.SegmentCount = mp4.SegmentCount + 1
+			if mp4.MediaStartPTS == 0 {
+				mp4.MediaStartPTS = pts
+			}
 
 			// Create a new media segment
 			seg := mp4ff.NewMediaSegment()
@@ -386,27 +433,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			}
 		} else if trackID == uint32(mp4.AudioTrack) {
 			if mp4.AudioFullSample != nil {
-				SplitAACFrame(mp4.AudioFullSample.Data, func(started bool, aac []byte) {
-					sampleToAdd := *mp4.AudioFullSample
-					dts := aacFrameDurationSamples(aac)
-					if dts == 0 {
-						dts = mp4.LastAudioSampleDTS
-						if dts == 0 {
-							dts = 1024
-						}
-					}
-					mp4.LastAudioSampleDTS = dts
-					mp4.AudioTotalDuration += dts
-					mp4.AudioPTS += dts
-					sampleToAdd.Data = aac[7:] // Remove the ADTS header (first 7 bytes)
-					sampleToAdd.DecodeTime = mp4.AudioPTS - dts
-					sampleToAdd.Sample.Dur = uint32(dts)
-					sampleToAdd.Sample.Size = uint32(len(aac[7:]))
-					err := mp4.MultiTrackFragment.AddFullSampleToTrack(sampleToAdd, trackID)
-					if err != nil {
-						log.Log.Error("mp4.AddSampleToTrack(): error adding sample to track " + fmt.Sprintf("%d: %v", trackID, err))
-					}
-				})
+				mp4.appendPendingAudioSample(trackID)
 			}
 
 			// Set the sample data
@@ -454,26 +481,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 
 		// Add final audio sample if pending
 		if mp4.AudioFullSample != nil && mp4.AudioTrack > 0 {
-			SplitAACFrame(mp4.AudioFullSample.Data, func(started bool, aac []byte) {
-				sampleToAdd := *mp4.AudioFullSample
-				dts := aacFrameDurationSamples(aac)
-				if dts == 0 {
-					dts = mp4.LastAudioSampleDTS
-					if dts == 0 {
-						dts = 1024 // Default fallback when ADTS is malformed.
-					}
-				}
-				mp4.AudioTotalDuration += dts
-				mp4.AudioPTS += dts
-				sampleToAdd.Data = aac[7:]
-				sampleToAdd.DecodeTime = mp4.AudioPTS - dts
-				sampleToAdd.Sample.Dur = uint32(dts)
-				sampleToAdd.Sample.Size = uint32(len(aac[7:]))
-				err := mp4.MultiTrackFragment.AddFullSampleToTrack(sampleToAdd, uint32(mp4.AudioTrack))
-				if err != nil {
-					log.Log.Error("mp4.Close(): error adding final audio sample: " + err.Error())
-				}
-			})
+			mp4.appendPendingAudioSample(uint32(mp4.AudioTrack))
 			mp4.AudioFullSample = nil
 		}
 	}

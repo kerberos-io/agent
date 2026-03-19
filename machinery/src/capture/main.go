@@ -588,7 +588,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): write frames")
 						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): recording started on keyframe")
 
-						// Align duration timers with the first keyframe.
+						// Align duration timers with the first keyframe so audio/video start together.
 						startRecording = pkt.CurrentTime
 
 						// Create a video file, and set the dimensions.

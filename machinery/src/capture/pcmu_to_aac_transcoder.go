@@ -199,7 +199,8 @@ func (t *ffmpegToAACTranscoder) Flush() ([]byte, error) {
 
 	processExited := false
 	readerFinished := false
-	deadline := time.Now().Add(3 * time.Second)
+	deadline := time.Now().Add(15 * time.Second)
+	timedOut := false
 	for !processExited || !readerFinished {
 		if !processExited {
 			select {
@@ -220,10 +221,15 @@ func (t *ffmpegToAACTranscoder) Flush() ([]byte, error) {
 			break
 		}
 		if time.Now().After(deadline) {
+			timedOut = true
 			break
 		}
 
 		time.Sleep(15 * time.Millisecond)
+	}
+
+	if timedOut {
+		log.Log.Warning("capture.audio_to_aac: flush timed out before ffmpeg fully drained (process_exited=" + strconv.FormatBool(processExited) + ", stdout_done=" + strconv.FormatBool(readerFinished) + ", buffered=" + intToString(t.bufferedLen()) + ")")
 	}
 
 	if processExited && t.waitErr != nil {
@@ -248,10 +254,14 @@ func (t *ffmpegToAACTranscoder) Close() {
 		t.mu.Unlock()
 
 		processExited := false
+		waitTimeout := 250 * time.Millisecond
+		if t.stdinClosed {
+			waitTimeout = 2 * time.Second
+		}
 		select {
 		case <-t.waitDone:
 			processExited = true
-		case <-time.After(250 * time.Millisecond):
+		case <-time.After(waitTimeout):
 		}
 
 		if !processExited {
