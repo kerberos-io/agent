@@ -87,13 +87,31 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 		// We only expect one audio and one video codec.
 		// If there are multiple audio or video streams, we will use the first one.
 		audioCodec := ""
+		audioBitDepth := 0
 		videoCodec := ""
+		configuredAudioSampleRate := config.Capture.IPCamera.SampleRate
+		configuredAudioChannels := config.Capture.IPCamera.Channels
 		audioStreams, _ := rtspClient.GetAudioStreams()
 		videoStreams, _ := rtspClient.GetVideoStreams()
 		if len(audioStreams) > 0 {
 			audioCodec = audioStreams[0].Name
-			config.Capture.IPCamera.SampleRate = audioStreams[0].SampleRate
-			config.Capture.IPCamera.Channels = audioStreams[0].Channels
+			resolvedSampleRate := audioStreams[0].SampleRate
+			resolvedChannels := audioStreams[0].Channels
+
+			if audioCodec == "LPCM" {
+				if configuredAudioSampleRate > 0 && configuredAudioSampleRate != resolvedSampleRate {
+					log.Log.Warning("capture.main.HandleRecordStream(): LPCM sample rate mismatch between configuration and RTSP stream; using configured value " + strconv.Itoa(configuredAudioSampleRate) + " instead of detected value " + strconv.Itoa(resolvedSampleRate))
+					resolvedSampleRate = configuredAudioSampleRate
+				}
+				if configuredAudioChannels > 0 && configuredAudioChannels != resolvedChannels {
+					log.Log.Warning("capture.main.HandleRecordStream(): LPCM channel count mismatch between configuration and RTSP stream; using configured value " + strconv.Itoa(configuredAudioChannels) + " instead of detected value " + strconv.Itoa(resolvedChannels))
+					resolvedChannels = configuredAudioChannels
+				}
+			}
+
+			config.Capture.IPCamera.SampleRate = resolvedSampleRate
+			config.Capture.IPCamera.Channels = resolvedChannels
+			audioBitDepth = audioStreams[0].BitDepth
 		}
 		if len(videoStreams) > 0 {
 			videoCodec = videoStreams[0].Name
@@ -112,6 +130,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			log.Log.Info("capture.main.HandleRecordStream(continuous): start recording")
 
 			start := false
+			rolloverRequested := false
+			rolloverMaxLogged := false
 
 			// If continuous record the full length
 			postRecording = maxRecordingPeriod
@@ -136,9 +156,18 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				nextPkt, cursorError = recordingCursor.ReadPacket()
 
 				now := time.Now().UnixMilli()
+				hardMaxReached := now-startRecording > maxRecordingPeriod-500
+				postRecordingElapsed := startRecording+postRecording-now <= 0
+				if start && (postRecordingElapsed || hardMaxReached) {
+					rolloverRequested = true
+					if hardMaxReached && !rolloverMaxLogged {
+						log.Log.Info("capture.main.HandleRecordStream(continuous): max recording period reached, waiting for next keyframe to roll over without dropping frames")
+						rolloverMaxLogged = true
+					}
+				}
 
 				if start && // If already recording and current frame is a keyframe and we should stop recording
-					nextPkt.IsKeyFrame && (startRecording+postRecording-now <= 0 || now-startRecording > maxRecordingPeriod-500) {
+					rolloverRequested && nextPkt.IsKeyFrame {
 
 					pts := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
@@ -177,6 +206,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					// Cleanup muxer
 					start = false
+					rolloverRequested = false
+					rolloverMaxLogged = false
 
 					// Update the name of the recording with the duration.
 					// We will update the name of the recording with the duration in milliseconds.
@@ -305,7 +336,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					} else if videoCodec == "H265" {
 						videoTrack = mp4Video.AddVideoTrack("H265")
 					}
-					audioWriter = newRecordingAudioWriter(mp4Video, audioCodec, config.Capture.IPCamera.SampleRate, config.Capture.IPCamera.Channels, "capture.main.HandleRecordStream(continuous)")
+					audioWriter = newRecordingAudioWriter(mp4Video, audioCodec, config.Capture.IPCamera.SampleRate, config.Capture.IPCamera.Channels, audioBitDepth, "capture.main.HandleRecordStream(continuous)")
 
 					pts := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
@@ -435,6 +466,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				motionTimestamp := now
 
 				start := false
+				rolloverRequested := false
+				rolloverMaxLogged := false
 
 				if cursorError == nil {
 					pkt, cursorError = recordingCursor.ReadPacket()
@@ -526,7 +559,17 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					default:
 					}
 
-					if start && (motionTimestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-500) && nextPkt.IsKeyFrame {
+					hardMaxReached := now-startRecording > maxRecordingPeriod-500
+					postRecordingElapsed := motionTimestamp+postRecording-now < 0
+					if start && (postRecordingElapsed || hardMaxReached) {
+						rolloverRequested = true
+						if hardMaxReached && !rolloverMaxLogged {
+							log.Log.Info("capture.main.HandleRecordStream(motiondetection): max recording period reached, waiting for next keyframe to close without dropping frames")
+							rolloverMaxLogged = true
+						}
+					}
+
+					if start && rolloverRequested && nextPkt.IsKeyFrame {
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(motionTimestamp+postRecording-now, 10) + " < 0")
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-500 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-500, 10))
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(motionTimestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
@@ -551,7 +594,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						} else if videoCodec == "H265" {
 							videoTrack = mp4Video.AddVideoTrack("H265")
 						}
-						audioWriter = newRecordingAudioWriter(mp4Video, audioCodec, config.Capture.IPCamera.SampleRate, config.Capture.IPCamera.Channels, "capture.main.HandleRecordStream(motiondetection)")
+						audioWriter = newRecordingAudioWriter(mp4Video, audioCodec, config.Capture.IPCamera.SampleRate, config.Capture.IPCamera.Channels, audioBitDepth, "capture.main.HandleRecordStream(motiondetection)")
 						start = true
 					}
 					if start {
