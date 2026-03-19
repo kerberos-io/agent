@@ -367,6 +367,8 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 					IsVideo:       false,
 					IsAudio:       true,
 					IsBackChannel: false,
+					SampleRate:    defaultPCMUSampleRate,
+					Channels:      defaultPCMUChannels,
 				})
 
 				// Set the index for the audio
@@ -509,6 +511,8 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 				IsVideo:       false,
 				IsAudio:       true,
 				IsBackChannel: true,
+				SampleRate:    defaultPCMUSampleRate,
+				Channels:      defaultPCMUChannels,
 			})
 			// Set the index for the audio
 			g.AudioG711IndexBackChannel = int8(len(g.Streams)) - 1

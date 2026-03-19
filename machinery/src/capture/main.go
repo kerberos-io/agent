@@ -105,7 +105,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			//var cws *cacheWriterSeeker
 			var mp4Video *video.MP4
 			var videoTrack uint32
-			var audioTrack uint32
+			var audioWriter *recordingAudioWriter
 			var name string
 
 			// Do not do anything!
@@ -147,16 +147,16 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
-						// Write the last packet
-						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-							}
-						} else if pkt.Codec == "PCM_MULAW" {
-							// TODO: transcode to AAC, some work to do..
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
+						if err := audioWriter.WritePacket(pkt); err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					}
+
+					if err := audioWriter.Flush(); err != nil {
+						log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
+					}
+					audioWriter.Close()
+					audioWriter = nil
 
 					// Close mp4
 					if len(mp4Video.SPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.SPSNALUs) > 0 {
@@ -305,11 +305,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					} else if videoCodec == "H265" {
 						videoTrack = mp4Video.AddVideoTrack("H265")
 					}
-					if audioCodec == "AAC" {
-						audioTrack = mp4Video.AddAudioTrack("AAC")
-					} else if audioCodec == "PCM_MULAW" {
-						log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
-					}
+					audioWriter = newRecordingAudioWriter(mp4Video, audioCodec, config.Capture.IPCamera.SampleRate, config.Capture.IPCamera.Channels, "capture.main.HandleRecordStream(continuous)")
 
 					pts := convertPTS(pkt.TimeLegacy)
 					if pkt.IsVideo {
@@ -317,15 +313,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
-						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-							}
-						} else if pkt.Codec == "PCM_MULAW" {
-							// TODO: transcode to AAC, some work to do..
-							// We might need to use ffmpeg to transcode the audio to AAC.
-							// For now we will skip the audio track.
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
+						if err := audioWriter.WritePacket(pkt); err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					}
 					recordingStatus = "started"
@@ -339,13 +328,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					} else if pkt.IsAudio {
-						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-							}
-						} else if pkt.Codec == "PCM_MULAW" {
-							// TODO: transcode to AAC, some work to do..
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
+						if err := audioWriter.WritePacket(pkt); err != nil {
+							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
 					}
 				}
@@ -355,6 +339,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			// We might have interrupted the recording while restarting the agent.
 			// If this happens we need to check to properly close the recording.
 			if cursorError != nil {
+				if audioWriter != nil {
+					audioWriter.Close()
+					audioWriter = nil
+				}
 				if recordingStatus == "started" {
 
 					log.Log.Info("capture.main.HandleRecordStream(continuous): Recording finished: file save: " + name)
@@ -434,7 +422,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var displayTime int64 = 0       // display time in milliseconds
 
 			var videoTrack uint32
-			var audioTrack uint32
 
 			for motion := range communication.HandleMotion {
 
@@ -520,6 +507,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				}
 				// Create the MP4 only once the first keyframe arrives.
 				var mp4Video *video.MP4
+				var audioWriter *recordingAudioWriter
 
 				for cursorError == nil {
 
@@ -563,11 +551,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						} else if videoCodec == "H265" {
 							videoTrack = mp4Video.AddVideoTrack("H265")
 						}
-						if audioCodec == "AAC" {
-							audioTrack = mp4Video.AddAudioTrack("AAC")
-						} else if audioCodec == "PCM_MULAW" {
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
-						}
+						audioWriter = newRecordingAudioWriter(mp4Video, audioCodec, config.Capture.IPCamera.SampleRate, config.Capture.IPCamera.Channels, "capture.main.HandleRecordStream(motiondetection)")
 						start = true
 					}
 					if start {
@@ -581,17 +565,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							}
 						} else if pkt.IsAudio {
 							log.Log.Debug("capture.main.HandleRecordStream(motiondetection): add audio sample")
-							if pkt.Codec == "AAC" {
-								if mp4Video != nil {
-									if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-										log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
-									}
+							if mp4Video != nil {
+								if err := audioWriter.WritePacket(pkt); err != nil {
+									log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
 								}
-							} else if pkt.Codec == "PCM_MULAW" {
-								// TODO: transcode to AAC, some work to do..
-								// We might need to use ffmpeg to transcode the audio to AAC.
-								// For now we will skip the audio track.
-								log.Log.Debug("capture.main.HandleRecordStream(motiondetection): no AAC audio codec detected, skipping audio track.")
 							}
 						}
 					}
@@ -604,9 +581,17 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				lastRecordingTime = pkt.CurrentTime
 
 				if mp4Video == nil {
+					if audioWriter != nil {
+						audioWriter.Close()
+					}
 					log.Log.Warning("capture.main.HandleRecordStream(motiondetection): recording closed without keyframe; no MP4 created")
 					continue
 				}
+
+				if err := audioWriter.Flush(); err != nil {
+					log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
+				}
+				audioWriter.Close()
 
 				// This will close the recording and write the last packet.
 				if len(mp4Video.SPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.SPSNALUs) > 0 {
