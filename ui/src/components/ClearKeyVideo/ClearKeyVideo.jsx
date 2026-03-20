@@ -2,8 +2,87 @@ import React, { useEffect, useRef } from 'react';
 import './ClearKeyVideo.scss';
 
 const DEFAULT_MIME = 'video/mp4; codecs="avc1.4d0033"';
-const DEFAULT_KID = 'gqDkMcXXD6OswvkMod1mEA';
-const DEFAULT_KEY = 'm3vJ57VuktuHrDz3tPv2ng';
+
+const base64UrlToBytes = (value) => {
+  if (!value) {
+    return null;
+  }
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+  try {
+    const decoded = atob(padded);
+    return Uint8Array.from(decoded, (c) => c.charCodeAt(0));
+  } catch (err) {
+    return null;
+  }
+};
+
+const bytesToBase64Url = (bytes) => {
+  const binary = Array.from(bytes, (b) => String.fromCharCode(b)).join('');
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+};
+
+const hexToBytes = (hex) => {
+  const cleaned = hex.toLowerCase();
+  if (!/^[0-9a-f]+$/.test(cleaned) || cleaned.length % 2 !== 0) {
+    return null;
+  }
+  const bytes = new Uint8Array(cleaned.length / 2);
+  for (let i = 0; i < bytes.length; i += 1) {
+    bytes[i] = parseInt(cleaned.slice(i * 2, i * 2 + 2), 16);
+  }
+  return bytes;
+};
+
+const parseSymmetricKey = (value) => {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  const noDashes = trimmed.replace(/-/g, '');
+
+  if (noDashes.length === 32 && /^[0-9a-fA-F]+$/.test(noDashes)) {
+    return hexToBytes(noDashes);
+  }
+
+  const base64Bytes = base64UrlToBytes(trimmed);
+  if (base64Bytes && base64Bytes.length === 16) {
+    return base64Bytes;
+  }
+
+  return null;
+};
+
+const sha256 = async (data) => {
+  if (!window.crypto || !window.crypto.subtle) {
+    return null;
+  }
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  return new Uint8Array(digest);
+};
+
+const deriveKeyMaterial = async (symmetricKey) => {
+  const keyBytes = parseSymmetricKey(symmetricKey);
+  if (keyBytes) {
+    const sum = await sha256(keyBytes);
+    if (!sum) {
+      return null;
+    }
+    return {
+      key: bytesToBase64Url(keyBytes),
+      kid: bytesToBase64Url(sum.slice(0, 16)),
+    };
+  }
+
+  const sum = await sha256(new TextEncoder().encode(symmetricKey));
+  if (!sum) {
+    return null;
+  }
+  return {
+    key: bytesToBase64Url(sum.slice(0, 16)),
+    kid: bytesToBase64Url(sum.slice(16, 32)),
+  };
+};
 
 const readUint64 = (view, offset) => {
   const high = view.getUint32(offset);
@@ -87,16 +166,18 @@ const splitFmp4 = (arrayBuffer) => {
 function ClearKeyVideo({
   src,
   mime = DEFAULT_MIME,
-  kid = DEFAULT_KID,
-  key = DEFAULT_KEY,
+  kid = '',
+  key = '',
+  symmetricKey = '',
   className = '',
   controls = true,
 }) {
   const videoRef = useRef(null);
+  const hasKeyMaterial = !!symmetricKey || (!!kid && !!key);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !src) {
+    if (!video || !src || !hasKeyMaterial) {
       return undefined;
     }
 
@@ -126,16 +207,43 @@ function ClearKeyVideo({
       mediaKeysReadyResolve = resolve;
     });
     let mediaKeysSet = false;
+    let keyMaterial = { kid, key };
+    let keyMaterialPromise;
+
+    const ensureKeyMaterial = async () => {
+      if (kid && key) {
+        return { kid, key };
+      }
+      if (!symmetricKey) {
+        return keyMaterial;
+      }
+      if (!keyMaterialPromise) {
+        keyMaterialPromise = deriveKeyMaterial(symmetricKey);
+      }
+      const derived = await keyMaterialPromise;
+      if (derived) {
+        keyMaterial = derived;
+      }
+      return keyMaterial;
+    };
 
     const handleEncrypted = async (event) => {
       await mediaKeysReady;
       if (!video.mediaKeys) {
         return;
       }
+      const resolved = await ensureKeyMaterial();
+      if (!resolved.kid || !resolved.key) {
+        return;
+      }
       const session = video.mediaKeys.createSession();
       session.addEventListener('message', async () => {
+        const resolved = await ensureKeyMaterial();
+        if (!resolved.kid || !resolved.key) {
+          return;
+        }
         const license = JSON.stringify({
-          keys: [{ kty: 'oct', kid, k: key }],
+          keys: [{ kty: 'oct', kid: resolved.kid, k: resolved.key }],
           type: 'temporary',
         });
         const licenseBytes = new TextEncoder().encode(license);
@@ -149,6 +257,10 @@ function ClearKeyVideo({
         return;
       }
       if (!MediaSource.isTypeSupported(mime)) {
+        return;
+      }
+      const resolved = await ensureKeyMaterial();
+      if (!resolved.kid || !resolved.key) {
         return;
       }
       const keyConfig = [
@@ -220,9 +332,17 @@ function ClearKeyVideo({
       }
       URL.revokeObjectURL(objectUrl);
     };
-  }, [src, mime, kid, key]);
+  }, [src, mime, kid, key, symmetricKey, hasKeyMaterial]);
 
   const videoClassName = `clearkey-video ${className}`.trim();
+  if (!hasKeyMaterial) {
+    return (
+      <div className="clearkey-placeholder">
+        Loading encryption key…
+      </div>
+    );
+  }
+
   return <video ref={videoRef} className={videoClassName} controls={controls} />;
 }
 

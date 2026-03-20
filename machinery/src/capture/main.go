@@ -212,8 +212,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
 					}
 
-
-
 					// Create a symbol link.
 					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
 					fc.Close()
@@ -377,8 +375,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					} else {
 						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
 					}
-
-
 
 					// Create a symbol link.
 					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
@@ -623,8 +619,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				} else {
 					log.Log.Info("capture.main.HandleRecordStream(motiondetection): no video data recorded, not renaming file.")
 				}
-
-
 
 				// Create a symbol linc.
 				fc, _ := os.Create(configDirectory + "/data/cloud/" + name)

@@ -15,8 +15,8 @@ import {
 } from '@kerberos-io/ui';
 import { Link, withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
-import { getEvents } from '../../actions/agent';
-import config from '../../config';
+import { getEvents, getConfig } from '../../actions/agent';
+import appConfig from '../../config';
 import ClearKeyVideo from '../../components/ClearKeyVideo/ClearKeyVideo';
 import './Media.scss';
 
@@ -74,9 +74,10 @@ class Media extends React.Component {
   }
 
   componentDidMount() {
-    const { dispatchGetEvents } = this.props;
+    const { dispatchGetEvents, dispatchGetConfig } = this.props;
     const { appliedFilter } = this.state;
     dispatchGetEvents(appliedFilter);
+    dispatchGetConfig();
     document.addEventListener('scroll', this.trackScrolling);
   }
 
@@ -206,9 +207,13 @@ class Media extends React.Component {
   }
 
   render() {
-    const { events, eventsLoaded, t } = this.props;
+    const { events, eventsLoaded, t, config: configResponse } = this.props;
     const { isScrolling, open, currentRecording, startDateTime, endDateTime } =
       this.state;
+    const symmetricKey =
+      configResponse && configResponse.config && configResponse.config.encryption
+        ? configResponse.config.encryption.symmetric_key
+        : '';
 
     return (
       <div id="media">
@@ -261,13 +266,16 @@ class Media extends React.Component {
           {events.map((event) => (
             <div
               key={event.key}
-              onClick={() => this.openModal(`${config.URL}/file/${event.key}`)}
+              onClick={() =>
+                this.openModal(`${appConfig.URL}/file/${event.key}`)
+              }
             >
               <div className="videocard-embedded videocard-media">
                 <Block>
                   <BlockBody>
                     <ClearKeyVideo
-                      src={`${config.URL}/file/${event.key}`}
+                      src={`${appConfig.URL}/file/${event.key}`}
+                      symmetricKey={symmetricKey}
                       className="videocard-video"
                       controls={false}
                     />
@@ -293,7 +301,7 @@ class Media extends React.Component {
               onClose={() => this.handleClose()}
             />
             <ModalBody>
-              <ClearKeyVideo src={currentRecording} />
+              <ClearKeyVideo src={currentRecording} symmetricKey={symmetricKey} />
             </ModalBody>
             <ModalFooter
               right={
@@ -340,18 +348,22 @@ class Media extends React.Component {
 const mapStateToProps = (state /* , ownProps */) => ({
   events: state.agent.events,
   eventsLoaded: state.agent.eventsLoaded,
+  config: state.agent.config,
 });
 
 const mapDispatchToProps = (dispatch) => ({
   dispatchGetEvents: (eventFilter, success, error, append) =>
     dispatch(getEvents(eventFilter, success, error, append)),
+  dispatchGetConfig: () => dispatch(getConfig()),
 });
 
 Media.propTypes = {
   t: PropTypes.func.isRequired,
   events: PropTypes.arrayOf(PropTypes.object).isRequired,
   eventsLoaded: PropTypes.number.isRequired,
+  config: PropTypes.object,
   dispatchGetEvents: PropTypes.func.isRequired,
+  dispatchGetConfig: PropTypes.func.isRequired,
 };
 
 export default withTranslation()(

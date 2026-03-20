@@ -3,8 +3,8 @@ package video
 import (
 	"bufio"
 	"bytes"
-	"crypto/sha256"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -75,12 +75,12 @@ type MP4 struct {
 	TotalKeyframesWritten   int               // Total keyframes written to trun boxes
 	FragmentKeyframeCount   int               // Keyframes in the current fragment
 	PendingSampleIsKeyframe bool              // Whether the pending video sample is a keyframe
-	EncryptRecordings        bool
-	EncryptionKey            []byte
-	EncryptionIV             []byte
-	EncryptionKID            mp4ff.UUID
-	EncryptionPssh           []*mp4ff.PsshBox
-	EncryptionIPD            *mp4ff.InitProtectData
+	EncryptRecordings       bool
+	EncryptionKey           []byte
+	EncryptionIV            []byte
+	EncryptionKID           mp4ff.UUID
+	EncryptionPssh          []*mp4ff.PsshBox
+	EncryptionIPD           *mp4ff.InitProtectData
 }
 
 // NewMP4 creates a new MP4 object.
