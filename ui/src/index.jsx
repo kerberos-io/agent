@@ -16,6 +16,7 @@ import Login from './pages/Login/Login';
 import Dashboard from './pages/Dashboard/Dashboard';
 import Media from './pages/Media/Media';
 import Settings from './pages/Settings/Settings';
+import ClearKeyPlayer from './pages/ClearKeyPlayer/ClearKeyPlayer';
 import RequireAuth from './containers/RequireAuth';
 import RequireGuest from './containers/RequireGuest';
 import './i18n';
@@ -76,6 +77,7 @@ ReactDOM.render(
             <Route exact path="/" render={() => <Redirect to="/dashboard" />} />
             <Route exact path="/media" component={RequireAuth(Media)} />
             <Route exact path="/settings" component={RequireAuth(Settings)} />
+            <Route exact path="/clearkey" component={RequireAuth(ClearKeyPlayer)} />
           </App>
         </Suspense>
       </Switch>

@@ -125,6 +125,11 @@ class App extends React.Component {
                   icon="preferences"
                   link="settings"
                 />
+                <NavigationItem
+                  title="ClearKey Demo"
+                  icon="media"
+                  link="clearkey"
+                />
               </NavigationGroup>
               <NavigationSection title={t('navigation.help_support')} />
               <NavigationGroup>

@@ -4,7 +4,9 @@ import { withTranslation } from 'react-i18next';
 import {
   Breadcrumb,
   ControlBar,
-  VideoCard,
+  Block,
+  BlockBody,
+  BlockFooter,
   Button,
   Modal,
   ModalHeader,
@@ -15,6 +17,7 @@ import { Link, withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { getEvents } from '../../actions/agent';
 import config from '../../config';
+import ClearKeyVideo from '../../components/ClearKeyVideo/ClearKeyVideo';
 import './Media.scss';
 
 function formatDateTimeLocal(date) {
@@ -260,18 +263,21 @@ class Media extends React.Component {
               key={event.key}
               onClick={() => this.openModal(`${config.URL}/file/${event.key}`)}
             >
-              <VideoCard
-                isMediaWall
-                videoSrc={`${config.URL}/file/${event.key}`}
-                hours={event.time}
-                month={event.short_day}
-                videoStatus=""
-                duration=""
-                headerStatus=""
-                headerStatusTitle=""
-                handleClickHD={() => true}
-                handleClickSD={() => true}
-              />
+              <div className="videocard-embedded videocard-media">
+                <Block>
+                  <BlockBody>
+                    <ClearKeyVideo
+                      src={`${config.URL}/file/${event.key}`}
+                      className="videocard-video"
+                      controls={false}
+                    />
+                  </BlockBody>
+                  <BlockFooter>
+                    <p className="month">{event.short_day}</p>
+                    <p className="hours">{event.time}</p>
+                  </BlockFooter>
+                </Block>
+              </div>
             </div>
           ))}
         </div>
@@ -287,9 +293,7 @@ class Media extends React.Component {
               onClose={() => this.handleClose()}
             />
             <ModalBody>
-              <video controls autoPlay>
-                <source src={currentRecording} type="video/mp4" />
-              </video>
+              <ClearKeyVideo src={currentRecording} />
             </ModalBody>
             <ModalFooter
               right={

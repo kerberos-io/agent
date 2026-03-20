@@ -15,7 +15,6 @@ import (
 
 	_ "github.com/kerberos-io/agent/machinery/docs"
 	"github.com/kerberos-io/agent/machinery/src/capture"
-	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -83,6 +82,11 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	r.Use(static.Serve("/media", static.LocalFile(configDirectory+"/www", true)))
 	r.Use(static.Serve("/settings", static.LocalFile(configDirectory+"/www", true)))
 	r.Use(static.Serve("/login", static.LocalFile(configDirectory+"/www", true)))
+	r.Handle("GET", "/debug/recordings", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"recordings_path": configDirectory + "/data/recordings",
+		})
+	})
 	r.Handle("GET", "/file/*filepath", func(c *gin.Context) {
 		Files(c, configDirectory, configuration)
 	})
@@ -106,26 +110,6 @@ func Files(c *gin.Context, configDirectory string, configuration *models.Configu
 
 	contents, err := os.ReadFile(filePath)
 	if err == nil {
-
-		// Get symmetric key
-		symmetricKey := configuration.Config.Encryption.SymmetricKey
-		encryptedRecordings := configuration.Config.Encryption.Recordings
-		// Decrypt file
-		if encryptedRecordings == "true" && symmetricKey != "" {
-
-			// Read file
-			if err != nil {
-				c.JSON(404, gin.H{"error": "File not found"})
-				return
-			}
-
-			// Decrypt file
-			contents, err = encryption.AesDecrypt(contents, symmetricKey)
-			if err != nil {
-				c.JSON(404, gin.H{"error": "File not found"})
-				return
-			}
-		}
 
 		// Get fileSize from contents
 		fileSize := len(contents)

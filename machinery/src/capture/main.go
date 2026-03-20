@@ -11,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/conditions"
-	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
@@ -133,6 +132,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 			for cursorError == nil {
 
+				encryptRecordings := config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != ""
+
 				nextPkt, cursorError = recordingCursor.ReadPacket()
 
 				now := time.Now().UnixMilli()
@@ -146,7 +147,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
-					} else if pkt.IsAudio {
+					} else if pkt.IsAudio && !encryptRecordings {
 						// Write the last packet
 						if pkt.Codec == "AAC" {
 							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
@@ -211,26 +212,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
 					}
 
-					// Check if we need to encrypt the recording.
-					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
-						// reopen file into memory 'fullName'
-						contents, err := os.ReadFile(fullName)
-						if err == nil {
-							// encrypt
-							encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
-							if err == nil {
-								// write back to file
-								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
-								if err != nil {
-									log.Log.Error("capture.main.HandleRecordStream(continuous): error writing file: " + err.Error())
-								}
-							} else {
-								log.Log.Error("capture.main.HandleRecordStream(continuous): error encrypting file: " + err.Error())
-							}
-						} else {
-							log.Log.Error("capture.main.HandleRecordStream(continuous): error reading file: " + err.Error())
-						}
-					}
+
 
 					// Create a symbol link.
 					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
@@ -299,13 +281,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					mp4Video = video.NewMP4(fullName, spsNALUS, ppsNALUS, vpsNALUS, configuration.Config.Capture.MaxLengthRecording)
 					mp4Video.SetWidth(width)
 					mp4Video.SetHeight(height)
+					mp4Video.ConfigureEncryption(&config)
 
 					if videoCodec == "H264" {
 						videoTrack = mp4Video.AddVideoTrack("H264")
 					} else if videoCodec == "H265" {
 						videoTrack = mp4Video.AddVideoTrack("H265")
 					}
-					if audioCodec == "AAC" {
+					if audioCodec == "AAC" && !encryptRecordings {
 						audioTrack = mp4Video.AddAudioTrack("AAC")
 					} else if audioCodec == "PCM_MULAW" {
 						log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
@@ -316,7 +299,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
-					} else if pkt.IsAudio {
+					} else if pkt.IsAudio && !encryptRecordings {
 						if pkt.Codec == "AAC" {
 							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -338,7 +321,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
 						}
-					} else if pkt.IsAudio {
+					} else if pkt.IsAudio && !encryptRecordings {
 						if pkt.Codec == "AAC" {
 							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
 								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
@@ -395,26 +378,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
 					}
 
-					// Check if we need to encrypt the recording.
-					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
-						// reopen file into memory 'fullName'
-						contents, err := os.ReadFile(fullName)
-						if err == nil {
-							// encrypt
-							encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
-							if err == nil {
-								// write back to file
-								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
-								if err != nil {
-									log.Log.Error("capture.main.HandleRecordStream(motiondetection): error writing file: " + err.Error())
-								}
-							} else {
-								log.Log.Error("capture.main.HandleRecordStream(motiondetection): error encrypting file: " + err.Error())
-							}
-						} else {
-							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error reading file: " + err.Error())
-						}
-					}
+
 
 					// Create a symbol link.
 					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
@@ -437,6 +401,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var audioTrack uint32
 
 			for motion := range communication.HandleMotion {
+
+				encryptRecordings := config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != ""
 
 				// Get as much packets we need.
 				var cursorError error
@@ -557,13 +523,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						mp4Video = video.NewMP4(fullName, spsNALUS, ppsNALUS, vpsNALUS, configuration.Config.Capture.MaxLengthRecording)
 						mp4Video.SetWidth(width)
 						mp4Video.SetHeight(height)
+						mp4Video.ConfigureEncryption(&config)
 
 						if videoCodec == "H264" {
 							videoTrack = mp4Video.AddVideoTrack("H264")
 						} else if videoCodec == "H265" {
 							videoTrack = mp4Video.AddVideoTrack("H265")
 						}
-						if audioCodec == "AAC" {
+						if audioCodec == "AAC" && !encryptRecordings {
 							audioTrack = mp4Video.AddAudioTrack("AAC")
 						} else if audioCodec == "PCM_MULAW" {
 							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
@@ -579,7 +546,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 									log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
 								}
 							}
-						} else if pkt.IsAudio {
+						} else if pkt.IsAudio && !encryptRecordings {
 							log.Log.Debug("capture.main.HandleRecordStream(motiondetection): add audio sample")
 							if pkt.Codec == "AAC" {
 								if mp4Video != nil {
@@ -657,26 +624,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					log.Log.Info("capture.main.HandleRecordStream(motiondetection): no video data recorded, not renaming file.")
 				}
 
-				// Check if we need to encrypt the recording.
-				if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
-					// reopen file into memory 'fullName'
-					contents, err := os.ReadFile(fullName)
-					if err == nil {
-						// encrypt
-						encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
-						if err == nil {
-							// write back to file
-							err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
-							if err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(motiondetection): error writing file: " + err.Error())
-							}
-						} else {
-							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error encrypting file: " + err.Error())
-						}
-					} else {
-						log.Log.Error("capture.main.HandleRecordStream(motiondetection): error reading file: " + err.Error())
-					}
-				}
+
 
 				// Create a symbol linc.
 				fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
