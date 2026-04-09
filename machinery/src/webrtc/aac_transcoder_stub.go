@@ -129,7 +129,7 @@ func (t *AACTranscoder) Transcode(adtsData []byte) ([]byte, error) {
 		return nil, err
 	}
 	if len(adtsData) <= 512 || len(adtsData)%1024 == 0 {
-		log.Log.Info("webrtc.aac_transcoder: wrote AAC bytes to ffmpeg, input=" + strconv.Itoa(len(adtsData)))
+		log.Log.Debug("webrtc.aac_transcoder: wrote AAC bytes to ffmpeg, input=" + strconv.Itoa(len(adtsData)))
 	}
 
 	deadline := time.Now().Add(75 * time.Millisecond)
@@ -144,7 +144,7 @@ func (t *AACTranscoder) Transcode(adtsData []byte) ([]byte, error) {
 			if stderr := t.stderrString(); stderr != "" {
 				log.Log.Warning("webrtc.aac_transcoder: no output before deadline, ffmpeg stderr: " + stderr)
 			} else {
-				log.Log.Info("webrtc.aac_transcoder: no PCMU output before deadline")
+				log.Log.Debug("webrtc.aac_transcoder: no PCMU output before deadline")
 			}
 			return nil, nil
 		}
