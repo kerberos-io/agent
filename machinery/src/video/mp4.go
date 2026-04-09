@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -820,32 +819,6 @@ func (mp4 *MP4) Close(config *models.Config) {
 	mp4.FileWriter.Close()
 }
 
-func deriveCencMaterial(sym string) (key []byte, kid []byte, iv []byte, usedFallback bool, err error) {
-	if sym == "" {
-		return nil, nil, nil, false, errors.New("empty symmetric key")
-	}
-
-	key, err = mp4ff.UnpackKey(sym)
-	if err != nil {
-		usedFallback = true
-		sum := sha256.Sum256([]byte(sym))
-		key = append([]byte(nil), sum[:16]...)
-		kid = append([]byte(nil), sum[16:32]...)
-		ivSum := sha256.Sum256(append([]byte("iv:"), []byte(sym)...))
-		iv = append([]byte(nil), ivSum[:16]...)
-		return key, kid, iv, usedFallback, nil
-	}
-
-	sum := sha256.Sum256(key)
-	kid = append([]byte(nil), sum[:16]...)
-	ivSeed := make([]byte, 0, 3+len(key))
-	ivSeed = append(ivSeed, []byte("iv:")...)
-	ivSeed = append(ivSeed, key...)
-	ivSum := sha256.Sum256(ivSeed)
-	iv = append([]byte(nil), ivSum[:16]...)
-	return key, kid, iv, false, nil
-}
-
 func buildPsshBoxes(kidUUID mp4ff.UUID) ([]*mp4ff.PsshBox, error) {
 	systemID, err := mp4ff.NewUUIDFromString(mp4ff.UUID_W3C_COMMON)
 	if err != nil {
@@ -875,7 +848,7 @@ func (mp4 *MP4) ConfigureEncryption(config *models.Config) {
 		return
 	}
 
-	key, kid, iv, usedFallback, err := deriveCencMaterial(config.Encryption.SymmetricKey)
+	key, kid, iv, usedFallback, err := encryption.DeriveCencMaterial(config.Encryption.SymmetricKey)
 	if err != nil {
 		log.Log.Error("mp4.ConfigureEncryption(): " + err.Error())
 		return
