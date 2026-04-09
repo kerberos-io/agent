@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Eyevinn/mp4ff/mp4"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -412,6 +413,96 @@ func Decrypt(directoryOrFile string, symmetricKey []byte) {
 			return
 		}
 	}
+}
+
+// DecryptRecording decrypts CENC-encrypted fragmented MP4 recordings using the agent symmetric key.
+func DecryptRecording(directoryOrFile string, symmetricKey string) error {
+	if strings.TrimSpace(symmetricKey) == "" {
+		return errors.New("symmetric key should not be empty")
+	}
+
+	fileInfo, err := os.Stat(directoryOrFile)
+	if err != nil {
+		return err
+	}
+
+	var files []string
+	if fileInfo.IsDir() {
+		dir, err := os.ReadDir(directoryOrFile)
+		if err != nil {
+			return err
+		}
+		for _, file := range dir {
+			if !file.IsDir() && strings.HasSuffix(file.Name(), ".mp4") {
+				files = append(files, filepath.Join(directoryOrFile, file.Name()))
+			}
+		}
+	} else {
+		files = append(files, directoryOrFile)
+	}
+
+	for _, file := range files {
+		if err := decryptRecordingFile(file, symmetricKey); err != nil {
+			return fmt.Errorf("decrypt %s: %w", file, err)
+		}
+	}
+
+	return nil
+}
+
+func decryptRecordingFile(filePath string, symmetricKey string) error {
+	key, _, _, _, err := encryption.DeriveCencMaterial(symmetricKey)
+	if err != nil {
+		return err
+	}
+
+	inFile, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer inFile.Close()
+
+	mp4File, err := mp4.DecodeFile(inFile)
+	if err != nil {
+		return err
+	}
+	if !mp4File.IsFragmented() {
+		return errors.New("file not fragmented. Not supported")
+	}
+	if mp4File.Init == nil {
+		return errors.New("missing init segment")
+	}
+
+	decryptInfo, err := mp4.DecryptInit(mp4File.Init)
+	if err != nil {
+		return err
+	}
+
+	outDir := filepath.Join(filepath.Dir(filePath), "decrypted")
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return err
+	}
+	outFilePath := filepath.Join(outDir, filepath.Base(filePath))
+	outFile, err := os.Create(outFilePath)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	if err := mp4File.Init.Encode(outFile); err != nil {
+		return err
+	}
+
+	for _, seg := range mp4File.Segments {
+		if err := mp4.DecryptSegment(seg, decryptInfo, key); err != nil {
+			return err
+		}
+		if err := seg.Encode(outFile); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func ImageToBytes(img *image.Image) ([]byte, error) {

@@ -116,19 +116,16 @@ func main() {
 		}
 	case "decrypt":
 		{
-			log.Log.Info("main.Main(): Decrypting: " + flag.Arg(0) + " with key: " + flag.Arg(1))
-			symmetricKey := []byte(flag.Arg(1))
-
-			if len(symmetricKey) == 0 {
+			log.Log.Info("main.Main(): Decrypting recording: " + flag.Arg(0))
+			symmetricKey := flag.Arg(1)
+			if symmetricKey == "" {
 				log.Log.Fatal("main.Main(): symmetric key should not be empty")
 				return
 			}
-			if len(symmetricKey) != 32 {
-				log.Log.Fatal("main.Main(): symmetric key should be 32 bytes")
+			if err := utils.DecryptRecording(flag.Arg(0), symmetricKey); err != nil {
+				log.Log.Fatal("main.Main(): decrypt failed: " + err.Error())
 				return
 			}
-
-			utils.Decrypt(flag.Arg(0), symmetricKey)
 		}
 
 	case "run":

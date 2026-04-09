@@ -74,6 +74,12 @@ type MP4 struct {
 	TotalKeyframesWritten   int               // Total keyframes written to trun boxes
 	FragmentKeyframeCount   int               // Keyframes in the current fragment
 	PendingSampleIsKeyframe bool              // Whether the pending video sample is a keyframe
+	EncryptRecordings       bool
+	EncryptionKey           []byte
+	EncryptionIV            []byte
+	EncryptionKID           mp4ff.UUID
+	EncryptionPssh          []*mp4ff.PsshBox
+	EncryptionIPD           *mp4ff.InitProtectData
 }
 
 // NewMP4 creates a new MP4 object.
@@ -309,9 +315,13 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 				segDuration := mp4.VideoTotalDuration - mp4.FragmentStartDTS
 				mp4.SegmentDurations = append(mp4.SegmentDurations, segDuration)
 				mp4.SegmentBaseDecTimes = append(mp4.SegmentBaseDecTimes, mp4.FragmentStartDTS)
-				err := mp4.Segment.Encode(mp4.Writer)
-				if err != nil {
-					log.Log.Error("mp4.AddSampleToTrack(): error encoding segment: " + err.Error())
+				if mp4.EncryptRecordings {
+					if encErr := mp4.encryptSegment(mp4.Segment); encErr != nil {
+						log.Log.Error("mp4.AddSampleToTrack(): encrypt segment failed: " + encErr.Error())
+					}
+				}
+				if segErr := mp4.Segment.Encode(mp4.Writer); segErr != nil {
+					log.Log.Error("mp4.AddSampleToTrack(): error encoding segment: " + segErr.Error())
 				}
 				mp4.Segments = append(mp4.Segments, mp4.Segment)
 			}
@@ -481,9 +491,13 @@ func (mp4 *MP4) Close(config *models.Config) {
 		mp4.SegmentDurations = append(mp4.SegmentDurations, lastSegDuration)
 		mp4.SegmentBaseDecTimes = append(mp4.SegmentBaseDecTimes, mp4.FragmentStartDTS)
 
-		err := mp4.Segment.Encode(mp4.Writer)
-		if err != nil {
-			log.Log.Error("mp4.Close(): error encoding last segment: " + err.Error())
+		if mp4.EncryptRecordings {
+			if encErr := mp4.encryptSegment(mp4.Segment); encErr != nil {
+				log.Log.Error("mp4.Close(): encrypt segment failed: " + encErr.Error())
+			}
+		}
+		if segErr := mp4.Segment.Encode(mp4.Writer); segErr != nil {
+			log.Log.Error("mp4.Close(): error encoding last segment: " + segErr.Error())
 		}
 	}
 
@@ -626,6 +640,13 @@ func (mp4 *MP4) Close(config *models.Config) {
 		init.Moov.Traks[1].Mdia.Mdhd.Duration = 0
 		init.Moov.Traks[1].Mdia.Mdhd.CreationTime = macTime
 		init.Moov.Traks[1].Mdia.Mdhd.ModificationTime = macTime
+	}
+
+	if mp4.EncryptRecordings {
+		_, err := mp4ff.InitProtect(init, mp4.EncryptionKey, mp4.EncryptionIV, "cenc", mp4.EncryptionKID, mp4.EncryptionPssh)
+		if err != nil {
+			log.Log.Error("mp4.Close(): init protect failed: " + err.Error())
+		}
 	}
 
 	// Try adding subtitle track if available
@@ -796,6 +817,143 @@ func (mp4 *MP4) Close(config *models.Config) {
 		log.Log.Error("mp4.Close(): error syncing file: " + err.Error())
 	}
 	mp4.FileWriter.Close()
+}
+
+func buildPsshBoxes(kidUUID mp4ff.UUID) ([]*mp4ff.PsshBox, error) {
+	systemID, err := mp4ff.NewUUIDFromString(mp4ff.UUID_W3C_COMMON)
+	if err != nil {
+		return nil, err
+	}
+
+	pssh := &mp4ff.PsshBox{
+		Version:  1,
+		Flags:    0,
+		SystemID: systemID,
+		KIDs:     []mp4ff.UUID{kidUUID},
+		Data:     []byte{},
+	}
+
+	return []*mp4ff.PsshBox{pssh}, nil
+}
+
+func (mp4 *MP4) ConfigureEncryption(config *models.Config) {
+	if config == nil || config.Encryption == nil {
+		return
+	}
+	if config.Encryption.Enabled != "true" || config.Encryption.Recordings != "true" || config.Encryption.SymmetricKey == "" {
+		return
+	}
+	if mp4.AudioTotalDuration > 0 {
+		log.Log.Warning("mp4.ConfigureEncryption(): skipping encryption because audio track is present")
+		return
+	}
+
+	key, kid, iv, usedFallback, err := encryption.DeriveCencMaterial(config.Encryption.SymmetricKey)
+	if err != nil {
+		log.Log.Error("mp4.ConfigureEncryption(): " + err.Error())
+		return
+	}
+	if usedFallback {
+		log.Log.Warning("mp4.ConfigureEncryption(): symmetric key is not hex/base64/uuid; derived key material via SHA-256")
+	}
+
+	kidHex := fmt.Sprintf("%x", kid)
+	kidUUID, err := mp4ff.NewUUIDFromString(kidHex)
+	if err != nil {
+		log.Log.Error("mp4.ConfigureEncryption(): invalid KID: " + err.Error())
+		return
+	}
+
+	psshBoxes, err := buildPsshBoxes(kidUUID)
+	if err != nil {
+		log.Log.Error("mp4.ConfigureEncryption(): invalid PSSH system id: " + err.Error())
+	}
+
+	mp4.EncryptRecordings = true
+	mp4.EncryptionKey = key
+	mp4.EncryptionIV = iv
+	mp4.EncryptionKID = kidUUID
+	mp4.EncryptionPssh = psshBoxes
+}
+
+func (mp4 *MP4) encryptSegment(segment *mp4ff.MediaSegment) error {
+	if segment == nil {
+		return nil
+	}
+	if len(segment.Fragments) != 1 {
+		return fmt.Errorf("expected one fragment in segment")
+	}
+	if mp4.EncryptionIPD == nil {
+		init, err := mp4.buildEncryptionInit()
+		if err != nil {
+			return err
+		}
+		ipd, err := mp4ff.InitProtect(init, mp4.EncryptionKey, mp4.EncryptionIV, "cenc", mp4.EncryptionKID, mp4.EncryptionPssh)
+		if err != nil {
+			return err
+		}
+		mp4.EncryptionIPD = ipd
+	}
+
+	return mp4ff.EncryptFragment(segment.Fragments[0], mp4.EncryptionKey, mp4.EncryptionIV, mp4.EncryptionIPD)
+}
+
+func (mp4 *MP4) buildEncryptionInit() (*mp4ff.InitSegment, error) {
+	init := mp4ff.NewMP4Init()
+	ftyp := mp4ff.NewFtyp("isom", 512, []string{"iso2", "avc1", "hvc1", "mp41"})
+	init.AddChild(ftyp)
+
+	moov := mp4ff.NewMoovBox()
+	init.AddChild(moov)
+
+	macTime := mp4.StartTime + MacEpochOffset
+	nextTrackID := uint32(len(mp4.TrackIDs) + 1)
+	mvhd := &mp4ff.MvhdBox{
+		Version:          0,
+		Flags:            0,
+		CreationTime:     macTime,
+		ModificationTime: macTime,
+		Timescale:        1000,
+		Duration:         0,
+		Rate:             0x00010000,
+		Volume:           0x0100,
+		NextTrackID:      nextTrackID,
+	}
+	init.Moov.AddChild(mvhd)
+
+	mvex := mp4ff.NewMvexBox()
+	init.Moov.AddChild(mvex)
+
+	switch mp4.VideoTrackName {
+	case "H264", "AVC1":
+		init.AddEmptyTrack(1000, "video", "und")
+		spsNALUs, ppsNALUs := normalizeH264ParameterSets(mp4.SPSNALUs, mp4.PPSNALUs)
+		if err := init.Moov.Traks[0].SetAVCDescriptor("avc1", spsNALUs, ppsNALUs, true); err != nil {
+			return nil, fmt.Errorf("set AVC descriptor: %w", err)
+		}
+		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
+		init.Moov.Traks[0].Tkhd.Height = mp4ff.Fixed32(uint32(mp4.height) << 16)
+		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
+		init.Moov.Traks[0].Mdia.Mdhd.Duration = 0
+		init.Moov.Traks[0].Mdia.Mdhd.CreationTime = macTime
+		init.Moov.Traks[0].Mdia.Mdhd.ModificationTime = macTime
+	case "H265", "HVC1":
+		init.AddEmptyTrack(1000, "video", "und")
+		vpsNALUs, spsNALUs, ppsNALUs := normalizeH265ParameterSets(mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs)
+		if err := init.Moov.Traks[0].SetHEVCDescriptor("hvc1", vpsNALUs, spsNALUs, ppsNALUs, [][]byte{}, true); err != nil {
+			return nil, fmt.Errorf("set HEVC descriptor: %w", err)
+		}
+		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
+		init.Moov.Traks[0].Tkhd.Height = mp4ff.Fixed32(uint32(mp4.height) << 16)
+		init.Moov.Traks[0].Mdia.Hdlr.Name = "agent " + utils.VERSION
+		init.Moov.Traks[0].Mdia.Mdhd.Duration = 0
+		init.Moov.Traks[0].Mdia.Mdhd.CreationTime = macTime
+		init.Moov.Traks[0].Mdia.Mdhd.ModificationTime = macTime
+	default:
+		return nil, fmt.Errorf("unsupported video track type %s", mp4.VideoTrackName)
+	}
+
+	return init, nil
 }
 
 // annexBToLengthPrefixed converts Annex B formatted H264 data (with start codes)

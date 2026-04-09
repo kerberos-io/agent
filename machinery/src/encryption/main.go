@@ -12,6 +12,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"hash"
+
+	mp4ff "github.com/Eyevinn/mp4ff/mp4"
 )
 
 func DecryptWithPrivateKey(ciphertext string, privateKey *rsa.PrivateKey) ([]byte, error) {
@@ -123,4 +125,31 @@ func PKCS5Padding(src []byte, blockSize int) []byte {
 	padding := blockSize - len(src)%blockSize
 	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
 	return append(src, padtext...)
+}
+
+// DeriveCencMaterial returns the key, KID, and IV derivation used for CENC recordings.
+func DeriveCencMaterial(sym string) (key []byte, kid []byte, iv []byte, usedFallback bool, err error) {
+	if sym == "" {
+		return nil, nil, nil, false, errors.New("empty symmetric key")
+	}
+
+	key, err = mp4ff.UnpackKey(sym)
+	if err != nil {
+		usedFallback = true
+		sum := sha256.Sum256([]byte(sym))
+		key = append([]byte(nil), sum[:16]...)
+		kid = append([]byte(nil), sum[16:32]...)
+		ivSum := sha256.Sum256(append([]byte("iv:"), []byte(sym)...))
+		iv = append([]byte(nil), ivSum[:16]...)
+		return key, kid, iv, usedFallback, nil
+	}
+
+	sum := sha256.Sum256(key)
+	kid = append([]byte(nil), sum[:16]...)
+	ivSeed := make([]byte, 0, 3+len(key))
+	ivSeed = append(ivSeed, []byte("iv:")...)
+	ivSeed = append(ivSeed, key...)
+	ivSum := sha256.Sum256(ivSeed)
+	iv = append([]byte(nil), ivSum[:16]...)
+	return key, kid, iv, false, nil
 }

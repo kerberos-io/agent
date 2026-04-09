@@ -956,7 +956,7 @@ func processAudioPacket(pkt packets.Packet, state *streamState, audioBroadcaster
 		if len(pcmu) == 0 {
 			state.aacNoOutput++
 			if state.aacNoOutput <= 5 || state.aacNoOutput%100 == 0 {
-				log.Log.Info(fmt.Sprintf("webrtc.main.processAudioPacket(): AAC packet produced no PCMU output yet (aac_packets=%d, no_output=%d, input_bytes=%d)", state.aacPacketsSeen, state.aacNoOutput, len(pkt.Data)))
+				log.Log.Debug(fmt.Sprintf("webrtc.main.processAudioPacket(): AAC packet produced no PCMU output yet (aac_packets=%d, no_output=%d, input_bytes=%d)", state.aacPacketsSeen, state.aacNoOutput, len(pkt.Data)))
 			}
 			return // decoder still buffering
 		}
@@ -972,7 +972,7 @@ func processAudioPacket(pkt packets.Packet, state *streamState, audioBroadcaster
 		state.lastAudioSample.Duration = sampleDuration(pkt, state.lastAudioSample.PacketTimestamp, 20*time.Millisecond)
 		state.audioSamplesSent++
 		if state.audioSamplesSent <= 5 || state.audioSamplesSent%100 == 0 {
-			log.Log.Info(fmt.Sprintf("webrtc.main.processAudioPacket(): queueing audio sample (samples=%d, codec=%s, bytes=%d, duration_ms=%d, peers=%d)", state.audioSamplesSent, pkt.Codec, len(state.lastAudioSample.Data), state.lastAudioSample.Duration.Milliseconds(), audioBroadcaster.PeerCount()))
+			log.Log.Debug(fmt.Sprintf("webrtc.main.processAudioPacket(): queueing audio sample (samples=%d, codec=%s, bytes=%d, duration_ms=%d, peers=%d)", state.audioSamplesSent, pkt.Codec, len(state.lastAudioSample.Data), state.lastAudioSample.Duration.Milliseconds(), audioBroadcaster.PeerCount()))
 		}
 		audioBroadcaster.WriteSample(*state.lastAudioSample)
 	}

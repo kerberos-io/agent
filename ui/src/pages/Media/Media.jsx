@@ -4,7 +4,9 @@ import { withTranslation } from 'react-i18next';
 import {
   Breadcrumb,
   ControlBar,
-  VideoCard,
+  Block,
+  BlockBody,
+  BlockFooter,
   Button,
   Modal,
   ModalHeader,
@@ -13,8 +15,9 @@ import {
 } from '@kerberos-io/ui';
 import { Link, withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
-import { getEvents } from '../../actions/agent';
-import config from '../../config';
+import { getEvents, getConfig } from '../../actions/agent';
+import appConfig from '../../config';
+import ClearKeyVideo from '../../components/ClearKeyVideo/ClearKeyVideo';
 import './Media.scss';
 
 function formatDateTimeLocal(date) {
@@ -71,9 +74,10 @@ class Media extends React.Component {
   }
 
   componentDidMount() {
-    const { dispatchGetEvents } = this.props;
+    const { dispatchGetEvents, dispatchGetConfig } = this.props;
     const { appliedFilter } = this.state;
     dispatchGetEvents(appliedFilter);
+    dispatchGetConfig();
     document.addEventListener('scroll', this.trackScrolling);
   }
 
@@ -203,9 +207,13 @@ class Media extends React.Component {
   }
 
   render() {
-    const { events, eventsLoaded, t } = this.props;
+    const { events, eventsLoaded, t, config: configResponse } = this.props;
     const { isScrolling, open, currentRecording, startDateTime, endDateTime } =
       this.state;
+    const symmetricKey =
+      configResponse && configResponse.config && configResponse.config.encryption
+        ? configResponse.config.encryption.symmetric_key
+        : '';
 
     return (
       <div id="media">
@@ -258,20 +266,26 @@ class Media extends React.Component {
           {events.map((event) => (
             <div
               key={event.key}
-              onClick={() => this.openModal(`${config.URL}/file/${event.key}`)}
+              onClick={() =>
+                this.openModal(`${appConfig.URL}/file/${event.key}`)
+              }
             >
-              <VideoCard
-                isMediaWall
-                videoSrc={`${config.URL}/file/${event.key}`}
-                hours={event.time}
-                month={event.short_day}
-                videoStatus=""
-                duration=""
-                headerStatus=""
-                headerStatusTitle=""
-                handleClickHD={() => true}
-                handleClickSD={() => true}
-              />
+              <div className="videocard-embedded videocard-media">
+                <Block>
+                  <BlockBody>
+                    <ClearKeyVideo
+                      src={`${appConfig.URL}/file/${event.key}`}
+                      symmetricKey={symmetricKey}
+                      className="videocard-video"
+                      controls={false}
+                    />
+                  </BlockBody>
+                  <BlockFooter>
+                    <p className="month">{event.short_day}</p>
+                    <p className="hours">{event.time}</p>
+                  </BlockFooter>
+                </Block>
+              </div>
             </div>
           ))}
         </div>
@@ -287,9 +301,7 @@ class Media extends React.Component {
               onClose={() => this.handleClose()}
             />
             <ModalBody>
-              <video controls autoPlay>
-                <source src={currentRecording} type="video/mp4" />
-              </video>
+              <ClearKeyVideo src={currentRecording} symmetricKey={symmetricKey} />
             </ModalBody>
             <ModalFooter
               right={
@@ -336,18 +348,22 @@ class Media extends React.Component {
 const mapStateToProps = (state /* , ownProps */) => ({
   events: state.agent.events,
   eventsLoaded: state.agent.eventsLoaded,
+  config: state.agent.config,
 });
 
 const mapDispatchToProps = (dispatch) => ({
   dispatchGetEvents: (eventFilter, success, error, append) =>
     dispatch(getEvents(eventFilter, success, error, append)),
+  dispatchGetConfig: () => dispatch(getConfig()),
 });
 
 Media.propTypes = {
   t: PropTypes.func.isRequired,
   events: PropTypes.arrayOf(PropTypes.object).isRequired,
   eventsLoaded: PropTypes.number.isRequired,
+  config: PropTypes.object,
   dispatchGetEvents: PropTypes.func.isRequired,
+  dispatchGetConfig: PropTypes.func.isRequired,
 };
 
 export default withTranslation()(
