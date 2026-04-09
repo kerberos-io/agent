@@ -96,7 +96,7 @@ func NewAACTranscoder() (*AACTranscoder, error) {
 				buffered := t.outBuf.Len()
 				t.outMu.Unlock()
 				if buffered <= 8192 || buffered%16000 == 0 {
-					log.Log.Info("webrtc.aac_transcoder: ffmpeg produced PCMU bytes, buffered=" + strconv.Itoa(buffered))
+					log.Log.Debug("webrtc.aac_transcoder: ffmpeg produced PCMU bytes, buffered=" + strconv.Itoa(buffered))
 				}
 			}
 			if readErr != nil {
@@ -136,7 +136,7 @@ func (t *AACTranscoder) Transcode(adtsData []byte) ([]byte, error) {
 	for {
 		data := t.readAvailable()
 		if len(data) > 0 {
-			log.Log.Info("webrtc.aac_transcoder: returning PCMU bytes=" + strconv.Itoa(len(data)))
+			log.Log.Debug("webrtc.aac_transcoder: returning PCMU bytes=" + strconv.Itoa(len(data)))
 			return data, nil
 		}
 
