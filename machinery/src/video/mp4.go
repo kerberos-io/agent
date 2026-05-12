@@ -32,14 +32,23 @@ const MacEpochOffset uint64 = 2082844800
 // resulting in ~3 second fragments (assuming a typical GOP interval).
 const FragmentDurationMs = 3000
 
-// MinNormalGOPMs is the minimum spacing we expect between two consecutive
-// IDRs of a healthy source (typical encoders produce IDRs every 1000ms or
-// more). When two keyframes arrive closer than this, we treat the second one
-// as an upstream restart/loop-seam and force a fresh fragment so the seam
-// IDR cannot end up as a mid-fragment sync sample. The check only runs when
-// the current fragment has not yet reached FragmentDurationMs, so it never
-// fires during normal multi-GOP fragments at intended GOP boundaries.
-const MinNormalGOPMs = 950
+// MinNormalGOPMs is the maximum spacing between two consecutive IDRs that
+// we still consider an anomalous "loop/restart seam". When two keyframes
+// arrive closer than this, we treat the second one as an upstream
+// restart/loop-seam and force a fresh fragment so the seam IDR cannot end
+// up as a mid-fragment sync sample. The check only runs when the current
+// fragment has not yet reached FragmentDurationMs.
+//
+// This must be set well below the smallest plausible *legitimate* GOP
+// length. Typical IP cameras use GOP intervals of 1000-2000 ms, and the
+// arrival timing of consecutive IDRs can jitter by a few hundred ms due to
+// network/RTSP buffering. A threshold close to 1 s (e.g. 950) caused
+// false positives on cameras with ~1 s GOPs (warnings like
+// "gap=800 ms / 300 ms / 200 ms" while the stream itself was healthy).
+// 400 ms is comfortably below any realistic GOP yet still catches the
+// virtual-rtsp / ffmpeg loop-seam pattern (seam IDRs typically arrive
+// 100-200 ms after the prior IDR).
+const MinNormalGOPMs = 400
 
 type MP4 struct {
 	// FileName is the name of the file
@@ -66,6 +75,7 @@ type MP4 struct {
 	FragmentStartRawPTS     uint64            // Raw PTS for timing when to flush fragments
 	FragmentStartDTS        uint64            // Accumulated VideoTotalDuration at fragment start (matches tfdt)
 	LastKeyframeRawPTS      uint64            // Raw PTS of the most recently seen keyframe (in any fragment)
+	LastKeyframeGapMs       uint64            // Gap (ms) between the previous two consecutive keyframes
 	MoofBoxes               int64             // Number of moof boxes in the file
 	MoofBoxSizes            []int64           // Sizes of each moof box
 	SegmentDurations        []uint64          // Duration of each segment in timescale units
@@ -326,13 +336,23 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		// fragment with a "media corruption" error because the inner IDR resets
 		// frame_num/POC inside what they expect to be a single GOP. Force a
 		// fragment boundary whenever two consecutive keyframes arrive much
-		// closer than a normal GOP (here: < 500 ms apart). This isolates the
-		// seam IDR into its own fragment so each fragment stays a clean GOP.
-		if !shouldFlush && trackID == uint32(mp4.VideoTrack) && mp4.Start &&
-			mp4.LastKeyframeRawPTS > 0 && pts > mp4.LastKeyframeRawPTS &&
-			pts-mp4.LastKeyframeRawPTS < MinNormalGOPMs {
-			log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): forcing fragment flush at unexpectedly close keyframe (gap=%d ms, fragment elapsed=%d ms) - likely upstream loop/restart discontinuity", pts-mp4.LastKeyframeRawPTS, elapsed))
-			shouldFlush = true
+		// closer than a normal GOP.
+		//
+		// We only flag this as a seam when it is a *sudden* anomaly: the
+		// previous keyframe gap must have been healthy (>= MinNormalGOPMs).
+		// This avoids false positives on cameras that legitimately emit
+		// short-interval IDRs (short GOP, motion-triggered recovery IDRs,
+		// all-intra streams) where every keyframe would otherwise be flagged
+		// in a cascade, producing many tiny fragments and log spam.
+		if trackID == uint32(mp4.VideoTrack) && mp4.Start &&
+			mp4.LastKeyframeRawPTS > 0 && pts > mp4.LastKeyframeRawPTS {
+			gap := pts - mp4.LastKeyframeRawPTS
+			if !shouldFlush && gap < MinNormalGOPMs &&
+				(mp4.LastKeyframeGapMs == 0 || mp4.LastKeyframeGapMs >= MinNormalGOPMs) {
+				log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): forcing fragment flush at unexpectedly close keyframe (gap=%d ms, fragment elapsed=%d ms) - likely upstream loop/restart discontinuity", gap, elapsed))
+				shouldFlush = true
+			}
+			mp4.LastKeyframeGapMs = gap
 		}
 		if trackID == uint32(mp4.VideoTrack) {
 			mp4.LastKeyframeRawPTS = pts

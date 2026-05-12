@@ -51,8 +51,11 @@ func TestMP4LoopSeamIsolation(t *testing.T) {
 
 	// 17 seconds of normal content (last "good" IDR at sec 17).
 	emit(17*30, 30)
-	// Seam: IDR arrives ~867ms after previous (vs normal 1000ms).
-	pts -= 100
+	// Seam: IDR arrives ~150ms after previous (vs normal ~1000ms).
+	// This matches the realistic virtual-rtsp / ffmpeg `-stream_loop`
+	// loop boundary, where the new clip's first IDR is emitted shortly
+	// after the previous clip's final IDR.
+	pts -= 820
 	emit(13*30, 30)
 
 	mp4Video.Close(&models.Config{Signing: &models.Signing{PrivateKey: ""}})
