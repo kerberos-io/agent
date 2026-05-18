@@ -56,7 +56,6 @@ type MP4 struct {
 	FreeBoxSize             int64
 	FragmentStartRawPTS     uint64            // Raw PTS for timing when to flush fragments
 	FragmentStartDTS        uint64            // Accumulated VideoTotalDuration at fragment start (matches tfdt)
-	LastKeyframeRawPTS      uint64            // Raw PTS of the most recently seen keyframe (in any fragment)
 	MoofBoxes               int64             // Number of moof boxes in the file
 	MoofBoxSizes            []int64           // Sizes of each moof box
 	SegmentDurations        []uint64          // Duration of each segment in timescale units
@@ -307,27 +306,6 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			elapsed = pts - mp4.FragmentStartRawPTS
 		}
 		shouldFlush := !mp4.Start || elapsed >= FragmentDurationMs
-
-		// Detect upstream source-loop / restart discontinuity. When an MP4 is
-		// looped through virtual-rtsp (ffmpeg `-stream_loop -1 -re`) the loop
-		// seam emits a fresh IDR much sooner than a normal GOP would. PTS keeps
-		// growing monotonically, so the timing-only `elapsed` check above does
-		// not catch it and the seam IDR ends up as a mid-fragment sync sample.
-		// MSE-based players (Video.js / Chromium / Firefox) reject the resulting
-		// fragment with a "media corruption" error because the inner IDR resets
-		// frame_num/POC inside what they expect to be a single GOP. Force a
-		// fragment boundary whenever two consecutive keyframes arrive much
-		// closer than a normal GOP (here: < 500 ms apart). This isolates the
-		// seam IDR into its own fragment so each fragment stays a clean GOP.
-		if !shouldFlush && trackID == uint32(mp4.VideoTrack) && mp4.Start &&
-			mp4.LastKeyframeRawPTS > 0 && pts > mp4.LastKeyframeRawPTS &&
-			pts-mp4.LastKeyframeRawPTS < 500 {
-			log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): forcing fragment flush at unexpectedly close keyframe (gap=%d ms, fragment elapsed=%d ms) - likely upstream loop/restart discontinuity", pts-mp4.LastKeyframeRawPTS, elapsed))
-			shouldFlush = true
-		}
-		if trackID == uint32(mp4.VideoTrack) {
-			mp4.LastKeyframeRawPTS = pts
-		}
 
 		if shouldFlush {
 			// Write the previous segment to the file
