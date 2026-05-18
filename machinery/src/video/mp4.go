@@ -32,15 +32,6 @@ const MacEpochOffset uint64 = 2082844800
 // resulting in ~3 second fragments (assuming a typical GOP interval).
 const FragmentDurationMs = 3000
 
-// MinNormalGOPMs is the minimum spacing we expect between two consecutive
-// IDRs of a healthy source (typical encoders produce IDRs every 1000ms or
-// more). When two keyframes arrive closer than this, we treat the second one
-// as an upstream restart/loop-seam and force a fresh fragment so the seam
-// IDR cannot end up as a mid-fragment sync sample. The check only runs when
-// the current fragment has not yet reached FragmentDurationMs, so it never
-// fires during normal multi-GOP fragments at intended GOP boundaries.
-const MinNormalGOPMs = 950
-
 type MP4 struct {
 	// FileName is the name of the file
 	FileName                string
@@ -330,7 +321,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		// seam IDR into its own fragment so each fragment stays a clean GOP.
 		if !shouldFlush && trackID == uint32(mp4.VideoTrack) && mp4.Start &&
 			mp4.LastKeyframeRawPTS > 0 && pts > mp4.LastKeyframeRawPTS &&
-			pts-mp4.LastKeyframeRawPTS < MinNormalGOPMs {
+			pts-mp4.LastKeyframeRawPTS < 500 {
 			log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): forcing fragment flush at unexpectedly close keyframe (gap=%d ms, fragment elapsed=%d ms) - likely upstream loop/restart discontinuity", pts-mp4.LastKeyframeRawPTS, elapsed))
 			shouldFlush = true
 		}
