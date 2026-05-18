@@ -233,24 +233,6 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 	var duration uint64
 	if nextPTS > 0 && nextPTS > mp4.VideoFullSample.DecodeTime {
 		duration = nextPTS - mp4.VideoFullSample.DecodeTime
-		// Guard against forward PTS jumps (e.g. when looping a source MP4
-		// through virtual-rtsp the upstream ffmpeg may insert a large offset
-		// at the loop boundary, or the RTSP stream may stall briefly).
-		// Without this clamp the sample gets a huge duration which appears
-		// as a discontinuity in the trun/sidx/mvhd and causes browsers
-		// (Video.js / MSE) to abort playback with a "media corruption"
-		// error around the loop boundary.
-		var maxPlausible uint64 = 1000 // 1 second hard ceiling
-		if mp4.LastVideoSampleDTS > 0 && mp4.LastVideoSampleDTS*10 < maxPlausible {
-			maxPlausible = mp4.LastVideoSampleDTS * 10
-		}
-		if duration > maxPlausible {
-			log.Log.Warning(fmt.Sprintf("mp4.flushPendingVideoSample(): video PTS jumped forward (nextPTS=%d, prevDTS=%d, gap=%d ms) - clamping to %d ms (likely source loop/stall discontinuity)", nextPTS, mp4.VideoFullSample.DecodeTime, duration, maxPlausible))
-			duration = mp4.LastVideoSampleDTS
-			if duration == 0 {
-				duration = 33
-			}
-		}
 	} else {
 		// No valid nextPTS (Close case) or PTS went backwards (jitter/discontinuity)
 		if nextPTS > 0 {
@@ -410,14 +392,6 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 					}
 					if started {
 						dts = 1
-					}
-					// Guard against forward PTS jumps (e.g. virtual-rtsp loop
-					// boundary or upstream stalls). Without this clamp the
-					// audio trun would carry an enormous sample duration that
-					// renders the recording unplayable in browsers.
-					if mp4.LastAudioSampleDTS > 0 && dts > mp4.LastAudioSampleDTS*10 {
-						log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): audio PTS jumped forward (pts=%d, prevDTS=%d, gap=%d) - clamping to last known duration", pts, mp4.AudioFullSample.DecodeTime, dts))
-						dts = mp4.LastAudioSampleDTS
 					}
 					mp4.LastAudioSampleDTS = dts
 					//fmt.Printf("Adding sample to track %d, PTS: %d, Duration: %d, size: %d\n", trackID, pts, dts, len(aac[7:]))
