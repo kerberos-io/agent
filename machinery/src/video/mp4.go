@@ -32,23 +32,14 @@ const MacEpochOffset uint64 = 2082844800
 // resulting in ~3 second fragments (assuming a typical GOP interval).
 const FragmentDurationMs = 3000
 
-// MinNormalGOPMs is the maximum spacing between two consecutive IDRs that
-// we still consider an anomalous "loop/restart seam". When two keyframes
-// arrive closer than this, we treat the second one as an upstream
-// restart/loop-seam and force a fresh fragment so the seam IDR cannot end
-// up as a mid-fragment sync sample. The check only runs when the current
-// fragment has not yet reached FragmentDurationMs.
-//
-// This must be set well below the smallest plausible *legitimate* GOP
-// length. Typical IP cameras use GOP intervals of 1000-2000 ms, and the
-// arrival timing of consecutive IDRs can jitter by a few hundred ms due to
-// network/RTSP buffering. A threshold close to 1 s (e.g. 950) caused
-// false positives on cameras with ~1 s GOPs (warnings like
-// "gap=800 ms / 300 ms / 200 ms" while the stream itself was healthy).
-// 400 ms is comfortably below any realistic GOP yet still catches the
-// virtual-rtsp / ffmpeg loop-seam pattern (seam IDRs typically arrive
-// 100-200 ms after the prior IDR).
-const MinNormalGOPMs = 400
+// MinNormalGOPMs is the minimum spacing we expect between two consecutive
+// IDRs of a healthy source (typical encoders produce IDRs every 1000ms or
+// more). When two keyframes arrive closer than this, we treat the second one
+// as an upstream restart/loop-seam and force a fresh fragment so the seam
+// IDR cannot end up as a mid-fragment sync sample. The check only runs when
+// the current fragment has not yet reached FragmentDurationMs, so it never
+// fires during normal multi-GOP fragments at intended GOP boundaries.
+const MinNormalGOPMs = 950
 
 type MP4 struct {
 	// FileName is the name of the file
