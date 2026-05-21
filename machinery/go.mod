@@ -4,28 +4,21 @@ go 1.24.2
 
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250519155744-55703ea1f237
 
-// TEMPORARY: point at the local kerberos-onvif fork carrying the
-// event/stream sub-package. Removed once those changes land upstream
-// and a new kerberos-io/onvif release is tagged.
+// TEMPORARY: point at the sharedjourney fork of kerberos-onvif carrying
+// the event/stream sub-package. Pinned by commit SHA so the build is
+// reproducible; remove this directive (and bump the version in
+// require) once those changes land in kerberos-io/onvif and a release
+// is tagged.
 //
-// Layout requirement: this path is RELATIVE to the machinery/ module
-// directory, so it resolves to <repo-parent>/kerberos-onvif. The build
-// expects kerberos-agent and kerberos-onvif to be sibling clones under
-// the same parent directory:
+// For fast local iteration on the lib without re-pushing, create a
+// (gitignored) go.work file at the repo root:
 //
-//     $PARENT/
-//       ├── kerberos-agent/      (this repo)
-//       └── kerberos-onvif/      (must be checked out at this path)
+//     go 1.24.2
+//     use ./machinery
+//     use ../../kerberos-onvif
 //
-// A standalone `git clone github.com/<fork>/kerberos-agent && go build`
-// without also cloning kerberos-onvif as a sibling will fail with a
-// missing-directory error. Sibling-clone the lib first:
-//
-//     git clone -b feature/event-stream <fork>/kerberos-onvif
-//
-// To remove the replace once upstream releases: delete the directive
-// and bump the kerberos-io/onvif version in the require block.
-replace github.com/kerberos-io/onvif => ../../kerberos-onvif
+// Go workspaces override go.mod replaces only when go.work is present.
+replace github.com/kerberos-io/onvif => github.com/sharedjourney/kerberos-onvif v0.0.0-20260521131915-21a1899f18a6
 
 require (
 	github.com/Eyevinn/mp4ff v0.48.0
