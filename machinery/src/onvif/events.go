@@ -11,29 +11,22 @@ import (
 	"github.com/kerberos-io/onvif/event/stream"
 )
 
-// initialBackoff and maxBackoff bound the wait between successive
-// attempts to (re)open the event stream after a transient construction
-// failure (camera reachable but ONVIF not yet ready, brief network blip
-// at agent boot, etc.). The library itself handles in-stream reconnect;
-// these guards cover the initial-connect path the library cannot see.
+// The library handles in-stream reconnect; these guards cover the
+// initial-connect path the library cannot see.
 const (
 	initialBackoff = time.Second
 	maxBackoff     = 5 * time.Minute
 )
 
 // HandleONVIFEventStream opens an event/stream against the configured
-// ONVIF camera and routes Motion events into communication.HandleMotion
-// so they trigger the existing recording pipeline.
+// ONVIF camera and routes Motion events into communication.HandleMotion.
 //
-// The goroutine retries construction with exponential backoff on
-// transient failure (camera reachable later, credentials reloaded,
-// network restored). It exits cleanly when ctx is cancelled.
-//
-// This is a feature behind Capture.ONVIFMotion. When the flag is not
-// enabled the goroutine returns immediately, preserving the pixel-diff
-// motion detector as the only source. Toggling the flag at runtime
-// requires an agent restart (Capture.ONVIFMotion is read once at
-// goroutine start).
+// Behind the Capture.ONVIFMotion flag; the goroutine returns
+// immediately when not enabled. The flag is read once at start, so
+// toggling at runtime requires an agent restart. On transient
+// construction failure (camera not yet ready at boot, brief network
+// blip, credential reload) the goroutine retries with exponential
+// backoff. Exits when ctx is cancelled.
 func HandleONVIFEventStream(ctx context.Context, configuration *models.Configuration, communication *models.Communication) {
 	log.Log.Debug("onvif.HandleONVIFEventStream(): started")
 	defer log.Log.Debug("onvif.HandleONVIFEventStream(): finished")
@@ -65,10 +58,8 @@ func HandleONVIFEventStream(ctx context.Context, configuration *models.Configura
 	}
 }
 
-// runStreamOnce opens one event stream and consumes from it until ctx
-// is cancelled or the stream exits. Returns true when the caller
-// should retry construction (transient failure), false on clean
-// ctx-driven shutdown.
+// runStreamOnce returns true when the caller should retry construction
+// (transient failure), false on clean ctx-driven shutdown.
 func runStreamOnce(ctx context.Context, configuration *models.Configuration, communication *models.Communication) (retry bool) {
 	camera := configuration.Config.Capture.IPCamera
 
@@ -92,9 +83,9 @@ func runStreamOnce(ctx context.Context, configuration *models.Configuration, com
 
 	log.Log.Info("onvif.HandleONVIFEventStream(): consuming events for " + deviceID)
 
-	// recovering tracks whether we're in a degraded period so the
-	// first successful event after an error streak can log a recovery
-	// line for on-call operators.
+	// recovering = the first successful event after an error streak
+	// logs a recovery line so on-call operators see the clear-of-
+	// condition for the ERROR they were paged on.
 	var recovering bool
 	for {
 		select {
@@ -102,9 +93,6 @@ func runStreamOnce(ctx context.Context, configuration *models.Configuration, com
 			return false
 		case ev, ok := <-s.Events():
 			if !ok {
-				// Lib's run goroutine exited — happens only on ctx
-				// cancel today (library handles its own reconnect),
-				// so treat as clean shutdown.
 				return false
 			}
 			if recovering {
@@ -122,23 +110,16 @@ func runStreamOnce(ctx context.Context, configuration *models.Configuration, com
 	}
 }
 
-// dispatchEvent routes a single decoded ONVIF Event into the agent's
-// existing channels. Motion-active events become MotionDataPartial on
-// HandleMotion, matching what the pixel-diff detector emits.
+// dispatchEvent routes motion-active events to HandleMotion.
 //
-// The ctx pre-check is the shutdown-race guard: between cancel() and
-// close(communication.HandleMotion) the agent leaves a ~3s window in
-// which a stale event could otherwise attempt to send on a closed
-// channel and panic. If ctx is done we drop the event silently — the
-// recording pipeline is already winding down.
+// The ctx pre-check + ctx-in-select guards a shutdown race: the agent
+// closes HandleMotion shortly after cancelling ctx, and a stale event
+// reaching the send would otherwise panic on a closed channel.
 func dispatchEvent(ctx context.Context, ev stream.Event, configuration *models.Configuration, communication *models.Communication) {
 	if ev.Kind != stream.KindMotion {
 		log.Log.Debug("onvif.dispatchEvent(): non-motion event " + ev.Kind.String() + " topic=" + ev.Topic)
 		return
 	}
-	// Leading-edge only. Motion-stop wiring into the recorder state
-	// machine is tracked as a follow-up; today the recorder uses a
-	// fixed PostRecording timeout.
 	if ev.State != stream.StateActive {
 		return
 	}
@@ -148,27 +129,21 @@ func dispatchEvent(ctx context.Context, ev stream.Event, configuration *models.C
 	if ctx.Err() != nil {
 		return
 	}
-	// Timestamp in seconds matches what computervision/main.go emits;
-	// downstream consumers (capture/main.go) tolerate either second-
-	// or millisecond-precision.
 	dataToPass := models.MotionDataPartial{
 		Timestamp:       time.Now().Unix(),
 		NumberOfChanges: 0, // ONVIF does not quantify motion area.
 	}
 	select {
 	case <-ctx.Done():
-		// Closes the residual race: ctx cancelled between the
-		// pre-check above and reaching this select.
 	case communication.HandleMotion <- dataToPass:
 	default:
 		log.Log.Debug("onvif.dispatchEvent(): HandleMotion full, dropping ONVIF motion event")
 	}
 }
 
-// logStreamError logs at a level matching the severity. Recreate
-// failures are loud because they usually mean the camera is offline;
-// pull/renew failures are debug because the library recovers from them
-// automatically.
+// logStreamError logs at a level matching severity: recreate is loud
+// because it usually means the camera is offline; pull and renew are
+// debug because the library recovers from them automatically.
 func logStreamError(e error) {
 	var recreate stream.ErrRecreateFailed
 	var pull stream.ErrPullFailed
@@ -185,19 +160,13 @@ func logStreamError(e error) {
 	}
 }
 
-// isONVIFMotionEnabled returns true when the Capture.ONVIFMotion flag
-// is set to "true" with case and whitespace tolerance. The rest of the
-// Capture struct uses string flags so we keep the same shape; the
-// difference is that ONVIFMotion defaults to disabled (opt-in), unlike
-// Recording / Motion / Snapshots which default to enabled.
 func isONVIFMotionEnabled(v string) bool {
 	return strings.EqualFold(strings.TrimSpace(v), "true")
 }
 
-// resolveDeviceID returns the most useful identifier for the camera
-// in stream events, logs and metrics. Falls back from configuration
-// name (the operator-supplied label) to the ONVIF endpoint to a
-// constant placeholder so log lines always have something to grep.
+// resolveDeviceID falls back from operator-supplied name to ONVIF
+// endpoint to a constant placeholder so log lines always have
+// something to grep.
 func resolveDeviceID(configName, xaddr string) string {
 	if n := strings.TrimSpace(configName); n != "" {
 		return n
@@ -208,8 +177,7 @@ func resolveDeviceID(configName, xaddr string) string {
 	return "unknown"
 }
 
-// sleepCtx blocks for d or until ctx is cancelled. Returns false if
-// ctx was cancelled, true if the full duration elapsed.
+// sleepCtx returns false if ctx was cancelled, true if d elapsed.
 func sleepCtx(ctx context.Context, d time.Duration) bool {
 	t := time.NewTimer(d)
 	defer t.Stop()
