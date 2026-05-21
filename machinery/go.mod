@@ -4,6 +4,11 @@ go 1.24.2
 
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250519155744-55703ea1f237
 
+// TEMPORARY: point at the local kerberos-onvif fork carrying the
+// event/stream sub-package. Remove once those changes land upstream
+// and a new kerberos-io/onvif release is tagged.
+replace github.com/kerberos-io/onvif => ../../kerberos-onvif
+
 require (
 	github.com/Eyevinn/mp4ff v0.48.0
 	github.com/InVisionApp/conjungo v1.1.0
