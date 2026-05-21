@@ -5,8 +5,26 @@ go 1.24.2
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250519155744-55703ea1f237
 
 // TEMPORARY: point at the local kerberos-onvif fork carrying the
-// event/stream sub-package. Remove once those changes land upstream
+// event/stream sub-package. Removed once those changes land upstream
 // and a new kerberos-io/onvif release is tagged.
+//
+// Layout requirement: this path is RELATIVE to the machinery/ module
+// directory, so it resolves to <repo-parent>/kerberos-onvif. The build
+// expects kerberos-agent and kerberos-onvif to be sibling clones under
+// the same parent directory:
+//
+//     $PARENT/
+//       ├── kerberos-agent/      (this repo)
+//       └── kerberos-onvif/      (must be checked out at this path)
+//
+// A standalone `git clone github.com/<fork>/kerberos-agent && go build`
+// without also cloning kerberos-onvif as a sibling will fail with a
+// missing-directory error. Sibling-clone the lib first:
+//
+//     git clone -b feature/event-stream <fork>/kerberos-onvif
+//
+// To remove the replace once upstream releases: delete the directive
+// and bump the kerberos-io/onvif version in the require block.
 replace github.com/kerberos-io/onvif => ../../kerberos-onvif
 
 require (
