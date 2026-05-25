@@ -352,5 +352,4 @@ Media.propTypes = {
 
 export default withTranslation()(
   connect(mapStateToProps, mapDispatchToProps)(Media)
-)
 );

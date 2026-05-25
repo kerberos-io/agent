@@ -753,5 +753,4 @@ Dashboard.propTypes = {
 
 export default withTranslation()(
   connect(mapStateToProps, mapDispatchToProps)(Dashboard)
-)
 );
