@@ -1,12 +1,17 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { withTranslation } from 'react-i18next';
-import uuid from 'uuidv4';
+import { Outlet } from 'react-router-dom';
 import {
   connect as connectWS,
   disconnect as disconnectWS,
   send,
 } from '@giantmachines/redux-websocket';
+
+const genClientId = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 import {
   Badge,
   Main,
@@ -60,7 +65,7 @@ class App extends React.Component {
     const { connected: connectedPrev } = prevProps;
     if (connectedPrev === false && connected === true) {
       const message = {
-        client_id: uuid(),
+        client_id: genClientId(),
         message_type: 'hello',
       };
       dispatchSend(message);
@@ -76,7 +81,7 @@ class App extends React.Component {
     this.subscription.unsubscribe();
     this.connectionSubscription.unsubscribe();
     const message = {
-      client_id: uuid(),
+      client_id: genClientId(),
       message_type: 'goodbye',
     };
     const { dispatchSend, dispatchDisconnect } = this.props;
@@ -90,7 +95,7 @@ class App extends React.Component {
 
   render() {
     const { t, connected } = this.props;
-    const { children, username, dashboard, dispatchLogout } = this.props;
+    const { username, dashboard, dispatchLogout } = this.props;
     const cloudOnline = this.getCurrentTimestamp() - dashboard.cloudOnline < 30;
     return (
       <>
@@ -205,7 +210,9 @@ class App extends React.Component {
               </Link>
             )}
 
-            <MainBody>{children}</MainBody>
+            <MainBody>
+              <Outlet />
+            </MainBody>
           </Main>
         </div>
       </>
@@ -236,8 +243,6 @@ App.propTypes = {
   dispatchConnect: PropTypes.func.isRequired,
   dispatchDisconnect: PropTypes.func.isRequired,
   dispatchSend: PropTypes.func.isRequired,
-  // eslint-disable-next-line react/forbid-prop-types
-  children: PropTypes.array.isRequired,
   username: PropTypes.string.isRequired,
   connected: PropTypes.bool.isRequired,
   dashboard: PropTypes.object.isRequired,

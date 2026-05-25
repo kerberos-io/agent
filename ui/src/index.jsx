@@ -1,14 +1,16 @@
-import React, { Suspense } from 'react';
-import ReactDOM from 'react-dom';
-import { Route, Switch } from 'react-router-dom';
-import { createStore, applyMiddleware } from 'redux';
-import { createBrowserHistory } from 'history';
-import { routerMiddleware, ConnectedRouter } from 'connected-react-router';
+import React, { Suspense, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+} from 'react-router-dom';
+import { createStore, applyMiddleware, compose } from 'redux';
 import { Provider } from 'react-redux';
 import reduxWebsocket from '@giantmachines/redux-websocket';
-import { composeWithDevTools } from 'redux-devtools-extension';
-import thunk from 'redux-thunk';
-import { Redirect } from 'react-router';
+import { thunk } from 'redux-thunk';
 import rootReducer from './reducers';
 import App from './App';
 import './index.scss';
@@ -18,9 +20,8 @@ import Media from './pages/Media/Media';
 import Settings from './pages/Settings/Settings';
 import RequireAuth from './containers/RequireAuth';
 import RequireGuest from './containers/RequireGuest';
+import { setNavigator } from './navigation';
 import './i18n';
-
-const history = createBrowserHistory();
 
 // We get the token from the store to initialise the store.
 // So we know if the user is still signed in.
@@ -54,32 +55,76 @@ const reduxWebsocketMiddleware = reduxWebsocket({
   reconnectOnClose: true,
 });
 
+// eslint-disable-next-line no-underscore-dangle
+const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
+
 const store = createStore(
-  rootReducer(history),
+  rootReducer,
   { ...getAuthState() },
-  composeWithDevTools(
-    applyMiddleware(thunk, reduxWebsocketMiddleware, routerMiddleware(history))
-  )
+  composeEnhancers(applyMiddleware(thunk, reduxWebsocketMiddleware))
 );
 
 const Loader = () => <div>loading...</div>;
 
-ReactDOM.render(
+// Bridges React Router's navigate function into a module-scoped singleton
+// so Redux thunks (e.g. login/logout) can navigate without a hook.
+function NavigationSetup() {
+  const nav = useNavigate();
+  useEffect(() => {
+    setNavigator(nav);
+  }, [nav]);
+  return null;
+}
+
+const container = document.getElementById('root');
+const root = createRoot(container);
+
+root.render(
   <Provider store={store}>
-    <ConnectedRouter history={history}>
-      <Switch>
-        <Route path="/login" component={RequireGuest(Login)} />
-        <Suspense fallback={<Loader />}>
-          <App>
-            <Route exact path="/" component={RequireAuth(Dashboard)} />
-            <Route exact path="/dashboard" component={RequireAuth(Dashboard)} />
-            <Route exact path="/" render={() => <Redirect to="/dashboard" />} />
-            <Route exact path="/media" component={RequireAuth(Media)} />
-            <Route exact path="/settings" component={RequireAuth(Settings)} />
-          </App>
-        </Suspense>
-      </Switch>
-    </ConnectedRouter>
-  </Provider>,
-  document.getElementById('root')
+    <BrowserRouter>
+      <NavigationSetup />
+      <Suspense fallback={<Loader />}>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              <RequireGuest>
+                <Login />
+              </RequireGuest>
+            }
+          />
+          <Route element={<App />}>
+            <Route
+              path="/"
+              element={<Navigate to="/dashboard" replace />}
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <RequireAuth>
+                  <Dashboard />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/media"
+              element={
+                <RequireAuth>
+                  <Media />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <RequireAuth>
+                  <Settings />
+                </RequireAuth>
+              }
+            />
+          </Route>
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  </Provider>
 );

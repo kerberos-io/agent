@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Link, withRouter } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { withTranslation } from 'react-i18next';
 import { send } from '@giantmachines/redux-websocket';
 import { connect } from 'react-redux';
@@ -24,7 +24,8 @@ import {
   ModalFooter,
 } from '@kerberos-io/ui';
 import './Dashboard.scss';
-import ReactTooltip from 'react-tooltip';
+import { Tooltip as ReactTooltip } from 'react-tooltip';
+import 'react-tooltip/dist/react-tooltip.css';
 import config from '../../config';
 import { getConfig } from '../../actions/agent';
 
@@ -617,7 +618,12 @@ class Dashboard extends React.Component {
                               }
                             >
                               <Ellipse status="success" />{' '}
-                              <p data-tip="10m and 5s ago">{event.time}</p>
+                              <p
+                                data-tooltip-id="dashboard-tip"
+                                data-tooltip-content="10m and 5s ago"
+                              >
+                                {event.time}
+                              </p>
                             </div>
                           </>,
                           <>
@@ -716,7 +722,7 @@ class Dashboard extends React.Component {
             </div>
           </div>
         </div>
-        <ReactTooltip />
+        <ReactTooltip id="dashboard-tip" />
       </div>
     );
   }
@@ -746,5 +752,6 @@ Dashboard.propTypes = {
 };
 
 export default withTranslation()(
-  withRouter(connect(mapStateToProps, mapDispatchToProps)(Dashboard))
+  connect(mapStateToProps, mapDispatchToProps)(Dashboard)
+)
 );

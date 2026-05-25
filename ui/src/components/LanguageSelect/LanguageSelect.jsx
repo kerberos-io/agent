@@ -1,9 +1,9 @@
 import React from 'react';
 import i18next from 'i18next';
-import Popover from '@material-ui/core/Popover';
-import List from '@material-ui/core/List';
-import ListItem from '@material-ui/core/ListItem';
-import ListSubheader from '@material-ui/core/ListSubheader';
+import Popover from '@mui/material/Popover';
+import List from '@mui/material/List';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListSubheader from '@mui/material/ListSubheader';
 import { Icon } from '@kerberos-io/ui';
 import { useTranslation } from 'react-i18next';
 import './LanguageSelect.scss';
@@ -69,8 +69,7 @@ const LanguageSelect = () => {
           <List>
             <ListSubheader>{t('navigation.choose_language')}</ListSubheader>
             {Object.keys(languageMap)?.map((item) => (
-              <ListItem
-                button
+              <ListItemButton
                 key={item}
                 onClick={() => {
                   i18next.changeLanguage(item);
@@ -79,7 +78,7 @@ const LanguageSelect = () => {
                 }}
               >
                 {languageMap[item] ? languageMap[item].label : ''}
-              </ListItem>
+              </ListItemButton>
             ))}
             <hr />
             <a
@@ -87,9 +86,9 @@ const LanguageSelect = () => {
               rel="noreferrer"
               target="_blank"
             >
-              <ListItem button key="contribute-language">
+              <ListItemButton key="contribute-language">
                 Contribute language
-              </ListItem>
+              </ListItemButton>
             </a>
           </List>
         </div>

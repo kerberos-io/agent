@@ -1,4 +1,4 @@
-import { push } from 'react-router-redux';
+import { navigate } from '../navigation';
 import { doLogin, doCheckIfInstalled } from '../api/authentication';
 
 export const login = (username, password) =>
@@ -15,7 +15,7 @@ export const login = (username, password) =>
           token: data.token,
           expire: data.expire,
         });
-        dispatch(push('/'));
+        navigate('/');
       },
       (error) => {
         dispatch({
@@ -60,6 +60,6 @@ export const logout = () => {
     dispatch({
       type: 'LOGOUT',
     });
-    dispatch(push('/login'));
+    navigate('/login');
   };
 };
