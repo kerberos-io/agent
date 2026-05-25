@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -170,11 +171,45 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 	return nil
 }
 
-// maxSignalingAge is the maximum age of a WebRTC signaling message (request-hd-stream,
-// receive-hd-candidates) before it is considered stale and discarded. With CleanSession=false
-// the MQTT broker may replay queued messages from previous sessions; this prevents the agent
-// from setting up peer connections for viewers that are no longer waiting.
-const maxSignalingAge = 30 * time.Second
+// recentHDSessions tracks recently-seen WebRTC viewer session IDs so we can
+// dedupe duplicate request-hd-stream messages without relying on the broker's
+// (and the viewer's) wall clock. The viewer's offer-republish loop can fire
+// the same request several times for the same session_id while waiting for an
+// answer; the broker can also redeliver a message after a reconnect with
+// CleanSession=false. In both cases we want to handle the session exactly
+// once.
+//
+// Entries expire after recentHDSessionTTL. The map is small (one entry per
+// active viewer over the TTL window) so a periodic sweep is sufficient.
+const recentHDSessionTTL = 60 * time.Second
+
+var (
+	recentHDSessionsMu sync.Mutex
+	recentHDSessions   = make(map[string]time.Time)
+)
+
+// markHDSessionSeen returns true if this session_id was already processed
+// within the TTL window (i.e. this message should be treated as a duplicate).
+// It also opportunistically prunes expired entries.
+func markHDSessionSeen(sessionID string) bool {
+	if sessionID == "" {
+		return false
+	}
+	recentHDSessionsMu.Lock()
+	defer recentHDSessionsMu.Unlock()
+	now := time.Now()
+	// Lazy GC — cheap given the expected map size.
+	for k, t := range recentHDSessions {
+		if now.Sub(t) > recentHDSessionTTL {
+			delete(recentHDSessions, k)
+		}
+	}
+	if _, exists := recentHDSessions[sessionID]; exists {
+		return true
+	}
+	recentHDSessions[sessionID] = now
+	return false
+}
 
 func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 	if hubKey == "" {
@@ -282,16 +317,13 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 				// We'll find out which message we received, and act accordingly.
 				log.Log.Info("routers.mqtt.main.MQTTListenerHandler(): received message with action: " + payload.Action)
 
-				// For time-sensitive WebRTC signaling messages, discard stale ones that may
-				// have been queued by the broker while CleanSession=false.
-				if payload.Action == "request-hd-stream" || payload.Action == "receive-hd-candidates" {
-					messageAge := time.Since(time.Unix(message.Timestamp, 0))
-					if messageAge > maxSignalingAge {
-						log.Log.Info("routers.mqtt.main.MQTTListenerHandler(): discarding stale " + payload.Action +
-							" message (age: " + messageAge.Round(time.Second).String() + ")")
-						return
-					}
-				}
+				// NOTE: We intentionally do NOT discard request-hd-stream /
+				// receive-hd-candidates messages based on a wall-clock age. The
+				// viewer and agent clocks can drift (especially on embedded
+				// devices), which previously caused valid requests to be
+				// silently dropped and forced the user to refresh the page.
+				// Duplicate handling for request-hd-stream is done by session_id
+				// inside HandleRequestHDStream (see markHDSessionSeen).
 
 				switch payload.Action {
 				case "record":
@@ -536,6 +568,15 @@ func HandleRequestHDStream(mqttClient mqtt.Client, hubKey string, payload models
 
 	if requestHDStreamPayload.Timestamp != 0 {
 		if communication.CameraConnected {
+			// Dedupe by session_id: the viewer republishes its offer while
+			// waiting for an answer (and the broker may redeliver), and we
+			// don't want to spawn multiple peer connections for the same
+			// browser session.
+			if markHDSessionSeen(requestHDStreamPayload.SessionID) {
+				log.Log.Info("routers.mqtt.main.HandleRequestHDStream(): duplicate request for session " +
+					requestHDStreamPayload.SessionID + ", ignoring")
+				return
+			}
 			// Set the Hub key, so we can send back the answer.
 			requestHDStreamPayload.HubKey = hubKey
 			if communication.HandleLiveHDHandshake == nil {

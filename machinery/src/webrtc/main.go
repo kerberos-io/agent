@@ -26,7 +26,12 @@ import (
 
 const (
 	// Channel buffer sizes
-	candidateChannelBuffer = 100
+	// candidateChannelBuffer: large enough to absorb the burst of trickled ICE
+	// candidates that can arrive over MQTT before the SetRemoteDescription
+	// goroutine starts draining them. A small buffer caused candidates to be
+	// dropped silently on restrictive networks, leaving ICE stuck in
+	// "checking" until the viewer refreshed.
+	candidateChannelBuffer = 512
 	rtcpBufferSize         = 1500
 
 	// Timeouts and intervals
@@ -114,6 +119,22 @@ func (cm *ConnectionManager) RemovePeerConnection(sessionKey string) {
 		}
 		delete(cm.peerConnections, sessionKey)
 	}
+}
+
+// CloseExistingPeerConnection closes and removes any peer connection currently
+// registered under sessionKey. Returns true if one was found. This is used to
+// reset state cleanly when a new request-hd-stream arrives for a session id
+// that the agent thinks is still active (for example after a viewer reload
+// where the previous PC hasn't yet been timed out by ICE).
+func (cm *ConnectionManager) CloseExistingPeerConnection(sessionKey string) bool {
+	cm.mu.RLock()
+	wrapper, exists := cm.peerConnections[sessionKey]
+	cm.mu.RUnlock()
+	if !exists || wrapper == nil {
+		return false
+	}
+	cleanupPeerConnection(sessionKey, wrapper)
+	return true
 }
 
 // QueueCandidate safely queues a candidate for a session without racing with channel closure.
@@ -341,6 +362,17 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 	// We create a channel which will hold the candidates for this session.
 	sessionKey := config.Key + "/" + handshakePayload.SessionID
+
+	// If a previous peer connection for this exact session is still hanging
+	// around (e.g. a viewer reloaded before pion's ICE timeout fired) close it
+	// first so we start from a clean slate. Without this, the new request would
+	// race against a stale PC that still owns the per-peer broadcaster tracks.
+	if globalConnectionManager.CloseExistingPeerConnection(sessionKey) {
+		log.Log.Info("webrtc.main.InitializeWebRTCConnection(): closed stale peer connection for session " + handshakePayload.SessionID)
+	}
+	// Drain/reset the candidate channel too \u2014 leftover candidates from the
+	// prior session are not valid for the new ICE agent.
+	globalConnectionManager.CloseCandidateChannel(sessionKey)
 	candidateChannel := globalConnectionManager.GetOrCreateCandidateChannel(sessionKey)
 
 	// Set variables
