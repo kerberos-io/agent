@@ -60,7 +60,7 @@ RUN cp -r /agent ./
 
 RUN /dist/agent/main version
 
-FROM node:18.14.0-alpine3.16 AS build-ui
+FROM node:22-alpine AS build-ui
 
 RUN apk update && apk upgrade --available && sync
 
