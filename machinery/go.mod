@@ -4,22 +4,6 @@ go 1.24.2
 
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20250519155744-55703ea1f237
 
-// TEMPORARY: point at the sharedjourney fork of kerberos-onvif carrying
-// the event/stream sub-package. Pinned by commit SHA so the build is
-// reproducible; remove this directive (and bump the version in
-// require) once those changes land in kerberos-io/onvif and a release
-// is tagged.
-//
-// For fast local iteration on the lib without re-pushing, create a
-// (gitignored) go.work file at the repo root:
-//
-//     go 1.24.2
-//     use ./machinery
-//     use ../../kerberos-onvif
-//
-// Go workspaces override go.mod replaces only when go.work is present.
-replace github.com/kerberos-io/onvif => github.com/sharedjourney/kerberos-onvif v0.0.0-20260521131915-21a1899f18a6
-
 require (
 	github.com/Eyevinn/mp4ff v0.48.0
 	github.com/InVisionApp/conjungo v1.1.0
@@ -40,7 +24,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/kellydunn/golang-geo v0.7.0
 	github.com/kerberos-io/joy4 v1.0.64
-	github.com/kerberos-io/onvif v1.0.0
+	github.com/kerberos-io/onvif v1.1.0
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
