@@ -68,5 +68,9 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "sass": "^1.54.4",
     "sass-loader": "^10.3.1"
+  },
+  "resolutions": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   }
 }
