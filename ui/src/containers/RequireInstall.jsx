@@ -1,17 +1,49 @@
 import React from 'react';
+import { bindActionCreators } from 'redux';
+import { connect } from 'react-redux';
+import { push } from 'react-router-redux';
 import PropTypes from 'prop-types';
-import { useSelector } from 'react-redux';
-import { Redirect } from 'react-router-dom';
 
-export default function RequireInstall({ children }) {
-  const isAuthenticated = useSelector((s) => s.authentication.loggedIn);
-  const isInstalled = useSelector((s) => s.authentication.installed);
-  if (isInstalled) {
-    return <Redirect to={isAuthenticated ? '/' : '/login'} />;
+export default function RequireInstall(ComposedComponent) {
+  class Install extends React.Component {
+    componentDidMount() {
+      const { isAuthenticated, isInstalled, redirectDashboard, redirectLogin } =
+        this.props;
+      if (isInstalled) {
+        if (isAuthenticated) {
+          redirectDashboard();
+        } else if (!isAuthenticated) {
+          redirectLogin();
+        }
+      }
+    }
+
+    render() {
+      const { isInstalled } = this.props;
+      return <div>{!isInstalled ? <ComposedComponent /> : null}</div>;
+    }
   }
-  return children;
-}
 
-RequireInstall.propTypes = {
-  children: PropTypes.node.isRequired,
-};
+  const mapStateToProps = (state) => ({
+    isAuthenticated: state.authentication.loggedIn,
+    isInstalled: state.authentication.installed,
+  });
+
+  const mapDispatchToProps = (dispatch) =>
+    bindActionCreators(
+      {
+        redirectDashboard: () => push('/'),
+        redirectLogin: () => push('/login'),
+      },
+      dispatch
+    );
+
+  Install.propTypes = {
+    isAuthenticated: PropTypes.bool.isRequired,
+    isInstalled: PropTypes.bool.isRequired,
+    redirectDashboard: PropTypes.func.isRequired,
+    redirectLogin: PropTypes.func.isRequired,
+  };
+
+  return connect(mapStateToProps, mapDispatchToProps)(Install);
+}

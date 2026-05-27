@@ -11,7 +11,7 @@ import {
   ModalBody,
   ModalFooter,
 } from '@kerberos-io/ui';
-import { Link } from 'react-router-dom';
+import { Link, withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { getEvents } from '../../actions/agent';
 import config from '../../config';
@@ -351,5 +351,5 @@ Media.propTypes = {
 };
 
 export default withTranslation()(
-  connect(mapStateToProps, mapDispatchToProps)(Media)
+  withRouter(connect(mapStateToProps, mapDispatchToProps)(Media))
 );

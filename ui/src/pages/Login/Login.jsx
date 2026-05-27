@@ -11,6 +11,7 @@ import {
   Icon,
   LandingLayout,
 } from '@kerberos-io/ui';
+import { withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { login, resetLogin } from '../../actions';
 import config from '../../config';
@@ -165,4 +166,4 @@ Login.propTypes = {
   dispatchResetLogin: PropTypes.func.isRequired,
 };
 
-export default connect(mapStateToProps, mapDispatchToProps)(Login);
+export default withRouter(connect(mapStateToProps, mapDispatchToProps)(Login));

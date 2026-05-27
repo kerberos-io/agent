@@ -17,7 +17,7 @@ import {
   Icon,
   Toggle,
 } from '@kerberos-io/ui';
-import { Link } from 'react-router-dom';
+import { Link, withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { interval } from 'rxjs';
 import { send } from '@giantmachines/redux-websocket';
@@ -2825,5 +2825,5 @@ Settings.propTypes = {
 };
 
 export default withTranslation()(
-  connect(mapStateToProps, mapDispatchToProps)(Settings)
+  withRouter(connect(mapStateToProps, mapDispatchToProps)(Settings))
 );

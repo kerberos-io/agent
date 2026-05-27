@@ -1,6 +1,7 @@
 import React from 'react';
 import { connect } from 'react-redux';
 import classNames from 'classnames';
+import { withRouter } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { login } from '../../../../actions';
 import styles from './LoginForm.module.scss';
@@ -102,4 +103,6 @@ LoginForm.propTypes = {
   dispatchLogin: PropTypes.func.isRequired,
 };
 
-export default connect(mapStateToProps, mapDispatchToProps)(LoginForm);
+export default withRouter(
+  connect(mapStateToProps, mapDispatchToProps)(LoginForm)
+);
