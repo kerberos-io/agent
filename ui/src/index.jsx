@@ -1,12 +1,6 @@
-import React, { Suspense, useEffect } from 'react';
+import React, { Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useNavigate,
-} from 'react-router-dom';
+import { Router, Switch, Route, Redirect } from 'react-router-dom';
 import { createStore, applyMiddleware, compose } from 'redux';
 import { Provider } from 'react-redux';
 import reduxWebsocket from '@giantmachines/redux-websocket';
@@ -20,7 +14,7 @@ import Media from './pages/Media/Media';
 import Settings from './pages/Settings/Settings';
 import RequireAuth from './containers/RequireAuth';
 import RequireGuest from './containers/RequireGuest';
-import { setNavigator } from './navigation';
+import history from './history';
 import './i18n';
 
 // We get the token from the store to initialise the store.
@@ -66,65 +60,45 @@ const store = createStore(
 
 const Loader = () => <div>loading...</div>;
 
-// Bridges React Router's navigate function into a module-scoped singleton
-// so Redux thunks (e.g. login/logout) can navigate without a hook.
-function NavigationSetup() {
-  const nav = useNavigate();
-  useEffect(() => {
-    setNavigator(nav);
-  }, [nav]);
-  return null;
-}
-
 const container = document.getElementById('root');
 const root = createRoot(container);
 
 root.render(
   <Provider store={store}>
-    <BrowserRouter>
-      <NavigationSetup />
+    <Router history={history}>
       <Suspense fallback={<Loader />}>
-        <Routes>
-          <Route
-            path="/login"
-            element={
-              <RequireGuest>
-                <Login />
-              </RequireGuest>
-            }
-          />
-          <Route element={<App />}>
-            <Route
-              path="/"
-              element={<Navigate to="/dashboard" replace />}
-            />
-            <Route
-              path="/dashboard"
-              element={
-                <RequireAuth>
-                  <Dashboard />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/media"
-              element={
-                <RequireAuth>
-                  <Media />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <RequireAuth>
-                  <Settings />
-                </RequireAuth>
-              }
-            />
+        <Switch>
+          <Route path="/login">
+            <RequireGuest>
+              <Login />
+            </RequireGuest>
           </Route>
-        </Routes>
+          <Route>
+            <App>
+              <Switch>
+                <Route exact path="/">
+                  <Redirect to="/dashboard" />
+                </Route>
+                <Route exact path="/dashboard">
+                  <RequireAuth>
+                    <Dashboard />
+                  </RequireAuth>
+                </Route>
+                <Route exact path="/media">
+                  <RequireAuth>
+                    <Media />
+                  </RequireAuth>
+                </Route>
+                <Route exact path="/settings">
+                  <RequireAuth>
+                    <Settings />
+                  </RequireAuth>
+                </Route>
+              </Switch>
+            </App>
+          </Route>
+        </Switch>
       </Suspense>
-    </BrowserRouter>
+    </Router>
   </Provider>
 );

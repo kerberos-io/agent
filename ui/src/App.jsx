@@ -1,7 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { withTranslation } from 'react-i18next';
-import { Outlet } from 'react-router-dom';
 import {
   connect as connectWS,
   disconnect as disconnectWS,
@@ -94,7 +93,7 @@ class App extends React.Component {
   }
 
   render() {
-    const { t, connected } = this.props;
+    const { t, connected, children } = this.props;
     const { username, dashboard, dispatchLogout } = this.props;
     const cloudOnline = this.getCurrentTimestamp() - dashboard.cloudOnline < 30;
     return (
@@ -211,7 +210,7 @@ class App extends React.Component {
             )}
 
             <MainBody>
-              <Outlet />
+              {children}
             </MainBody>
           </Main>
         </div>
@@ -247,6 +246,11 @@ App.propTypes = {
   connected: PropTypes.bool.isRequired,
   dashboard: PropTypes.object.isRequired,
   dispatchGetDashboardInformation: PropTypes.func.isRequired,
+  children: PropTypes.node,
+};
+
+App.defaultProps = {
+  children: null,
 };
 
 export default withTranslation()(

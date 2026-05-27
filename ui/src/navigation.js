@@ -1,16 +1,12 @@
 // Lightweight navigation singleton so non-React code (Redux thunks) can
-// trigger client-side navigation. The value is set from a component that
-// has access to React Router's `useNavigate` hook (see NavigationSetup in
-// index.jsx).
+// trigger client-side navigation. Backed by the shared `history` instance
+// passed to react-router's <Router>.
+import history from './history';
 
-let navigatorFn = null;
-
-export const setNavigator = (fn) => {
-  navigatorFn = fn;
+export const setNavigator = () => {
+  // Kept for API compatibility; no-op since history is module-scoped.
 };
 
-export const navigate = (path, options) => {
-  if (navigatorFn) {
-    navigatorFn(path, options);
-  }
+export const navigate = (path) => {
+  history.push(path);
 };
