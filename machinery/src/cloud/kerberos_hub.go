@@ -68,9 +68,9 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
-		client = &http.Client{Transport: tr}
+		client = &http.Client{Transport: tr, CheckRedirect: stripHubCredentialsOnCrossHostRedirect}
 	} else {
-		client = &http.Client{}
+		client = &http.Client{CheckRedirect: stripHubCredentialsOnCrossHostRedirect}
 	}
 
 	resp, err := client.Do(req)
@@ -128,4 +128,21 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 	errorMessage := "UploadKerberosHub: Upload Failed, " + err.Error()
 	log.Log.Info(errorMessage)
 	return false, true, errors.New(errorMessage)
+}
+
+// stripHubCredentialsOnCrossHostRedirect removes the custom Kerberos Hub
+// credential headers on a redirect that crosses to a different host. net/http
+// already strips the standard sensitive headers (Authorization, Cookie,
+// WWW-Authenticate) on a cross-host redirect, but it does NOT strip
+// custom-named headers, so without this the Hub private/public keys would be
+// forwarded to any host the configured HubURI redirects to.
+func stripHubCredentialsOnCrossHostRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) == 0 {
+		return nil
+	}
+	if req.URL.Host != via[0].URL.Host {
+		req.Header.Del("X-Kerberos-Hub-PrivateKey")
+		req.Header.Del("X-Kerberos-Hub-PublicKey")
+	}
+	return nil
 }
