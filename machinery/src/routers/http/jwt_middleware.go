@@ -14,7 +14,14 @@ import (
 func JWTMiddleWare() jwt.GinJWTMiddleware {
 
 	identityKey := "id"
-	myKey := "TOBECHANGED"
+	// Allow the JWT signing secret to be configured through an environment
+	// variable so that tokens issued by another service (e.g. the Kerberos
+	// Factory) can be validated by the agent. Falls back to the historic
+	// default to preserve backwards compatibility.
+	myKey := os.Getenv("AGENT_JWT_SECRET")
+	if myKey == "" {
+		myKey = "TOBECHANGED"
+	}
 
 	m := jwt.GinJWTMiddleware{
 		Realm:       "kerberosio",
@@ -106,7 +113,11 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 		// - "query:<name>"
 		// - "cookie:<name>"
 		// - "param:<name>"
-		TokenLookup: "header: Authorization, query: token, cookie: jwt",
+		// X-Authorization is included because requests proxied through the
+		// Kubernetes apiserver service-proxy have their Authorization header
+		// consumed by the apiserver; the original bearer token is forwarded in
+		// the X-Authorization header instead.
+		TokenLookup: "header: Authorization, header: X-Authorization, query: token, cookie: jwt",
 		// TokenLookup: "query:token",
 		// TokenLookup: "cookie:token",
 
