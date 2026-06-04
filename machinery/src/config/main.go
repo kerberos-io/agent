@@ -193,8 +193,78 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 	return
 }
 
-// This function will override the configuration with environment variables.
+// OverrideWithEnvironmentVariables builds the effective configuration from the
+// environment variables.
+//
+// In ConfigMap/standalone mode (DEPLOYMENT empty or "agent") the global
+// configuration is delivered as GLOBAL_AGENT_* environment variables and the
+// per-agent configuration as AGENT_* environment variables. We parse them into
+// the separate global and custom configurations and build the effective
+// configuration as "global overridden by custom", mirroring the MongoDB-backed
+// factory behaviour. This keeps the global and per-agent (custom) configuration
+// separated so the factory edit page can distinguish inherited global settings
+// from per-agent overrides.
 func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
+	if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
+		initConfigPointers(&configuration.Config)
+
+		// Parse the global configuration from the GLOBAL_AGENT_* variables.
+		globalWrap := &models.Configuration{Config: configuration.GlobalConfig}
+		initConfigPointers(&globalWrap.Config)
+		applyAgentEnvVars(globalWrap, "GLOBAL_", false)
+		configuration.GlobalConfig = globalWrap.Config
+
+		// Parse the per-agent (custom) configuration from the AGENT_* variables.
+		customWrap := &models.Configuration{Config: configuration.CustomConfig}
+		initConfigPointers(&customWrap.Config)
+		applyAgentEnvVars(customWrap, "", false)
+		configuration.CustomConfig = customWrap.Config
+
+		// Build the effective configuration: global base, then per-agent
+		// overrides on top. Defaults (e.g. signing) are applied on the last
+		// pass only.
+		applyAgentEnvVars(configuration, "GLOBAL_", false)
+		applyAgentEnvVars(configuration, "", true)
+	} else {
+		// Factory/MongoDB mode: the global and custom configurations are already
+		// loaded and merged from MongoDB; we only override the effective
+		// configuration with any AGENT_* environment variables.
+		applyAgentEnvVars(configuration, "", true)
+	}
+}
+
+// initConfigPointers ensures all pointer sub-structs are non-nil so that the
+// environment-variable parsing can assign into them without dereferencing a nil
+// pointer.
+func initConfigPointers(config *models.Config) {
+	if config.KStorage == nil {
+		config.KStorage = &models.KStorage{}
+	}
+	if config.KStorageSecondary == nil {
+		config.KStorageSecondary = &models.KStorage{}
+	}
+	if config.S3 == nil {
+		config.S3 = &models.S3{}
+	}
+	if config.Encryption == nil {
+		config.Encryption = &models.Encryption{}
+	}
+	if config.Signing == nil {
+		config.Signing = &models.Signing{}
+	}
+	if config.Dropbox == nil {
+		config.Dropbox = &models.Dropbox{}
+	}
+	if config.Region == nil {
+		config.Region = &models.Region{}
+	}
+}
+
+// applyAgentEnvVars applies the AGENT_* environment variables (optionally
+// carrying the given prefix, e.g. "GLOBAL_") onto configuration.Config. When
+// applyDefaults is true, defaults (such as the signing key) are applied after
+// parsing; this should only be done for the effective configuration.
+func applyAgentEnvVars(configuration *models.Configuration, prefix string, applyDefaults bool) {
 	environmentVariables := os.Environ()
 
 	// Initialize the configuration for some new fields.
@@ -203,9 +273,10 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 	}
 
 	for _, env := range environmentVariables {
-		if strings.Contains(env, "AGENT_") {
-			key := strings.Split(env, "=")[0]
-			value := os.Getenv(key)
+		fullKey := strings.SplitN(env, "=", 2)[0]
+		if strings.HasPrefix(fullKey, prefix+"AGENT_") && !(prefix == "" && strings.HasPrefix(fullKey, "GLOBAL_AGENT_")) {
+			key := strings.TrimPrefix(fullKey, prefix)
+			value := os.Getenv(fullKey)
 			switch key {
 
 			/* General configuration */
@@ -545,24 +616,20 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 		}
 	}
 
-	// Signing is a new feature, so if empty we set default values.
-	if configuration.Config.Signing == nil || configuration.Config.Signing.PrivateKey == "" {
+	// Signing is a new feature, so if empty we set default values. Only applied
+	// for the effective configuration (applyDefaults), not for the separate
+	// global/custom views.
+	if applyDefaults && (configuration.Config.Signing == nil || configuration.Config.Signing.PrivateKey == "") {
 		configuration.Config.Signing = &models.Signing{
 			Enabled:    "true",
 			PrivateKey: "-----BEGIN PRIVATE KEY-----\n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\n-----END PRIVATE KEY-----",
 		}
 	}
 
-	// When the agent is configured through environment variables (for example
-	// delivered via a Kubernetes ConfigMap in the factory standalone/configmap
-	// mode), there is no separate global/custom configuration coming from
-	// MongoDB. Mirror the effective configuration into CustomConfig so consumers
-	// that read the per-agent ("custom") configuration — such as the factory
-	// agent edit page — see the values that were injected through the
-	// environment instead of an empty configuration.
-	if os.Getenv("DEPLOYMENT") == "" || os.Getenv("DEPLOYMENT") == "agent" {
-		configuration.CustomConfig = configuration.Config
-	}
+	// When the agent is configured through environment variables the global and
+	// custom configurations were already parsed separately (see
+	// OverrideWithEnvironmentVariables), so there is no need to mirror the
+	// effective configuration into CustomConfig anymore.
 }
 
 func SaveConfig(configDirectory string, config models.Config, configuration *models.Configuration, communication *models.Communication) error {
