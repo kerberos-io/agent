@@ -215,7 +215,18 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 		configuration.GlobalConfig = globalWrap.Config
 
 		// Parse the per-agent (custom) configuration from the AGENT_* variables.
-		customWrap := &models.Configuration{Config: configuration.CustomConfig}
+		// In ConfigMap mode the per-agent overrides are delivered exclusively
+		// through AGENT_* environment variables, so we must start from an empty
+		// configuration rather than the bundled config.json that OpenConfig loaded
+		// into CustomConfig. Otherwise defaults from that file (e.g. cloud="s3")
+		// would leak into the custom config and be mistaken for explicit per-agent
+		// overrides, hiding inherited global settings (the factory edit page would
+		// show the local default instead of the inherited global persistence).
+		customBase := configuration.CustomConfig
+		if isConfigMapMode() {
+			customBase = models.Config{}
+		}
+		customWrap := &models.Configuration{Config: customBase}
 		initConfigPointers(&customWrap.Config)
 		applyAgentEnvVars(customWrap, "", false)
 		configuration.CustomConfig = customWrap.Config
@@ -231,6 +242,21 @@ func OverrideWithEnvironmentVariables(configuration *models.Configuration) {
 		// configuration with any AGENT_* environment variables.
 		applyAgentEnvVars(configuration, "", true)
 	}
+}
+
+// isConfigMapMode reports whether the agent is running in ConfigMap mode, i.e.
+// whether a global configuration layer is delivered separately through
+// GLOBAL_AGENT_* environment variables. In that mode the per-agent (custom)
+// configuration must be built solely from the AGENT_* overrides and must not be
+// seeded with the bundled config.json defaults, so that inherited global
+// settings remain distinguishable from explicit per-agent overrides.
+func isConfigMapMode() bool {
+	for _, env := range os.Environ() {
+		if strings.HasPrefix(env, "GLOBAL_AGENT_") {
+			return true
+		}
+	}
+	return false
 }
 
 // initConfigPointers ensures all pointer sub-structs are non-nil so that the
