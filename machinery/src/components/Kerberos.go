@@ -752,10 +752,24 @@ func GetSnapshotRaw(c *gin.Context, captureDevice *capture.Capture, configuratio
 // @Description Get the current configuration.
 // @Success 200
 func GetConfig(c *gin.Context, captureDevice *capture.Capture, configuration *models.Configuration, communication *models.Communication) {
-	// We'll try to get a snapshot from the camera.
-	base64Image := capture.Base64Image(captureDevice, communication, configuration)
-	if base64Image != "" {
-		communication.Image = base64Image
+	// We'll try to get a fresh snapshot from the camera. Capturing a snapshot
+	// reads a keyframe from the live stream, which blocks until one arrives.
+	// When the camera is offline or the stream is stalled (no packets being
+	// received) this would block the /config endpoint indefinitely, making the
+	// agent appear unreachable even though its HTTP server is healthy. We
+	// therefore bound the snapshot fetch with a short timeout and fall back to
+	// the last cached snapshot, so /config always responds promptly.
+	snapshot := make(chan string, 1)
+	go func() {
+		snapshot <- capture.Base64Image(captureDevice, communication, configuration)
+	}()
+	select {
+	case base64Image := <-snapshot:
+		if base64Image != "" {
+			communication.Image = base64Image
+		}
+	case <-time.After(2 * time.Second):
+		log.Log.Info("components.Kerberos.GetConfig(): snapshot timed out (stream stalled or camera offline), returning configuration with the last cached snapshot.")
 	}
 
 	c.JSON(200, gin.H{
