@@ -140,23 +140,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				if start && // If already recording and current frame is a keyframe and we should stop recording
 					nextPkt.IsKeyFrame && (startRecording+postRecording-now <= 0 || now-startRecording > maxRecordingPeriod-500) {
 
-					pts := convertPTS(pkt.TimeLegacy)
-					if pkt.IsVideo {
-						// Write the last packet
-						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-						}
-					} else if pkt.IsAudio {
-						// Write the last packet
-						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-							}
-						} else if pkt.Codec == "PCM_MULAW" {
-							// TODO: transcode to AAC, some work to do..
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
-						}
-					}
+					// Write the last packet before closing the recording.
+					writeSampleToMP4(mp4Video, videoTrack, audioTrack, pkt)
 
 					// Close mp4
 					if len(mp4Video.SPSNALUs) == 0 && len(configuration.Config.Capture.IPCamera.SPSNALUs) > 0 {
@@ -311,43 +296,12 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 					}
 
-					pts := convertPTS(pkt.TimeLegacy)
-					if pkt.IsVideo {
-						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-						}
-					} else if pkt.IsAudio {
-						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-							}
-						} else if pkt.Codec == "PCM_MULAW" {
-							// TODO: transcode to AAC, some work to do..
-							// We might need to use ffmpeg to transcode the audio to AAC.
-							// For now we will skip the audio track.
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
-						}
-					}
+					writeSampleToMP4(mp4Video, videoTrack, audioTrack, pkt)
 					recordingStatus = "started"
 
 				} else if start {
 
-					pts := convertPTS(pkt.TimeLegacy)
-					if pkt.IsVideo {
-						// New method using new mp4 library
-						if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-							log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-						}
-					} else if pkt.IsAudio {
-						if pkt.Codec == "AAC" {
-							if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(continuous): " + err.Error())
-							}
-						} else if pkt.Codec == "PCM_MULAW" {
-							// TODO: transcode to AAC, some work to do..
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
-						}
-					}
+					writeSampleToMP4(mp4Video, videoTrack, audioTrack, pkt)
 				}
 				pkt = nextPkt
 			}
@@ -571,29 +525,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						start = true
 					}
 					if start {
-						pts := convertPTS(pkt.TimeLegacy)
-						if pkt.IsVideo {
-							log.Log.Debug("capture.main.HandleRecordStream(motiondetection): add video sample")
-							if mp4Video != nil {
-								if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-									log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
-								}
-							}
-						} else if pkt.IsAudio {
-							log.Log.Debug("capture.main.HandleRecordStream(motiondetection): add audio sample")
-							if pkt.Codec == "AAC" {
-								if mp4Video != nil {
-									if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts); err != nil {
-										log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + err.Error())
-									}
-								}
-							} else if pkt.Codec == "PCM_MULAW" {
-								// TODO: transcode to AAC, some work to do..
-								// We might need to use ffmpeg to transcode the audio to AAC.
-								// For now we will skip the audio track.
-								log.Log.Debug("capture.main.HandleRecordStream(motiondetection): no AAC audio codec detected, skipping audio track.")
-							}
-						}
+						writeSampleToMP4(mp4Video, videoTrack, audioTrack, pkt)
 					}
 
 					pkt = nextPkt
@@ -865,6 +797,41 @@ func JpegImage(captureDevice *Capture, communication *models.Communication) imag
 
 func convertPTS(v time.Duration) uint64 {
 	return uint64(v.Milliseconds())
+}
+
+// writeSampleToMP4 writes a single capture packet to the fragmented MP4.
+//
+// For video it derives the decode timestamp (DTS) from the packet PTS using the
+// per-packet composition offset (PTS - DTS), which is non-zero only for streams
+// that contain B-frames. Passing the monotonic DTS as the sample timestamp keeps
+// the fragment timeline (tfdt/sidx) monotonic, while the composition offset is
+// forwarded so frames are still presented in PTS order.
+func writeSampleToMP4(mp4Video *video.MP4, videoTrack, audioTrack uint32, pkt packets.Packet) {
+	if mp4Video == nil {
+		return
+	}
+
+	pts := convertPTS(pkt.TimeLegacy)
+
+	if pkt.IsVideo {
+		compositionOffset := pkt.CompositionTime
+		dts := pts
+		if compositionOffset > 0 && uint64(compositionOffset) <= pts {
+			dts = pts - uint64(compositionOffset)
+		}
+		if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, dts, compositionOffset); err != nil {
+			log.Log.Error("capture.main.writeSampleToMP4(): " + err.Error())
+		}
+	} else if pkt.IsAudio {
+		if pkt.Codec == "AAC" {
+			if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts, 0); err != nil {
+				log.Log.Error("capture.main.writeSampleToMP4(): " + err.Error())
+			}
+		} else if pkt.Codec == "PCM_MULAW" {
+			// TODO: transcode to AAC, some work to do..
+			log.Log.Debug("capture.main.writeSampleToMP4(): no AAC audio codec detected, skipping audio track.")
+		}
+	}
 }
 
 /*func convertPTS2(v int64) uint64 {
