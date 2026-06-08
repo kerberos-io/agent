@@ -14,7 +14,7 @@ type Packet struct {
 	IsKeyFrame      bool   // video packet is key frame
 	Idx             int8   // stream index in container format
 	Codec           string // codec name
-	CompositionTime int64  // packet presentation time minus decode time for H264 B-Frame
+	CompositionTime int64  // composition offset (PTS - DTS) in milliseconds, non-zero for H264/H265 B-frames
 	Time            int64  // packet decode time
 	TimeLegacy      time.Duration
 	CurrentTime     int64  // current time in milliseconds (UNIX timestamp)
