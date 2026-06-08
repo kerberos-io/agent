@@ -517,6 +517,35 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 	return
 }
 
+// dtsExtractor abstracts the codec-specific DTS extractors from mediacommon
+// (h264.DTSExtractor2 and h265.DTSExtractor2), which expose the same method.
+type dtsExtractor interface {
+	Extract(au [][]byte, pts int64) (int64, error)
+}
+
+// compositionOffsetMs returns the composition time offset (PTS - DTS) in
+// milliseconds for a coded access unit. Streams that contain B-frames deliver
+// access units in decode order with non-monotonic PTS; the fragmented MP4
+// writer needs a monotonic DTS timeline plus a per-sample composition offset
+// so browsers (Media Source Extensions) can decode the chained segments.
+//
+// It returns 0 when the codec has no frame reordering (the common case, e.g.
+// baseline "IPPP" streams) or when extraction fails, making it a safe no-op.
+func compositionOffsetMs(ext dtsExtractor, au [][]byte, pts int64, clockRate int) int64 {
+	if ext == nil || clockRate <= 0 {
+		return 0
+	}
+	dts, err := ext.Extract(au, pts)
+	if err != nil {
+		return 0
+	}
+	offset := pts - dts
+	if offset <= 0 {
+		return 0
+	}
+	return offset * 1000 / int64(clockRate)
+}
+
 // Start the RTSP client, and start reading packets.
 func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) (err error) {
 	log.Log.Debug("capture.golibrtsp.Start(): started")
@@ -602,7 +631,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	var filteredAU [][]byte
 	if g.VideoH264Media != nil && g.VideoH264Forma != nil {
 
-		//dtsExtractor := h264.NewDTSExtractor2()
+		// Extracts DTS from the bitstream to support B-frame H264 streams.
+		// Created once per stream (tracks reorder state across access units).
+		h264DTSExtractor := h264.NewDTSExtractor2()
 
 		g.Client.OnPacketRTP(g.VideoH264Media, g.VideoH264Forma, func(rtppkt *rtp.Packet) {
 
@@ -742,6 +773,11 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					return
 				}
 
+				// Composition time offset (PTS - DTS) in milliseconds. Non-zero
+				// only for streams with B-frames; the MP4 writer uses it to keep a
+				// monotonic decode timeline and present frames in PTS order.
+				compositionOffset := compositionOffsetMs(h264DTSExtractor, au, pts2, g.VideoH264Forma.ClockRate())
+
 				pkt := packets.Packet{
 					IsKeyFrame:      idrPresent,
 					Packet:          rtppkt,
@@ -749,7 +785,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					Time:            pts2,
 					TimeLegacy:      pts,
 					CurrentTime:     time.Now().UnixMilli(),
-					CompositionTime: pts2,
+					CompositionTime: compositionOffset,
 					Idx:             g.VideoH264Index,
 					IsVideo:         true,
 					IsAudio:         false,
@@ -817,6 +853,11 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 	// called when a video RTP packet arrives for H265
 	if g.VideoH265Media != nil && g.VideoH265Forma != nil {
+
+		// Extracts DTS from the bitstream to support B-frame H265 streams.
+		// Created once per stream (tracks reorder state across access units).
+		h265DTSExtractor := h265.NewDTSExtractor2()
+
 		g.Client.OnPacketRTP(g.VideoH265Media, g.VideoH265Forma, func(rtppkt *rtp.Packet) {
 
 			// This will check if we need to stop the thread,
@@ -860,6 +901,10 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					}
 				}
 
+				// Preserve the decoded access unit (in decode order) for DTS
+				// extraction before we rewrite it into the filtered/annexb form.
+				decodedAU := au
+
 				filteredAU = [][]byte{
 					{byte(h265.NALUType_AUD_NUT) << 1, 1, 0x50},
 				}
@@ -902,6 +947,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					return
 				}
 
+				// Composition time offset (PTS - DTS) in milliseconds; see H264 handler.
+				compositionOffset := compositionOffsetMs(h265DTSExtractor, decodedAU, pts2, g.VideoH265Forma.ClockRate())
+
 				pkt := packets.Packet{
 					IsKeyFrame:      isRandomAccess,
 					Packet:          rtppkt,
@@ -909,7 +957,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					Time:            pts2,
 					TimeLegacy:      pts,
 					CurrentTime:     time.Now().UnixMilli(),
-					CompositionTime: pts2,
+					CompositionTime: compositionOffset,
 					Idx:             g.VideoH265Index,
 					IsVideo:         true,
 					IsAudio:         false,

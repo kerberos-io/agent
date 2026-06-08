@@ -266,7 +266,16 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 	return true
 }
 
-func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64) error {
+// AddSampleToTrack appends a sample to the given track.
+//
+// For video, pts is the decode timestamp (DTS, in milliseconds) and
+// compositionOffset is the composition time offset (PTS - DTS, in milliseconds).
+// The offset is non-zero only for streams that contain B-frames; it is written
+// as the sample's signed composition time offset so the decoder presents frames
+// in PTS order while the fragment timeline stays monotonic in DTS.
+//
+// For audio, pts is the sample timestamp and compositionOffset should be 0.
+func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64, compositionOffset int64) error {
 
 	if isKeyframe && trackID == uint32(mp4.VideoTrack) {
 		mp4.TotalKeyframesReceived++
@@ -375,7 +384,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 				fullSample.Sample = mp4ff.Sample{
 					Size:                  uint32(len(fullSample.Data)),
 					Flags:                 flags,
-					CompositionTimeOffset: 0, // No composition time offset for video
+					CompositionTimeOffset: int32(compositionOffset), // PTS-DTS, non-zero for B-frames
 				}
 				mp4.VideoFullSample = &fullSample
 				mp4.PendingSampleIsKeyframe = isKeyframe

@@ -49,7 +49,7 @@ func TestMP4Duration(t *testing.T) {
 	for i := 0; i < numFrames; i++ {
 		pts := uint64(i) * frameDuration
 		isKeyframe := i%gopSize == 0
-		err := mp4Video.AddSampleToTrack(videoTrack, isKeyframe, makeFrame(isKeyframe), pts)
+		err := mp4Video.AddSampleToTrack(videoTrack, isKeyframe, makeFrame(isKeyframe), pts, 0)
 		if err != nil {
 			t.Fatalf("AddSampleToTrack failed at frame %d: %v", i, err)
 		}
