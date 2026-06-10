@@ -2,6 +2,7 @@ package components
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"sync/atomic"
@@ -446,6 +447,37 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	return status
 }
 
+// packetAgeString returns a human readable age (e.g. "12s") since the last
+// packet timestamp stored in the given atomic.Value, or "unknown" when no
+// packet has been received yet. Used to add context to watchdog restart logs.
+func packetAgeString(timer *atomic.Value) string {
+	if timer == nil {
+		return "unknown"
+	}
+
+	// atomic.Value panics on Load() if it was never initialized via Store().
+	var v any
+	func() {
+		defer func() {
+			if recover() != nil {
+				v = nil
+			}
+		}()
+		v = timer.Load()
+	}()
+
+	last, ok := v.(int64)
+	if !ok || last == 0 {
+		return "unknown"
+	}
+
+	age := time.Now().Unix() - last
+	if age < 0 {
+		age = 0
+	}
+	return strconv.FormatInt(age, 10) + "s"
+}
+
 // ControlAgent will check if the camera is still connected, if not it will restart the agent.
 // In the other thread we are keeping track of the number of packets received, and particular the keyframe packets.
 // Once we are not receiving any packets anymore, we will restart the agent.
@@ -480,7 +512,8 @@ func ControlAgent(communication *models.Communication) {
 
 				// After 15 seconds without activity this is thrown..
 				if occurence == 3 {
-					log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking mainstream.")
+					log.Log.Info(fmt.Sprintf("components.Kerberos.ControlAgent(): Restarting machinery because of blocking mainstream. (stalledKeyframeCounter=%d, lastPacket=%s ago, isConfiguring=%t)",
+						packetsR, packetAgeString(communication.LastPacketTimer), communication.IsConfiguring.IsSet()))
 					select {
 					case communication.HandleBootstrap <- "restart":
 						log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream.")
@@ -507,6 +540,8 @@ func ControlAgent(communication *models.Communication) {
 
 					// After 15 seconds without activity this is thrown..
 					if occurenceSub == 3 {
+						log.Log.Info(fmt.Sprintf("components.Kerberos.ControlAgent(): substream stalled (stalledKeyframeCounter=%d, lastPacket=%s ago, isConfiguring=%t)",
+							packetsSubR, packetAgeString(communication.LastPacketTimerSub), communication.IsConfiguring.IsSet()))
 						select {
 						case communication.HandleBootstrap <- "restart":
 							log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream.")

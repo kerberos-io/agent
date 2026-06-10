@@ -2,25 +2,16 @@ name: Autofill PR description
 
 on: pull_request
 
-env:
-  ORGANIZATION: uugai
-  PROJECT: ${{ github.event.repository.name }}
-  PR_NUMBER: ${{ github.event.number }}
-  
 jobs:
   openai-pr-description:
-    runs-on: ubuntu-22.04
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Autofill PR description if empty using OpenAI
-        uses: cedricve/azureopenai-pr-description@master
-        with:
-          github_token: ${{ secrets.TOKEN }}
-          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-          azure_openai_api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
-          azure_openai_endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-          azure_openai_version: ${{ secrets.AZURE_OPENAI_VERSION }}
-          openai_model: ${{ secrets.OPENAI_MODEL }}
-          pull_request_url: https://pr${{ env.PR_NUMBER }}.api.kerberos.lol
-          overwrite_description: true
+    uses: uug-ai/workflows/.github/workflows/pr-description.yml@main
+    with:
+      pr_number: ${{ github.event.number }}
+      pull_request_url: ""
+      overwrite_description: true
+    secrets:
+      TOKEN: ${{ secrets.TOKEN }}
+      AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_VERSION: ${{ secrets.AZURE_OPENAI_VERSION }}
