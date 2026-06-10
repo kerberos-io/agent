@@ -95,6 +95,121 @@ type Golibrtsp struct {
 	keyframeBufferSize       int
 	keyframeBufferIndex      int
 	keyframeMutex            sync.Mutex
+
+	// Stream health instrumentation. Used to pinpoint the root cause behind
+	// "RTP packets lost" + watchdog restarts by separating downstream
+	// back-pressure from upstream network/camera stalls.
+	health      *streamHealth
+	streamLabel string
+}
+
+// streamHealth instruments the RTSP read path. gortsplib delivers every RTP
+// packet on a single read goroutine; queue.WritePacket() is synchronous, so if
+// a downstream consumer (recording, muxing, WebRTC) is slow or the process is
+// CPU-starved, WritePacket() blocks, the TCP socket is not drained, and the
+// camera advances RTP sequence numbers -> "RTP packets lost". This type makes
+// the two failure modes distinguishable:
+//   - large writeMax / writeAvg  => downstream back-pressure (our side).
+//   - large gapMax with fast writes => upstream network / camera stall.
+type streamHealth struct {
+	mu          sync.Mutex
+	windowStart time.Time
+	lastPacket  time.Time
+	frames      int64
+	writeSum    time.Duration
+	writeMax    time.Duration
+	gapMax      time.Duration
+	lost        uint64
+	decodeErrs  int64
+}
+
+const (
+	streamHealthWindow    = 10 * time.Second
+	streamHealthWriteWarn = 150 * time.Millisecond
+	streamHealthGapWarn   = 1500 * time.Millisecond
+)
+
+func newStreamHealth() *streamHealth {
+	now := time.Now()
+	return &streamHealth{windowStart: now, lastPacket: now}
+}
+
+// observePacket records one processed video frame: the wall-clock gap since the
+// previous frame (arrival cadence) and how long WritePacket() blocked
+// (back-pressure). It emits an immediate warning when either side stalls and a
+// periodic summary every streamHealthWindow.
+func (h *streamHealth) observePacket(streamType string, writeDur time.Duration) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	now := time.Now()
+	gap := now.Sub(h.lastPacket)
+	h.lastPacket = now
+	h.frames++
+	h.writeSum += writeDur
+	if writeDur > h.writeMax {
+		h.writeMax = writeDur
+	}
+	if gap > h.gapMax {
+		h.gapMax = gap
+	}
+	if writeDur >= streamHealthWriteWarn {
+		log.Log.Warning(fmt.Sprintf(
+			"capture.golibrtsp.health(%s): WritePacket blocked %dms — downstream back-pressure / CPU starvation",
+			streamType, writeDur.Milliseconds()))
+	}
+	if gap >= streamHealthGapWarn {
+		log.Log.Warning(fmt.Sprintf(
+			"capture.golibrtsp.health(%s): %dms since previous frame — upstream network / camera stall",
+			streamType, gap.Milliseconds()))
+	}
+	if now.Sub(h.windowStart) >= streamHealthWindow {
+		elapsed := now.Sub(h.windowStart).Seconds()
+		var avgWriteMs float64
+		if h.frames > 0 {
+			avgWriteMs = float64(h.writeSum.Milliseconds()) / float64(h.frames)
+		}
+		log.Log.Info(fmt.Sprintf(
+			"capture.golibrtsp.health(%s): %.0fs window — frames=%d (%.1f/s) writeAvg=%.1fms writeMax=%dms gapMax=%dms lost=%d decodeErrs=%d",
+			streamType, elapsed, h.frames, float64(h.frames)/elapsed, avgWriteMs,
+			h.writeMax.Milliseconds(), h.gapMax.Milliseconds(), h.lost, h.decodeErrs))
+		h.windowStart = now
+		h.frames = 0
+		h.writeSum = 0
+		h.writeMax = 0
+		h.gapMax = 0
+		h.lost = 0
+		h.decodeErrs = 0
+	}
+}
+
+// observeLost is invoked by gortsplib when RTP sequence numbers skip. On a TCP
+// transport this means the sender (camera) dropped packets because we were not
+// reading fast enough, not loss on the wire.
+func (h *streamHealth) observeLost(streamType string, lost uint64) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	h.lost += lost
+	h.mu.Unlock()
+	log.Log.Warning(fmt.Sprintf(
+		"capture.golibrtsp.health(%s): %d RTP packet(s) lost — sender-side gap (receiver not draining TCP fast enough)",
+		streamType, lost))
+}
+
+// observeDecodeError is invoked by gortsplib on incomplete/invalid access units,
+// which are a downstream symptom of the loss reported by observeLost.
+func (h *streamHealth) observeDecodeError(streamType string, err error) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	h.decodeErrs++
+	h.mu.Unlock()
+	log.Log.Debug(fmt.Sprintf("capture.golibrtsp.health(%s): decode error: %s", streamType, err.Error()))
 }
 
 // fpsTracker holds per-stream state for PTS-based FPS calculation.
@@ -195,9 +310,20 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	defer span.End()
 
 	transport := gortsplib.TransportTCP
+	g.health = newStreamHealth()
 	g.Client = gortsplib.Client{
 		RequestBackChannels: false,
 		Transport:           &transport,
+		// Route gortsplib's packet-loss / decode-error reporting through our
+		// structured logger with stream context (replaces its plain stdout
+		// logging). These hooks are what let us tell whether the camera is
+		// dropping packets because we can't drain the socket fast enough.
+		OnPacketsLost: func(lost uint64) {
+			g.health.observeLost(g.streamLabel, lost)
+		},
+		OnDecodeError: func(err error) {
+			g.health.observeDecodeError(g.streamLabel, err)
+		},
 	}
 
 	// parse URL
@@ -550,6 +676,12 @@ func compositionOffsetMs(ext dtsExtractor, au [][]byte, pts int64, clockRate int
 func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) (err error) {
 	log.Log.Debug("capture.golibrtsp.Start(): started")
 
+	// Label this client's loss/decode/health logging with the stream type.
+	g.streamLabel = streamType
+	if g.health == nil {
+		g.health = newStreamHealth()
+	}
+
 	// called when a MULAW audio RTP packet arrives
 	if g.AudioG711Media != nil && g.AudioG711Forma != nil {
 		g.Client.OnPacketRTP(g.AudioG711Media, g.AudioG711Forma, func(rtppkt *rtp.Packet) {
@@ -821,7 +953,11 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
 				}
 
+				writeStart := time.Now()
 				queue.WritePacket(pkt)
+				// Records WritePacket() blocking time and frame arrival cadence so
+				// we can tell back-pressure from a network/camera stall.
+				g.health.observePacket(streamType, time.Since(writeStart))
 
 				// This will check if we need to stop the thread,
 				// because of a reconfiguration.
@@ -983,7 +1119,11 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					}
 				}
 
+				writeStart := time.Now()
 				queue.WritePacket(pkt)
+				// Records WritePacket() blocking time and frame arrival cadence so
+				// we can tell back-pressure from a network/camera stall.
+				g.health.observePacket(streamType, time.Since(writeStart))
 
 				// This will check if we need to stop the thread,
 				// because of a reconfiguration.
