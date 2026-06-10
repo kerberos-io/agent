@@ -145,8 +145,16 @@ func (h *streamHealth) observePacket(streamType string, writeDur time.Duration) 
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	now := time.Now()
-	gap := now.Sub(h.lastPacket)
-	h.lastPacket = now
+	var gap time.Duration
+	if h.frames == 0 {
+		// First frame: initialize timing to avoid counting RTSP setup time as a stall.
+		h.windowStart = now
+		h.lastPacket = now
+		gap = 0
+	} else {
+		gap = now.Sub(h.lastPacket)
+		h.lastPacket = now
+	}
 	h.frames++
 	h.writeSum += writeDur
 	if writeDur > h.writeMax {
