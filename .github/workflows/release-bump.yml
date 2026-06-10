@@ -1,9 +1,5 @@
 name: Bump release
 
-# Manually "promote" the agent to a new release.
-# Pick which part of the semantic version to bump, this workflow computes the
-# next vMAJOR.MINOR.PATCH tag, pushes it and triggers the existing
-# release-create pipeline to build and publish the images and GitHub release.
 on:
   workflow_dispatch:
     inputs:
@@ -19,50 +15,154 @@ on:
 
 permissions:
   contents: write
-  actions: write
+
+env:
+  REPO: kerberos/agent
 
 jobs:
+  # Determine the next version, create the GitHub release and expose the tag.
   bump-release:
+    uses: uug-ai/workflows/.github/workflows/release-bump.yml@main
+    with:
+      bump: ${{ github.event.inputs.bump }}
+    secrets: inherit
+
+  # Publish the platform image to the uug-ai GitHub Container Registry
+  # (ghcr.io/uug-ai/agent-platform).
+  release:
+    needs: bump-release
+    uses: uug-ai/workflows/.github/workflows/release-create.yml@main
+    with:
+      organization: uug-ai
+      project: ${{ github.event.repository.name }}
+      tag: ${{ needs.bump-release.outputs.tag }}
+      docker_context: "."
+      create_gitops_pr: false
+      runner_matrix: >-
+        [
+          {"architecture":"amd64","runner":"ubuntu-24.04"},
+          {"architecture":"arm64","runner":"ubuntu-24.04-arm"}
+        ]
+    secrets: inherit
+
+  # Everything below mirrors the agent's own release-create.yml pipeline and
+  # publishes the multi-arch image to the kerberos/agent Docker Hub repo, driven
+  # by the freshly bumped tag instead of a `release: created` event.
+  build-amd64:
+    needs: bump-release
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        architecture: [amd64]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
         with:
-          fetch-depth: 0
-          fetch-tags: true
-
-      - name: Compute next version
-        id: version
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: benjlevesque/short-sha@v2.1
+        id: short-sha
+        with:
+          length: 7
+      - name: Run Build
         run: |
-          set -euo pipefail
-          latest=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
-          latest=${latest:-v0.0.0}
-          echo "Latest tag: $latest"
-          version=${latest#v}
-          IFS='.' read -r major minor patch <<< "$version"
-          case "${{ github.event.inputs.bump }}" in
-            major) major=$((major + 1)); minor=0; patch=0 ;;
-            minor) minor=$((minor + 1)); patch=0 ;;
-            patch) patch=$((patch + 1)) ;;
-          esac
-          next="v${major}.${minor}.${patch}"
-          echo "Next tag: $next"
-          echo "tag=$next" >> "$GITHUB_OUTPUT"
-
-      - name: Create and push tag
+          docker build --provenance=false --build-arg VERSION=${{ needs.bump-release.outputs.tag }} -t ${{matrix.architecture}} .
+          CID=$(docker create ${{matrix.architecture}})
+          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
+          docker rm ${CID}
+      - name: Strip binary
+        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
+      - name: Build and push Docker image
         run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
-          git push origin "${{ steps.version.outputs.tag }}"
+          docker tag ${{matrix.architecture}} $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
+          docker push $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-${{matrix.architecture}}.tar
+          path: agent-${{matrix.architecture}}.tar
 
-      # A tag pushed with the default GITHUB_TOKEN does not trigger other
-      # workflows, so invoke the release pipeline explicitly for the new tag.
-      - name: Trigger release pipeline
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  build-arm64:
+    needs: bump-release
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        architecture: [arm64]
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Checkout
+        uses: actions/checkout@v3
+      - uses: benjlevesque/short-sha@v2.1
+        id: short-sha
+        with:
+          length: 7
+      - name: Run Build
         run: |
-          gh workflow run release-create.yml \
-            --ref "${{ steps.version.outputs.tag }}" \
-            -f tag="${{ steps.version.outputs.tag }}"
+          docker build --provenance=false --build-arg VERSION=${{ needs.bump-release.outputs.tag }} -t ${{matrix.architecture}} -f Dockerfile.arm64 .
+          CID=$(docker create ${{matrix.architecture}})
+          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
+          docker rm ${CID}
+      - name: Strip binary
+        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
+      - name: Build and push Docker image
+        run: |
+          docker tag ${{matrix.architecture}} $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
+          docker push $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-${{matrix.architecture}}.tar
+          path: agent-${{matrix.architecture}}.tar
+
+  create-manifest:
+    runs-on: ubuntu-24.04
+    needs: [bump-release, build-amd64, build-arm64]
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Create and push multi-arch manifest
+        run: |
+          docker manifest create $REPO:${{ needs.bump-release.outputs.tag }} \
+            $REPO-arch:arch-amd64-${{ needs.bump-release.outputs.tag }} \
+            $REPO-arch:arch-arm64-${{ needs.bump-release.outputs.tag }}
+          docker manifest push $REPO:${{ needs.bump-release.outputs.tag }}
+      - name: Create and push latest manifest
+        run: |
+          docker manifest create $REPO:latest \
+            $REPO-arch:arch-amd64-${{ needs.bump-release.outputs.tag }} \
+            $REPO-arch:arch-arm64-${{ needs.bump-release.outputs.tag }}
+          docker manifest push $REPO:latest
+
+  create-release:
+    runs-on: ubuntu-24.04
+    needs: [bump-release, build-amd64, build-arm64]
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      - name: Create a release
+        uses: ncipollo/release-action@v1
+        with:
+          latest: true
+          allowUpdates: true
+          name: ${{ needs.bump-release.outputs.tag }}
+          tag: ${{ needs.bump-release.outputs.tag }}
+          generateReleaseNotes: false
+          omitBodyDuringUpdate: true
+          artifacts: "agent-*.tar/agent-*.tar"
+
+  
