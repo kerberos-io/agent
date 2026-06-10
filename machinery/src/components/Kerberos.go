@@ -454,15 +454,28 @@ func packetAgeString(timer *atomic.Value) string {
 	if timer == nil {
 		return "unknown"
 	}
-	v := timer.Load()
-	if v == nil {
-		return "unknown"
-	}
+
+	// atomic.Value panics on Load() if it was never initialized via Store().
+	var v any
+	func() {
+		defer func() {
+			if recover() != nil {
+				v = nil
+			}
+		}()
+		v = timer.Load()
+	}()
+
 	last, ok := v.(int64)
 	if !ok || last == 0 {
 		return "unknown"
 	}
-	return strconv.FormatInt(time.Now().Unix()-last, 10) + "s"
+
+	age := time.Now().Unix() - last
+	if age < 0 {
+		age = 0
+	}
+	return strconv.FormatInt(age, 10) + "s"
 }
 
 // ControlAgent will check if the camera is still connected, if not it will restart the agent.
