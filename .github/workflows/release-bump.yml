@@ -43,7 +43,13 @@ jobs:
           {"architecture":"amd64","runner":"ubuntu-24.04"},
           {"architecture":"arm64","runner":"ubuntu-24.04-arm"}
         ]
-    secrets: inherit
+    # The reusable workflow declares USERNAME/TOKEN as required secrets, so they
+    # must be passed explicitly (secrets: inherit only forwards secrets that
+    # already share those exact names). Map them to a dedicated PAT that has
+    # write:packages access on the uug-ai GitHub Container Registry.
+    secrets:
+      USERNAME: ${{ secrets.GHCR_USERNAME }}
+      TOKEN: ${{ secrets.GHCR_TOKEN }}
 
   # Everything below mirrors the agent's own release-create.yml pipeline and
   # publishes the multi-arch image to the kerberos/agent Docker Hub repo, driven

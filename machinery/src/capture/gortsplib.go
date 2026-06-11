@@ -204,7 +204,7 @@ func (h *streamHealth) observeLost(streamType string, lost uint64) {
 	h.lost += lost
 	h.mu.Unlock()
 	log.Log.Warning(fmt.Sprintf(
-		"capture.golibrtsp.health(%s): %d RTP packet(s) lost — sender-side gap (receiver not draining TCP fast enough)",
+		"capture.golibrtsp.health(%s): %d RTP packet(s) lost — camera skipped sequence numbers (TCP transport: camera dropped frames; cause is network path or receiver CPU starvation, not the downstream pipeline)",
 		streamType, lost))
 }
 

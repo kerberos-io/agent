@@ -80,6 +80,12 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 	// do several checks to see if the agent is still operational.
 	go ControlAgent(communication)
 
+	// Independent CPU-starvation probe. It runs once for the whole process and
+	// is decoupled from the network, so it disambiguates the two remaining
+	// causes of RTP loss + stream stalls: a starved process (k8s CPU throttling)
+	// vs. an upstream network/camera problem.
+	go monitorCPUStarvation()
+
 	// Handle heartbeats
 	go cloud.HandleHeartBeat(configuration, communication, uptimeStart)
 
@@ -476,6 +482,53 @@ func packetAgeString(timer *atomic.Value) string {
 		age = 0
 	}
 	return strconv.FormatInt(age, 10) + "s"
+}
+
+// monitorCPUStarvation runs a single, process-wide probe that is independent of
+// the camera and network. It sleeps for a fixed interval and measures how much
+// the wake-up overshoots the requested duration. A goroutine that asks to sleep
+// 1s but wakes up after 2s could not get scheduled onto a CPU — the classic
+// signature of CPU starvation / cgroup (Kubernetes) CPU throttling.
+//
+// This disambiguates the two remaining causes of RTP loss + stream stalls:
+//   - large overshoot here  => the process is starved (CPU limit / noisy
+//     neighbour); the RTSP read loop can't drain the socket, so the camera
+//     drops frames. Fix: raise/remove the CPU limit.
+//   - overshoot stays small  => the process is healthy; the loss is upstream
+//     (network path or camera). Fix: investigate the camera link.
+func monitorCPUStarvation() {
+	const (
+		interval     = 1 * time.Second
+		warnAbove    = 250 * time.Millisecond
+		summaryEvery = 30 * time.Second
+	)
+	var (
+		maxOvershoot time.Duration
+		windowStart  = time.Now()
+	)
+	for {
+		start := time.Now()
+		time.Sleep(interval)
+		overshoot := time.Since(start) - interval
+		if overshoot < 0 {
+			overshoot = 0
+		}
+		if overshoot > maxOvershoot {
+			maxOvershoot = overshoot
+		}
+		if overshoot >= warnAbove {
+			log.Log.Warning(fmt.Sprintf(
+				"components.Kerberos.monitorCPUStarvation(): scheduler overshoot %dms (asked %dms) — process not getting CPU; likely CPU throttling / starvation",
+				overshoot.Milliseconds(), interval.Milliseconds()))
+		}
+		if time.Since(windowStart) >= summaryEvery {
+			log.Log.Info(fmt.Sprintf(
+				"components.Kerberos.monitorCPUStarvation(): %.0fs window — maxSchedulerOvershoot=%dms (>=%dms indicates CPU starvation)",
+				time.Since(windowStart).Seconds(), maxOvershoot.Milliseconds(), warnAbove.Milliseconds()))
+			windowStart = time.Now()
+			maxOvershoot = 0
+		}
+	}
 }
 
 // ControlAgent will check if the camera is still connected, if not it will restart the agent.
