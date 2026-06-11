@@ -953,10 +953,10 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 				pkt.Data = pkt.Data[4:]
 				if pkt.IsKeyFrame {
-					// Prepend SPS and PPS in front of every keyframe so the access unit
-					// is self-contained. Downstream decoders (and the MP4 writer's in-band
-					// parameter-set recovery) rely on this; a recording whose first frame
-					// lacks SPS/PPS produces an MP4 with an empty avcC, which makes FFmpeg
+					// Prepend SPS/PPS (when available) in front of every keyframe so the
+					// access unit is self-contained. Downstream decoders (and the MP4 writer's
+					// in-band parameter-set recovery) rely on this; a recording whose first
+					// frame lacks SPS/PPS produces an MP4 with an empty avcC, which makes FFmpeg
 					// report "non-existing PPS 0 referenced".
 					//
 					// Build the payload in a freshly allocated buffer. The previous code
