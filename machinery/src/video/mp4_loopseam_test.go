@@ -9,19 +9,25 @@ import (
 )
 
 // runLoopSeamScenario builds a fragmented MP4 that reproduces the loop-seam
-// pattern observed in the failing virtual-rtsp recordings (see
-// thales_1781183923_3-758_2top_0-0-0-0_-1_30221.mp4): a steady GOP cadence,
-// but at the source-MP4 loop boundary an IDR arrives prematurely - far sooner
-// than a normal GOP. Without the fix this seam IDR ends up bunched into the
-// same fragment as the prior GOP's IDR, producing a mid-fragment sync sample
-// that trips macOS VideoToolbox (kVTVideoDecoderBadDataErr / -12909) and
-// MSE-based players, freezing playback around the seam (~10s in the original
-// file).
+// pattern observed in the failing virtual-rtsp recordings (e.g.
+// thales_1781196512_3-138_2top_0-0-0-0_-1_30219.mp4): a steady GOP cadence, but
+// at the source-MP4 loop boundary the source restarts and emits a fresh IDR far
+// sooner than a normal GOP. In the real recordings the short tail GOP left just
+// before that premature IDR contains a truncated inter-frame - software decoders
+// conceal the missing macroblocks, but hardware decoders (macOS VideoToolbox,
+// kVTVideoDecoderBadDataErr / -12909) and MSE players reject it and freeze
+// playback at the seam (~10s in the original file).
+//
+// The fix detects the premature seam IDR and drops the truncated tail GOP that
+// precedes it. The seam IDR is itself a clean random-access point, so playback
+// resumes seamlessly. This scenario asserts that the tail GOP is removed -
+// exactly one GOP fewer than emitted - while every healthy GOP is preserved in
+// full and no two IDRs are left bunched in a fragment.
 //
 // gopFrames is the number of frames per GOP, so the same scenario can be
 // exercised at different (configurable) camera GOP sizes. The fix derives its
-// threshold from the observed keyframe cadence, so the seam must be isolated
-// into its own fragment regardless of GOP size.
+// threshold from the observed keyframe cadence, so the truncated tail GOP is
+// dropped regardless of GOP size.
 func runLoopSeamScenario(t *testing.T, gopFrames int) {
 	t.Helper()
 
@@ -71,22 +77,22 @@ func runLoopSeamScenario(t *testing.T, gopFrames int) {
 	}
 
 	// Several healthy GOPs to establish the cadence and fill a couple of
-	// fragments, then the last "good" keyframe followed by a few P-frames so we
-	// are clearly mid-fragment when the seam arrives.
+	// fragments, then the truncated tail GOP: a keyframe followed by only a few
+	// P-frames before the source loops. This is the GOP that must be dropped.
 	for g := 0; g < 9; g++ {
 		emitGOP()
 	}
 	emitFrame(true)
-	seamLead := gopFrames / 5 // seam IDR arrives ~20% into the GOP
+	seamLead := gopFrames / 5 // tail GOP is only ~20% of a normal GOP before the loop
 	if seamLead < 1 {
 		seamLead = 1
 	}
 	emitP(seamLead)
 	// Loop seam: the source recording restarts, emitting a fresh IDR far sooner
-	// than the normal GOP. Without the fix this lands as a mid-fragment sync
-	// sample and freezes playback at the seam.
+	// than the normal GOP. The short tail GOP emitted just above is the truncated
+	// one that must be dropped; this seam IDR opens a fresh, healthy GOP.
 	emitFrame(true)
-	emitP(gopFrames - 1) // the seam IDR opens a fresh, healthy GOP
+	emitP(gopFrames - 1)
 	// The recording continues with normal GOPs to the end.
 	for g := 0; g < 10; g++ {
 		emitGOP()
@@ -104,11 +110,25 @@ func runLoopSeamScenario(t *testing.T, gopFrames int) {
 		t.Fatalf("decode: %v", err)
 	}
 
+	// After the fix, the truncated tail GOP that precedes the premature seam IDR
+	// is dropped entirely (its first inter-frame is the incomplete one that
+	// freezes hardware decoders), while every other GOP is preserved in full.
+	//
+	// 9 lead GOPs + the seam's own (healthy) GOP + 10 trailing GOPs = 20 committed
+	// GOPs. The standalone "tail" keyframe and its seamLead P-frames are the
+	// dropped truncated GOP, so the output must contain exactly one GOP fewer than
+	// emitted and a whole number of complete GOPs.
+	const committedGOPs = 9 + 1 + 10
+	wantSync := committedGOPs
+	wantSamples := committedGOPs * gopFrames
+
 	// A healthy fragment only ever contains keyframes spaced ~normalGOPms apart.
 	// If any fragment contains two keyframes closer than half a normal GOP, the
-	// premature seam IDR was not isolated and the file will freeze on playback.
+	// premature seam IDR was not dropped and the file will freeze on playback.
 	maxBunchMs := normalGOPms / 2
 
+	totalSamples := 0
+	totalSync := 0
 	fragIdx := 0
 	for _, seg := range parsed.Segments {
 		for _, fr := range seg.Fragments {
@@ -121,9 +141,11 @@ func runLoopSeamScenario(t *testing.T, gopFrames int) {
 				var keys []uint64
 				for _, trun := range traf.Truns {
 					for _, s := range trun.Samples {
+						totalSamples++
 						// sample_depends_on == 2 => "does not depend on others" => IDR/sync.
 						if (s.Flags>>24)&0x03 == 0x02 {
 							keys = append(keys, offset)
+							totalSync++
 						}
 						offset += uint64(s.Dur)
 					}
@@ -132,7 +154,7 @@ func runLoopSeamScenario(t *testing.T, gopFrames int) {
 				for i := 1; i < len(keys); i++ {
 					gap := keys[i] - keys[i-1]
 					if gap < maxBunchMs {
-						t.Errorf("gop=%dframes frag %d (tfdt=%d): two IDRs only %d ms apart in same fragment (< %d) - seam was not isolated",
+						t.Errorf("gop=%dframes frag %d (tfdt=%d): two IDRs only %d ms apart in same fragment (< %d) - seam was not dropped",
 							gopFrames, fragIdx, tfdt, gap, maxBunchMs)
 					}
 				}
@@ -140,24 +162,33 @@ func runLoopSeamScenario(t *testing.T, gopFrames int) {
 			}
 		}
 	}
+
+	if totalSync != wantSync {
+		t.Errorf("gop=%dframes: got %d keyframes in output, want %d - the truncated seam GOP was not dropped exactly once",
+			gopFrames, totalSync, wantSync)
+	}
+	if totalSamples != wantSamples {
+		t.Errorf("gop=%dframes: got %d video samples in output, want %d (= %d committed GOPs x %d frames) - the seam GOP drop removed the wrong frames",
+			gopFrames, totalSamples, wantSamples, committedGOPs, gopFrames)
+	}
 }
 
-// TestMP4LoopSeamIsolation exercises the ~1s GOP case (30 frames @ ~33ms),
+// TestMP4LoopSeamDrop exercises the ~1s GOP case (30 frames @ ~33ms),
 // matching the original failing recording.
-func TestMP4LoopSeamIsolation(t *testing.T) {
+func TestMP4LoopSeamDrop(t *testing.T) {
 	runLoopSeamScenario(t, 30)
 }
 
-// TestMP4LoopSeamIsolationLargeGOP exercises a larger ~2s GOP (60 frames). The
+// TestMP4LoopSeamDropLargeGOP exercises a larger ~2s GOP (60 frames). The
 // GOP size is configurable per camera; this guards against regressing to a
 // fixed-millisecond threshold that would only work for ~1s GOPs.
-func TestMP4LoopSeamIsolationLargeGOP(t *testing.T) {
+func TestMP4LoopSeamDropLargeGOP(t *testing.T) {
 	runLoopSeamScenario(t, 60)
 }
 
-// TestMP4LoopSeamIsolationShortGOP exercises a short ~0.5s GOP (15 frames),
+// TestMP4LoopSeamDropShortGOP exercises a short ~0.5s GOP (15 frames),
 // where a fixed ~1s threshold would misfire on every keyframe. The relative
-// detection must only isolate the genuine premature seam IDR.
-func TestMP4LoopSeamIsolationShortGOP(t *testing.T) {
+// detection must only drop the genuine premature seam's truncated tail GOP.
+func TestMP4LoopSeamDropShortGOP(t *testing.T) {
 	runLoopSeamScenario(t, 15)
 }

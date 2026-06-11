@@ -4,6 +4,11 @@ ARG VERSION=0.0.0
 FROM kerberos/base:${BASE_IMAGE_VERSION} AS build-machinery
 LABEL AUTHOR=uug.ai
 
+# Re-declare VERSION inside this stage so the value passed via
+# `--build-arg VERSION=...` (e.g. the release tag) is available below.
+# ARGs declared before the first FROM are not visible inside build stages.
+ARG VERSION
+
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:$GOROOT/bin:/usr/local/lib:$PATH
@@ -35,7 +40,9 @@ RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
 
 RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	go mod download && \
-	VERSION=$(cd /go/src/github.com/kerberos-io/agent && git describe --tags --always 2>/dev/null || echo "${VERSION}") && \
+	if [ -z "${VERSION}" ] || [ "${VERSION}" = "0.0.0" ]; then \
+		VERSION=$(cd /go/src/github.com/kerberos-io/agent && git describe --tags --always 2>/dev/null || echo "0.0.0"); \
+	fi && \
 	go build -tags timetzdata,netgo,osusergo --ldflags "-s -w -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${VERSION} -extldflags '-static -latomic'" main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
