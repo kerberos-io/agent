@@ -86,6 +86,18 @@ type MP4 struct {
 	PendingSampleIsKeyframe bool              // Whether the pending video sample is a keyframe
 	LastKeyframeRawPTS      uint64            // Raw PTS of the most recently seen keyframe (across fragments)
 	LastKeyframeGapMs       uint64            // Interval (ms) between the two most recent keyframes; reference cadence for seam detection
+	gopBuffer               []bufferedSample  // Current, not-yet-committed GOP (video frames + interleaved audio), held so a loop-seam GOP can be dropped before it reaches the file
+}
+
+// bufferedSample is a single sample (video or audio) held in the current-GOP
+// buffer until we know whether the GOP should be committed to the file or
+// dropped as an upstream loop-seam artifact (see AddSampleToTrack).
+type bufferedSample struct {
+	trackID           uint32
+	isKeyframe        bool
+	data              []byte
+	pts               uint64
+	compositionOffset int64
 }
 
 // NewMP4 creates a new MP4 object.
@@ -287,7 +299,101 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 // in PTS order while the fragment timeline stays monotonic in DTS.
 //
 // For audio, pts is the sample timestamp and compositionOffset should be 0.
+//
+// Samples are not written straight through. Each video GOP is held in a small
+// buffer (gopBuffer) until the next keyframe arrives, so a GOP belonging to an
+// upstream source-loop / restart seam can be dropped before it ever reaches the
+// file. When a source MP4 is looped through virtual-rtsp
+// (ffmpeg `-stream_loop -1 -re`), the loop boundary leaves a truncated tail GOP
+// whose first inter-frame is incomplete: software decoders conceal the missing
+// macroblocks, but hardware decoders (macOS VideoToolbox) reject it with
+// kVTVideoDecoderBadDataErr (-12909) and MSE players (Video.js / Chromium /
+// Firefox) report media corruption, freezing playback at the seam (e.g. the
+// ~10s mark in the original recordings). The seam IDR that follows is a clean
+// random-access point, so dropping the truncated GOP lets playback continue
+// seamlessly. Holding back at most one GOP only delays on-disk fragments; for
+// any recording without a seam the finalized file is identical to the straight
+// pass-through output (Close flushes the final buffered GOP).
 func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64, compositionOffset int64) error {
+	isVideoKeyframe := isKeyframe && trackID == uint32(mp4.VideoTrack)
+	if !isVideoKeyframe {
+		// Part of the current GOP window (P/B frame or interleaved audio): hold it
+		// until the GOP is committed or dropped at the next video keyframe.
+		mp4.gopBuffer = append(mp4.gopBuffer, bufferedSample{
+			trackID:           trackID,
+			isKeyframe:        isKeyframe,
+			data:              data,
+			pts:               pts,
+			compositionOffset: compositionOffset,
+		})
+		return nil
+	}
+
+	// A video keyframe ends the GOP we have been buffering. Decide whether that
+	// buffered GOP is genuine (commit it) or the truncated tail GOP at an upstream
+	// loop/restart seam (drop it).
+	//
+	// The GOP size is configurable per camera, so we do NOT compare against a
+	// fixed millisecond threshold. Instead we compare this keyframe interval to
+	// the previous one and only flag a *sudden* shortening: a seam IDR arrives in
+	// less than (previous interval / SeamGapDivisor). Deriving the threshold from
+	// the observed cadence keeps detection correct for any configured GOP (0.5s,
+	// 1s, 2s, ...) and avoids false positives on steady short-GOP / all-intra
+	// streams (where consecutive intervals are similar, so none looks anomalously
+	// short). Because the reference is the immediately preceding interval, a burst
+	// of close keyframes only drops a single GOP instead of cascading.
+	seam := false
+	if mp4.LastKeyframeRawPTS > 0 && pts > mp4.LastKeyframeRawPTS {
+		gap := pts - mp4.LastKeyframeRawPTS
+		if mp4.LastKeyframeGapMs > 0 && gap*SeamGapDivisor < mp4.LastKeyframeGapMs {
+			seam = true
+			log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): dropping truncated GOP at unexpectedly close keyframe (interval=%d ms, previous interval=%d ms, buffered samples=%d) - likely upstream loop/restart discontinuity", gap, mp4.LastKeyframeGapMs, len(mp4.gopBuffer)))
+		}
+		mp4.LastKeyframeGapMs = gap
+	}
+	mp4.LastKeyframeRawPTS = pts
+
+	if seam {
+		// Discard the truncated tail GOP; this keyframe is a clean restart point.
+		mp4.gopBuffer = mp4.gopBuffer[:0]
+	} else {
+		// Genuine GOP boundary: commit the GOP we just finished buffering.
+		mp4.commitBufferedGOP()
+	}
+
+	// Begin buffering the new GOP, starting with this keyframe.
+	mp4.gopBuffer = append(mp4.gopBuffer, bufferedSample{
+		trackID:           trackID,
+		isKeyframe:        isKeyframe,
+		data:              data,
+		pts:               pts,
+		compositionOffset: compositionOffset,
+	})
+	return nil
+}
+
+// commitBufferedGOP writes every sample currently held in gopBuffer to the file
+// in arrival order, then clears the buffer. Committing in arrival order
+// preserves the original audio/video interleave and lets commitSampleToTrack's
+// pending-sample mechanism derive each sample's duration from the next one, so
+// the on-disk result matches a straight pass-through.
+func (mp4 *MP4) commitBufferedGOP() {
+	if len(mp4.gopBuffer) == 0 {
+		return
+	}
+	buffered := mp4.gopBuffer
+	mp4.gopBuffer = nil // detach so commitSampleToTrack never observes a half-cleared buffer
+	for _, s := range buffered {
+		if err := mp4.commitSampleToTrack(s.trackID, s.isKeyframe, s.data, s.pts, s.compositionOffset); err != nil {
+			log.Log.Error("mp4.commitBufferedGOP(): " + err.Error())
+		}
+	}
+}
+
+// commitSampleToTrack appends a single buffered sample to the current fragment.
+// It is the low-level writer behind AddSampleToTrack and is only ever invoked
+// from commitBufferedGOP, after a GOP has been confirmed as non-seam.
+func (mp4 *MP4) commitSampleToTrack(trackID uint32, isKeyframe bool, data []byte, pts uint64, compositionOffset int64) error {
 
 	if isKeyframe && trackID == uint32(mp4.VideoTrack) {
 		mp4.TotalKeyframesReceived++
@@ -309,42 +415,6 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			elapsed = pts - mp4.FragmentStartRawPTS
 		}
 		shouldFlush := !mp4.Start || elapsed >= FragmentDurationMs
-
-		// Detect an upstream source-loop / restart discontinuity. When a source
-		// MP4 is looped through virtual-rtsp (ffmpeg `-stream_loop -1 -re`) the
-		// loop seam emits a fresh IDR much sooner than a normal GOP would. PTS
-		// keeps growing monotonically, so the timing-only `elapsed` check above
-		// does not catch it and the seam IDR ends up as a mid-fragment sync
-		// sample. macOS VideoToolbox rejects such a fragment with
-		// kVTVideoDecoderBadDataErr (-12909) and MSE players (Video.js /
-		// Chromium / Firefox) report media corruption, because the inner IDR
-		// resets frame_num/POC inside what they expect to be a single GOP. This
-		// is exactly what freezes playback around the seam (e.g. the ~10s mark).
-		// Force a fragment boundary so the seam IDR starts its own fragment.
-		//
-		// The GOP size is configurable per camera, so we do NOT compare against a
-		// fixed millisecond threshold. Instead we compare this keyframe interval
-		// to the previous one and only flag a *sudden* shortening: a seam IDR
-		// arrives in less than (previous interval / SeamGapDivisor). Deriving the
-		// threshold from the observed cadence keeps detection correct for any
-		// configured GOP (0.5s, 1s, 2s, ...) and avoids false positives on
-		// steady short-GOP / all-intra streams (where consecutive intervals are
-		// similar, so none looks anomalously short). Because the reference is the
-		// immediately preceding interval, a burst of close keyframes only forces
-		// a single flush instead of cascading into many tiny fragments.
-		if trackID == uint32(mp4.VideoTrack) && mp4.Start &&
-			mp4.LastKeyframeRawPTS > 0 && pts > mp4.LastKeyframeRawPTS {
-			gap := pts - mp4.LastKeyframeRawPTS
-			if !shouldFlush && mp4.LastKeyframeGapMs > 0 &&
-				gap*SeamGapDivisor < mp4.LastKeyframeGapMs {
-				log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): forcing fragment flush at unexpectedly close keyframe (interval=%d ms, previous interval=%d ms, fragment elapsed=%d ms) - likely upstream loop/restart discontinuity", gap, mp4.LastKeyframeGapMs, elapsed))
-				shouldFlush = true
-			}
-			mp4.LastKeyframeGapMs = gap
-		}
-		if trackID == uint32(mp4.VideoTrack) {
-			mp4.LastKeyframeRawPTS = pts
-		}
 
 		if shouldFlush {
 			// Write the previous segment to the file
@@ -484,6 +554,10 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 }
 
 func (mp4 *MP4) Close(config *models.Config) {
+
+	// Commit the final buffered GOP held back for seam detection. The last GOP of
+	// a recording is never a loop seam, so it must always be written out.
+	mp4.commitBufferedGOP()
 
 	log.Log.Info(fmt.Sprintf("mp4.Close(): KEYFRAME SUMMARY - totalReceived=%d, totalWritten=%d, segments=%d, lastFragmentKF=%d",
 		mp4.TotalKeyframesReceived, mp4.TotalKeyframesWritten, mp4.SegmentCount, mp4.FragmentKeyframeCount))
