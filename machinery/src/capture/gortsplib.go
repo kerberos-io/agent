@@ -953,12 +953,31 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 				pkt.Data = pkt.Data[4:]
 				if pkt.IsKeyFrame {
-					annexbNALUStartCode := func() []byte { return []byte{0x00, 0x00, 0x00, 0x01} }
-					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
-					pkt.Data = append(g.VideoH264Forma.PPS, pkt.Data...)
-					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
-					pkt.Data = append(g.VideoH264Forma.SPS, pkt.Data...)
-					pkt.Data = append(annexbNALUStartCode(), pkt.Data...)
+					// Prepend SPS/PPS (when available) in front of every keyframe so the
+					// access unit is self-contained. Downstream decoders (and the MP4 writer's
+					// in-band parameter-set recovery) rely on this; a recording whose first
+					// frame lacks SPS/PPS produces an MP4 with an empty avcC, which makes FFmpeg
+					// report "non-existing PPS 0 referenced".
+					//
+					// Build the payload in a freshly allocated buffer. The previous code
+					// did append(g.VideoH264Forma.PPS, pkt.Data...): because the SPS/PPS
+					// slices are sub-slices of the RTP reassembly buffer (spare capacity),
+					// that append wrote into - and corrupted - the shared parameter-set
+					// backing arrays, occasionally poisoning the SPS/PPS stored for the
+					// recording.
+					startCode := []byte{0x00, 0x00, 0x00, 0x01}
+					out := make([]byte, 0, len(g.VideoH264Forma.SPS)+len(g.VideoH264Forma.PPS)+len(pkt.Data)+12)
+					if len(g.VideoH264Forma.SPS) > 0 {
+						out = append(out, startCode...)
+						out = append(out, g.VideoH264Forma.SPS...)
+					}
+					if len(g.VideoH264Forma.PPS) > 0 {
+						out = append(out, startCode...)
+						out = append(out, g.VideoH264Forma.PPS...)
+					}
+					out = append(out, startCode...)
+					out = append(out, pkt.Data...)
+					pkt.Data = out
 				}
 
 				writeStart := time.Now()

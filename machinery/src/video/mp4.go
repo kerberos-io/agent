@@ -32,6 +32,16 @@ const MacEpochOffset uint64 = 2082844800
 // resulting in ~3 second fragments (assuming a typical GOP interval).
 const FragmentDurationMs = 3000
 
+// SeamGapDivisor controls loop-seam detection. A keyframe is treated as an
+// upstream loop/restart seam when it arrives in less than (previous keyframe
+// interval / SeamGapDivisor) — i.e. far sooner than the established keyframe
+// cadence. Comparing against the *previous* interval (rather than a fixed
+// millisecond threshold) makes the check scale automatically with the camera's
+// configured GOP size: it works the same whether keyframes are 0.5s, 1s, 2s or
+// more apart, and does not misfire on legitimately short-GOP or all-intra
+// streams (where every interval is similar, so none looks anomalously short).
+const SeamGapDivisor = 2
+
 type MP4 struct {
 	// FileName is the name of the file
 	FileName                string
@@ -74,6 +84,8 @@ type MP4 struct {
 	TotalKeyframesWritten   int               // Total keyframes written to trun boxes
 	FragmentKeyframeCount   int               // Keyframes in the current fragment
 	PendingSampleIsKeyframe bool              // Whether the pending video sample is a keyframe
+	LastKeyframeRawPTS      uint64            // Raw PTS of the most recently seen keyframe (across fragments)
+	LastKeyframeGapMs       uint64            // Interval (ms) between the two most recent keyframes; reference cadence for seam detection
 }
 
 // NewMP4 creates a new MP4 object.
@@ -297,6 +309,42 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			elapsed = pts - mp4.FragmentStartRawPTS
 		}
 		shouldFlush := !mp4.Start || elapsed >= FragmentDurationMs
+
+		// Detect an upstream source-loop / restart discontinuity. When a source
+		// MP4 is looped through virtual-rtsp (ffmpeg `-stream_loop -1 -re`) the
+		// loop seam emits a fresh IDR much sooner than a normal GOP would. PTS
+		// keeps growing monotonically, so the timing-only `elapsed` check above
+		// does not catch it and the seam IDR ends up as a mid-fragment sync
+		// sample. macOS VideoToolbox rejects such a fragment with
+		// kVTVideoDecoderBadDataErr (-12909) and MSE players (Video.js /
+		// Chromium / Firefox) report media corruption, because the inner IDR
+		// resets frame_num/POC inside what they expect to be a single GOP. This
+		// is exactly what freezes playback around the seam (e.g. the ~10s mark).
+		// Force a fragment boundary so the seam IDR starts its own fragment.
+		//
+		// The GOP size is configurable per camera, so we do NOT compare against a
+		// fixed millisecond threshold. Instead we compare this keyframe interval
+		// to the previous one and only flag a *sudden* shortening: a seam IDR
+		// arrives in less than (previous interval / SeamGapDivisor). Deriving the
+		// threshold from the observed cadence keeps detection correct for any
+		// configured GOP (0.5s, 1s, 2s, ...) and avoids false positives on
+		// steady short-GOP / all-intra streams (where consecutive intervals are
+		// similar, so none looks anomalously short). Because the reference is the
+		// immediately preceding interval, a burst of close keyframes only forces
+		// a single flush instead of cascading into many tiny fragments.
+		if trackID == uint32(mp4.VideoTrack) && mp4.Start &&
+			mp4.LastKeyframeRawPTS > 0 && pts > mp4.LastKeyframeRawPTS {
+			gap := pts - mp4.LastKeyframeRawPTS
+			if !shouldFlush && mp4.LastKeyframeGapMs > 0 &&
+				gap*SeamGapDivisor < mp4.LastKeyframeGapMs {
+				log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): forcing fragment flush at unexpectedly close keyframe (interval=%d ms, previous interval=%d ms, fragment elapsed=%d ms) - likely upstream loop/restart discontinuity", gap, mp4.LastKeyframeGapMs, elapsed))
+				shouldFlush = true
+			}
+			mp4.LastKeyframeGapMs = gap
+		}
+		if trackID == uint32(mp4.VideoTrack) {
+			mp4.LastKeyframeRawPTS = pts
+		}
 
 		if shouldFlush {
 			// Write the previous segment to the file
@@ -571,6 +619,13 @@ func (mp4 *MP4) Close(config *models.Config) {
 		includePS := true
 		spsNALUs, ppsNALUs := normalizeH264ParameterSets(mp4.SPSNALUs, mp4.PPSNALUs)
 		log.Log.Debug("mp4.Close(): AVC parameter sets: SPS=" + formatNaluDebug(spsNALUs) + ", PPS=" + formatNaluDebug(ppsNALUs))
+		if len(spsNALUs) == 0 || len(ppsNALUs) == 0 {
+			// An avcC without both SPS and PPS is invalid: downstream FFmpeg-based
+			// pipelines decoding this file will report "non-existing PPS 0 referenced"
+			// and fail to extract any frame. Surface it loudly so the capture-side
+			// parameter-set handling can be diagnosed.
+			log.Log.Error(fmt.Sprintf("mp4.Close(): incomplete H264 parameter sets (SPS=%d, PPS=%d) - the avcC will be invalid and downstream decoders will report 'non-existing PPS 0 referenced'", len(spsNALUs), len(ppsNALUs)))
+		}
 		err := init.Moov.Traks[0].SetAVCDescriptor("avc1", spsNALUs, ppsNALUs, includePS)
 		if err != nil {
 			log.Log.Error("mp4.Close(): error setting AVC descriptor: " + err.Error())
@@ -597,6 +652,11 @@ func (mp4 *MP4) Close(config *models.Config) {
 		includePS := true
 		vpsNALUs, spsNALUs, ppsNALUs := normalizeH265ParameterSets(mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs)
 		log.Log.Debug("mp4.Close(): HEVC parameter sets: VPS=" + formatNaluDebug(vpsNALUs) + ", SPS=" + formatNaluDebug(spsNALUs) + ", PPS=" + formatNaluDebug(ppsNALUs))
+		if len(vpsNALUs) == 0 || len(spsNALUs) == 0 || len(ppsNALUs) == 0 {
+			// An hvcC missing VPS/SPS/PPS is invalid and downstream FFmpeg-based
+			// pipelines will fail to decode the recording. Surface it loudly.
+			log.Log.Error(fmt.Sprintf("mp4.Close(): incomplete H265 parameter sets (VPS=%d, SPS=%d, PPS=%d) - the hvcC will be invalid and downstream decoders will fail to process the recording", len(vpsNALUs), len(spsNALUs), len(ppsNALUs)))
+		}
 		err := init.Moov.Traks[0].SetHEVCDescriptor("hvc1", vpsNALUs, spsNALUs, ppsNALUs, [][]byte{}, includePS)
 		if err != nil {
 			log.Log.Error("mp4.Close(): error setting HEVC descriptor: " + err.Error())
