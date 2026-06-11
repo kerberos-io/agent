@@ -30,6 +30,7 @@ type fakeTus struct {
 	counter        int
 	creates        int
 	lastPatchBytes int64
+	patchSizes     []int64
 
 	// unsupported makes the creation endpoint return 404, simulating an older
 	// vault without a tus endpoint.
@@ -66,6 +67,15 @@ func (s *fakeTus) lastPatch() int64 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.lastPatchBytes
+}
+
+// patchCounts returns the number of PATCH requests received and the size of each.
+func (s *fakeTus) patchCounts() (int, []int64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sizes := make([]int64, len(s.patchSizes))
+	copy(sizes, s.patchSizes)
+	return len(s.patchSizes), sizes
 }
 
 func (s *fakeTus) createCount() int {
@@ -118,6 +128,7 @@ func (s *fakeTus) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
 		u.offset += n
 		s.lastPatchBytes = n
+		s.patchSizes = append(s.patchSizes, n)
 		complete := u.offset >= u.size
 		failNow := complete && s.failFinalize > 0
 		if failNow {
@@ -199,6 +210,96 @@ func TestUploadVaultResumable_HappyPath(t *testing.T) {
 	}
 	if _, err := os.Stat(tusSidecarPath(fileName, "primary")); !os.IsNotExist(err) {
 		t.Fatalf("expected sidecar to be removed after success, stat err = %v", err)
+	}
+}
+
+func TestUploadVaultResumable_Chunked(t *testing.T) {
+	srv := newFakeTus()
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	fileName := "1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4"
+	// 10 KiB payload uploaded in 4 KiB chunks => 3 PATCH requests (4096+4096+2048).
+	payload := bytes.Repeat([]byte("c"), 10240)
+	withRecording(t, fileName, payload)
+	t.Setenv("AGENT_TUS_CHUNK_SIZE_BYTES", "4096")
+
+	uploaded, _, supported, _, err := uploadVaultResumable(testVault(ts.URL), "pk", "dev", fileName, "test", "primary")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !uploaded || !supported {
+		t.Fatalf("expected chunked upload success, got uploaded=%v supported=%v", uploaded, supported)
+	}
+	if got := srv.totalBytes(); got != int64(len(payload)) {
+		t.Fatalf("server received %d bytes, want %d", got, len(payload))
+	}
+	count, sizes := srv.patchCounts()
+	if count != 3 {
+		t.Fatalf("expected 3 chunked PATCH requests, got %d (sizes=%v)", count, sizes)
+	}
+	want := []int64{4096, 4096, 2048}
+	for i, w := range want {
+		if sizes[i] != w {
+			t.Fatalf("chunk %d size = %d, want %d (sizes=%v)", i, sizes[i], w, sizes)
+		}
+	}
+	if _, err := os.Stat(tusSidecarPath(fileName, "primary")); !os.IsNotExist(err) {
+		t.Fatalf("expected sidecar removed after success, stat err = %v", err)
+	}
+}
+
+func TestUploadVaultResumable_ChunkingDisabled(t *testing.T) {
+	srv := newFakeTus()
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	fileName := "1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4"
+	payload := bytes.Repeat([]byte("d"), 10240)
+	withRecording(t, fileName, payload)
+	// 0 disables chunking: the whole file should go out in a single PATCH.
+	t.Setenv("AGENT_TUS_CHUNK_SIZE_BYTES", "0")
+
+	uploaded, _, supported, _, err := uploadVaultResumable(testVault(ts.URL), "pk", "dev", fileName, "test", "primary")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !uploaded || !supported {
+		t.Fatalf("expected success, got uploaded=%v supported=%v", uploaded, supported)
+	}
+	count, sizes := srv.patchCounts()
+	if count != 1 {
+		t.Fatalf("expected a single PATCH when chunking is disabled, got %d (sizes=%v)", count, sizes)
+	}
+	if sizes[0] != int64(len(payload)) {
+		t.Fatalf("single PATCH size = %d, want %d", sizes[0], len(payload))
+	}
+}
+
+func TestTusChunkSize(t *testing.T) {
+	cases := []struct {
+		name string
+		env  string
+		set  bool
+		want int64
+	}{
+		{name: "default when unset", set: false, want: tusDefaultChunkSize},
+		{name: "default on invalid", env: "notanumber", set: true, want: tusDefaultChunkSize},
+		{name: "explicit value", env: "65536", set: true, want: 65536},
+		{name: "zero disables", env: "0", set: true, want: 0},
+		{name: "negative disables", env: "-5", set: true, want: 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.set {
+				t.Setenv("AGENT_TUS_CHUNK_SIZE_BYTES", tc.env)
+			} else {
+				t.Setenv("AGENT_TUS_CHUNK_SIZE_BYTES", "")
+			}
+			if got := tusChunkSize(); got != tc.want {
+				t.Fatalf("tusChunkSize() = %d, want %d", got, tc.want)
+			}
+		})
 	}
 }
 

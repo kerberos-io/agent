@@ -42,6 +42,31 @@ func resumableUploadsEnabled() bool {
 	return os.Getenv("AGENT_DISABLE_RESUMABLE_UPLOAD") != "true"
 }
 
+// tusDefaultChunkSize is the number of bytes uploaded per PATCH request when no
+// explicit size is configured. Splitting the upload into chunks keeps each HTTP
+// request small enough for intermediary proxies/load balancers and checkpoints
+// progress frequently, so an interruption resumes with minimal re-upload.
+const tusDefaultChunkSize int64 = 1 << 20 // 1 MiB
+
+// tusChunkSize returns the number of bytes to send per PATCH request. It
+// defaults to tusDefaultChunkSize (1 MiB) and can be overridden with the
+// AGENT_TUS_CHUNK_SIZE_BYTES environment variable. A value of 0 (or negative)
+// disables chunking and sends the remaining bytes in a single PATCH.
+func tusChunkSize() int64 {
+	v := os.Getenv("AGENT_TUS_CHUNK_SIZE_BYTES")
+	if v == "" {
+		return tusDefaultChunkSize
+	}
+	n, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		return tusDefaultChunkSize
+	}
+	if n <= 0 {
+		return 0 // chunking disabled: send everything in one PATCH
+	}
+	return n
+}
+
 // uploadVaultResumable uploads a recording to a Kerberos Vault using the tus
 // resumable upload protocol.
 //
@@ -136,29 +161,61 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 			continue
 		}
 
-		// (4) Stream the remaining bytes in a single PATCH directly from disk.
-		if _, sErr := file.Seek(offset, io.SeekStart); sErr != nil {
-			return false, false, true, "", sErr
-		}
-		newOffset, status, respBody, perr := tusPatch(client, uploadURL, offset, size, file, vault, publicKey, deviceKey)
-		if perr != nil {
-			if status >= 400 {
-				// Definitive rejection (e.g. provider push failed during finalize).
-				// Re-evaluate via HEAD on the next iteration to decide retry/restart.
-				log.Log.Info(label + ": resumable patch rejected, " + perr.Error())
-			} else {
-				log.Log.Info(label + ": resumable patch failed, " + perr.Error())
+		// (4) Stream the remaining bytes to the vault via PATCH, reading directly
+		// from disk so the recording is never fully buffered in memory. When a chunk
+		// size is configured the data is sent across several PATCH requests,
+		// checkpointing the offset after each one so an interruption resumes from the
+		// last completed chunk instead of re-uploading everything.
+		chunkSize := tusChunkSize()
+		progressed := false
+		patchFailed := false
+		var lastBody string
+		for offset < size {
+			// Re-seek every chunk so the on-disk position always matches the
+			// server-acknowledged offset, even if a PATCH was partially accepted.
+			if _, sErr := file.Seek(offset, io.SeekStart); sErr != nil {
+				return false, false, true, "", sErr
 			}
-			tusBackoff(attempt)
+			patchLen := size - offset
+			if chunkSize > 0 && chunkSize < patchLen {
+				patchLen = chunkSize
+			}
+			newOffset, status, respBody, perr := tusPatch(client, uploadURL, offset, patchLen, file, vault, publicKey, deviceKey)
+			if perr != nil {
+				if status >= 400 {
+					// Definitive rejection (e.g. provider push failed during finalize).
+					// Re-evaluate via HEAD on the next iteration to decide retry/restart.
+					log.Log.Info(label + ": resumable patch rejected, " + perr.Error())
+				} else {
+					log.Log.Info(label + ": resumable patch failed, " + perr.Error())
+				}
+				tusBackoff(attempt)
+				patchFailed = true
+				break
+			}
+			if newOffset > offset {
+				progressed = true
+			}
+			offset = newOffset
+			lastBody = respBody
+			if offset < size {
+				// Partial progress: persist so a later retry resumes from here.
+				saveTusResumeState(sidecar, tusResumeState{UploadURL: uploadURL, VaultURI: baseURL, Size: size})
+			}
+		}
+		if patchFailed {
+			if progressed {
+				// Forward progress refreshes the retry budget: maxAttempts bounds the
+				// number of consecutive failures, not the number of chunks needed for
+				// a large recording.
+				attempt = -1
+			}
 			continue
 		}
-		if newOffset >= size {
-			removeTusResumeState(sidecar)
-			return true, true, true, respBody, nil
-		}
 
-		// Partial progress: persist and continue with the next chunk.
-		saveTusResumeState(sidecar, tusResumeState{UploadURL: uploadURL, VaultURI: baseURL, Size: size})
+		// All declared bytes have been sent and acknowledged: the upload is done.
+		removeTusResumeState(sidecar)
+		return true, true, true, lastBody, nil
 	}
 
 	return false, true, true, "resumable upload did not complete after retries", errors.New(label + ": resumable upload did not complete after retries")
@@ -227,16 +284,15 @@ func tusHead(client *http.Client, uploadURL string, vault models.KStorage, publi
 	return offset, resp.StatusCode, nil
 }
 
-// tusPatch streams the remaining bytes of the file (from offset to size) to the
+// tusPatch streams up to length bytes of the file (starting at offset) to the
 // upload URL using a single PATCH request. The body is read straight from the
 // *os.File, so the recording is never fully buffered in memory.
-func tusPatch(client *http.Client, uploadURL string, offset, size int64, file io.Reader, vault models.KStorage, publicKey, deviceKey string) (int64, int, string, error) {
-	remaining := size - offset
-	req, err := http.NewRequest("PATCH", uploadURL, io.LimitReader(file, remaining))
+func tusPatch(client *http.Client, uploadURL string, offset, length int64, file io.Reader, vault models.KStorage, publicKey, deviceKey string) (int64, int, string, error) {
+	req, err := http.NewRequest("PATCH", uploadURL, io.LimitReader(file, length))
 	if err != nil {
 		return offset, 0, "", err
 	}
-	req.ContentLength = remaining
+	req.ContentLength = length
 	req.Header.Set("Tus-Resumable", tusResumableVersion)
 	req.Header.Set("Content-Type", "application/offset+octet-stream")
 	req.Header.Set("Upload-Offset", strconv.FormatInt(offset, 10))
@@ -258,8 +314,8 @@ func tusPatch(client *http.Client, uploadURL string, offset, size int64, file io
 	newOffsetStr := resp.Header.Get("Upload-Offset")
 	newOffset, perr := strconv.ParseInt(newOffsetStr, 10, 64)
 	if perr != nil {
-		// A 204 without a parseable offset means the upload finished.
-		return size, resp.StatusCode, respBody, nil
+		// A 204 without a parseable offset means this PATCH was fully accepted.
+		return offset + length, resp.StatusCode, respBody, nil
 	}
 	return newOffset, resp.StatusCode, respBody, nil
 }

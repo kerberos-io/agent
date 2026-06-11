@@ -30,6 +30,15 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 		return false, false, errors.New(err)
 	}
 
+	// If the recording no longer exists on disk there is nothing to upload.
+	// This can happen when the file was already removed (e.g. cleanup, or an
+	// earlier successful upload). Skip it so the watcher drops the marker
+	// instead of retrying indefinitely.
+	if _, err := os.Stat("data/recordings/" + fileName); err != nil {
+		log.Log.Info("UploadKerberosVault: skipping " + fileName + ", file doesn't exist anymore")
+		return false, false, nil
+	}
+
 	// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 	// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
 	// - Timestamp
