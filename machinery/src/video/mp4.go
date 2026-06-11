@@ -571,6 +571,13 @@ func (mp4 *MP4) Close(config *models.Config) {
 		includePS := true
 		spsNALUs, ppsNALUs := normalizeH264ParameterSets(mp4.SPSNALUs, mp4.PPSNALUs)
 		log.Log.Debug("mp4.Close(): AVC parameter sets: SPS=" + formatNaluDebug(spsNALUs) + ", PPS=" + formatNaluDebug(ppsNALUs))
+		if len(spsNALUs) == 0 || len(ppsNALUs) == 0 {
+			// An avcC without both SPS and PPS is invalid: downstream FFmpeg-based
+			// pipelines decoding this file will report "non-existing PPS 0 referenced"
+			// and fail to extract any frame. Surface it loudly so the capture-side
+			// parameter-set handling can be diagnosed.
+			log.Log.Error(fmt.Sprintf("mp4.Close(): incomplete H264 parameter sets (SPS=%d, PPS=%d) - the avcC will be invalid and downstream decoders will report 'non-existing PPS 0 referenced'", len(spsNALUs), len(ppsNALUs)))
+		}
 		err := init.Moov.Traks[0].SetAVCDescriptor("avc1", spsNALUs, ppsNALUs, includePS)
 		if err != nil {
 			log.Log.Error("mp4.Close(): error setting AVC descriptor: " + err.Error())
@@ -597,6 +604,11 @@ func (mp4 *MP4) Close(config *models.Config) {
 		includePS := true
 		vpsNALUs, spsNALUs, ppsNALUs := normalizeH265ParameterSets(mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs)
 		log.Log.Debug("mp4.Close(): HEVC parameter sets: VPS=" + formatNaluDebug(vpsNALUs) + ", SPS=" + formatNaluDebug(spsNALUs) + ", PPS=" + formatNaluDebug(ppsNALUs))
+		if len(vpsNALUs) == 0 || len(spsNALUs) == 0 || len(ppsNALUs) == 0 {
+			// An hvcC missing VPS/SPS/PPS is invalid and downstream FFmpeg-based
+			// pipelines will fail to decode the recording. Surface it loudly.
+			log.Log.Error(fmt.Sprintf("mp4.Close(): incomplete H265 parameter sets (VPS=%d, SPS=%d, PPS=%d) - the hvcC will be invalid and downstream decoders will fail to process the recording", len(vpsNALUs), len(spsNALUs), len(ppsNALUs)))
+		}
 		err := init.Moov.Traks[0].SetHEVCDescriptor("hvc1", vpsNALUs, spsNALUs, ppsNALUs, [][]byte{}, includePS)
 		if err != nil {
 			log.Log.Error("mp4.Close(): error setting HEVC descriptor: " + err.Error())
