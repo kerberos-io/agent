@@ -48,6 +48,8 @@ func resumableUploadsEnabled() bool {
 // progress frequently, so an interruption resumes with minimal re-upload.
 const tusDefaultChunkSize int64 = 1 << 20 // 1 MiB
 
+const tusProgressBucketPercent int64 = 10
+
 // tusChunkSize returns the number of bytes to send per PATCH request. It
 // defaults to tusDefaultChunkSize (1 MiB) and can be overridden with the
 // AGENT_TUS_CHUNK_SIZE_BYTES environment variable. A value of 0 (or negative)
@@ -65,6 +67,30 @@ func tusChunkSize() int64 {
 		return 0 // chunking disabled: send everything in one PATCH
 	}
 	return n
+}
+
+func tusProgressBucket(offset, size int64) int64 {
+	if size <= 0 {
+		return 100
+	}
+	percent := (offset * 100) / size
+	if percent > 100 {
+		percent = 100
+	}
+	return percent / tusProgressBucketPercent
+}
+
+func logTusUploadProgress(label string, offset, size int64, loggedBucket *int64) {
+	bucket := tusProgressBucket(offset, size)
+	if bucket <= *loggedBucket {
+		return
+	}
+	*loggedBucket = bucket
+	percent := bucket * tusProgressBucketPercent
+	if percent > 100 {
+		percent = 100
+	}
+	log.Log.Infof("%s: resumable upload progress %d%% (%d/%d bytes)", label, percent, offset, size)
 }
 
 // uploadVaultResumable uploads a recording to a Kerberos Vault using the tus
@@ -170,6 +196,7 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 		progressed := false
 		patchFailed := false
 		var lastBody string
+		loggedProgressBucket := tusProgressBucket(offset, size)
 		for offset < size {
 			// Re-seek every chunk so the on-disk position always matches the
 			// server-acknowledged offset, even if a PATCH was partially accepted.
@@ -198,6 +225,7 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 			}
 			offset = newOffset
 			lastBody = respBody
+			logTusUploadProgress(label, offset, size, &loggedProgressBucket)
 			if offset < size {
 				// Partial progress: persist so a later retry resumes from here.
 				saveTusResumeState(sidecar, tusResumeState{UploadURL: uploadURL, VaultURI: baseURL, Size: size})
