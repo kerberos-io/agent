@@ -141,7 +141,7 @@ func sendToVault(vault models.KStorage, publicKey, deviceKey, fileName, label, s
 func uploadVaultLegacy(vault models.KStorage, publicKey, deviceKey, fileName, label string) (bool, bool, string, error) {
 	fullname := "data/recordings/" + fileName
 
-	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
+	file, err := os.Open(fullname)
 	if file != nil {
 		defer file.Close()
 	}
@@ -151,9 +151,14 @@ func uploadVaultLegacy(vault models.KStorage, publicKey, deviceKey, fileName, la
 		return false, false, "", errors.New(msg)
 	}
 
-	req, err := http.NewRequest("POST", vault.URI+"/storage", file)
+	uri := vault.URI
+	for len(uri) > 0 && uri[len(uri)-1] == '/' {
+		uri = uri[:len(uri)-1]
+	}
+
+	req, err := http.NewRequest("POST", uri+"/storage", file)
 	if err != nil {
-		errorMessage := label + ": error reading request, " + vault.URI + "/storage: " + err.Error()
+		errorMessage := label + ": error reading request, " + uri + "/storage: " + err.Error()
 		log.Log.Error(errorMessage)
 		return false, false, "", errors.New(errorMessage)
 	}
