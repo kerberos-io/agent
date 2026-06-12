@@ -18,6 +18,9 @@
             ],
             "envFile": "${workspaceFolder}/machinery/.env.local",
             "buildFlags": "--tags dynamic",
+            "env": {
+                "GOWORK": "off"
+            },
         },
         {
             "name": "Launch React",

@@ -14,5 +14,7 @@ machinery/test*
 machinery/init-dev.sh
 machinery/.env.local
 machinery/vendor
+machinery/go.work
+machinery/go.work.sum
 deployments/docker/private-docker-compose.yaml
 video.mp4

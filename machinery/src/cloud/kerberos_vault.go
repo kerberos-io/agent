@@ -30,6 +30,15 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 		return false, false, errors.New(err)
 	}
 
+	// If the recording no longer exists on disk there is nothing to upload.
+	// This can happen when the file was already removed (e.g. cleanup, or an
+	// earlier successful upload). Skip it so the watcher drops the marker
+	// instead of retrying indefinitely.
+	if _, err := os.Stat("data/recordings/" + fileName); err != nil {
+		log.Log.Info("UploadKerberosVault: skipping " + fileName + ", file doesn't exist anymore")
+		return false, false, nil
+	}
+
 	// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
 	// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
 	// - Timestamp
@@ -41,17 +50,6 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 	// KerberosCloud, this means storage is disabled and proxy enabled.
 	log.Log.Info("UploadKerberosVault: Uploading to Kerberos Vault (" + config.KStorage.URI + ")")
 	log.Log.Info("UploadKerberosVault: Upload started for " + fileName)
-	fullname := "data/recordings/" + fileName
-
-	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
-	if file != nil {
-		defer file.Close()
-	}
-	if err != nil {
-		err := "UploadKerberosVault: Upload Failed, file doesn't exists anymore"
-		log.Log.Info(err)
-		return false, false, errors.New(err)
-	}
 
 	publicKey := config.KStorage.CloudKey
 	if config.HubKey != "" {
@@ -60,62 +58,30 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 
 	// We need to check if we are in a retry timeout.
 	if kstorageRetryTimeout <= time.Now().Unix() {
+		uploaded, responded, body, err := sendToVault(*config.KStorage, publicKey, config.Key, fileName, "UploadKerberosVault", "primary")
+		if uploaded {
+			kstorageRetryCount = 0
+			log.Log.Info("UploadKerberosVault: Upload Finished, " + body)
+			return true, true, nil
+		}
 
-		req, err := http.NewRequest("POST", config.KStorage.URI+"/storage", file)
 		if err != nil {
-			errorMessage := "UploadKerberosVault: error reading request, " + config.KStorage.URI + "/storage: " + err.Error()
-			log.Log.Error(errorMessage)
-			return false, true, errors.New(errorMessage)
-		}
-		req.Header.Set("Content-Type", "video/mp4")
-		req.Header.Set("X-Kerberos-Storage-CloudKey", publicKey)
-		req.Header.Set("X-Kerberos-Storage-AccessKey", config.KStorage.AccessKey)
-		req.Header.Set("X-Kerberos-Storage-SecretAccessKey", config.KStorage.SecretAccessKey)
-		req.Header.Set("X-Kerberos-Storage-Provider", config.KStorage.Provider)
-		req.Header.Set("X-Kerberos-Storage-FileName", fileName)
-		req.Header.Set("X-Kerberos-Storage-Device", config.Key)
-		req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
-		req.Header.Set("X-Kerberos-Storage-Directory", config.KStorage.Directory)
-
-		var client *http.Client
-		if os.Getenv("AGENT_TLS_INSECURE") == "true" {
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-			client = &http.Client{Transport: tr}
-		} else {
-			client = &http.Client{}
-		}
-
-		resp, err := client.Do(req)
-		if resp != nil {
-			defer resp.Body.Close()
-		}
-
-		if err == nil {
-			if resp != nil {
-				body, err := io.ReadAll(resp.Body)
-				if err == nil {
-					if resp.StatusCode == 200 {
-						kstorageRetryCount = 0
-						log.Log.Info("UploadKerberosVault: Upload Finished, " + resp.Status + ", " + string(body))
-						return true, true, nil
-					} else {
-						// We increase the retry count, and set the timeout.
-						// If we have reached the retry policy, we set the timeout.
-						// This means we will not retry for the next 5 minutes.
-						if kstorageRetryCount < config.KStorage.MaxRetries {
-							kstorageRetryCount = (kstorageRetryCount + 1)
-						}
-						if kstorageRetryCount == config.KStorage.MaxRetries {
-							kstorageRetryTimeout = time.Now().Add(time.Duration(config.KStorage.Timeout) * time.Second).Unix()
-						}
-						log.Log.Info("UploadKerberosVault: Upload Failed, " + resp.Status + ", " + string(body))
-					}
-				}
-			}
-		} else {
 			log.Log.Info("UploadKerberosVault: Upload Failed, " + err.Error())
+		} else {
+			log.Log.Info("UploadKerberosVault: Upload Failed, " + body)
+		}
+
+		// We only advance the retry policy when the vault gave a definitive
+		// response (mirroring the original behaviour where transient network
+		// errors did not consume retries). When the retry count reaches the
+		// configured maximum we back off for the configured timeout.
+		if responded {
+			if kstorageRetryCount < config.KStorage.MaxRetries {
+				kstorageRetryCount = (kstorageRetryCount + 1)
+			}
+			if kstorageRetryCount == config.KStorage.MaxRetries {
+				kstorageRetryTimeout = time.Now().Add(time.Duration(config.KStorage.Timeout) * time.Second).Unix()
+			}
 		}
 	}
 
@@ -134,61 +100,116 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 
 		log.Log.Info("UploadKerberosVault (Secondary): Uploading to Secondary Kerberos Vault (" + config.KStorageSecondary.URI + ")")
 
-		file, err = os.OpenFile(fullname, os.O_RDWR, 0755)
-		if file != nil {
-			defer file.Close()
-		}
-		if err != nil {
-			err := "UploadKerberosVault (Secondary): Upload Failed, file doesn't exists anymore"
-			log.Log.Info(err)
-			return false, false, errors.New(err)
+		uploaded, _, body, err := sendToVault(*config.KStorageSecondary, publicKey, config.Key, fileName, "UploadKerberosVault (Secondary)", "secondary")
+		if uploaded {
+			log.Log.Info("UploadKerberosVault (Secondary): Upload Finished to secondary, " + body)
+			return true, true, nil
 		}
 
-		req, err := http.NewRequest("POST", config.KStorageSecondary.URI+"/storage", file)
 		if err != nil {
-			errorMessage := "UploadKerberosVault (Secondary): error reading request, " + config.KStorageSecondary.URI + "/storage: " + err.Error()
-			log.Log.Error(errorMessage)
-			return false, true, errors.New(errorMessage)
-		}
-		req.Header.Set("Content-Type", "video/mp4")
-		req.Header.Set("X-Kerberos-Storage-CloudKey", publicKey)
-		req.Header.Set("X-Kerberos-Storage-AccessKey", config.KStorageSecondary.AccessKey)
-		req.Header.Set("X-Kerberos-Storage-SecretAccessKey", config.KStorageSecondary.SecretAccessKey)
-		req.Header.Set("X-Kerberos-Storage-Provider", config.KStorageSecondary.Provider)
-		req.Header.Set("X-Kerberos-Storage-FileName", fileName)
-		req.Header.Set("X-Kerberos-Storage-Device", config.Key)
-		req.Header.Set("X-Kerberos-Storage-Capture", "IPCamera")
-		req.Header.Set("X-Kerberos-Storage-Directory", config.KStorageSecondary.Directory)
-
-		var client *http.Client
-		if os.Getenv("AGENT_TLS_INSECURE") == "true" {
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-			client = &http.Client{Transport: tr}
+			log.Log.Info("UploadKerberosVault (Secondary): Upload Failed to secondary, " + err.Error())
 		} else {
-			client = &http.Client{}
-		}
-
-		resp, err := client.Do(req)
-		if resp != nil {
-			defer resp.Body.Close()
-		}
-
-		if err == nil {
-			if resp != nil {
-				body, err := io.ReadAll(resp.Body)
-				if err == nil {
-					if resp.StatusCode == 200 {
-						log.Log.Info("UploadKerberosVault (Secondary): Upload Finished to secondary, " + resp.Status + ", " + string(body))
-						return true, true, nil
-					} else {
-						log.Log.Info("UploadKerberosVault (Secondary): Upload Failed to secondary, " + resp.Status + ", " + string(body))
-					}
-				}
-			}
+			log.Log.Info("UploadKerberosVault (Secondary): Upload Failed to secondary, " + body)
 		}
 	}
 
 	return false, true, nil
+}
+
+// sendToVault uploads a single recording to one Kerberos Vault. When resumable
+// uploads are enabled (the default) it attempts the tus protocol first and, if
+// the vault does not expose a tus endpoint (older deployments), transparently
+// falls back to the legacy single-shot POST.
+//
+// It returns whether the upload succeeded, whether the vault gave a definitive
+// HTTP response (so the caller can advance its retry policy), a short message
+// for logging, and a transport error if any.
+func sendToVault(vault models.KStorage, publicKey, deviceKey, fileName, label, slot string) (bool, bool, string, error) {
+	if resumableUploadsEnabled() {
+		uploaded, responded, supported, body, err := uploadVaultResumable(vault, publicKey, deviceKey, fileName, label, slot)
+		if supported {
+			return uploaded, responded, body, err
+		}
+		log.Log.Info(label + ": resumable (tus) endpoint not available, falling back to legacy upload")
+	}
+	return uploadVaultLegacy(vault, publicKey, deviceKey, fileName, label)
+}
+
+// uploadVaultLegacy performs the original single-request upload: the whole file
+// is sent as the body of a POST to {URI}/storage. Kept for backwards
+// compatibility with vault deployments that do not support resumable uploads.
+func uploadVaultLegacy(vault models.KStorage, publicKey, deviceKey, fileName, label string) (bool, bool, string, error) {
+	fullname := "data/recordings/" + fileName
+
+	file, err := os.Open(fullname)
+	if file != nil {
+		defer file.Close()
+	}
+	if err != nil {
+		msg := label + ": Upload Failed, file doesn't exists anymore"
+		log.Log.Info(msg)
+		return false, false, "", errors.New(msg)
+	}
+
+	uri := vault.URI
+	for len(uri) > 0 && uri[len(uri)-1] == '/' {
+		uri = uri[:len(uri)-1]
+	}
+
+	req, err := http.NewRequest("POST", uri+"/storage", file)
+	if err != nil {
+		errorMessage := label + ": error reading request, " + uri + "/storage: " + err.Error()
+		log.Log.Error(errorMessage)
+		return false, false, "", errors.New(errorMessage)
+	}
+	req.Header.Set("Content-Type", "video/mp4")
+	setVaultHeaders(req.Header, vault, publicKey, deviceKey, fileName)
+
+	client := newVaultHTTPClient(0)
+	resp, err := client.Do(req)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		return false, false, "", err
+	}
+
+	body, rerr := io.ReadAll(resp.Body)
+	if rerr != nil {
+		return false, false, "", rerr
+	}
+
+	if resp.StatusCode == 200 {
+		return true, true, resp.Status + ", " + string(body), nil
+	}
+	return false, true, resp.Status + ", " + string(body), nil
+}
+
+// setVaultHeaders sets the standard Kerberos Vault headers used by the legacy
+// single-POST upload.
+func setVaultHeaders(h http.Header, vault models.KStorage, publicKey, deviceKey, fileName string) {
+	h.Set("X-Kerberos-Storage-CloudKey", publicKey)
+	h.Set("X-Kerberos-Storage-AccessKey", vault.AccessKey)
+	h.Set("X-Kerberos-Storage-SecretAccessKey", vault.SecretAccessKey)
+	h.Set("X-Kerberos-Storage-Provider", vault.Provider)
+	h.Set("X-Kerberos-Storage-FileName", fileName)
+	h.Set("X-Kerberos-Storage-Device", deviceKey)
+	h.Set("X-Kerberos-Storage-Capture", "IPCamera")
+	h.Set("X-Kerberos-Storage-Directory", vault.Directory)
+}
+
+// newVaultHTTPClient builds an HTTP client honouring the AGENT_TLS_INSECURE
+// escape hatch. A timeout of 0 disables the client-level timeout, which is
+// required for streaming large upload bodies.
+func newVaultHTTPClient(timeout time.Duration) *http.Client {
+	client := &http.Client{}
+	if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+		client.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+	}
+	if timeout > 0 {
+		client.Timeout = timeout
+	}
+	return client
 }
