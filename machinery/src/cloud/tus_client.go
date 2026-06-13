@@ -134,6 +134,19 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 	size := info.Size()
 
 	client := newVaultHTTPClient(0)
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) == 0 {
+			return nil
+		}
+		if req.URL.Host != via[0].URL.Host {
+			for k := range req.Header {
+				if strings.HasPrefix(http.CanonicalHeaderKey(k), "X-Kerberos-") {
+					req.Header.Del(k)
+				}
+			}
+		}
+		return nil
+	}
 
 	sidecar := tusSidecarPath(fileName, slot)
 	uploadURL := loadTusResumeState(sidecar, baseURL)
