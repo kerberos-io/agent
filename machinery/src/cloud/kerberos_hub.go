@@ -34,6 +34,29 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 
 	log.Log.Info("UploadKerberosHub: Uploading to Kerberos Hub (" + config.HubURI + ")")
 	log.Log.Info("UploadKerberosHub: Upload started for " + fileName)
+
+	// Prefer the resumable (tus) upload when enabled (the default). Kerberos Hub
+	// authenticates the agent with its Hub public/private key and proxies the
+	// resumable upload to the Kerberos Vault. When Hub does not expose a tus
+	// endpoint (older deployments) we transparently fall back to the legacy
+	// single-POST upload below.
+	if resumableUploadsEnabled() {
+		uploaded, _, supported, body, rerr := uploadHubResumable(&config, fileName, "UploadKerberosHub", "hub")
+		if supported {
+			if uploaded {
+				log.Log.Info("UploadKerberosHub: Upload Finished (resumable), " + body)
+				return true, true, nil
+			}
+			if rerr != nil {
+				log.Log.Info("UploadKerberosHub: resumable upload failed, " + rerr.Error())
+			} else {
+				log.Log.Info("UploadKerberosHub: resumable upload incomplete, " + body)
+			}
+			return false, true, rerr
+		}
+		log.Log.Info("UploadKerberosHub: resumable (tus) endpoint not available, falling back to legacy upload")
+	}
+
 	fullname := "data/recordings/" + fileName
 
 	// Check if we still have the file otherwise we abort the request.
