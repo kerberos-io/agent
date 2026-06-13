@@ -1,2 +1,2 @@
 #!/bin/bash
-swag init -g ./src/routers/http/Server.go
+swag init -g ./src/routers/http/server.go
