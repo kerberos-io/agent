@@ -274,6 +274,7 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 // directory and provider are resolved and injected by Kerberos Hub, so they are
 // intentionally omitted from the metadata here.
 func uploadHubResumable(config *models.Config, fileName, label, slot string) (bool, bool, bool, string, error) {
+	baseURL := strings.TrimRight(config.HubURI, "/") + tusUploadPath
 	metadata := encodeTusMetadata(map[string]string{
 		"filename": fileName,
 		"device":   config.Key,
