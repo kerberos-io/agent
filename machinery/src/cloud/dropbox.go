@@ -46,7 +46,11 @@ func UploadDropbox(configuration *models.Configuration, fileName string) (bool, 
 
 	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
 	if file != nil {
-		defer file.Close()
+		defer func() {
+			if cerr := file.Close(); cerr != nil {
+				log.Log.Error("UploadDropbox: Error closing file: " + cerr.Error())
+			}
+		}()
 	}
 
 	if err == nil {
