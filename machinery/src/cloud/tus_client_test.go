@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,6 +23,13 @@ type fakeUpload struct {
 	offset int64
 }
 
+// recordedRequest captures the method and headers of a request received by the
+// fake tus server, so tests can assert the client's per-method auth headers.
+type recordedRequest struct {
+	method string
+	header http.Header
+}
+
 // fakeTus is a tiny in-memory implementation of the tus 1.0.0 server protocol,
 // sufficient to exercise the agent's resumable client.
 type fakeTus struct {
@@ -38,6 +46,10 @@ type fakeTus struct {
 	// failFinalize causes the next N completing PATCH requests to return 502
 	// after storing the bytes, simulating a failed completion hook.
 	failFinalize int
+
+	// requests records the headers of every received request (in order) so
+	// tests can assert which auth/routing headers the client sent per method.
+	requests []recordedRequest
 }
 
 func newFakeTus() *fakeTus {
@@ -84,9 +96,26 @@ func (s *fakeTus) createCount() int {
 	return s.creates
 }
 
+// requestsForMethod returns the recorded requests for the given HTTP method.
+func (s *fakeTus) requestsForMethod(method string) []recordedRequest {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []recordedRequest
+	for _, req := range s.requests {
+		if req.method == method {
+			out = append(out, req)
+		}
+	}
+	return out
+}
+
 func (s *fakeTus) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, tusUploadPath)
 	w.Header().Set("Tus-Resumable", tusResumableVersion)
+
+	s.mu.Lock()
+	s.requests = append(s.requests, recordedRequest{method: r.Method, header: r.Header.Clone()})
+	s.mu.Unlock()
 
 	switch r.Method {
 	case http.MethodPost:
@@ -375,6 +404,137 @@ func TestUploadVaultResumable_ResumeFromSidecar(t *testing.T) {
 	}
 	if srv.createCount() != 0 {
 		t.Fatalf("resume should not create a new upload, got %d creates", srv.createCount())
+	}
+}
+
+func testHubConfig(hubURI string) *models.Config {
+	return &models.Config{
+		Key:           "device-key",
+		HubURI:        hubURI,
+		HubKey:        "hubpub",
+		HubPrivateKey: "hubpriv",
+		S3:            &models.S3{Region: "eu-west"},
+	}
+}
+
+// decodeTusMetadata parses a tus Upload-Metadata header value ("key b64,key b64")
+// back into a map of decoded key/value pairs.
+func decodeTusMetadata(meta string) map[string]string {
+	out := map[string]string{}
+	if meta == "" {
+		return out
+	}
+	for _, pair := range strings.Split(meta, ",") {
+		parts := strings.SplitN(strings.TrimSpace(pair), " ", 2)
+		if parts[0] == "" {
+			continue
+		}
+		val := ""
+		if len(parts) == 2 {
+			if b, err := base64.StdEncoding.DecodeString(parts[1]); err == nil {
+				val = string(b)
+			}
+		}
+		out[parts[0]] = val
+	}
+	return out
+}
+
+func TestUploadHubResumable_HappyPath(t *testing.T) {
+	srv := newFakeTus()
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	fileName := "1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4"
+	payload := bytes.Repeat([]byte("h"), 4096)
+	withRecording(t, fileName, payload)
+
+	uploaded, _, supported, _, err := uploadHubResumable(testHubConfig(ts.URL), fileName, "test", "hub")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !uploaded || !supported {
+		t.Fatalf("uploaded/supported = %v/%v, want both true", uploaded, supported)
+	}
+	if got := srv.totalBytes(); got != int64(len(payload)) {
+		t.Fatalf("server received %d bytes, want %d", got, len(payload))
+	}
+
+	// The Hub auth headers must be present on every request type (POST/HEAD/PATCH),
+	// because Kerberos Hub validates them on each proxied request. Conversely the
+	// vault credentials/routing are injected by Kerberos Hub on the agent's behalf
+	// and must never be sent by the agent on the hub path.
+	for _, method := range []string{http.MethodPost, http.MethodHead, http.MethodPatch} {
+		reqs := srv.requestsForMethod(method)
+		if len(reqs) == 0 {
+			t.Fatalf("expected at least one %s request", method)
+		}
+		for _, req := range reqs {
+			if got := req.header.Get("X-Kerberos-Hub-PublicKey"); got != "hubpub" {
+				t.Errorf("%s: X-Kerberos-Hub-PublicKey = %q, want %q", method, got, "hubpub")
+			}
+			if got := req.header.Get("X-Kerberos-Hub-PrivateKey"); got != "hubpriv" {
+				t.Errorf("%s: X-Kerberos-Hub-PrivateKey = %q, want %q", method, got, "hubpriv")
+			}
+			if got := req.header.Get("X-Kerberos-Hub-Region"); got != "eu-west" {
+				t.Errorf("%s: X-Kerberos-Hub-Region = %q, want %q", method, got, "eu-west")
+			}
+			if got := req.header.Get("X-Kerberos-Storage-Device"); got != "device-key" {
+				t.Errorf("%s: X-Kerberos-Storage-Device = %q, want %q", method, got, "device-key")
+			}
+			for _, h := range []string{
+				"X-Kerberos-Storage-AccessKey",
+				"X-Kerberos-Storage-SecretAccessKey",
+				"X-Kerberos-Storage-CloudKey",
+				"X-Kerberos-Storage-Provider",
+				"X-Kerberos-Storage-Directory",
+			} {
+				if got := req.header.Get(h); got != "" {
+					t.Errorf("%s: %s should be empty on the hub path, got %q", method, h, got)
+				}
+			}
+		}
+	}
+
+	// The creation request carries the upload metadata; on the hub path it must
+	// omit directory/provider/cloudkey (Hub resolves those) but include
+	// filename/device/capture. The filename header is also set on create.
+	posts := srv.requestsForMethod(http.MethodPost)
+	if got := posts[0].header.Get("X-Kerberos-Storage-FileName"); got != fileName {
+		t.Errorf("POST X-Kerberos-Storage-FileName = %q, want %q", got, fileName)
+	}
+	meta := decodeTusMetadata(posts[0].header.Get("Upload-Metadata"))
+	for _, omitted := range []string{"directory", "provider", "cloudkey"} {
+		if _, ok := meta[omitted]; ok {
+			t.Errorf("hub metadata must omit %q, got %v", omitted, meta)
+		}
+	}
+	if meta["filename"] != fileName {
+		t.Errorf("hub metadata filename = %q, want %q", meta["filename"], fileName)
+	}
+	if meta["device"] != "device-key" {
+		t.Errorf("hub metadata device = %q, want %q", meta["device"], "device-key")
+	}
+	if meta["capture"] != "IPCamera" {
+		t.Errorf("hub metadata capture = %q, want %q", meta["capture"], "IPCamera")
+	}
+}
+
+func TestUploadHubResumable_Unsupported(t *testing.T) {
+	srv := newFakeTus()
+	srv.unsupported = true
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	fileName := "f.mp4"
+	withRecording(t, fileName, []byte("hello"))
+
+	uploaded, _, supported, _, _ := uploadHubResumable(testHubConfig(ts.URL), fileName, "test", "hub")
+	if uploaded {
+		t.Fatal("expected uploaded=false against a hub without a tus endpoint")
+	}
+	if supported {
+		t.Fatal("expected supported=false so the caller falls back to the legacy upload")
 	}
 }
 

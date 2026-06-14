@@ -93,17 +93,26 @@ func logTusUploadProgress(label string, offset, size int64, loggedBucket *int64)
 	log.Log.Infof("%s: resumable upload progress %d%% (%d/%d bytes)", label, percent, offset, size)
 }
 
-// uploadVaultResumable uploads a recording to a Kerberos Vault using the tus
-// resumable upload protocol.
+// tusHeaderFunc sets the authentication and routing headers required on every
+// tus request for a particular upload target (Kerberos Vault directly, or
+// Kerberos Hub which proxies to a vault). fileName is only meaningful on the
+// creation request; it is empty on HEAD/PATCH/DELETE.
+type tusHeaderFunc func(h http.Header, fileName string)
+
+// runTusUpload performs a resumable (tus) upload of data/recordings/<fileName>
+// to baseURL, sending target-specific authentication/routing headers via
+// setHeaders on every request. It encapsulates the create/resume/chunk/finalize
+// state machine shared by the Kerberos Vault (direct) and Kerberos Hub (proxied)
+// upload paths.
 //
 // Return values:
-//   - uploaded:  the recording was fully received and persisted by the vault.
-//   - responded: the vault returned a definitive HTTP response (used by the
+//   - uploaded:  the recording was fully received and persisted by the server.
+//   - responded: the server returned a definitive HTTP response (used by the
 //     caller to advance its retry/secondary-failover policy).
-//   - supported: the vault exposes a tus endpoint. When false, the caller should
-//     fall back to the legacy single-POST upload (older vault deployments).
+//   - supported: the server exposes a tus endpoint. When false, the caller
+//     should fall back to the legacy single-POST upload (older deployments).
 //   - body:      a short message for logging.
-func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName, label, slot string) (uploaded bool, responded bool, supported bool, body string, err error) {
+func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tusHeaderFunc) (uploaded bool, responded bool, supported bool, body string, err error) {
 	fullname := "data/recordings/" + fileName
 
 	file, ferr := os.Open(fullname)
@@ -124,17 +133,20 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 	}
 	size := info.Size()
 
-	baseURL := strings.TrimRight(vault.URI, "/") + tusUploadPath
 	client := newVaultHTTPClient(0)
-
-	metadata := encodeTusMetadata(map[string]string{
-		"filename":  fileName,
-		"device":    deviceKey,
-		"directory": vault.Directory,
-		"provider":  vault.Provider,
-		"capture":   "IPCamera",
-		"cloudkey":  publicKey,
-	})
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) == 0 {
+			return nil
+		}
+		if req.URL.Host != via[0].URL.Host {
+			for k := range req.Header {
+				if strings.HasPrefix(http.CanonicalHeaderKey(k), "X-Kerberos-") {
+					req.Header.Del(k)
+				}
+			}
+		}
+		return nil
+	}
 
 	sidecar := tusSidecarPath(fileName, slot)
 	uploadURL := loadTusResumeState(sidecar, baseURL)
@@ -145,7 +157,7 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		// (1) Ensure we have an active upload URL, creating one if needed.
 		if uploadURL == "" {
-			created, status, cerr := tusCreate(client, baseURL, size, metadata, vault, publicKey, deviceKey, fileName)
+			created, status, cerr := tusCreate(client, baseURL, size, metadata, setHeaders, fileName)
 			if cerr != nil {
 				if status == http.StatusNotFound || status == http.StatusMethodNotAllowed || status == http.StatusNotImplemented {
 					// The vault does not implement tus; let the caller fall back.
@@ -160,7 +172,7 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 		}
 
 		// (2) Query the current server-side offset.
-		offset, status, herr := tusHead(client, uploadURL, vault, publicKey, deviceKey)
+		offset, status, herr := tusHead(client, uploadURL, setHeaders)
 		if herr != nil {
 			if status == http.StatusNotFound || status == http.StatusGone {
 				// The upload expired/was removed server-side; start over.
@@ -180,7 +192,7 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 			if restartedAfterComplete {
 				return false, true, true, "resumable finalize did not complete", errors.New(label + ": resumable finalize did not complete")
 			}
-			tusTerminate(client, uploadURL, vault, publicKey, deviceKey)
+			tusTerminate(client, uploadURL, setHeaders)
 			removeTusResumeState(sidecar)
 			uploadURL = ""
 			restartedAfterComplete = true
@@ -207,7 +219,7 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 			if chunkSize > 0 && chunkSize < patchLen {
 				patchLen = chunkSize
 			}
-			newOffset, status, respBody, perr := tusPatch(client, uploadURL, offset, patchLen, file, vault, publicKey, deviceKey)
+			newOffset, status, respBody, perr := tusPatch(client, uploadURL, offset, patchLen, file, setHeaders)
 			if perr != nil {
 				if status >= 400 {
 					// Definitive rejection (e.g. provider push failed during finalize).
@@ -249,9 +261,47 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 	return false, true, true, "resumable upload did not complete after retries", errors.New(label + ": resumable upload did not complete after retries")
 }
 
+// uploadVaultResumable uploads a recording directly to a Kerberos Vault using
+// the tus resumable upload protocol. Credentials travel in the
+// X-Kerberos-Storage-* headers on every request and routing (directory/provider)
+// is additionally carried in the tus Upload-Metadata.
+func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName, label, slot string) (bool, bool, bool, string, error) {
+	baseURL := strings.TrimRight(vault.URI, "/") + tusUploadPath
+	metadata := encodeTusMetadata(map[string]string{
+		"filename":  fileName,
+		"device":    deviceKey,
+		"directory": vault.Directory,
+		"provider":  vault.Provider,
+		"capture":   "IPCamera",
+		"cloudkey":  publicKey,
+	})
+	setHeaders := func(h http.Header, fn string) {
+		setVaultTusHeaders(h, vault, publicKey, deviceKey, fn)
+	}
+	return runTusUpload(baseURL, metadata, fileName, label, slot, setHeaders)
+}
+
+// uploadHubResumable uploads a recording to Kerberos Hub's tus endpoint, which
+// authenticates the agent with its Hub public/private key and proxies the
+// resumable upload to the Kerberos Vault on the agent's behalf. The vault
+// directory and provider are resolved and injected by Kerberos Hub, so they are
+// intentionally omitted from the metadata here.
+func uploadHubResumable(config *models.Config, fileName, label, slot string) (bool, bool, bool, string, error) {
+	baseURL := strings.TrimRight(config.HubURI, "/") + tusUploadPath
+	metadata := encodeTusMetadata(map[string]string{
+		"filename": fileName,
+		"device":   config.Key,
+		"capture":  "IPCamera",
+	})
+	setHeaders := func(h http.Header, fn string) {
+		setHubTusHeaders(h, config, fn)
+	}
+	return runTusUpload(baseURL, metadata, fileName, label, slot, setHeaders)
+}
+
 // tusCreate performs the tus "creation" request (POST). On success it returns
 // the resolved upload URL the agent should use for subsequent HEAD/PATCH calls.
-func tusCreate(client *http.Client, baseURL string, size int64, metadata string, vault models.KStorage, publicKey, deviceKey, fileName string) (string, int, error) {
+func tusCreate(client *http.Client, baseURL string, size int64, metadata string, setHeaders tusHeaderFunc, fileName string) (string, int, error) {
 	req, err := http.NewRequest("POST", baseURL, nil)
 	if err != nil {
 		return "", 0, err
@@ -261,7 +311,7 @@ func tusCreate(client *http.Client, baseURL string, size int64, metadata string,
 	if metadata != "" {
 		req.Header.Set("Upload-Metadata", metadata)
 	}
-	setVaultTusHeaders(req.Header, vault, publicKey, deviceKey, fileName)
+	setHeaders(req.Header, fileName)
 
 	resp, err := client.Do(req)
 	if resp != nil {
@@ -284,13 +334,13 @@ func tusCreate(client *http.Client, baseURL string, size int64, metadata string,
 
 // tusHead performs the tus "offset" request (HEAD) and returns the current
 // server-side upload offset.
-func tusHead(client *http.Client, uploadURL string, vault models.KStorage, publicKey, deviceKey string) (int64, int, error) {
+func tusHead(client *http.Client, uploadURL string, setHeaders tusHeaderFunc) (int64, int, error) {
 	req, err := http.NewRequest("HEAD", uploadURL, nil)
 	if err != nil {
 		return 0, 0, err
 	}
 	req.Header.Set("Tus-Resumable", tusResumableVersion)
-	setVaultTusHeaders(req.Header, vault, publicKey, deviceKey, "")
+	setHeaders(req.Header, "")
 
 	resp, err := client.Do(req)
 	if resp != nil {
@@ -315,7 +365,7 @@ func tusHead(client *http.Client, uploadURL string, vault models.KStorage, publi
 // tusPatch streams up to length bytes of the file (starting at offset) to the
 // upload URL using a single PATCH request. The body is read straight from the
 // *os.File, so the recording is never fully buffered in memory.
-func tusPatch(client *http.Client, uploadURL string, offset, length int64, file io.Reader, vault models.KStorage, publicKey, deviceKey string) (int64, int, string, error) {
+func tusPatch(client *http.Client, uploadURL string, offset, length int64, file io.Reader, setHeaders tusHeaderFunc) (int64, int, string, error) {
 	req, err := http.NewRequest("PATCH", uploadURL, io.LimitReader(file, length))
 	if err != nil {
 		return offset, 0, "", err
@@ -324,7 +374,7 @@ func tusPatch(client *http.Client, uploadURL string, offset, length int64, file 
 	req.Header.Set("Tus-Resumable", tusResumableVersion)
 	req.Header.Set("Content-Type", "application/offset+octet-stream")
 	req.Header.Set("Upload-Offset", strconv.FormatInt(offset, 10))
-	setVaultTusHeaders(req.Header, vault, publicKey, deviceKey, "")
+	setHeaders(req.Header, "")
 
 	resp, err := client.Do(req)
 	if resp != nil {
@@ -349,13 +399,13 @@ func tusPatch(client *http.Client, uploadURL string, offset, length int64, file 
 }
 
 // tusTerminate best-effort deletes an upload server-side (DELETE).
-func tusTerminate(client *http.Client, uploadURL string, vault models.KStorage, publicKey, deviceKey string) {
+func tusTerminate(client *http.Client, uploadURL string, setHeaders tusHeaderFunc) {
 	req, err := http.NewRequest("DELETE", uploadURL, nil)
 	if err != nil {
 		return
 	}
 	req.Header.Set("Tus-Resumable", tusResumableVersion)
-	setVaultTusHeaders(req.Header, vault, publicKey, deviceKey, "")
+	setHeaders(req.Header, "")
 
 	resp, derr := client.Do(req)
 	if resp != nil {
@@ -377,6 +427,22 @@ func setVaultTusHeaders(h http.Header, vault models.KStorage, publicKey, deviceK
 	h.Set("X-Kerberos-Storage-Provider", vault.Provider)
 	h.Set("X-Kerberos-Storage-Device", deviceKey)
 	h.Set("X-Kerberos-Storage-Directory", vault.Directory)
+	h.Set("X-Kerberos-Storage-Capture", "IPCamera")
+	if fileName != "" {
+		h.Set("X-Kerberos-Storage-FileName", fileName)
+	}
+}
+
+// setHubTusHeaders sets the Kerberos Hub authentication headers on every tus
+// request of a hub-proxied resumable upload. The agent authenticates with its
+// Hub public/private key (exactly as the legacy single-POST hub upload does);
+// Kerberos Hub validates the subscription and injects the vault credentials and
+// directory/provider on the agent's behalf.
+func setHubTusHeaders(h http.Header, config *models.Config, fileName string) {
+	h.Set("X-Kerberos-Hub-PublicKey", config.HubKey)
+	h.Set("X-Kerberos-Hub-PrivateKey", config.HubPrivateKey)
+	h.Set("X-Kerberos-Hub-Region", config.S3.Region)
+	h.Set("X-Kerberos-Storage-Device", config.Key)
 	h.Set("X-Kerberos-Storage-Capture", "IPCamera")
 	if fileName != "" {
 		h.Set("X-Kerberos-Storage-FileName", fileName)
