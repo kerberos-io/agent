@@ -1,19 +1,24 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/Eyevinn/mp4ff/avc"
 	mp4ff "github.com/Eyevinn/mp4ff/mp4"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("usage: mp4analyze <file.mp4>")
+	fromFlag := flag.Int64("from", -1, "start of the detailed inspection window (track timescale units); default auto-detects the largest keyframe gap")
+	toFlag := flag.Int64("to", -1, "end of the detailed inspection window (track timescale units); default auto-detected")
+	flag.Parse()
+	if flag.NArg() < 1 {
+		fmt.Println("usage: mp4analyze [-from N] [-to N] <file.mp4>")
 		os.Exit(1)
 	}
-	f, err := os.Open(os.Args[1])
+	f, err := os.Open(flag.Arg(0))
 	if err != nil {
 		panic(err)
 	}
@@ -110,7 +115,7 @@ func main() {
 				tid := traf.Tfhd.TrackID
 				tfdt := traf.Tfdt.BaseMediaDecodeTime()
 				offset := uint64(0)
-				var keys []uint64    // keyframe offset-from-tfdt
+				var keys []uint64 // keyframe offset-from-tfdt
 				var durs []uint64
 				zeroDur := 0
 				nSamples := 0
@@ -157,15 +162,20 @@ func main() {
 		if i > 0 {
 			gap = int64(k) - int64(allKeyGlobal[i-1])
 		}
-		flag := ""
+		seam := ""
 		if i > 1 {
 			prevGap := int64(allKeyGlobal[i-1]) - int64(allKeyGlobal[i-2])
 			if gap > 0 && prevGap > 0 && gap*2 < prevGap {
-				flag = fmt.Sprintf("  <== SEAM? gap=%d < prevGap/2=%d", gap, prevGap/2)
+				seam = fmt.Sprintf("  <== SEAM? gap=%d < prevGap/2=%d", gap, prevGap/2)
 			}
 		}
-		fmt.Printf("  kf#%02d dt=%d gap=%d%s\n", i, k, gap, flag)
+		fmt.Printf("  kf#%02d dt=%d gap=%d%s\n", i, k, gap, seam)
 	}
+
+	// Choose the detailed-inspection window. By default centre it on the largest
+	// keyframe gap (the most likely artifact location); -from/-to override.
+	winLo, winHi := inspectWindow(allKeyGlobal, *fromFlag, *toFlag)
+	fmt.Printf("=== detailed inspection window: dts %d..%d ===\n", winLo, winHi)
 
 	// Full sample timeline: DTS, CTS (=DTS+cto), composition offset, NAL types,
 	// to detect PTS non-monotonicity / gaps / param-set changes at the seam.
@@ -201,9 +211,11 @@ func main() {
 				if lastDTS >= 0 && dts < lastDTS {
 					anomaly += fmt.Sprintf(" <== DTS BACKWARDS (prev=%d)", lastDTS)
 				}
-				isSync := s.Flags&0x02000000 == 0 && (s.Flags>>24)&0x03 == 0x02
-				// Only print near the seam region and any anomalies, to keep output small.
-				near := dts >= 7800 && dts <= 8700
+				// sample_is_non_sync_sample is bit 16 (0x00010000); a sync sample
+				// has it clear and sample_depends_on==2 (i.e. an I-frame).
+				isSync := s.Flags&0x00010000 == 0 && (s.Flags>>24)&0x03 == 0x02
+				// Only print inside the inspection window and any anomalies, to keep output small.
+				near := dts >= winLo && dts <= winHi
 				if near || anomaly != "" {
 					fmt.Printf("  s%04d frag%d dts=%d cts=%d cto=%d dur=%d size=%d sync=%v nal=%v%s\n",
 						sampIdx, fragIdx, dts, cts, s.CompositionTimeOffset, s.Dur, len(s.Data), isSync, nals, anomaly)
@@ -293,10 +305,12 @@ func main() {
 		}
 	}
 
-	sliceHeaders(parsed, trex)
+	sliceHeaders(parsed, trex, winLo, winHi)
+
+	summary(parsed, trex)
 }
 
-func sliceHeaders(parsed *mp4ff.File, trex *mp4ff.TrexBox) {
+func sliceHeaders(parsed *mp4ff.File, trex *mp4ff.TrexBox, winLo, winHi int64) {
 	// Build SPS/PPS maps from avcC.
 	spsMap := map[uint32]*avc.SPS{}
 	ppsMap := map[uint32]*avc.PPS{}
@@ -322,7 +336,7 @@ func sliceHeaders(parsed *mp4ff.File, trex *mp4ff.TrexBox) {
 		}
 	}
 
-	fmt.Println("=== slice headers near seam (frame_num / poc / idr_pic_id) ===")
+	fmt.Println("=== slice headers in inspection window (frame_num / poc / idr_pic_id) ===")
 	fragIdx := 0
 	sampIdx := 0
 	for _, seg := range parsed.Segments {
@@ -334,7 +348,7 @@ func sliceHeaders(parsed *mp4ff.File, trex *mp4ff.TrexBox) {
 			}
 			for _, s := range fs {
 				dts := int64(s.DecodeTime)
-				if dts < 6800 || dts > 9400 {
+				if dts < winLo || dts > winHi {
 					sampIdx++
 					continue
 				}
@@ -422,4 +436,201 @@ func nalsByType(b []byte, want int) [][]byte {
 		i += n
 	}
 	return out
+}
+
+// inspectWindow returns the [lo,hi] decode-time range (track timescale units)
+// for which sample-level detail is printed. Explicit -from/-to win; otherwise
+// the window auto-centres on the largest gap between consecutive video
+// keyframes — the most likely location of a visible artifact — with a margin on
+// each side so the frames leading into and out of the gap are shown too.
+func inspectWindow(keyDecodeTimes []uint64, from, to int64) (int64, int64) {
+	if from >= 0 || to >= 0 {
+		if from < 0 {
+			from = 0
+		}
+		if to < 0 {
+			to = from + 2000
+		}
+		return from, to
+	}
+	if len(keyDecodeTimes) < 2 {
+		return 0, 1 << 62
+	}
+	worstIdx, worstGap := 1, uint64(0)
+	for i := 1; i < len(keyDecodeTimes); i++ {
+		if g := keyDecodeTimes[i] - keyDecodeTimes[i-1]; g > worstGap {
+			worstGap = g
+			worstIdx = i
+		}
+	}
+	const margin = 500
+	lo := int64(keyDecodeTimes[worstIdx-1]) - margin
+	if lo < 0 {
+		lo = 0
+	}
+	return lo, int64(keyDecodeTimes[worstIdx]) + margin
+}
+
+// summary prints a compact, generic health report so a recording can be
+// validated at a glance without reading the full per-sample dump above.
+func summary(parsed *mp4ff.File, trex *mp4ff.TrexBox) {
+	fmt.Println("=== SUMMARY (health checks) ===")
+
+	videoTracks, audioTracks := 0, 0
+	var videoTimescale uint64 = 1
+	if parsed.Init != nil && parsed.Init.Moov != nil {
+		for _, trak := range parsed.Init.Moov.Traks {
+			switch trak.Mdia.Hdlr.HandlerType {
+			case "vide":
+				videoTracks++
+				if trak.Mdia.Mdhd.Timescale != 0 {
+					videoTimescale = uint64(trak.Mdia.Mdhd.Timescale)
+				}
+			case "soun":
+				audioTracks++
+			}
+		}
+	}
+	fmt.Printf("  tracks: %d video, %d audio\n", videoTracks, audioTracks)
+	if audioTracks == 0 {
+		fmt.Println("    note: no audio track is embedded in this file")
+	}
+
+	type fragStat struct {
+		idx     int
+		tfdt    uint64
+		dur     uint64
+		nSamp   int
+		nKeys   int
+		zeroDur int
+		fps     float64
+	}
+	var stats []fragStat
+	var keyTimes []uint64
+	var fpsArr []float64
+	tfdtGaps := 0
+	var prevEnd uint64
+	havePrev := false
+	fi := 0
+	for _, seg := range parsed.Segments {
+		for _, fr := range seg.Fragments {
+			for _, traf := range fr.Moof.Trafs {
+				if traf.Tfhd.TrackID != 1 {
+					continue
+				}
+				st := fragStat{idx: fi, tfdt: traf.Tfdt.BaseMediaDecodeTime()}
+				off := uint64(0)
+				for _, trun := range traf.Truns {
+					for _, s := range trun.Samples {
+						st.nSamp++
+						if (s.Flags>>24)&0x03 == 0x02 {
+							st.nKeys++
+							keyTimes = append(keyTimes, st.tfdt+off)
+						}
+						if s.Dur == 0 {
+							st.zeroDur++
+						}
+						off += uint64(s.Dur)
+					}
+				}
+				st.dur = off
+				d := st.dur
+				if d == 0 {
+					d = 1
+				}
+				st.fps = float64(st.nSamp) * float64(videoTimescale) / float64(d)
+				fpsArr = append(fpsArr, st.fps)
+				if havePrev && st.tfdt != prevEnd {
+					tfdtGaps++
+				}
+				prevEnd = st.tfdt + st.dur
+				havePrev = true
+				stats = append(stats, st)
+			}
+			fi++
+		}
+	}
+
+	medFps := medianFloat(fpsArr)
+	fmt.Printf("  fragments: %d (video timescale=%d, median %.1f fps)\n", len(stats), videoTimescale, medFps)
+	lowFps := 0
+	totalZero := 0
+	for _, st := range stats {
+		totalZero += st.zeroDur
+		flagStr := ""
+		if medFps > 0 && st.fps < medFps*0.9 {
+			lowFps++
+			flagStr = "  <== LOW FRAME RATE — likely dropped frames"
+		}
+		fmt.Printf("    frag%02d tfdt=%-6d dur=%-5d samples=%-3d keyframes=%d zeroDur=%d fps=%.1f%s\n",
+			st.idx, st.tfdt, st.dur, st.nSamp, st.nKeys, st.zeroDur, st.fps, flagStr)
+	}
+
+	var gaps []uint64
+	for i := 1; i < len(keyTimes); i++ {
+		gaps = append(gaps, keyTimes[i]-keyTimes[i-1])
+	}
+	irregular := 0
+	if len(gaps) > 0 {
+		med := medianUint(gaps)
+		mn, mx := gaps[0], gaps[0]
+		for _, g := range gaps {
+			if g < mn {
+				mn = g
+			}
+			if g > mx {
+				mx = g
+			}
+			// Flag intervals that deviate by more than ~50% from the median GOP.
+			if med > 0 && (g*2 > med*3 || g*2 < med) {
+				irregular++
+			}
+		}
+		fmt.Printf("  keyframe gaps: min=%d median=%d max=%d  irregular=%d/%d\n", mn, med, mx, irregular, len(gaps))
+	}
+	fmt.Printf("  tfdt discontinuities: %d\n", tfdtGaps)
+	fmt.Printf("  zero-duration samples: %d\n", totalZero)
+
+	fmt.Println("  verdict:")
+	clean := true
+	if audioTracks == 0 {
+		fmt.Println("    - no audio track (expected if this recording is video-only)")
+	}
+	if lowFps > 0 {
+		clean = false
+		fmt.Printf("    - %d fragment(s) have a reduced frame rate (dropped frames) — likely source of the artifacts\n", lowFps)
+	}
+	if irregular > 0 {
+		clean = false
+		fmt.Printf("    - %d irregular keyframe interval(s)\n", irregular)
+	}
+	if tfdtGaps > 0 {
+		clean = false
+		fmt.Printf("    - %d timeline (tfdt) discontinuity(ies)\n", tfdtGaps)
+	}
+	if totalZero > 0 {
+		clean = false
+		fmt.Printf("    - %d zero-duration sample(s)\n", totalZero)
+	}
+	if clean {
+		fmt.Println("    - container structure looks healthy")
+	}
+}
+
+func medianUint(v []uint64) uint64 {
+	if len(v) == 0 {
+		return 0
+	}
+	c := append([]uint64(nil), v...)
+	sort.Slice(c, func(i, j int) bool { return c[i] < c[j] })
+	return c[len(c)/2]
+}
+
+func medianFloat(v []float64) float64 {
+	if len(v) == 0 {
+		return 0
+	}
+	c := append([]float64(nil), v...)
+	sort.Float64s(c)
+	return c[len(c)/2]
 }
