@@ -434,7 +434,7 @@ func (mp4 *MP4) expectedGopFrames(gap uint64) uint64 {
 	return cadence / frameDur
 }
 
-// bufferedVideoFrameDuration returns the median-ish per-frame duration (in PTS
+// bufferedVideoFrameDuration returns the average per-frame duration (in PTS
 // units) of the video samples currently buffered, derived from the PTS deltas
 // between consecutive video frames. Returns 0 when fewer than two video frames
 // are buffered.
