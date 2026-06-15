@@ -370,7 +370,7 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 			log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): dropping truncated GOP at premature keyframe (interval=%d ms, min interval=%d ms, buffered video frames=%d of ~%d) - likely upstream loop/restart discontinuity", gap, mp4.MinKeyframeGapMs, bufferedVideo, fullGopFrames))
 		}
 		mp4.LastKeyframeGapMs = gap
-		if mp4.MinKeyframeGapMs == 0 || gap < mp4.MinKeyframeGapMs {
+		if !seam && (mp4.MinKeyframeGapMs == 0 || gap < mp4.MinKeyframeGapMs) {
 			mp4.MinKeyframeGapMs = gap
 		}
 	}
