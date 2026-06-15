@@ -33,13 +33,18 @@ const MacEpochOffset uint64 = 2082844800
 const FragmentDurationMs = 3000
 
 // SeamGapDivisor controls loop-seam detection. A keyframe is treated as an
-// upstream loop/restart seam when it arrives in less than (previous keyframe
-// interval / SeamGapDivisor) — i.e. far sooner than the established keyframe
-// cadence. Comparing against the *previous* interval (rather than a fixed
-// millisecond threshold) makes the check scale automatically with the camera's
-// configured GOP size: it works the same whether keyframes are 0.5s, 1s, 2s or
-// more apart, and does not misfire on legitimately short-GOP or all-intra
-// streams (where every interval is similar, so none looks anomalously short).
+// upstream loop/restart seam when it arrives in less than (smallest normal
+// keyframe interval / SeamGapDivisor) — i.e. far sooner than the camera's
+// tightest established keyframe cadence.
+//
+// The reference is the running *minimum* keyframe interval, NOT the immediately
+// preceding one. Variable-GOP ("smart codec") cameras lengthen the GOP during
+// static scenes and shorten it again on motion, so consecutive intervals differ
+// wildly (e.g. 2000 ms then 500 ms). Comparing against the previous interval
+// then flags every normal short GOP that happens to follow a long static GOP as
+// a seam and drops healthy video. Comparing against the minimum cadence instead
+// scales with any configured GOP size (0.5s, 1s, 2s, ...) yet never mistakes the
+// camera's own normal cadence for a premature seam IDR.
 const SeamGapDivisor = 2
 
 type MP4 struct {
@@ -85,7 +90,8 @@ type MP4 struct {
 	FragmentKeyframeCount   int               // Keyframes in the current fragment
 	PendingSampleIsKeyframe bool              // Whether the pending video sample is a keyframe
 	LastKeyframeRawPTS      uint64            // Raw PTS of the most recently seen keyframe (across fragments)
-	LastKeyframeGapMs       uint64            // Interval (ms) between the two most recent keyframes; reference cadence for seam detection
+	LastKeyframeGapMs       uint64            // Interval (ms) between the two most recent keyframes (diagnostic only)
+	MinKeyframeGapMs        uint64            // Smallest keyframe interval (ms) seen so far; the camera's tightest cadence and the reference for seam detection
 	gopBuffer               []bufferedSample  // Current, not-yet-committed GOP (video frames + interleaved audio), held so a loop-seam GOP can be dropped before it reaches the file
 }
 
@@ -333,23 +339,40 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 	// buffered GOP is genuine (commit it) or the truncated tail GOP at an upstream
 	// loop/restart seam (drop it).
 	//
-	// The GOP size is configurable per camera, so we do NOT compare against a
-	// fixed millisecond threshold. Instead we compare this keyframe interval to
-	// the previous one and only flag a *sudden* shortening: a seam IDR arrives in
-	// less than (previous interval / SeamGapDivisor). Deriving the threshold from
-	// the observed cadence keeps detection correct for any configured GOP (0.5s,
-	// 1s, 2s, ...) and avoids false positives on steady short-GOP / all-intra
-	// streams (where consecutive intervals are similar, so none looks anomalously
-	// short). Because the reference is the immediately preceding interval, a burst
-	// of close keyframes only drops a single GOP instead of cascading.
+	// A genuine loop/restart seam has TWO signatures that must BOTH hold; we never
+	// drop a GOP on the interval alone, because variable-GOP ("smart codec")
+	// cameras legitimately shorten the GOP on motion:
+	//
+	//  1. The new keyframe arrives much sooner than the camera's tightest normal
+	//     cadence: gap*SeamGapDivisor < MinKeyframeGapMs (the running MINIMUM
+	//     interval). Using the minimum — not the previous interval — means a
+	//     normal short GOP that merely follows a long static GOP (2000 ms -> 500 ms)
+	//     is NOT flagged, while a true premature restart still is.
+	//  2. The GOP we just buffered is actually TRUNCATED — far shorter than a full
+	//     GOP. A real seam cuts a GOP off mid-stream, leaving only a handful of
+	//     frames; a healthy GOP (even a legitimately short one) is left intact and
+	//     must be committed in full. We require the buffered tail to be under half
+	//     the minimum normal GOP length to qualify as truncated.
+	//
+	// Deriving both thresholds from the observed cadence keeps detection correct
+	// for any configured GOP size (0.5s, 1s, 2s, ...) and stops the heuristic from
+	// discarding healthy video.
 	seam := false
 	if mp4.LastKeyframeRawPTS > 0 && pts > mp4.LastKeyframeRawPTS {
 		gap := pts - mp4.LastKeyframeRawPTS
-		if mp4.LastKeyframeGapMs > 0 && gap*SeamGapDivisor < mp4.LastKeyframeGapMs {
+		bufferedVideo := mp4.bufferedVideoCount()
+		// Frames a full GOP at the tightest normal cadence would contain.
+		fullGopFrames := mp4.expectedGopFrames(gap)
+		closeKeyframe := mp4.MinKeyframeGapMs > 0 && gap*SeamGapDivisor < mp4.MinKeyframeGapMs
+		truncatedTail := fullGopFrames > 0 && bufferedVideo*2 < fullGopFrames
+		if closeKeyframe && truncatedTail {
 			seam = true
-			log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): dropping truncated GOP at unexpectedly close keyframe (interval=%d ms, previous interval=%d ms, buffered samples=%d) - likely upstream loop/restart discontinuity", gap, mp4.LastKeyframeGapMs, len(mp4.gopBuffer)))
+			log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): dropping truncated GOP at premature keyframe (interval=%d ms, min interval=%d ms, buffered video frames=%d of ~%d) - likely upstream loop/restart discontinuity", gap, mp4.MinKeyframeGapMs, bufferedVideo, fullGopFrames))
 		}
 		mp4.LastKeyframeGapMs = gap
+		if !seam && (mp4.MinKeyframeGapMs == 0 || gap < mp4.MinKeyframeGapMs) {
+			mp4.MinKeyframeGapMs = gap
+		}
 	}
 	mp4.LastKeyframeRawPTS = pts
 
@@ -370,6 +393,70 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		compositionOffset: compositionOffset,
 	})
 	return nil
+}
+
+// bufferedVideoCount returns how many video-track samples are currently held in
+// the GOP buffer (interleaved audio samples are ignored). It measures how
+// complete the buffered GOP is, used to tell a truncated seam tail from a
+// healthy — possibly legitimately short — GOP.
+func (mp4 *MP4) bufferedVideoCount() uint64 {
+	var n uint64
+	for _, s := range mp4.gopBuffer {
+		if s.trackID == uint32(mp4.VideoTrack) {
+			n++
+		}
+	}
+	return n
+}
+
+// expectedGopFrames estimates how many video frames a full GOP at the camera's
+// tightest normal cadence (MinKeyframeGapMs) would contain, using the video
+// frame interval inferred from the buffered GOP. gap is the current keyframe
+// interval, used as a fallback frame-duration source. Returns 0 when there is
+// not yet enough information to judge (so callers must not treat a GOP as
+// truncated without a reliable estimate).
+func (mp4 *MP4) expectedGopFrames(gap uint64) uint64 {
+	cadence := mp4.MinKeyframeGapMs
+	if cadence == 0 {
+		return 0
+	}
+	frameDur := mp4.bufferedVideoFrameDuration()
+	if frameDur == 0 {
+		// Fall back to deriving a per-frame duration from the buffered tail across
+		// the current interval; if that is unavailable too, we cannot estimate.
+		if n := mp4.bufferedVideoCount(); n > 0 && gap > 0 {
+			frameDur = gap / n
+		}
+	}
+	if frameDur == 0 {
+		return 0
+	}
+	return cadence / frameDur
+}
+
+// bufferedVideoFrameDuration returns the average per-frame duration (in PTS
+// units) of the video samples currently buffered, derived from the PTS deltas
+// between consecutive video frames. Returns 0 when fewer than two video frames
+// are buffered.
+func (mp4 *MP4) bufferedVideoFrameDuration() uint64 {
+	var prev uint64
+	havePrev := false
+	var sum, count uint64
+	for _, s := range mp4.gopBuffer {
+		if s.trackID != uint32(mp4.VideoTrack) {
+			continue
+		}
+		if havePrev && s.pts > prev {
+			sum += s.pts - prev
+			count++
+		}
+		prev = s.pts
+		havePrev = true
+	}
+	if count == 0 {
+		return 0
+	}
+	return sum / count
 }
 
 // commitBufferedGOP writes every sample currently held in gopBuffer to the file
