@@ -204,12 +204,12 @@ func (ls *LiveSegmenter) buildInit() error {
 	return nil
 }
 
-// WriteSample feeds one Annex B access unit with its presentation timestamp in
+// WriteSample feeds one Annex B access unit with its decode timestamp (DTS) in
 // milliseconds. The first sample of a session MUST be a keyframe; a non-keyframe
 // first sample is dropped (it could not be decoded without a preceding IDR).
 //
-// compositionOffsetMs is the PTS-DTS offset (B-frame reordering) in timescale
-// ticks; pass 0 for streams without B-frames.
+// compositionOffsetMs is the CTS offset (PTS-DTS, for B-frame reordering) in
+// timescale ticks; pass 0 for streams without B-frames.
 func (ls *LiveSegmenter) WriteSample(isKeyframe bool, annexB []byte, ptsMs uint64, compositionOffsetMs int32) error {
 	// Lazily build + emit the init segment on the first accepted sample.
 	if ls.initBytes == nil {
