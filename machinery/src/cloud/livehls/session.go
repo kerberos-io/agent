@@ -149,6 +149,9 @@ func (s *Session) WritePacket(pkt packets.Packet) error {
 	dts := pts
 	if compositionOffset > 0 && uint64(compositionOffset) <= pts {
 		dts = pts - uint64(compositionOffset)
+	} else if compositionOffset < 0 || uint64(compositionOffset) > pts {
+		// Guard against invalid offsets to avoid producing a CTS (DTS+CTO) jump.
+		compositionOffset = 0
 	}
 	return s.segmenter.WriteSample(pkt.IsKeyFrame, pkt.Data, dts, int32(compositionOffset))
 }
