@@ -40,6 +40,7 @@ type Communication struct {
 	HandleLiveHDKeepalive chan string
 	HandleLiveHDHandshake chan LiveHDHandshake
 	HandleLiveHDPeers     chan string
+	HandleLiveHLS         chan int64
 	HandleONVIF           chan OnvifAction
 	IsConfiguring         *abool.AtomicBool
 	Queue                 *packets.Queue

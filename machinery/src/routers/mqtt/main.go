@@ -344,6 +344,8 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 					go HandleRequestSDStream(mqttClient, hubKey, payload, configuration, communication)
 				case "request-hd-stream":
 					go HandleRequestHDStream(mqttClient, hubKey, payload, configuration, communication)
+				case "request-hls-stream":
+					go HandleRequestHLSStream(mqttClient, hubKey, payload, configuration, communication)
 				case "receive-hd-candidates":
 					go HandleReceiveHDCandidates(mqttClient, hubKey, payload, configuration, communication)
 				case "trigger-relay":
@@ -555,6 +557,30 @@ func HandleRequestSDStream(mqttClient mqtt.Client, hubKey string, payload models
 			log.Log.Info("routers.mqtt.main.HandleRequestSDStream(): received request to livestream.")
 		} else {
 			log.Log.Info("routers.mqtt.main.HandleRequestSDStream(): received request to livestream, but camera is not connected.")
+		}
+	}
+}
+
+// HandleRequestHLSStream is the viewer keepalive for live HLS. Like the SD
+// stream it simply signals that a viewer is watching; the agent owns the live
+// HLS session, so a single non-zero timestamp on the channel keeps the segment
+// pipeline alive (see cloud.HandleLiveStreamHLS). Viewers republish this
+// periodically; when the keepalives stop, the agent tears the session down.
+func HandleRequestHLSStream(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
+	value := payload.Value
+	jsonData, _ := json.Marshal(value)
+	var requestHLSStreamPayload models.RequestHLSStreamPayload
+	json.Unmarshal(jsonData, &requestHLSStreamPayload)
+
+	if requestHLSStreamPayload.Timestamp != 0 {
+		if communication.CameraConnected {
+			select {
+			case communication.HandleLiveHLS <- time.Now().Unix():
+			default:
+			}
+			log.Log.Info("routers.mqtt.main.HandleRequestHLSStream(): received request to livestream over HLS.")
+		} else {
+			log.Log.Info("routers.mqtt.main.HandleRequestHLSStream(): received request to livestream over HLS, but camera is not connected.")
 		}
 	}
 }
