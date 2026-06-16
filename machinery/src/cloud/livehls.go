@@ -38,7 +38,7 @@ const hlsReadyReannounceSeconds = 2
 //
 // A session is created lazily on the first keyframe seen while a viewer is active
 // and torn down once viewers go away, so an idle camera produces no live traffic.
-func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
+func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, _ capture.RTSPClient) {
 
 	log.Log.Debug("cloud.HandleLiveStreamHLS(): started")
 
