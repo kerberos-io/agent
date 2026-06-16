@@ -173,6 +173,13 @@ type RequestSDStreamPayload struct {
 	Timestamp int64 `json:"timestamp"` // timestamp
 }
 
+// We received a request live HLS stream request. Like SD it is a simple viewer
+// keepalive: the agent owns the live HLS session, so the request only needs to
+// signal "a viewer is watching" to keep the segment pipeline alive.
+type RequestHLSStreamPayload struct {
+	Timestamp int64 `json:"timestamp"` // timestamp
+}
+
 // We received a request HD stream request
 type RequestHDStreamPayload struct {
 	Timestamp          int64  `json:"timestamp"`           // timestamp

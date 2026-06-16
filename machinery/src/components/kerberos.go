@@ -72,6 +72,7 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 	communication.HandleLiveSD = make(chan int64, 1)
 	communication.HandleLiveHDKeepalive = make(chan string, 1)
 	communication.HandleLiveHDPeers = make(chan string, 1)
+	communication.HandleLiveHLS = make(chan int64, 1)
 	communication.IsConfiguring = abool.New()
 
 	cameraSettings := &models.Camera{}
@@ -302,6 +303,18 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	} else {
 		livestreamCursor := queue.Latest()
 		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspClient)
+	}
+
+	// Handle livestream HLS (adaptive segments over HTTP via hub-api -> vault).
+	// Uses the sub stream when available (lower bitrate, browser-friendly), else
+	// the main stream. Like SD it is viewer-keepalive gated and produces no
+	// traffic while nobody is watching.
+	if subStreamEnabled {
+		livestreamHLSCursor := subQueue.Latest()
+		go cloud.HandleLiveStreamHLS(livestreamHLSCursor, configuration, communication, mqttClient, rtspSubClient)
+	} else {
+		livestreamHLSCursor := queue.Latest()
+		go cloud.HandleLiveStreamHLS(livestreamHLSCursor, configuration, communication, mqttClient, rtspClient)
 	}
 
 	// Handle livestream HD (high resolution over WEBRTC)
