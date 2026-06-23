@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -21,6 +22,7 @@ import (
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
+	"github.com/kerberos-io/agent/machinery/src/cloud/livesnapshot"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -684,7 +686,28 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 				hubKey = config.HubKey
 			}
 
-			lastLivestreamRequest := int64(0)
+			lastLivestreamRequestMQTT := int64(0)
+			lastLivestreamRequestHTTP := int64(0)
+
+			// HTTP transport (preferred when this agent is paired with a Kerberos
+			// Hub): ship preview frames to hub-api over HTTPS instead of pushing
+			// (large, base64) images through the MQTT broker. Viewers opt in per
+			// session via the "http" transport on their keepalive; the legacy MQTT
+			// push is kept for viewers (older frontends) that don't, and as a fallback.
+			region := ""
+			if config.S3 != nil {
+				region = config.S3.Region
+			}
+			var snapshotPublisher *livesnapshot.Publisher
+			if config.HubURI != "" && config.HubKey != "" {
+				snapshotPublisher = livesnapshot.NewPublisher(livesnapshot.PublisherConfig{
+					HubURI:        config.HubURI,
+					HubKey:        config.HubKey,
+					HubPrivateKey: config.HubPrivateKey,
+					Region:        region,
+					DeviceKey:     deviceId,
+				})
+			}
 
 			var cursorError error
 			var pkt packets.Packet
@@ -695,20 +718,49 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 					continue
 				}
 				now := time.Now().Unix()
+				// Drain both viewer keepalive channels (non-blocking): one for the
+				// HTTP transport, one for the legacy MQTT push.
 				select {
 				case <-communication.HandleLiveSD:
-					lastLivestreamRequest = now
+					lastLivestreamRequestMQTT = now
 				default:
 				}
-				if now-lastLivestreamRequest > 3 {
+				select {
+				case <-communication.HandleLiveSDHTTP:
+					lastLivestreamRequestHTTP = now
+				default:
+				}
+
+				mqttViewerActive := now-lastLivestreamRequestMQTT <= 3
+				httpViewerActive := now-lastLivestreamRequestHTTP <= 3
+				if !mqttViewerActive && !httpViewerActive {
 					continue
 				}
-				log.Log.Info("cloud.HandleLiveStreamSD(): Sending base64 encoded images to MQTT.")
-				img, err := rtspClient.DecodePacket(pkt)
-				if err == nil {
-					imageResized, _ := utils.ResizeImage(&img, uint(config.Capture.IPCamera.BaseWidth), uint(config.Capture.IPCamera.BaseHeight))
-					bytes, _ := utils.ImageToBytes(imageResized)
 
+				img, err := rtspClient.DecodePacket(pkt)
+				if err != nil {
+					continue
+				}
+				imageResized, _ := utils.ResizeImage(&img, uint(config.Capture.IPCamera.BaseWidth), uint(config.Capture.IPCamera.BaseHeight))
+				bytes, _ := utils.ImageToBytes(imageResized)
+
+				// Prefer HTTP for viewers that asked for it. Only if that did not
+				// deliver (Hub not configured, or the upload failed) do we also push
+				// over MQTT, so a new frontend can still fall back to its MQTT path.
+				httpPushed := false
+				if httpViewerActive && snapshotPublisher != nil {
+					ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+					if errPublish := snapshotPublisher.PublishSnapshot(ctx, bytes); errPublish != nil {
+						log.Log.Error("cloud.HandleLiveStreamSD(): failed to publish preview frame over HTTP: " + errPublish.Error())
+					} else {
+						httpPushed = true
+					}
+					cancel()
+				}
+
+				pushMQTT := mqttViewerActive || (httpViewerActive && !httpPushed)
+				if pushMQTT {
+					log.Log.Info("cloud.HandleLiveStreamSD(): Sending base64 encoded images to MQTT.")
 					chunking := config.Capture.LiveviewChunking
 
 					if chunking == "true" {

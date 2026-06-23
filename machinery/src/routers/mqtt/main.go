@@ -550,9 +550,20 @@ func HandleRequestSDStream(mqttClient mqtt.Client, hubKey string, payload models
 
 	if requestSDStreamPayload.Timestamp != 0 {
 		if communication.CameraConnected {
-			select {
-			case communication.HandleLiveSD <- time.Now().Unix():
-			default:
+			// A viewer that opted into the HTTP transport is signalled on a separate
+			// channel so the producer ships its frames to hub-api over HTTP instead of
+			// publishing them over MQTT. Any other (or absent) transport keeps the
+			// legacy MQTT image push, so older frontends behave exactly as before.
+			if requestSDStreamPayload.Transport == "http" {
+				select {
+				case communication.HandleLiveSDHTTP <- time.Now().Unix():
+				default:
+				}
+			} else {
+				select {
+				case communication.HandleLiveSD <- time.Now().Unix():
+				default:
+				}
 			}
 			log.Log.Info("routers.mqtt.main.HandleRequestSDStream(): received request to livestream.")
 		} else {

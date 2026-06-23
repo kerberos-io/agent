@@ -37,6 +37,7 @@ type Communication struct {
 	HandleUpload          chan string
 	HandleHeartBeat       chan string
 	HandleLiveSD          chan int64
+	HandleLiveSDHTTP      chan int64
 	HandleLiveHDKeepalive chan string
 	HandleLiveHDHandshake chan LiveHDHandshake
 	HandleLiveHDPeers     chan string
