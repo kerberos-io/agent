@@ -231,9 +231,9 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_MQTT_PASSWORD`                       | Password of the MQTT broker.                                                                    | ""                             |
 | `AGENT_REALTIME_PROCESSING`                 | If `AGENT_REALTIME_PROCESSING` set to `true`, the agent will send key frames to the topic       | ""                             |
 | `AGENT_REALTIME_PROCESSING_TOPIC`           | The topic to which keyframes will be sent in base64 encoded format.                             | ""                             |
-| `AGENT_STUN_URI`                            | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn.kerberos.io:8443"   |
+| `AGENT_STUN_URI`                            | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn-fra1.kerberos.io:3478"|
 | `AGENT_FORCE_TURN`                          | Force using a TURN server, by generating relay candidates only.                                 | "false"                        |
-| `AGENT_TURN_URI`                            | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn.kerberos.io:8443"   |
+| `AGENT_TURN_URI`                            | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn-fra1.kerberos.io:348"|
 | `AGENT_TURN_USERNAME`                       | TURN username used for WebRTC.                                                                  | "username1"                    |
 | `AGENT_TURN_PASSWORD`                       | TURN password used for WebRTC.                                                                  | "password1"                    |
 | `AGENT_CLOUD`                               | Store recordings in Kerberos Hub (s3), Kerberos Vault (kstorage), or Dropbox (dropbox).         | "s3"                           |
