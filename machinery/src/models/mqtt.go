@@ -171,6 +171,12 @@ type UpdateConfigPayload struct {
 // We received a request SD stream request
 type RequestSDStreamPayload struct {
 	Timestamp int64 `json:"timestamp"` // timestamp
+	// Transport selects how the agent should deliver the preview frames for this
+	// viewer. "http" asks the agent to POST frames to hub-api (keeping them off
+	// MQTT); empty/absent means the legacy MQTT image push. Older agents simply
+	// ignore this unknown field and keep doing MQTT, and older frontends never set
+	// it — so new/old agents and frontends interoperate in every combination.
+	Transport string `json:"transport,omitempty"`
 }
 
 // We received a live HLS stream request. Like SD it is a simple viewer

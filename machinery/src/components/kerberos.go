@@ -70,6 +70,7 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 	communication.HandleUpload = make(chan string, 1)
 	communication.HandleHeartBeat = make(chan string, 1)
 	communication.HandleLiveSD = make(chan int64, 1)
+	communication.HandleLiveSDHTTP = make(chan int64, 1)
 	communication.HandleLiveHDKeepalive = make(chan string, 1)
 	communication.HandleLiveHDPeers = make(chan string, 1)
 	communication.HandleLiveHLS = make(chan int64, 1)

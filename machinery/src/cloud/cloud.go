@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -21,6 +22,7 @@ import (
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
+	"github.com/kerberos-io/agent/machinery/src/cloud/livesnapshot"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -528,6 +530,7 @@ loop:
 						"onvif_events_list": %s,
 						"cameraConnected": "%s",
 						"hasBackChannel": "%s",
+						"livePreviewHttp": true,
 						"numberoffiles" : "33",
 						"timestamp" : 1564747908,
 						"cameratype" : "IPCamera",
@@ -684,7 +687,35 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 				hubKey = config.HubKey
 			}
 
-			lastLivestreamRequest := int64(0)
+			lastLivestreamRequestMQTT := int64(0)
+			lastLivestreamRequestHTTP := int64(0)
+
+			// HTTP transport (preferred when this agent is paired with a Kerberos
+			// Hub): ship preview frames to hub-api over HTTPS instead of pushing
+			// (large, base64) images through the MQTT broker. Viewers opt in per
+			// session via the "http" transport on their keepalive; the legacy MQTT
+			// push is kept for viewers (older frontends) that don't, and as a fallback.
+			region := ""
+			if config.S3 != nil {
+				region = config.S3.Region
+			}
+			var snapshotPublisher *livesnapshot.Publisher
+			if config.HubURI != "" && config.HubKey != "" {
+				snapshotPublisher = livesnapshot.NewPublisher(livesnapshot.PublisherConfig{
+					HubURI:        config.HubURI,
+					HubKey:        config.HubKey,
+					HubPrivateKey: config.HubPrivateKey,
+					Region:        region,
+					DeviceKey:     deviceId,
+				})
+				log.Log.Info("cloud.HandleLiveStreamSD(): HTTP preview transport ENABLED; frames go to " + strings.TrimRight(config.HubURI, "/") + "/storage/snapshot when a viewer requests it (kept off MQTT).")
+			} else {
+				log.Log.Info("cloud.HandleLiveStreamSD(): HTTP preview transport DISABLED (Hub not configured: HubURI/HubKey empty); preview frames are pushed over MQTT.")
+			}
+
+			// Track the transport actually used so we log only when it changes; the
+			// loop runs once per keyframe and logging every frame would be noise.
+			lastTransport := ""
 
 			var cursorError error
 			var pkt packets.Packet
@@ -695,20 +726,74 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 					continue
 				}
 				now := time.Now().Unix()
+				// Drain both viewer keepalive channels (non-blocking): one for the
+				// HTTP transport, one for the legacy MQTT push.
 				select {
 				case <-communication.HandleLiveSD:
-					lastLivestreamRequest = now
+					lastLivestreamRequestMQTT = now
 				default:
 				}
-				if now-lastLivestreamRequest > 3 {
+				select {
+				case <-communication.HandleLiveSDHTTP:
+					lastLivestreamRequestHTTP = now
+				default:
+				}
+
+				mqttViewerActive := now-lastLivestreamRequestMQTT <= 3
+				httpViewerActive := now-lastLivestreamRequestHTTP <= 3
+				if !mqttViewerActive && !httpViewerActive {
 					continue
 				}
-				log.Log.Info("cloud.HandleLiveStreamSD(): Sending base64 encoded images to MQTT.")
-				img, err := rtspClient.DecodePacket(pkt)
-				if err == nil {
-					imageResized, _ := utils.ResizeImage(&img, uint(config.Capture.IPCamera.BaseWidth), uint(config.Capture.IPCamera.BaseHeight))
-					bytes, _ := utils.ImageToBytes(imageResized)
 
+				img, err := rtspClient.DecodePacket(pkt)
+				if err != nil {
+					continue
+				}
+				imageResized, _ := utils.ResizeImage(&img, uint(config.Capture.IPCamera.BaseWidth), uint(config.Capture.IPCamera.BaseHeight))
+				bytes, _ := utils.ImageToBytes(imageResized)
+
+				// Prefer HTTP for viewers that asked for it. Only if that did not
+				// deliver (Hub not configured, or the upload failed) do we also push
+				// over MQTT, so a new frontend can still fall back to its MQTT path.
+				httpPushed := false
+				var httpErr error
+				if httpViewerActive && snapshotPublisher != nil {
+					ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+					httpErr = snapshotPublisher.PublishSnapshot(ctx, bytes)
+					if httpErr == nil {
+						httpPushed = true
+					}
+					cancel()
+				}
+
+				pushMQTT := mqttViewerActive || (httpViewerActive && !httpPushed)
+
+				// Log only when the effective transport changes, so an operator can
+				// tell at a glance whether a device's preview travels over HTTP or
+				// MQTT (and why it fell back) without per-frame log spam.
+				transport := ""
+				if httpPushed {
+					transport = "http"
+				} else if pushMQTT {
+					transport = "mqtt"
+				}
+				if transport != "" && transport != lastTransport {
+					if transport == "http" {
+						log.Log.Info("cloud.HandleLiveStreamSD(): delivering preview frames over HTTP for device " + deviceId + ".")
+					} else {
+						reason := "viewer requested MQTT (older frontend)"
+						if httpViewerActive && snapshotPublisher == nil {
+							reason = "viewer asked for HTTP but Hub is not configured"
+						} else if httpViewerActive && httpErr != nil {
+							reason = "HTTP upload failed, falling back: " + httpErr.Error()
+						}
+						log.Log.Info("cloud.HandleLiveStreamSD(): delivering preview frames over MQTT for device " + deviceId + " (" + reason + ").")
+					}
+					lastTransport = transport
+				}
+
+				if pushMQTT {
+					log.Log.Debug("cloud.HandleLiveStreamSD(): Sending base64 encoded images to MQTT.")
 					chunking := config.Capture.LiveviewChunking
 
 					if chunking == "true" {
