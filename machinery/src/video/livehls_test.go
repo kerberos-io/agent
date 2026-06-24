@@ -369,3 +369,186 @@ func TestLiveSegmenterWritesHLSBundle(t *testing.T) {
 	t.Logf("wrote HLS bundle to %s (%d segments)\n%s", outDir, len(segments), playlist)
 }
 
+// boxTypeAt returns the 4CC box type at the front of a top-level box blob (the
+// 4 bytes following the 32-bit size), or "" if the blob is too short.
+func boxTypeAt(b []byte) string {
+	if len(b) < 8 {
+		return ""
+	}
+	return string(b[4:8])
+}
+
+// TestLiveSegmenterLowLatencyParts runs the segmenter in LL-HLS mode over the
+// same synthetic stream and asserts that:
+//   - each ~2s segment is sliced into multiple CMAF parts (more parts than
+//     segments overall);
+//   - part 0 of every segment carries the CMAF styp and is INDEPENDENT (begins
+//     with the segment keyframe); later parts are bare moof+mdat (no styp);
+//   - moof sequence numbers are globally monotonic across all parts (MSE needs
+//     increasing moof sequence numbers);
+//   - concatenating a segment's parts in order yields exactly the same bytes the
+//     classic per-segment path would emit, decoding into one independent CMAF
+//     segment whose first sample is a sync sample with the expected tfdt;
+//   - every sample and keyframe of the input is preserved end to end.
+func TestLiveSegmenterLowLatencyParts(t *testing.T) {
+	const (
+		frameDurMs = uint64(40) // 25 fps
+		gopFrames  = 25         // keyframe every 1000 ms
+		numGOPs    = 6
+		numFrames  = gopFrames * numGOPs // 150 frames, 6000 ms
+		targetMs   = uint64(2000)        // 2s segments => 2 GOPs each
+		partMs     = uint64(300)         // ~300 ms parts => ~6-7 parts/segment
+	)
+
+	seg := NewLiveSegmenter("H264", [][]byte{liveTestSPS}, [][]byte{liveTestPPS}, nil, targetMs)
+	seg.SetDimensions(640, 480)
+	seg.EnableLowLatency(partMs)
+
+	var initBytes []byte
+	var initCalls int
+	var parts []LivePart
+	seg.OnInit = func(b []byte) error {
+		initCalls++
+		initBytes = append([]byte(nil), b...)
+		return nil
+	}
+	seg.OnPart = func(p LivePart) error {
+		parts = append(parts, p)
+		return nil
+	}
+
+	for i := 0; i < numFrames; i++ {
+		isKey := i%gopFrames == 0
+		if err := seg.WriteSample(isKey, makeAnnexBFrame(isKey), uint64(i)*frameDurMs, 0); err != nil {
+			t.Fatalf("WriteSample(frame=%d): %v", i, err)
+		}
+	}
+	if err := seg.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if initCalls != 1 {
+		t.Fatalf("OnInit called %d times, want 1", initCalls)
+	}
+	if len(parts) == 0 {
+		t.Fatal("no parts produced in low-latency mode")
+	}
+
+	// --- Parts are globally moof-monotonic, and group into 3 segments whose part
+	// indices are contiguous from 0. ---
+	bySeg := map[uint32][]LivePart{}
+	var order []uint32
+	var lastMoof uint32
+	for i, p := range parts {
+		if _, seen := bySeg[p.SegmentSeq]; !seen {
+			order = append(order, p.SegmentSeq)
+		}
+		bySeg[p.SegmentSeq] = append(bySeg[p.SegmentSeq], p)
+
+		// Decode the part to read its moof sequence number and confirm the styp
+		// convention (part 0 => styp present, later parts => bare moof+mdat).
+		front := boxTypeAt(p.Data)
+		if p.PartIndex == 0 {
+			if front != "styp" {
+				t.Errorf("seg %d part 0: leading box=%q, want styp", p.SegmentSeq, front)
+			}
+			if !p.Independent {
+				t.Errorf("seg %d part 0: Independent=false, want true (starts on keyframe)", p.SegmentSeq)
+			}
+		} else if front != "moof" {
+			t.Errorf("seg %d part %d: leading box=%q, want moof (no styp on later parts)", p.SegmentSeq, p.PartIndex, front)
+		}
+
+		parsed, err := mp4ff.DecodeFile(bytes.NewReader(p.Data))
+		if err != nil {
+			t.Fatalf("seg %d part %d: decode: %v", p.SegmentSeq, p.PartIndex, err)
+		}
+		if len(parsed.Segments) != 1 || len(parsed.Segments[0].Fragments) != 1 {
+			t.Fatalf("seg %d part %d: want exactly one fragment", p.SegmentSeq, p.PartIndex)
+		}
+		moof := parsed.Segments[0].Fragments[0].Moof.Mfhd.SequenceNumber
+		if i > 0 && moof <= lastMoof {
+			t.Errorf("part %d: moof sequence=%d not greater than previous %d", i, moof, lastMoof)
+		}
+		lastMoof = moof
+	}
+
+	if len(order) != 3 {
+		t.Fatalf("got %d segments, want 3", len(order))
+	}
+	if len(parts) <= len(order) {
+		t.Fatalf("got %d parts for %d segments, expected each segment to be sliced into multiple parts", len(parts), len(order))
+	}
+	for _, segSeq := range order {
+		for idx, p := range bySeg[segSeq] {
+			if p.PartIndex != uint32(idx) {
+				t.Errorf("seg %d: part index %d out of order (want %d)", segSeq, p.PartIndex, idx)
+			}
+		}
+	}
+
+	// --- Concatenating a segment's parts must reconstruct one independent CMAF
+	// segment that decodes against the init segment. ---
+	wantTFDT := map[uint32]uint64{1: 0, 2: 2000, 3: 4000}
+	var totalSamples, totalSync int
+	for _, segSeq := range order {
+		segParts := bySeg[segSeq]
+		var full []byte
+		var wantPartDur uint64
+		for _, p := range segParts {
+			full = append(full, p.Data...)
+			wantPartDur += p.DurationMs
+		}
+		standalone := append(append([]byte(nil), initBytes...), full...)
+		parsed, err := mp4ff.DecodeFile(bytes.NewReader(standalone))
+		if err != nil {
+			t.Fatalf("seg %d: decode concatenated parts: %v", segSeq, err)
+		}
+		if len(parsed.Segments) != 1 {
+			t.Fatalf("seg %d: parsed %d media segments, want 1", segSeq, len(parsed.Segments))
+		}
+		mseg := parsed.Segments[0]
+		if mseg.Styp == nil {
+			t.Errorf("seg %d: reconstructed segment missing CMAF styp", segSeq)
+		}
+		if len(mseg.Fragments) != len(segParts) {
+			t.Errorf("seg %d: %d fragments, want %d (one per part)", segSeq, len(mseg.Fragments), len(segParts))
+		}
+		firstTraf := mseg.Fragments[0].Moof.Traf
+		if got := firstTraf.Tfdt.BaseMediaDecodeTime(); got != wantTFDT[segSeq] {
+			t.Errorf("seg %d: first fragment tfdt=%d, want %d", segSeq, got, wantTFDT[segSeq])
+		}
+		var segDur uint64
+		var firstSample mp4ff.Sample
+		var haveFirst bool
+		for _, fr := range mseg.Fragments {
+			for _, trun := range fr.Moof.Traf.Truns {
+				for _, smp := range trun.Samples {
+					if !haveFirst {
+						firstSample = smp
+						haveFirst = true
+					}
+					totalSamples++
+					if isSyncSample(smp) {
+						totalSync++
+					}
+					segDur += uint64(smp.Dur)
+				}
+			}
+		}
+		if !isSyncSample(firstSample) {
+			t.Errorf("seg %d: first sample is not a sync sample", segSeq)
+		}
+		if segDur != wantPartDur {
+			t.Errorf("seg %d: summed sample dur=%d, summed part dur=%d", segSeq, segDur, wantPartDur)
+		}
+	}
+
+	if totalSamples != numFrames {
+		t.Errorf("total samples across parts=%d, want %d", totalSamples, numFrames)
+	}
+	if totalSync != numGOPs {
+		t.Errorf("total sync samples=%d, want %d (one per GOP)", totalSync, numGOPs)
+	}
+}
+

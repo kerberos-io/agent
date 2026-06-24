@@ -97,6 +97,18 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 		log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS prewarm DISABLED (AGENT_LIVE_HLS_PREWARM=false)")
 	}
 
+	// lowLatency enables LL-HLS: each segment is sliced into CMAF parts shipped the
+	// instant they close and advertised via #EXT-X-PART, taking glass-to-glass HLS
+	// latency from ~4-6s down to ~1-2s. Enabled by default; set
+	// AGENT_LIVE_HLS_LOW_LATENCY=false to fall back to whole-segment HLS.
+	partTargetMs := uint64(0)
+	if os.Getenv("AGENT_LIVE_HLS_LOW_LATENCY") != "false" {
+		partTargetMs = livehls.DefaultPartTargetMs
+		log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS low-latency (LL-HLS) ENABLED (set AGENT_LIVE_HLS_LOW_LATENCY=false to disable)")
+	} else {
+		log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS low-latency (LL-HLS) DISABLED (AGENT_LIVE_HLS_LOW_LATENCY=false)")
+	}
+
 	var session *livehls.Session
 	lastViewerRequest := int64(0)
 	lastReadyAnnounce := int64(0)
@@ -144,6 +156,7 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 					VPSNALUs:       config.Capture.IPCamera.VPSNALUs,
 					Width:          width,
 					Height:         height,
+					PartTargetMs:   partTargetMs,
 					StartBuffering: true,
 				})
 				session.SetOnReady(func(sessionID string) {
@@ -197,12 +210,13 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 				continue
 			}
 			session = livehls.NewSession(publisher, livehls.SessionOptions{
-				Codec:    pkt.Codec,
-				SPSNALUs: config.Capture.IPCamera.SPSNALUs,
-				PPSNALUs: config.Capture.IPCamera.PPSNALUs,
-				VPSNALUs: config.Capture.IPCamera.VPSNALUs,
-				Width:    width,
-				Height:   height,
+				Codec:        pkt.Codec,
+				SPSNALUs:     config.Capture.IPCamera.SPSNALUs,
+				PPSNALUs:     config.Capture.IPCamera.PPSNALUs,
+				VPSNALUs:     config.Capture.IPCamera.VPSNALUs,
+				Width:        width,
+				Height:       height,
+				PartTargetMs: partTargetMs,
 			})
 			session.SetOnReady(func(sessionID string) {
 				log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS session ready, announcing " + sessionID)

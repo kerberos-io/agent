@@ -57,6 +57,11 @@ const (
 	headerLiveName      = "X-Kerberos-Live-Name"
 	headerLiveSequence  = "X-Kerberos-Live-Sequence"
 	headerLiveDuration  = "X-Kerberos-Live-Duration"
+	// Low-latency (LL-HLS) part headers. A part belongs to media segment
+	// X-Kerberos-Live-Sequence and is the X-Kerberos-Live-Part-th chunk within it;
+	// X-Kerberos-Live-Part-Independent flags a part that starts on a keyframe.
+	headerLivePart            = "X-Kerberos-Live-Part"
+	headerLivePartIndependent = "X-Kerberos-Live-Part-Independent"
 
 	// defaultPublishTimeout bounds a single segment upload. A live segment that
 	// cannot be delivered within roughly its own duration is stale, so the upload
@@ -136,12 +141,33 @@ func (p *Publisher) PublishSegment(ctx context.Context, sessionID string, seg vi
 	})
 }
 
+// PublishPart uploads one CMAF partial segment (LL-HLS). The part is named
+// seg-<segment>.<part>.m4s and carries its segment sequence, part index,
+// independence flag and duration in headers so hub-api can advertise it via
+// #EXT-X-PART and reconstruct the full segment by concatenating its parts.
+func (p *Publisher) PublishPart(ctx context.Context, sessionID string, part video.LivePart) error {
+	return p.post(ctx, postParams{
+		sessionID:   sessionID,
+		name:        fmt.Sprintf("seg-%d.%d.m4s", part.SegmentSeq, part.PartIndex),
+		sequence:    part.SegmentSeq,
+		durationMs:  part.DurationMs,
+		partIndex:   part.PartIndex,
+		independent: part.Independent,
+		hasPart:     true,
+		contentType: contentTypeSegment,
+		body:        part.Data,
+	})
+}
+
 type postParams struct {
 	sessionID   string
 	name        string
 	sequence    uint32
 	durationMs  uint64
 	hasSegment  bool
+	partIndex   uint32
+	independent bool
+	hasPart     bool
 	contentType string
 	body        []byte
 }
@@ -165,9 +191,17 @@ func (p *Publisher) post(ctx context.Context, params postParams) error {
 	req.Header.Set(headerStorageDevice, p.cfg.DeviceKey)
 	req.Header.Set(headerLiveSession, params.sessionID)
 	req.Header.Set(headerLiveName, params.name)
-	if params.hasSegment {
+	if params.hasSegment || params.hasPart {
 		req.Header.Set(headerLiveSequence, strconv.FormatUint(uint64(params.sequence), 10))
 		req.Header.Set(headerLiveDuration, strconv.FormatUint(params.durationMs, 10))
+	}
+	if params.hasPart {
+		req.Header.Set(headerLivePart, strconv.FormatUint(uint64(params.partIndex), 10))
+		independent := "0"
+		if params.independent {
+			independent = "1"
+		}
+		req.Header.Set(headerLivePartIndependent, independent)
 	}
 	req.Header.Set(headerHubPublicKey, p.cfg.HubKey)
 	req.Header.Set(headerHubPrivateKey, p.cfg.HubPrivateKey)
