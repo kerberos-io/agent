@@ -427,10 +427,47 @@ func ResizeImage(img image.Image, newWidth uint, newHeight uint) (*image.Image, 
 		return nil, errors.New("image is nil")
 	}
 
+	// Callers cast int->uint, so a negative or poisoned int (e.g. MinInt from
+	// `int(float * +Inf)` when the source width is 0) wraps to a near-MaxUint
+	// value here and crashes nfnt/resize's allocator with "makeslice: len out
+	// of range". Clamp anything past a sane camera ceiling to 0 ("auto" in
+	// nfnt — preserves aspect from the source).
+	const maxDim uint = 8192
+	if newWidth > maxDim {
+		newWidth = 0
+	}
+	if newHeight > maxDim {
+		newHeight = 0
+	}
+
 	// resize to width 640 using Lanczos resampling
 	// and preserve aspect ratio
 	m := resize.Resize(newWidth, newHeight, img, resize.Lanczos3)
 	return &m, nil
+}
+
+// ResolveBaseDimensions resolves the liveview/motion base dimensions for a
+// stream given the (optionally configured) base width/height and the camera's
+// probed source width/height. It returns the width and height that should be
+// stored on the configuration.
+//
+// The aspect-ratio branch is gated on width>0 && height>0: a not-yet-probed
+// stream has width=height=0, which previously made the ratio +Inf and
+// int(float * +Inf) yield MinInt. That poisoned value, later cast to uint at
+// the ResizeImage call sites, wrapped to ~MaxUint and crashed resize with
+// "makeslice: len out of range". When the source isn't probed yet we fall back
+// to the source dimensions (0,0 -> "auto") instead.
+func ResolveBaseDimensions(baseWidth, baseHeight, width, height int) (int, int) {
+	if baseWidth > 0 && baseHeight == 0 && width > 0 && height > 0 {
+		// Derive the height from the configured width and the source aspect ratio.
+		widthAspectRatio := float64(baseWidth) / float64(width)
+		return baseWidth, int(float64(height) * widthAspectRatio)
+	} else if baseHeight > 0 && baseWidth > 0 {
+		// Both base dimensions are configured; honor them as-is.
+		return baseWidth, baseHeight
+	}
+	// Nothing usable configured (or source not probed yet): use source dimensions.
+	return width, height
 }
 
 func ResizeHeightWithAspectRatio(newWidth int, width int, height int) (int, int) {

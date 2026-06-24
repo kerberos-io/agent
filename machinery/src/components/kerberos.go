@@ -178,19 +178,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	configuration.Config.Capture.IPCamera.Height = height
 
 	// Set the liveview width and height, this is used for the liveview and motion regions (drawing on the hub).
-	baseWidth := config.Capture.IPCamera.BaseWidth
-	baseHeight := config.Capture.IPCamera.BaseHeight
-	// If the liveview height is not set, we will calculate it based on the width and aspect ratio of the camera.
-	if baseWidth > 0 && baseHeight == 0 {
-		widthAspectRatio := float64(baseWidth) / float64(width)
-		configuration.Config.Capture.IPCamera.BaseHeight = int(float64(height) * widthAspectRatio)
-	} else if baseHeight > 0 && baseWidth > 0 {
-		configuration.Config.Capture.IPCamera.BaseHeight = baseHeight
-		configuration.Config.Capture.IPCamera.BaseWidth = baseWidth
-	} else {
-		configuration.Config.Capture.IPCamera.BaseHeight = height
-		configuration.Config.Capture.IPCamera.BaseWidth = width
-	}
+	// ResolveBaseDimensions gates the aspect-ratio compute on width/height > 0
+	// so a not-yet-probed stream can't poison the dimensions and crash resize.
+	configuration.Config.Capture.IPCamera.BaseWidth, configuration.Config.Capture.IPCamera.BaseHeight =
+		utils.ResolveBaseDimensions(config.Capture.IPCamera.BaseWidth, config.Capture.IPCamera.BaseHeight, width, height)
 
 	// Set the SPS and PPS values in the configuration.
 	configuration.Config.Capture.IPCamera.SPSNALUs = [][]byte{videoStream.SPS}
@@ -248,19 +239,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 		// If we have a substream, we need to set the width and height of the substream. (so we will override above information)
 		// Set the liveview width and height, this is used for the liveview and motion regions (drawing on the hub).
-		baseWidth := config.Capture.IPCamera.BaseWidth
-		baseHeight := config.Capture.IPCamera.BaseHeight
-		// If the liveview height is not set, we will calculate it based on the width and aspect ratio of the camera.
-		if baseWidth > 0 && baseHeight == 0 {
-			widthAspectRatio := float64(baseWidth) / float64(width)
-			configuration.Config.Capture.IPCamera.BaseHeight = int(float64(height) * widthAspectRatio)
-		} else if baseHeight > 0 && baseWidth > 0 {
-			configuration.Config.Capture.IPCamera.BaseHeight = baseHeight
-			configuration.Config.Capture.IPCamera.BaseWidth = baseWidth
-		} else {
-			configuration.Config.Capture.IPCamera.BaseHeight = height
-			configuration.Config.Capture.IPCamera.BaseWidth = width
-		}
+		configuration.Config.Capture.IPCamera.BaseWidth, configuration.Config.Capture.IPCamera.BaseHeight =
+			utils.ResolveBaseDimensions(config.Capture.IPCamera.BaseWidth, config.Capture.IPCamera.BaseHeight, width, height)
 	}
 
 	// We are creating a queue to store the RTSP frames in, these frames will be
