@@ -530,6 +530,7 @@ loop:
 						"onvif_events_list": %s,
 						"cameraConnected": "%s",
 						"hasBackChannel": "%s",
+						"livePreviewHttp": true,
 						"numberoffiles" : "33",
 						"timestamp" : 1564747908,
 						"cameratype" : "IPCamera",
@@ -707,7 +708,14 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 					Region:        region,
 					DeviceKey:     deviceId,
 				})
+				log.Log.Info("cloud.HandleLiveStreamSD(): HTTP preview transport ENABLED; frames go to " + strings.TrimRight(config.HubURI, "/") + "/storage/snapshot when a viewer requests it (kept off MQTT).")
+			} else {
+				log.Log.Info("cloud.HandleLiveStreamSD(): HTTP preview transport DISABLED (Hub not configured: HubURI/HubKey empty); preview frames are pushed over MQTT.")
 			}
+
+			// Track the transport actually used so we log only when it changes; the
+			// loop runs once per keyframe and logging every frame would be noise.
+			lastTransport := ""
 
 			var cursorError error
 			var pkt packets.Packet
@@ -748,19 +756,44 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 				// deliver (Hub not configured, or the upload failed) do we also push
 				// over MQTT, so a new frontend can still fall back to its MQTT path.
 				httpPushed := false
+				var httpErr error
 				if httpViewerActive && snapshotPublisher != nil {
 					ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
-					if errPublish := snapshotPublisher.PublishSnapshot(ctx, bytes); errPublish != nil {
-						log.Log.Error("cloud.HandleLiveStreamSD(): failed to publish preview frame over HTTP: " + errPublish.Error())
-					} else {
+					httpErr = snapshotPublisher.PublishSnapshot(ctx, bytes)
+					if httpErr == nil {
 						httpPushed = true
 					}
 					cancel()
 				}
 
 				pushMQTT := mqttViewerActive || (httpViewerActive && !httpPushed)
+
+				// Log only when the effective transport changes, so an operator can
+				// tell at a glance whether a device's preview travels over HTTP or
+				// MQTT (and why it fell back) without per-frame log spam.
+				transport := ""
+				if httpPushed {
+					transport = "http"
+				} else if pushMQTT {
+					transport = "mqtt"
+				}
+				if transport != "" && transport != lastTransport {
+					if transport == "http" {
+						log.Log.Info("cloud.HandleLiveStreamSD(): delivering preview frames over HTTP for device " + deviceId + ".")
+					} else {
+						reason := "viewer requested MQTT (older frontend)"
+						if httpViewerActive && snapshotPublisher == nil {
+							reason = "viewer asked for HTTP but Hub is not configured"
+						} else if httpViewerActive && httpErr != nil {
+							reason = "HTTP upload failed, falling back: " + httpErr.Error()
+						}
+						log.Log.Info("cloud.HandleLiveStreamSD(): delivering preview frames over MQTT for device " + deviceId + " (" + reason + ").")
+					}
+					lastTransport = transport
+				}
+
 				if pushMQTT {
-					log.Log.Info("cloud.HandleLiveStreamSD(): Sending base64 encoded images to MQTT.")
+					log.Log.Debug("cloud.HandleLiveStreamSD(): Sending base64 encoded images to MQTT.")
 					chunking := config.Capture.LiveviewChunking
 
 					if chunking == "true" {
