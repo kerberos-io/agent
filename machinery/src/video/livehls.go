@@ -81,8 +81,30 @@ type LiveSegmenter struct {
 	// OnInit is invoked exactly once with the encoded init segment bytes before
 	// the first media segment is emitted. Optional.
 	OnInit func(initBytes []byte) error
-	// OnSegment is invoked once per completed media segment. Optional.
+	// OnSegment is invoked once per completed media segment. Optional. It is left
+	// unused in low-latency mode (see OnPart).
 	OnSegment func(seg LiveSegment) error
+
+	// --- Low-latency (LL-HLS) partial-segment mode ---
+	//
+	// When partTargetMs > 0 the segmenter additionally slices each segment into
+	// ~partTargetMs CMAF "parts" (chunks) and emits them via OnPart the instant
+	// each one closes, instead of waiting for the whole segment. The classic
+	// per-segment OnSegment path above is left untouched (and unused) in this mode.
+	// Each part is one mp4ff fragment (moof+mdat); part 0 of a segment also carries
+	// the CMAF styp, so concatenating a segment's parts yields one valid segment.
+	partTargetMs uint64
+	// partFrag is the open part's fragment; partIndex is its 0-based index within
+	// the current segment; fragSeq is the globally monotonic moof sequence number
+	// shared across all parts (MSE wants increasing moof sequence numbers).
+	partFrag        *mp4ff.Fragment
+	partIndex       uint32
+	fragSeq         uint32
+	partSampleCount int
+	partDurationMs  uint64
+	partIndependent bool
+	// OnPart is invoked once per completed CMAF part when partTargetMs > 0.
+	OnPart func(part LivePart) error
 }
 
 // LiveSegment is one independently-decodable CMAF media segment.
@@ -94,6 +116,24 @@ type LiveSegment struct {
 	DurationMs uint64
 	// Data is the complete styp+moof+mdat segment, ready to append after the init
 	// segment and hand to hls.js / a vault object.
+	Data []byte
+}
+
+// LivePart is one CMAF partial segment (chunk) of a media segment, emitted in
+// low-latency mode the instant it closes - before the whole segment is done - so
+// the playlist can advertise it via #EXT-X-PART for near-live playback.
+type LivePart struct {
+	// SegmentSeq is the parent media segment's sequence number (the N in
+	// seg-N.K.m4s); PartIndex is K within that segment (0-based).
+	SegmentSeq uint32
+	PartIndex  uint32
+	// Independent is true when the part begins with a keyframe (its first sample is
+	// an IDR), i.e. it is independently decodable (#EXT-X-PART INDEPENDENT=YES).
+	Independent bool
+	// DurationMs is the summed sample duration of the part (for #EXT-X-PART).
+	DurationMs uint64
+	// Data of part 0 is styp+moof+mdat; later parts are bare moof+mdat, so
+	// concatenating a segment's parts in order yields one valid CMAF segment.
 	Data []byte
 }
 
@@ -135,6 +175,16 @@ func NewLiveSegmenter(codec string, spsNALUs, ppsNALUs, vpsNALUs [][]byte, targe
 func (ls *LiveSegmenter) SetDimensions(width, height uint16) {
 	ls.width = width
 	ls.height = height
+}
+
+// EnableLowLatency switches the segmenter into LL-HLS mode, additionally slicing
+// each segment into ~partTargetMs CMAF parts emitted via OnPart as they close.
+// partTargetMs is clamped to a sane floor. Call before the first WriteSample.
+func (ls *LiveSegmenter) EnableLowLatency(partTargetMs uint64) {
+	if partTargetMs < 100 {
+		partTargetMs = 100
+	}
+	ls.partTargetMs = partTargetMs
 }
 
 // InitSegment returns the encoded init segment bytes, building them on demand.
@@ -236,6 +286,12 @@ func (ls *LiveSegmenter) WriteSample(isKeyframe bool, annexB []byte, ptsMs uint6
 	lengthPrefixed, err := annexBToLengthPrefixed(annexB)
 	if err != nil {
 		return fmt.Errorf("livehls: convert AnnexB: %w", err)
+	}
+
+	// Low-latency mode slices each segment into parts; the classic per-segment path
+	// below is left exactly as-is for the default (non-LL) configuration.
+	if ls.partTargetMs > 0 {
+		return ls.writeSampleLL(isKeyframe, lengthPrefixed, ptsMs, compositionOffsetMs)
 	}
 
 	// The previous sample's duration is the gap to this sample's PTS. Commit it
@@ -350,9 +406,23 @@ func (ls *LiveSegmenter) emitSegment() error {
 	return nil
 }
 
-// Close flushes the final pending sample and emits the last open segment. Call
-// once when the live session ends so no trailing media is lost.
+// Close flushes the final pending sample and emits the last open segment (or, in
+// low-latency mode, the last open part). Call once when the live session ends so
+// no trailing media is lost.
 func (ls *LiveSegmenter) Close() error {
+	if ls.partTargetMs > 0 {
+		if ls.pending != nil {
+			dur := ls.lastDurationMs
+			if dur == 0 {
+				dur = liveFallbackDurationMs
+			}
+			ls.pending.Sample.Dur = uint32(dur)
+			if err := ls.commitPendingPart(); err != nil {
+				return err
+			}
+		}
+		return ls.closePart()
+	}
 	if ls.pending != nil {
 		dur := ls.lastDurationMs
 		if dur == 0 {
@@ -364,4 +434,153 @@ func (ls *LiveSegmenter) Close() error {
 		}
 	}
 	return ls.emitSegment()
+}
+
+// writeSampleLL is the low-latency counterpart of the per-segment staging in
+// WriteSample: it commits the previous sample into the open part, rolls the part
+// (every ~partTargetMs) and the segment (at keyframes, every ~targetSegmentMs),
+// then stages the current sample. Parts are emitted via OnPart as they close.
+func (ls *LiveSegmenter) writeSampleLL(isKeyframe bool, lengthPrefixed []byte, ptsMs uint64, compositionOffsetMs int32) error {
+	if ls.pending != nil {
+		dur := ls.lastDurationMs
+		if ptsMs > ls.pending.DecodeTime {
+			dur = ptsMs - ls.pending.DecodeTime
+		}
+		if dur == 0 {
+			dur = liveFallbackDurationMs
+		}
+		ls.lastDurationMs = dur
+		ls.pending.Sample.Dur = uint32(dur)
+		if err := ls.commitPendingPart(); err != nil {
+			return err
+		}
+	}
+
+	// Roll the segment at keyframes once enough media accumulated; otherwise roll a
+	// part once it reaches the part target. The two are mutually exclusive: a
+	// keyframe cut also closes the current part.
+	cut := false
+	if isKeyframe {
+		cut = !ls.started || (ptsMs-ls.segStartPTS) >= ls.targetSegmentMs
+	}
+	switch {
+	case cut:
+		if ls.started {
+			if err := ls.closePart(); err != nil {
+				return err
+			}
+		}
+		ls.openSegmentLL(ptsMs)
+	case ls.started && ls.partDurationMs >= ls.partTargetMs:
+		if err := ls.closePart(); err != nil {
+			return err
+		}
+		ls.openPartLL()
+	}
+
+	flags := liveNonSyncSampleFlags
+	if isKeyframe {
+		flags = liveSyncSampleFlags
+	}
+	ls.pending = &mp4ff.FullSample{
+		Sample: mp4ff.Sample{
+			Flags:                 flags,
+			Size:                  uint32(len(lengthPrefixed)),
+			CompositionTimeOffset: compositionOffsetMs,
+		},
+		DecodeTime: ptsMs,
+		Data:       lengthPrefixed,
+	}
+	return nil
+}
+
+// commitPendingPart appends the staged sample to the open part fragment, marking
+// the part independent when its first sample is a keyframe.
+func (ls *LiveSegmenter) commitPendingPart() error {
+	if ls.pending == nil {
+		return nil
+	}
+	if ls.partFrag == nil {
+		// No open part yet (pending staged before the first keyframe cut). The cut
+		// path always opens a part before staging, so this only guards against logic
+		// drift; drop rather than panic.
+		ls.pending = nil
+		return nil
+	}
+	first := ls.partSampleCount == 0
+	if err := ls.partFrag.AddFullSampleToTrack(*ls.pending, ls.videoTrackID); err != nil {
+		return fmt.Errorf("livehls: AddFullSampleToTrack: %w", err)
+	}
+	if first && ls.pending.Sample.Flags == liveSyncSampleFlags {
+		ls.partIndependent = true
+	}
+	ls.partSampleCount++
+	ls.partDurationMs += uint64(ls.pending.Sample.Dur)
+	ls.segDurationMs += uint64(ls.pending.Sample.Dur)
+	ls.pending = nil
+	return nil
+}
+
+// openSegmentLL starts a fresh media segment at a keyframe by opening its part 0.
+func (ls *LiveSegmenter) openSegmentLL(startPTS uint64) {
+	ls.seqNr++
+	ls.partIndex = 0
+	ls.segStartPTS = startPTS
+	ls.segDurationMs = 0
+	ls.started = true
+	ls.openPartFragment()
+}
+
+// openPartLL starts the next part within the current segment.
+func (ls *LiveSegmenter) openPartLL() {
+	ls.partIndex++
+	ls.openPartFragment()
+}
+
+// openPartFragment allocates a fresh single-track fragment (one moof+mdat) for
+// the next part, with a globally monotonic moof sequence number.
+func (ls *LiveSegmenter) openPartFragment() {
+	ls.fragSeq++
+	frag, err := mp4ff.CreateFragment(ls.fragSeq, ls.videoTrackID)
+	if err != nil {
+		log.Log.Error("LiveSegmenter.openPartFragment(): CreateFragment failed: " + err.Error())
+		return
+	}
+	ls.partFrag = frag
+	ls.partSampleCount = 0
+	ls.partDurationMs = 0
+	ls.partIndependent = false
+}
+
+// closePart encodes the open part and hands it to OnPart. Part 0 of a segment
+// carries the CMAF styp; later parts are bare moof+mdat, so a segment's parts
+// concatenate into one valid segment. Empty parts are skipped.
+func (ls *LiveSegmenter) closePart() error {
+	if ls.partFrag == nil || ls.partSampleCount == 0 {
+		return nil
+	}
+	var buf bytes.Buffer
+	if ls.partIndex == 0 {
+		seg := mp4ff.NewMediaSegment() // includes a CMAF styp box by default
+		seg.AddFragment(ls.partFrag)
+		if err := seg.Encode(&buf); err != nil {
+			return fmt.Errorf("livehls: encode part %d.%d: %w", ls.seqNr, ls.partIndex, err)
+		}
+	} else {
+		if err := ls.partFrag.Encode(&buf); err != nil {
+			return fmt.Errorf("livehls: encode part %d.%d: %w", ls.seqNr, ls.partIndex, err)
+		}
+	}
+	out := LivePart{
+		SegmentSeq:  ls.seqNr,
+		PartIndex:   ls.partIndex,
+		Independent: ls.partIndependent,
+		DurationMs:  ls.partDurationMs,
+		Data:        buf.Bytes(),
+	}
+	ls.partFrag = nil
+	if ls.OnPart != nil {
+		return ls.OnPart(out)
+	}
+	return nil
 }

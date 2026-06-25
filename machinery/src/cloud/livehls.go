@@ -1,6 +1,7 @@
 package cloud
 
 import (
+	"os"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -29,7 +30,6 @@ const hlsViewerTimeoutSeconds = 8
 // spamming the control plane.
 const hlsReadyReannounceSeconds = 2
 
-
 // HandleLiveStreamHLS drives the live HLS producer. It mirrors HandleLiveStreamSD:
 // it reads the camera's packet stream from a Latest() cursor, and while a viewer
 // is active (kept alive via communication.HandleLiveHLS) it muxes the packets
@@ -38,6 +38,14 @@ const hlsReadyReannounceSeconds = 2
 //
 // A session is created lazily on the first keyframe seen while a viewer is active
 // and torn down once viewers go away, so an idle camera produces no live traffic.
+//
+// By default (AGENT_LIVE_HLS_PREWARM unset or != "false") the agent instead keeps
+// one long-lived session muxing continuously into a small in-memory ring buffer
+// while idle (uploading nothing) and, the moment a viewer arrives, flushes the
+// already-encoded init + most-recent segment(s) and starts uploading live. This
+// trades a little idle CPU for a near-instant "requesting stream", so viewers no
+// longer wait a full GOP for the first segment to be cut. Set
+// AGENT_LIVE_HLS_PREWARM=false to fall back to the lazy on-demand path above.
 func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, _ capture.RTSPClient) {
 
 	log.Log.Debug("cloud.HandleLiveStreamHLS(): started")
@@ -78,6 +86,29 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 	width := uint16(config.Capture.IPCamera.Width)
 	height := uint16(config.Capture.IPCamera.Height)
 
+	// prewarm keeps a single long-lived session muxing into an in-memory ring
+	// buffer while idle and flushes it the instant a viewer arrives, eliminating
+	// the per-request GOP wait. Enabled by default; set AGENT_LIVE_HLS_PREWARM=false
+	// to fall back to the lazy on-demand path.
+	prewarm := os.Getenv("AGENT_LIVE_HLS_PREWARM") != "false"
+	if prewarm {
+		log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS prewarm ENABLED (set AGENT_LIVE_HLS_PREWARM=false to disable)")
+	} else {
+		log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS prewarm DISABLED (AGENT_LIVE_HLS_PREWARM=false)")
+	}
+
+	// lowLatency enables LL-HLS: each segment is sliced into CMAF parts shipped the
+	// instant they close and advertised via #EXT-X-PART, taking glass-to-glass HLS
+	// latency from ~4-6s down to ~1-2s. Enabled by default; set
+	// AGENT_LIVE_HLS_LOW_LATENCY=false to fall back to whole-segment HLS.
+	partTargetMs := uint64(0)
+	if os.Getenv("AGENT_LIVE_HLS_LOW_LATENCY") != "false" {
+		partTargetMs = livehls.DefaultPartTargetMs
+		log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS low-latency (LL-HLS) ENABLED (set AGENT_LIVE_HLS_LOW_LATENCY=false to disable)")
+	} else {
+		log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS low-latency (LL-HLS) DISABLED (AGENT_LIVE_HLS_LOW_LATENCY=false)")
+	}
+
 	var session *livehls.Session
 	lastViewerRequest := int64(0)
 	lastReadyAnnounce := int64(0)
@@ -97,7 +128,10 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 			// fired when this session's first segment landed. Re-announce (throttled)
 			// so late/refreshed viewers learn the active session id; the frontend
 			// dedupes by session id, so this is a no-op for viewers already playing.
-			if session != nil && session.IsReady() && now-lastReadyAnnounce >= hlsReadyReannounceSeconds {
+			// UploadsActive() is always true for the on-demand path; for prewarm it
+			// suppresses a stale re-announce while idle (the flush-on-arrival path
+			// below announces once the buffer has actually been shipped).
+			if session != nil && session.IsReady() && session.UploadsActive() && now-lastReadyAnnounce >= hlsReadyReannounceSeconds {
 				publishHLSReady(configuration, mqttClient, hubKey, deviceId, session.SessionID())
 				lastReadyAnnounce = now
 			}
@@ -105,6 +139,55 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 		}
 
 		viewerActive := now-lastViewerRequest <= hlsViewerTimeoutSeconds
+
+		if prewarm {
+			// Keep one long-lived session muxing into the ring buffer. Create it on
+			// the first keyframe (so the buffer opens on a random-access point) and
+			// never tear it down for idleness; uploads, not muxing, are what we gate
+			// on viewer presence.
+			if session == nil {
+				if len(pkt.Data) == 0 || !pkt.IsVideo || !pkt.IsKeyFrame {
+					continue
+				}
+				session = livehls.NewSession(publisher, livehls.SessionOptions{
+					Codec:          pkt.Codec,
+					SPSNALUs:       config.Capture.IPCamera.SPSNALUs,
+					PPSNALUs:       config.Capture.IPCamera.PPSNALUs,
+					VPSNALUs:       config.Capture.IPCamera.VPSNALUs,
+					Width:          width,
+					Height:         height,
+					PartTargetMs:   partTargetMs,
+					StartBuffering: true,
+				})
+				session.SetOnReady(func(sessionID string) {
+					log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS session ready, announcing " + sessionID)
+					publishHLSReady(configuration, mqttClient, hubKey, deviceId, sessionID)
+					lastReadyAnnounce = time.Now().Unix()
+				})
+				log.Log.Info("cloud.HandleLiveStreamHLS(): prewarming live HLS session " + session.SessionID())
+			}
+
+			if viewerActive {
+				// Activating flushes the cached init + buffered segment(s). onReady
+				// announces the first-ever readiness; on a later re-activation it has
+				// already fired, so announce here (throttled, so the first activation
+				// does not double up) once the buffer has actually been shipped.
+				if session.SetUploadsActive(true) && session.IsReady() && now-lastReadyAnnounce >= hlsReadyReannounceSeconds {
+					publishHLSReady(configuration, mqttClient, hubKey, deviceId, session.SessionID())
+					lastReadyAnnounce = now
+				}
+			} else {
+				// No viewer: keep muxing into the buffer but stop uploading.
+				session.SetUploadsActive(false)
+			}
+
+			if len(pkt.Data) > 0 && pkt.IsVideo {
+				if err := session.WritePacket(pkt); err != nil {
+					log.Log.Error("cloud.HandleLiveStreamHLS(): " + err.Error())
+				}
+			}
+			continue
+		}
 
 		if !viewerActive {
 			// No viewer: stop and discard the session so we stop shipping segments.
@@ -127,12 +210,13 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 				continue
 			}
 			session = livehls.NewSession(publisher, livehls.SessionOptions{
-				Codec:    pkt.Codec,
-				SPSNALUs: config.Capture.IPCamera.SPSNALUs,
-				PPSNALUs: config.Capture.IPCamera.PPSNALUs,
-				VPSNALUs: config.Capture.IPCamera.VPSNALUs,
-				Width:    width,
-				Height:   height,
+				Codec:        pkt.Codec,
+				SPSNALUs:     config.Capture.IPCamera.SPSNALUs,
+				PPSNALUs:     config.Capture.IPCamera.PPSNALUs,
+				VPSNALUs:     config.Capture.IPCamera.VPSNALUs,
+				Width:        width,
+				Height:       height,
+				PartTargetMs: partTargetMs,
 			})
 			session.SetOnReady(func(sessionID string) {
 				log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS session ready, announcing " + sessionID)

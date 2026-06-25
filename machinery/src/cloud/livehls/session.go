@@ -18,6 +18,12 @@ import (
 // large enough that per-segment HTTP overhead is negligible.
 const DefaultTargetSegmentMs = 2000
 
+// DefaultPartTargetMs is the nominal LL-HLS part length used when low latency is
+// enabled. ~300ms parts yield ~6-7 parts per 2s segment; with the playlist's
+// PART-HOLD-BACK at ~3x the part target this lands glass-to-glass latency around
+// 1-2s (versus ~4-6s for whole-segment HLS).
+const DefaultPartTargetMs = 300
+
 // Session ties a video.LiveSegmenter to a Publisher: it converts capture packets
 // into CMAF segments and ships each one to hub-api. Exactly one init segment is
 // delivered per session (re-attempted until it lands), after which media
@@ -43,6 +49,21 @@ type Session struct {
 	lastInitAt time.Time
 	readyFired bool
 	onReady    func(sessionID string)
+
+	// uploadsActive gates whether the init and completed segments are shipped to
+	// hub-api. It is true for the default on-demand path. The prewarm path starts
+	// it false so the session keeps muxing into bufferedSegments without producing
+	// any live traffic until a viewer actually arrives; see SetUploadsActive.
+	uploadsActive bool
+	// bufferedSegments is the in-memory ring buffer (the most recent
+	// prewarmMaxBufferedSegments segments) kept while uploadsActive is false, so a
+	// viewer that arrives can be served an already-encoded segment immediately
+	// instead of waiting a full GOP for the next one to be cut.
+	bufferedSegments []video.LiveSegment
+	// bufferedParts is the LL-HLS counterpart of bufferedSegments: while idle it
+	// retains the parts of the most recent (prewarmMaxBufferedSegments+1) segments,
+	// pruned a WHOLE segment at a time so a flushed segment is never partial.
+	bufferedParts []video.LivePart
 }
 
 // SessionOptions configures a live HLS session.
@@ -54,6 +75,16 @@ type SessionOptions struct {
 	Width           uint16   // encoded width (for the avcC fallback path)
 	Height          uint16   // encoded height
 	TargetSegmentMs uint64   // 0 => DefaultTargetSegmentMs
+	// PartTargetMs, when > 0, enables LL-HLS: each segment is additionally sliced
+	// into ~PartTargetMs CMAF parts that are published (and advertised via
+	// #EXT-X-PART) the instant they close, for ~1-2s glass-to-glass latency. 0
+	// keeps the classic whole-segment path.
+	PartTargetMs uint64
+	// StartBuffering starts the session in prewarm (buffer-only) mode: it muxes
+	// segments into an in-memory ring buffer but uploads nothing until
+	// SetUploadsActive(true) is called. Default false => uploads are live
+	// immediately (the on-demand path's behaviour).
+	StartBuffering bool
 }
 
 // NewSession builds a session with a fresh random id and wires the segmenter's
@@ -65,11 +96,16 @@ func NewSession(publisher *Publisher, opts SessionOptions) *Session {
 	}
 	seg := video.NewLiveSegmenter(opts.Codec, opts.SPSNALUs, opts.PPSNALUs, opts.VPSNALUs, target)
 	seg.SetDimensions(opts.Width, opts.Height)
+	if opts.PartTargetMs > 0 {
+		seg.EnableLowLatency(opts.PartTargetMs)
+	}
 
 	s := &Session{
 		id:        newSessionID(),
 		publisher: publisher,
 		segmenter: seg,
+		// Uploads are live by default; the prewarm path opts into buffer-only mode.
+		uploadsActive: !opts.StartBuffering,
 		newContext: func() (context.Context, context.CancelFunc) {
 			return context.WithTimeout(context.Background(), defaultPublishTimeout)
 		},
@@ -82,8 +118,13 @@ func NewSession(publisher *Publisher, opts SessionOptions) *Session {
 	seg.OnInit = func(initBytes []byte) error {
 		s.mu.Lock()
 		s.initBytes = append([]byte(nil), initBytes...)
+		active := s.uploadsActive
 		s.mu.Unlock()
-		s.publishInitIfNeeded()
+		// While prewarming we cache the init in memory but ship nothing; it is
+		// uploaded on the first SetUploadsActive(true) flush.
+		if active {
+			s.publishInitIfNeeded()
+		}
 		return nil
 	}
 
@@ -91,6 +132,15 @@ func NewSession(publisher *Publisher, opts SessionOptions) *Session {
 	// init segment has landed (a media segment is useless without it), and we fire
 	// OnReady after the first successfully shipped segment.
 	seg.OnSegment = func(segment video.LiveSegment) error {
+		s.mu.Lock()
+		active := s.uploadsActive
+		s.mu.Unlock()
+		if !active {
+			// Prewarm: retain the most recent segments in memory but upload nothing
+			// until a viewer arrives (SetUploadsActive flushes them).
+			s.bufferSegment(segment)
+			return nil
+		}
 		if !s.publishInitIfNeeded() {
 			log.Log.Warning("livehls.Session: dropping segment " +
 				fmt.Sprintf("%d", segment.SequenceNumber) + " because init has not been delivered yet")
@@ -107,6 +157,36 @@ func NewSession(publisher *Publisher, opts SessionOptions) *Session {
 		// while the session is still producing media.
 		s.refreshInitIfStale()
 		return nil
+	}
+
+	// In LL-HLS mode the segmenter emits parts (not whole segments); ship each one
+	// the instant it closes. Mirrors OnSegment: buffer while prewarming, otherwise
+	// publish after the init has landed and fire OnReady on the first part.
+	if opts.PartTargetMs > 0 {
+		seg.OnPart = func(part video.LivePart) error {
+			s.mu.Lock()
+			active := s.uploadsActive
+			s.mu.Unlock()
+			if !active {
+				s.bufferPart(part)
+				return nil
+			}
+			if !s.publishInitIfNeeded() {
+				log.Log.Warning("livehls.Session: dropping part " +
+					fmt.Sprintf("%d.%d", part.SegmentSeq, part.PartIndex) +
+					" because init has not been delivered yet")
+				return nil
+			}
+			ctx, cancel := s.newContext()
+			defer cancel()
+			if err := s.publisher.PublishPart(ctx, s.id, part); err != nil {
+				log.Log.Warning("livehls.Session: " + err.Error())
+				return nil
+			}
+			s.fireReadyOnce()
+			s.refreshInitIfStale()
+			return nil
+		}
 	}
 
 	return s
@@ -133,6 +213,128 @@ func (s *Session) IsReady() bool {
 func (s *Session) SetOnReady(fn func(sessionID string)) {
 	s.mu.Lock()
 	s.onReady = fn
+	s.mu.Unlock()
+}
+
+// prewarmMaxBufferedSegments is how many of the most recent completed segments
+// the prewarm path keeps in memory while idle and flushes to a viewer on arrival.
+// One segment keeps startup instant (the viewer immediately gets a playable
+// segment) while starting as close to the live edge as possible, so the HLS view
+// tracks the WebRTC/live edge instead of opening several seconds behind; hls.js
+// then converges to the edge via maxLiveSyncPlaybackRate. Raising it trades
+// latency-from-live for a little more startup cushion.
+const prewarmMaxBufferedSegments = 1
+
+// SetUploadsActive toggles whether the session ships its init and segments to
+// hub-api, and reports whether this call flipped it from inactive to active.
+//
+// While uploads are inactive the session keeps muxing capture packets into an
+// in-memory ring buffer (the cached init plus the most recent
+// prewarmMaxBufferedSegments segments) but uploads nothing, so an idle camera
+// produces no live traffic. Switching from inactive to active immediately
+// flushes the cached init and buffered segments so a viewer can start almost
+// instantly instead of waiting a full GOP for the next segment to be cut.
+// Switching from active to inactive resets the init-published flag so the next
+// activation re-uploads the init (it may have aged out of the hub's short-TTL
+// live window while idle). All other transitions are no-ops. Driven from the
+// live-stream goroutine; not safe for concurrent use.
+func (s *Session) SetUploadsActive(active bool) bool {
+	s.mu.Lock()
+	if s.uploadsActive == active {
+		s.mu.Unlock()
+		return false
+	}
+	s.uploadsActive = active
+	if !active {
+		// Going idle: force the next activation to re-deliver the init segment,
+		// which may have expired from the hub live window while nobody was watching.
+		s.initPublished = false
+		s.mu.Unlock()
+		return false
+	}
+	// Inactive -> active: take the cached buffered segments/parts and flush them
+	// outside the lock (the publish calls take their own time and re-acquire the
+	// mutex).
+	buffered := s.bufferedSegments
+	bufferedParts := s.bufferedParts
+	s.bufferedSegments = nil
+	s.bufferedParts = nil
+	s.mu.Unlock()
+
+	// Deliver the init first; media segments are useless without it.
+	for i := range buffered {
+		if !s.publishInitIfNeeded() {
+			break
+		}
+		ctx, cancel := s.newContext()
+		if err := s.publisher.PublishSegment(ctx, s.id, buffered[i]); err != nil {
+			log.Log.Warning("livehls.Session: prewarm flush: " + err.Error())
+			cancel()
+			continue
+		}
+		cancel()
+		s.fireReadyOnce()
+		s.refreshInitIfStale()
+	}
+	// LL-HLS: flush the buffered parts in order (oldest first) so the viewer gets a
+	// playable, near-live window immediately.
+	for i := range bufferedParts {
+		if !s.publishInitIfNeeded() {
+			break
+		}
+		ctx, cancel := s.newContext()
+		if err := s.publisher.PublishPart(ctx, s.id, bufferedParts[i]); err != nil {
+			log.Log.Warning("livehls.Session: prewarm flush (part): " + err.Error())
+			cancel()
+			continue
+		}
+		cancel()
+		s.fireReadyOnce()
+		s.refreshInitIfStale()
+	}
+	return true
+}
+
+// UploadsActive reports whether the session is currently shipping segments (as
+// opposed to buffering them while prewarming). Always true for the on-demand
+// path.
+func (s *Session) UploadsActive() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.uploadsActive
+}
+
+// bufferSegment appends a completed segment to the in-memory prewarm ring buffer,
+// discarding the oldest so at most prewarmMaxBufferedSegments are retained.
+func (s *Session) bufferSegment(seg video.LiveSegment) {
+	s.mu.Lock()
+	s.bufferedSegments = append(s.bufferedSegments, seg)
+	if overflow := len(s.bufferedSegments) - prewarmMaxBufferedSegments; overflow > 0 {
+		// Drop the oldest segment(s) and shrink the backing array so retained bytes
+		// stay bounded.
+		s.bufferedSegments = append([]video.LiveSegment(nil), s.bufferedSegments[overflow:]...)
+	}
+	s.mu.Unlock()
+}
+
+// bufferPart appends a part to the LL-HLS prewarm ring buffer, pruning whole
+// older segments (never individual parts) so the retained window always consists
+// of complete segments plus the in-progress one. Pruning on a part-0 boundary
+// keeps at most prewarmMaxBufferedSegments fully-buffered segments behind the
+// current one, which guarantees a flushed segment can be reconstructed in full.
+func (s *Session) bufferPart(part video.LivePart) {
+	s.mu.Lock()
+	s.bufferedParts = append(s.bufferedParts, part)
+	if part.PartIndex == 0 && part.SegmentSeq > uint32(prewarmMaxBufferedSegments) {
+		minSeg := part.SegmentSeq - uint32(prewarmMaxBufferedSegments)
+		kept := make([]video.LivePart, 0, len(s.bufferedParts))
+		for _, p := range s.bufferedParts {
+			if p.SegmentSeq >= minSeg {
+				kept = append(kept, p)
+			}
+		}
+		s.bufferedParts = kept
+	}
 	s.mu.Unlock()
 }
 
