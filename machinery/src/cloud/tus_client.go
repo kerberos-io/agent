@@ -46,12 +46,12 @@ func resumableUploadsEnabled() bool {
 // explicit size is configured. Splitting the upload into chunks keeps each HTTP
 // request small enough for intermediary proxies/load balancers and checkpoints
 // progress frequently, so an interruption resumes with minimal re-upload.
-const tusDefaultChunkSize int64 = 1 << 20 // 1 MiB
+const tusDefaultChunkSize int64 = 8 << 20 // 8 MiB (>= S3 multipart minimum part size)
 
 const tusProgressBucketPercent int64 = 10
 
 // tusChunkSize returns the number of bytes to send per PATCH request. It
-// defaults to tusDefaultChunkSize (1 MiB) and can be overridden with the
+// defaults to tusDefaultChunkSize (8 MiB) and can be overridden with the
 // AGENT_TUS_CHUNK_SIZE_BYTES environment variable. A value of 0 (or negative)
 // disables chunking and sends the remaining bytes in a single PATCH.
 func tusChunkSize() int64 {
