@@ -29,21 +29,21 @@ jobs:
 
   # Publish the platform image to the uug-ai GitHub Container Registry
   # (ghcr.io/uug-ai/agent-platform).
-  release:
-    needs: bump-release
-    uses: uug-ai/workflows/.github/workflows/release-create.yml@main
-    with:
-      organization: uug-ai
-      project: ${{ github.event.repository.name }}
-      tag: ${{ needs.bump-release.outputs.tag }}
-      docker_context: "."
-      create_gitops_pr: false
-      runner_matrix: >-
-        [
-          {"architecture":"amd64","runner":"ubuntu-24.04"},
-          {"architecture":"arm64","runner":"ubuntu-24.04-arm"}
-        ]
-    secrets: inherit
+  #release:
+  #  needs: bump-release
+  #  uses: uug-ai/workflows/.github/workflows/release-create.yml@main
+  #  with:
+  #    organization: uug-ai
+  #    project: ${{ github.event.repository.name }}
+  #    tag: ${{ needs.bump-release.outputs.tag }}
+  #    docker_context: "."
+  #    create_gitops_pr: false
+  #    runner_matrix: >-
+  #       [
+  #         {"architecture":"amd64","runner":"ubuntu-24.04"},
+  #         {"architecture":"arm64","runner":"ubuntu-24.04-arm"}
+  #      ]
+  #  secrets: inherit
 
   # Everything below mirrors the agent's own release-create.yml pipeline and
   # publishes the multi-arch image to the kerberos/agent Docker Hub repo, driven
