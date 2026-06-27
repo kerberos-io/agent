@@ -99,8 +99,14 @@ type IPCamera struct {
 	SPSNALUs      [][]byte `json:"sps_nalus,omitempty" bson:"sps_nalus,omitempty"`
 	PPSNALUs      [][]byte `json:"pps_nalus,omitempty" bson:"pps_nalus,omitempty"`
 	VPSNALUs      [][]byte `json:"vps_nalus,omitempty" bson:"vps_nalus,omitempty"`
-	SampleRate    int      `json:"sample_rate,omitempty" bson:"sample_rate,omitempty"`
-	Channels      int      `json:"channels,omitempty" bson:"channels,omitempty"`
+	// Sub stream parameter sets, captured separately from the main stream so the
+	// live HLS muxer can build a correct init segment when a viewer switches the
+	// live view to the sub (low-resolution) stream.
+	SubSPSNALUs [][]byte `json:"sub_sps_nalus,omitempty" bson:"sub_sps_nalus,omitempty"`
+	SubPPSNALUs [][]byte `json:"sub_pps_nalus,omitempty" bson:"sub_pps_nalus,omitempty"`
+	SubVPSNALUs [][]byte `json:"sub_vps_nalus,omitempty" bson:"sub_vps_nalus,omitempty"`
+	SampleRate  int      `json:"sample_rate,omitempty" bson:"sample_rate,omitempty"`
+	Channels    int      `json:"channels,omitempty" bson:"channels,omitempty"`
 }
 
 // USBCamera configuration, such as the device path (/dev/video*)

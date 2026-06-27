@@ -585,8 +585,11 @@ func HandleRequestHLSStream(mqttClient mqtt.Client, hubKey string, payload model
 
 	if requestHLSStreamPayload.Timestamp != 0 {
 		if communication.CameraConnected {
+			// Forward the requested quality ("auto"|"high"|"low"; empty => auto) so
+			// the producer can switch the live session between the main and sub
+			// stream on demand. The send doubles as the viewer keepalive.
 			select {
-			case communication.HandleLiveHLS <- time.Now().Unix():
+			case communication.HandleLiveHLS <- requestHLSStreamPayload.Quality:
 			default:
 			}
 			log.Log.Info("routers.mqtt.main.HandleRequestHLSStream(): received request to livestream over HLS.")

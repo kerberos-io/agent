@@ -41,7 +41,10 @@ type Communication struct {
 	HandleLiveHDKeepalive chan string
 	HandleLiveHDHandshake chan LiveHDHandshake
 	HandleLiveHDPeers     chan string
-	HandleLiveHLS         chan int64
+	// HandleLiveHLS is the live HLS viewer keepalive. It carries the requested
+	// quality tier ("auto"|"high"|"low"; empty => auto) so the producer can switch
+	// the live session between the main and sub stream on demand.
+	HandleLiveHLS chan string
 	HandleONVIF           chan OnvifAction
 	IsConfiguring         *abool.AtomicBool
 	Queue                 *packets.Queue

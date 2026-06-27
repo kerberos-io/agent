@@ -179,11 +179,26 @@ type RequestSDStreamPayload struct {
 	Transport string `json:"transport,omitempty"`
 }
 
+// Stream quality tiers a viewer can request for the live (HD) view. The agent
+// maps these onto the camera's main (high-resolution) or sub (low-resolution)
+// RTSP stream, so a viewer can pick the resolution it needs instead of the agent
+// always preferring the sub stream. Empty/unknown values are treated as "auto"
+// for backward compatibility: older frontends that never set a quality keep the
+// previous behaviour (sub stream when available, otherwise main).
+const (
+	StreamQualityAuto = "auto" // agent decides based on availability/resolution
+	StreamQualityHigh = "high" // main stream (highest resolution)
+	StreamQualityLow  = "low"  // sub stream (lowest resolution)
+)
+
 // We received a live HLS stream request. Like SD it is a simple viewer
 // keepalive: the agent owns the live HLS session, so the request only needs to
-// signal "a viewer is watching" to keep the segment pipeline alive.
+// signal "a viewer is watching" to keep the segment pipeline alive. Quality lets
+// the viewer ask for the main (high) or sub (low) stream on demand; the agent
+// switches the live session's source stream when it changes.
 type RequestHLSStreamPayload struct {
-	Timestamp int64 `json:"timestamp"` // timestamp
+	Timestamp int64  `json:"timestamp"`         // timestamp
+	Quality   string `json:"quality,omitempty"` // "auto" | "high" | "low" (empty => auto)
 }
 
 // We received a request HD stream request
@@ -192,6 +207,7 @@ type RequestHDStreamPayload struct {
 	HubKey             string `json:"hub_key"`             // hub key
 	SessionID          string `json:"session_id"`          // session id
 	SessionDescription string `json:"session_description"` // session description
+	Quality            string `json:"quality,omitempty"`   // "auto" | "high" | "low" (empty => auto)
 }
 
 // We received a receive HD candidates request

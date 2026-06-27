@@ -6,7 +6,6 @@ import (
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 
-	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud/livehls"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -46,7 +45,7 @@ const hlsReadyReannounceSeconds = 2
 // trades a little idle CPU for a near-instant "requesting stream", so viewers no
 // longer wait a full GOP for the first segment to be cut. Set
 // AGENT_LIVE_HLS_PREWARM=false to fall back to the lazy on-demand path above.
-func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, _ capture.RTSPClient) {
+func HandleLiveStreamHLS(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, subStreamEnabled bool) {
 
 	log.Log.Debug("cloud.HandleLiveStreamHLS(): started")
 
@@ -81,10 +80,16 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 		DeviceKey:     deviceId,
 	})
 
+	// The live session can be served from the main (high-resolution) or sub
+	// (low-resolution) stream and switched on demand. requestedQuality tracks the
+	// latest tier asked for over the keepalive; source holds the cursor plus the
+	// encoded parameter sets/dimensions for the stream currently being muxed.
 	// Encoded dimensions are only needed for the avcC fallback path (an SPS that
-	// mp4ff's strict parser rejects); the main stream dimensions are a safe value.
-	width := uint16(config.Capture.IPCamera.Width)
-	height := uint16(config.Capture.IPCamera.Height)
+	// mp4ff's strict parser rejects).
+	requestedQuality := models.StreamQualityAuto
+	useSub := models.SelectSubStreamForQuality(config, requestedQuality, subStreamEnabled)
+	source := buildHLSSource(config, communication, useSub)
+	log.Log.Info("cloud.HandleLiveStreamHLS(): serving live HLS from the " + source.label + " stream")
 
 	// prewarm keeps a single long-lived session muxing into an in-memory ring
 	// buffer while idle and flushes it the instant a viewer arrives, eliminating
@@ -117,12 +122,15 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 	var pkt packets.Packet
 
 	for cursorError == nil {
-		pkt, cursorError = livestreamCursor.ReadPacket()
+		pkt, cursorError = source.cursor.ReadPacket()
 
 		now := time.Now().Unix()
 		select {
-		case <-communication.HandleLiveHLS:
+		case q := <-communication.HandleLiveHLS:
 			lastViewerRequest = now
+			if q != "" {
+				requestedQuality = q
+			}
 			// A keepalive may come from a viewer that just connected or hard-
 			// refreshed and therefore missed the one-shot readiness announcement
 			// fired when this session's first segment landed. Re-announce (throttled)
@@ -138,6 +146,22 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 		default:
 		}
 
+		// Switch the source stream when the requested quality now maps to the other
+		// stream. Tearing the current session down makes the producer rebuild the
+		// init segment and announce a fresh session id from the new stream, which the
+		// viewer re-attaches to.
+		if wantSub := models.SelectSubStreamForQuality(config, requestedQuality, subStreamEnabled); wantSub != useSub {
+			useSub = wantSub
+			if session != nil {
+				_ = session.Close()
+				session = nil
+			}
+			source = buildHLSSource(config, communication, useSub)
+			lastReadyAnnounce = 0
+			log.Log.Info("cloud.HandleLiveStreamHLS(): switched live HLS to the " + source.label + " stream (quality=" + requestedQuality + ")")
+			continue
+		}
+
 		viewerActive := now-lastViewerRequest <= hlsViewerTimeoutSeconds
 
 		if prewarm {
@@ -151,11 +175,11 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 				}
 				session = livehls.NewSession(publisher, livehls.SessionOptions{
 					Codec:          pkt.Codec,
-					SPSNALUs:       config.Capture.IPCamera.SPSNALUs,
-					PPSNALUs:       config.Capture.IPCamera.PPSNALUs,
-					VPSNALUs:       config.Capture.IPCamera.VPSNALUs,
-					Width:          width,
-					Height:         height,
+					SPSNALUs:       source.sps,
+					PPSNALUs:       source.pps,
+					VPSNALUs:       source.vps,
+					Width:          source.width,
+					Height:         source.height,
 					PartTargetMs:   partTargetMs,
 					StartBuffering: true,
 				})
@@ -211,11 +235,11 @@ func HandleLiveStreamHLS(livestreamCursor *packets.QueueCursor, configuration *m
 			}
 			session = livehls.NewSession(publisher, livehls.SessionOptions{
 				Codec:        pkt.Codec,
-				SPSNALUs:     config.Capture.IPCamera.SPSNALUs,
-				PPSNALUs:     config.Capture.IPCamera.PPSNALUs,
-				VPSNALUs:     config.Capture.IPCamera.VPSNALUs,
-				Width:        width,
-				Height:       height,
+				SPSNALUs:     source.sps,
+				PPSNALUs:     source.pps,
+				VPSNALUs:     source.vps,
+				Width:        source.width,
+				Height:       source.height,
 				PartTargetMs: partTargetMs,
 			})
 			session.SetOnReady(func(sessionID string) {
@@ -257,5 +281,47 @@ func publishHLSReady(configuration *models.Configuration, mqttClient mqtt.Client
 		log.Log.Info("cloud.HandleLiveStreamHLS(): announced live HLS session " + sessionID)
 	} else {
 		log.Log.Error("cloud.HandleLiveStreamHLS(): failed to package receive-hls-ready message: " + err.Error())
+	}
+}
+
+// hlsStreamSource bundles everything the live HLS producer needs to mux one of
+// the camera's streams: the packet cursor it reads from plus the encoded
+// parameter sets and dimensions used to build that stream's init segment.
+type hlsStreamSource struct {
+	cursor *packets.QueueCursor
+	sps    [][]byte
+	pps    [][]byte
+	vps    [][]byte
+	width  uint16
+	height uint16
+	label  string
+}
+
+// buildHLSSource resolves the packet cursor and encoded parameter sets/dimensions
+// for the selected stream. useSub picks the sub (low-resolution) stream when one
+// is available; otherwise the main (high-resolution) stream is used. A fresh
+// Latest() cursor is created so muxing resumes from the live edge of the chosen
+// stream after a switch.
+func buildHLSSource(config models.Config, communication *models.Communication, useSub bool) hlsStreamSource {
+	cam := config.Capture.IPCamera
+	if useSub && communication.SubQueue != nil {
+		return hlsStreamSource{
+			cursor: communication.SubQueue.Latest(),
+			sps:    cam.SubSPSNALUs,
+			pps:    cam.SubPPSNALUs,
+			vps:    cam.SubVPSNALUs,
+			width:  uint16(cam.SubWidth),
+			height: uint16(cam.SubHeight),
+			label:  "sub",
+		}
+	}
+	return hlsStreamSource{
+		cursor: communication.Queue.Latest(),
+		sps:    cam.SPSNALUs,
+		pps:    cam.PPSNALUs,
+		vps:    cam.VPSNALUs,
+		width:  uint16(cam.Width),
+		height: uint16(cam.Height),
+		label:  "main",
 	}
 }

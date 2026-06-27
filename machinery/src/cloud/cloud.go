@@ -874,7 +874,7 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 	log.Log.Debug("cloud.HandleLiveStreamSD(): finished")
 }
 
-func HandleLiveStreamHD(livestreamCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
+func HandleLiveStreamHD(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient, rtspSubClient capture.RTSPClient, subStreamEnabled bool) {
 
 	config := configuration.Config
 
@@ -888,23 +888,51 @@ func HandleLiveStreamHD(livestreamCursor *packets.QueueCursor, configuration *mo
 			// Create per-peer broadcasters instead of shared tracks.
 			// Each viewer gets its own track with independent, non-blocking writes
 			// so a slow/congested peer cannot stall the others.
-			streams, _ := rtspClient.GetStreams()
-			videoBroadcaster := webrtc.NewVideoBroadcaster(streams)
-			audioBroadcaster := webrtc.NewAudioBroadcaster(streams)
+			//
+			// Both the main (high-resolution) and sub (low-resolution) streams are
+			// exposed as separate broadcasters that are always forwarding, so a
+			// viewer can pick the resolution it needs per peer connection without
+			// the agent re-negotiating the RTSP source.
+			mainStreams, _ := rtspClient.GetStreams()
+			mainVideoBroadcaster := webrtc.NewVideoBroadcaster(mainStreams)
+			mainAudioBroadcaster := webrtc.NewAudioBroadcaster(mainStreams)
 
-			if videoBroadcaster == nil && audioBroadcaster == nil {
-				log.Log.Error("cloud.HandleLiveStreamHD(): failed to create both video and audio broadcasters")
+			if mainVideoBroadcaster == nil && mainAudioBroadcaster == nil {
+				log.Log.Error("cloud.HandleLiveStreamHD(): failed to create both video and audio broadcasters for the main stream")
 				return
 			}
 
-			go webrtc.WriteToTrack(livestreamCursor, configuration, communication, mqttClient, videoBroadcaster, audioBroadcaster, rtspClient)
+			go webrtc.WriteToTrack(communication.Queue.Latest(), configuration, communication, mqttClient, mainVideoBroadcaster, mainAudioBroadcaster, rtspClient)
+
+			// Sub stream broadcasters, only when a distinct sub stream is available.
+			var subVideoBroadcaster *webrtc.TrackBroadcaster
+			var subAudioBroadcaster *webrtc.TrackBroadcaster
+			if subStreamEnabled && rtspSubClient != nil && communication.SubQueue != nil {
+				subStreams, _ := rtspSubClient.GetStreams()
+				subVideoBroadcaster = webrtc.NewVideoBroadcaster(subStreams)
+				subAudioBroadcaster = webrtc.NewAudioBroadcaster(subStreams)
+				go webrtc.WriteToTrack(communication.SubQueue.Latest(), configuration, communication, mqttClient, subVideoBroadcaster, subAudioBroadcaster, rtspSubClient)
+			}
+			subBroadcastersReady := subVideoBroadcaster != nil || subAudioBroadcaster != nil
 
 			if config.Capture.ForwardWebRTC == "true" {
 
 			} else {
 				log.Log.Info("cloud.HandleLiveStreamHD(): Waiting for peer connections.")
 				for handshake := range communication.HandleLiveHDHandshake {
-					log.Log.Info("cloud.HandleLiveStreamHD(): setting up a peer connection.")
+					// Route each viewer to the main or sub broadcasters based on the
+					// quality it requested; "auto" prefers the sub stream when one is
+					// available, matching the historical default.
+					useSub := models.SelectSubStreamForQuality(config, handshake.Payload.Quality, subStreamEnabled && subBroadcastersReady)
+					videoBroadcaster := mainVideoBroadcaster
+					audioBroadcaster := mainAudioBroadcaster
+					streamLabel := "main"
+					if useSub {
+						videoBroadcaster = subVideoBroadcaster
+						audioBroadcaster = subAudioBroadcaster
+						streamLabel = "sub"
+					}
+					log.Log.Info("cloud.HandleLiveStreamHD(): setting up a peer connection on the " + streamLabel + " stream (quality=" + handshake.Payload.Quality + ").")
 					go webrtc.InitializeWebRTCConnection(configuration, communication, mqttClient, videoBroadcaster, audioBroadcaster, handshake)
 				}
 			}
