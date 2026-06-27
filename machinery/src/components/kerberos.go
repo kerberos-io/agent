@@ -73,7 +73,7 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 	communication.HandleLiveSDHTTP = make(chan int64, 1)
 	communication.HandleLiveHDKeepalive = make(chan string, 1)
 	communication.HandleLiveHDPeers = make(chan string, 1)
-	communication.HandleLiveHLS = make(chan int64, 1)
+	communication.HandleLiveHLS = make(chan string, 1)
 	communication.IsConfiguring = abool.New()
 
 	cameraSettings := &models.Camera{}
@@ -237,6 +237,13 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		configuration.Config.Capture.IPCamera.SubWidth = width
 		configuration.Config.Capture.IPCamera.SubHeight = height
 
+		// Capture the sub stream parameter sets separately from the main stream so
+		// the live HLS muxer can build a correct init segment when a viewer asks for
+		// the sub (low-resolution) stream on demand.
+		configuration.Config.Capture.IPCamera.SubSPSNALUs = [][]byte{videoSubStream.SPS}
+		configuration.Config.Capture.IPCamera.SubPPSNALUs = [][]byte{videoSubStream.PPS}
+		configuration.Config.Capture.IPCamera.SubVPSNALUs = [][]byte{videoSubStream.VPS}
+
 		// If we have a substream, we need to set the width and height of the substream. (so we will override above information)
 		// Set the liveview width and height, this is used for the liveview and motion regions (drawing on the hub).
 		configuration.Config.Capture.IPCamera.BaseWidth, configuration.Config.Capture.IPCamera.BaseHeight =
@@ -287,26 +294,19 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	}
 
 	// Handle livestream HLS (adaptive segments over HTTP via hub-api -> vault).
-	// Uses the sub stream when available (lower bitrate, browser-friendly), else
-	// the main stream. Like SD it is viewer-keepalive gated and produces no
-	// traffic while nobody is watching.
-	if subStreamEnabled {
-		livestreamHLSCursor := subQueue.Latest()
-		go cloud.HandleLiveStreamHLS(livestreamHLSCursor, configuration, communication, mqttClient, rtspSubClient)
-	} else {
-		livestreamHLSCursor := queue.Latest()
-		go cloud.HandleLiveStreamHLS(livestreamHLSCursor, configuration, communication, mqttClient, rtspClient)
-	}
+	// The producer can serve either the main (high-resolution) or sub
+	// (low-resolution) stream and switches between them on demand based on the
+	// quality the viewer requests; "auto" prefers the sub stream when available.
+	// Like SD it is viewer-keepalive gated and produces no traffic while nobody is
+	// watching.
+	go cloud.HandleLiveStreamHLS(configuration, communication, mqttClient, subStreamEnabled)
 
-	// Handle livestream HD (high resolution over WEBRTC)
+	// Handle livestream HD (high resolution over WEBRTC). Both the main and sub
+	// stream are exposed as separate broadcasters so a viewer can request the
+	// high (main) or low (sub) resolution per peer connection; "auto" prefers the
+	// sub stream when available.
 	communication.HandleLiveHDHandshake = make(chan models.LiveHDHandshake, 100)
-	if subStreamEnabled {
-		livestreamHDCursor := subQueue.Latest()
-		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspSubClient)
-	} else {
-		livestreamHDCursor := queue.Latest()
-		go cloud.HandleLiveStreamHD(livestreamHDCursor, configuration, communication, mqttClient, rtspClient)
-	}
+	go cloud.HandleLiveStreamHD(configuration, communication, mqttClient, rtspClient, rtspSubClient, subStreamEnabled)
 
 	// Handle recording, will write an mp4 to disk.
 	go capture.HandleRecordStream(queue, configDirectory, configuration, communication, rtspClient)
