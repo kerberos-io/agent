@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/conditions"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
@@ -19,6 +20,35 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/video"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// publishRecordingState notifies the hub (and ultimately the live-view UI) that
+// this camera started ("recording": true) or stopped ("recording": false)
+// recording, so the frontend can show a "recording" indicator while the agent
+// is recording (e.g. a motion clip triggered manually from the live view or by
+// motion detection). It is a best-effort broadcast: when no hub/MQTT is
+// configured (or the agent is offline) it is a no-op, and a missed message is
+// self-healed by the frontend's safety timeout.
+func publishRecordingState(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, recording bool) {
+	if mqttClient == nil || hubKey == "" || configuration.Config.Offline == "true" {
+		return
+	}
+	message := models.Message{
+		Payload: models.Payload{
+			Action:   "recording",
+			DeviceId: configuration.Config.Key,
+			Value: map[string]interface{}{
+				"timestamp": time.Now().Unix(),
+				"recording": recording,
+			},
+		},
+	}
+	payload, err := models.PackageMQTTMessage(configuration, message)
+	if err == nil {
+		mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
+	} else {
+		log.Log.Error("capture.main.publishRecordingState(): failed to package MQTT message: " + err.Error())
+	}
+}
 
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
 	autoClean := configuration.Config.AutoClean
@@ -54,9 +84,10 @@ func CleanupRecordingDirectory(configDirectory string, configuration *models.Con
 	}
 }
 
-func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient) {
+func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient, mqttClient mqtt.Client) {
 
 	config := configuration.Config
+	hubKey := config.HubKey
 	loc, _ := time.LoadLocation(config.Timezone)
 
 	if config.Capture.Recording == "false" {
