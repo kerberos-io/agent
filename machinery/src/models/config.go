@@ -74,6 +74,14 @@ type Capture struct {
 	Fragmented            string      `json:"fragmented,omitempty" bson:"fragmented,omitempty"`
 	FragmentedDuration    int64       `json:"fragmentedduration,omitempty" bson:"fragmentedduration,omitempty"`
 	PixelChangeThreshold  int         `json:"pixelChangeThreshold,omitempty"`
+	// ONVIFMotion routes the camera's ONVIF motion events into the
+	// agent's motion-triggered recording pipeline. When "true" the
+	// agent opens an event/stream against the configured ONVIF
+	// endpoint and forwards Motion+Active events to HandleMotion.
+	// Requires Capture.IPCamera.ONVIFXAddr / ONVIFUsername /
+	// ONVIFPassword to be set. Default empty (disabled) keeps the
+	// existing pixel-diff motion detection as the only source.
+	ONVIFMotion string `json:"onvif_motion,omitempty" bson:"onvif_motion,omitempty"`
 }
 
 // IPCamera configuration, such as the RTSP url of the IPCamera and the FPS.
