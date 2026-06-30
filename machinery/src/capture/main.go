@@ -90,6 +90,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 	hubKey := config.HubKey
 	loc, _ := time.LoadLocation(config.Timezone)
 
+	// Start each capture session with manual recording off, so a leftover
+	// request from before a restart/reconnect doesn't silently persist.
+	communication.IsRecordingManual.UnSet()
+
 	if config.Capture.Recording == "false" {
 		log.Log.Info("capture.main.HandleRecordStream(): disabled, we will not record anything.")
 	} else {
@@ -532,6 +536,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					default:
 					}
 
+					// While a manual recording is active, keep it alive: refresh the
+					// motion timestamp every iteration so the post-recording timeout
+					// never fires. The clip still rolls over at maxRecordingPeriod and
+					// is restarted below, until the viewer stops the manual recording.
+					if communication.IsRecordingManual.IsSet() {
+						motionTimestamp = now
+					}
+
 					if start && (motionTimestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-500) && nextPkt.IsKeyFrame {
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(motionTimestamp+postRecording-now, 10) + " < 0")
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-500 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-500, 10))
@@ -602,6 +614,16 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				// Notify the hub / live-view UI that this camera stopped recording.
 				publishRecordingState(mqttClient, hubKey, configuration, false)
+
+				// If the viewer still has a manual recording running, this clip just
+				// rolled over at the max length — immediately kick off the next
+				// segment so recording stays continuous until they stop it.
+				if communication.IsRecordingManual.IsSet() {
+					select {
+					case communication.HandleMotion <- models.MotionDataPartial{Timestamp: time.Now().Unix(), NumberOfChanges: 100000000}:
+					default:
+					}
+				}
 
 				// Update the name of the recording with the duration.
 				// We will update the name of the recording with the duration in milliseconds.
