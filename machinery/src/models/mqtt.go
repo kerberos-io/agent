@@ -150,6 +150,10 @@ type AudioPayload struct {
 // We received a recording request, we'll send it to the motion handler.
 type RecordPayload struct {
 	Timestamp int64 `json:"timestamp"` // timestamp of the recording request.
+	// Recording toggles a manual recording from the live view: true starts a
+	// recording (and keeps it running), false stops it. Older clients that only
+	// send a timestamp default to false; the live view always sets it explicitly.
+	Recording bool `json:"recording"`
 }
 
 // We received a preset position request, we'll request it through onvif and send it back.

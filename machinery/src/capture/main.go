@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/conditions"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
@@ -19,6 +20,35 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/video"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// publishRecordingState notifies the hub (and ultimately the live-view UI) that
+// this camera started ("recording": true) or stopped ("recording": false)
+// recording, so the frontend can show a "recording" indicator while the agent
+// is recording (e.g. a motion clip triggered manually from the live view or by
+// motion detection). It is a best-effort broadcast: when no hub/MQTT is
+// configured (or the agent is offline) it is a no-op, and a missed message is
+// self-healed by the frontend's safety timeout.
+func publishRecordingState(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, recording bool) {
+	if mqttClient == nil || hubKey == "" || configuration.Config.Offline == "true" {
+		return
+	}
+	message := models.Message{
+		Payload: models.Payload{
+			Action:   "recording",
+			DeviceId: configuration.Config.Key,
+			Value: map[string]interface{}{
+				"timestamp": time.Now().Unix(),
+				"recording": recording,
+			},
+		},
+	}
+	payload, err := models.PackageMQTTMessage(configuration, message)
+	if err == nil {
+		mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
+	} else {
+		log.Log.Error("capture.main.publishRecordingState(): failed to package MQTT message: " + err.Error())
+	}
+}
 
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
 	autoClean := configuration.Config.AutoClean
@@ -54,10 +84,15 @@ func CleanupRecordingDirectory(configDirectory string, configuration *models.Con
 	}
 }
 
-func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient) {
+func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient, mqttClient mqtt.Client) {
 
 	config := configuration.Config
+	hubKey := config.HubKey
 	loc, _ := time.LoadLocation(config.Timezone)
+
+	// Start each capture session with manual recording off, so a leftover
+	// request from before a restart/reconnect doesn't silently persist.
+	communication.IsRecordingManual.UnSet()
 
 	if config.Capture.Recording == "false" {
 		log.Log.Info("capture.main.HandleRecordStream(): disabled, we will not record anything.")
@@ -223,6 +258,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					recordingStatus = "idle"
 
+					// Notify the hub / live-view UI that this camera stopped recording.
+					publishRecordingState(mqttClient, hubKey, configuration, false)
+
 					// Clean up the recording directory if necessary.
 					CleanupRecordingDirectory(configDirectory, configuration)
 				}
@@ -298,6 +336,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					writeSampleToMP4(mp4Video, videoTrack, audioTrack, pkt)
 					recordingStatus = "started"
+
+					// Notify the hub / live-view UI that this camera started recording.
+					publishRecordingState(mqttClient, hubKey, configuration, true)
 
 				} else if start {
 
@@ -375,6 +416,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					fc.Close()
 
 					recordingStatus = "idle"
+
+					// Notify the hub / live-view UI that this camera stopped recording.
+					publishRecordingState(mqttClient, hubKey, configuration, false)
 
 					// Clean up the recording directory if necessary.
 					CleanupRecordingDirectory(configDirectory, configuration)
@@ -492,6 +536,14 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					default:
 					}
 
+					// While a manual recording is active, keep it alive: refresh the
+					// motion timestamp every iteration so the post-recording timeout
+					// never fires. The clip still rolls over at maxRecordingPeriod and
+					// is restarted below, until the viewer stops the manual recording.
+					if communication.IsRecordingManual.IsSet() {
+						motionTimestamp = now
+					}
+
 					if start && (motionTimestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-500) && nextPkt.IsKeyFrame {
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(motionTimestamp+postRecording-now, 10) + " < 0")
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-500 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-500, 10))
@@ -523,6 +575,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 						}
 						start = true
+
+						// Notify the hub / live-view UI that this camera started recording.
+						publishRecordingState(mqttClient, hubKey, configuration, true)
 					}
 					if start {
 						writeSampleToMP4(mp4Video, videoTrack, audioTrack, pkt)
@@ -556,6 +611,19 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				}
 				mp4Video.Close(&config)
 				log.Log.Info("capture.main.HandleRecordStream(motiondetection): file save: " + name)
+
+				// Notify the hub / live-view UI that this camera stopped recording.
+				publishRecordingState(mqttClient, hubKey, configuration, false)
+
+				// If the viewer still has a manual recording running, this clip just
+				// rolled over at the max length — immediately kick off the next
+				// segment so recording stays continuous until they stop it.
+				if communication.IsRecordingManual.IsSet() {
+					select {
+					case communication.HandleMotion <- models.MotionDataPartial{Timestamp: time.Now().Unix(), NumberOfChanges: 100000000}:
+					default:
+					}
+				}
 
 				// Update the name of the recording with the duration.
 				// We will update the name of the recording with the duration in milliseconds.

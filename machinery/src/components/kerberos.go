@@ -75,6 +75,7 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 	communication.HandleLiveHDPeers = make(chan string, 1)
 	communication.HandleLiveHLS = make(chan string, 1)
 	communication.IsConfiguring = abool.New()
+	communication.IsRecordingManual = abool.New()
 
 	cameraSettings := &models.Camera{}
 
@@ -309,7 +310,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	go cloud.HandleLiveStreamHD(configuration, communication, mqttClient, rtspClient, rtspSubClient, subStreamEnabled)
 
 	// Handle recording, will write an mp4 to disk.
-	go capture.HandleRecordStream(queue, configDirectory, configuration, communication, rtspClient)
+	go capture.HandleRecordStream(queue, configDirectory, configuration, communication, rtspClient, mqttClient)
 
 	// Handle processing of motion
 	communication.HandleMotion = make(chan models.MotionDataPartial, 10)
