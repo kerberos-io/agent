@@ -44,9 +44,9 @@ type Communication struct {
 	// HandleLiveHLS is the live HLS viewer keepalive. It carries the requested
 	// quality tier ("auto"|"high"|"low"; empty => auto) so the producer can switch
 	// the live session between the main and sub stream on demand.
-	HandleLiveHLS       chan string
-	HandleONVIF         chan OnvifAction
-	IsConfiguring       *abool.AtomicBool
+	HandleLiveHLS chan string
+	HandleONVIF   chan OnvifAction
+	IsConfiguring *abool.AtomicBool
 	// IsRecordingManual is set while a viewer has requested a manual recording
 	// from the live view (the record button). While set, the motion-based
 	// recorder keeps recording (it does not auto-close on the post-recording
