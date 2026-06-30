@@ -254,6 +254,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					recordingStatus = "idle"
 
+					// Notify the hub / live-view UI that this camera stopped recording.
+					publishRecordingState(mqttClient, hubKey, configuration, false)
+
 					// Clean up the recording directory if necessary.
 					CleanupRecordingDirectory(configDirectory, configuration)
 				}
@@ -329,6 +332,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					writeSampleToMP4(mp4Video, videoTrack, audioTrack, pkt)
 					recordingStatus = "started"
+
+					// Notify the hub / live-view UI that this camera started recording.
+					publishRecordingState(mqttClient, hubKey, configuration, true)
 
 				} else if start {
 
@@ -406,6 +412,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					fc.Close()
 
 					recordingStatus = "idle"
+
+					// Notify the hub / live-view UI that this camera stopped recording.
+					publishRecordingState(mqttClient, hubKey, configuration, false)
 
 					// Clean up the recording directory if necessary.
 					CleanupRecordingDirectory(configDirectory, configuration)
@@ -554,6 +563,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 						}
 						start = true
+
+						// Notify the hub / live-view UI that this camera started recording.
+						publishRecordingState(mqttClient, hubKey, configuration, true)
 					}
 					if start {
 						writeSampleToMP4(mp4Video, videoTrack, audioTrack, pkt)
@@ -587,6 +599,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				}
 				mp4Video.Close(&config)
 				log.Log.Info("capture.main.HandleRecordStream(motiondetection): file save: " + name)
+
+				// Notify the hub / live-view UI that this camera stopped recording.
+				publishRecordingState(mqttClient, hubKey, configuration, false)
 
 				// Update the name of the recording with the duration.
 				// We will update the name of the recording with the duration in milliseconds.

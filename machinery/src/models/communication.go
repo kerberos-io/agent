@@ -47,6 +47,12 @@ type Communication struct {
 	HandleLiveHLS       chan string
 	HandleONVIF         chan OnvifAction
 	IsConfiguring       *abool.AtomicBool
+	// IsRecordingManual is set while a viewer has requested a manual recording
+	// from the live view (the record button). While set, the motion-based
+	// recorder keeps recording (it does not auto-close on the post-recording
+	// timeout) until the viewer stops it again. It is independent of motion
+	// detection so it also works when nothing is moving.
+	IsRecordingManual   *abool.AtomicBool
 	Queue               *packets.Queue
 	SubQueue            *packets.Queue
 	Image               string

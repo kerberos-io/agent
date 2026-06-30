@@ -375,11 +375,29 @@ func HandleRecording(mqttClient mqtt.Client, hubKey string, payload models.Paylo
 	var recordPayload models.RecordPayload
 	json.Unmarshal(jsonData, &recordPayload)
 
-	if recordPayload.Timestamp != 0 {
-		motionDataPartial := models.MotionDataPartial{
-			Timestamp: recordPayload.Timestamp,
+	timestamp := recordPayload.Timestamp
+	if timestamp == 0 {
+		timestamp = time.Now().Unix()
+	}
+
+	if recordPayload.Recording {
+		// Start a manual recording from the live view (record button). Keep it
+		// running until the viewer stops it again — the motion recorder honours
+		// communication.IsRecordingManual and won't auto-close on the
+		// post-recording timeout while it's set. We also inject a motion event
+		// so the recording starts immediately, even when nothing is moving.
+		log.Log.Info("routers.mqtt.main.HandleRecording(): manual recording started.")
+		communication.IsRecordingManual.Set()
+		select {
+		case communication.HandleMotion <- models.MotionDataPartial{Timestamp: timestamp, NumberOfChanges: 100000000}:
+		default:
+			log.Log.Warning("routers.mqtt.main.HandleRecording(): motion channel full, manual recording start not queued.")
 		}
-		communication.HandleMotion <- motionDataPartial
+	} else {
+		// Stop the manual recording; the motion recorder closes the clip once the
+		// post-recording window elapses.
+		log.Log.Info("routers.mqtt.main.HandleRecording(): manual recording stopped.")
+		communication.IsRecordingManual.UnSet()
 	}
 }
 
