@@ -7,7 +7,7 @@
 	"offline": "false",
 	"auto_clean": "true",
 	"remove_after_upload": "true",
-	"max_directory_size": 100,
+	"max_directory_size": 0,
 	"timezone": "Africa/Ceuta",
 	"capture": {
 		"name": "",
