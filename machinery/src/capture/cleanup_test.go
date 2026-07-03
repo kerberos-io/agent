@@ -196,3 +196,24 @@ func TestRecordingsNeedCleanup_DefaultDiskReserve(t *testing.T) {
 		t.Fatalf("expected no cleanup when free space (%dMB) exceeds the 1MB reserve", availableMB)
 	}
 }
+
+// The default 5% reserve must never truncate to 0MB on small disks, otherwise
+// cleanup would only trigger once the disk is completely full.
+func TestDefaultReserveMB(t *testing.T) {
+	cases := []struct {
+		totalMB int64
+		want    int64
+	}{
+		{totalMB: 0, want: 1},   // no/unknown disk size still reserves 1MB
+		{totalMB: 10, want: 1},  // 5% = 0MB -> floored to 1MB
+		{totalMB: 19, want: 1},  // 5% = 0MB -> floored to 1MB
+		{totalMB: 20, want: 1},  // 5% = exactly 1MB
+		{totalMB: 100, want: 5}, // 5% = 5MB
+		{totalMB: 1000, want: 50},
+	}
+	for _, c := range cases {
+		if got := defaultReserveMB(c.totalMB); got != c.want {
+			t.Errorf("defaultReserveMB(%d) = %d, want %d", c.totalMB, got, c.want)
+		}
+	}
+}

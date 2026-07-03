@@ -118,10 +118,23 @@ func recordingsNeedCleanup(recordingsDirectory string, configuration *models.Con
 
 	reserveMB := configuration.Config.MinFreeSpace
 	if reserveMB <= 0 {
-		reserveMB = totalMB * 5 / 100 // keep 5% of the disk free by default
+		reserveMB = defaultReserveMB(totalMB)
 	}
 
 	return availableMB <= reserveMB, nil
+}
+
+// defaultReserveMB returns the free-space reserve (MB) to keep on the recordings
+// disk when AGENT_AUTO_CLEAN_MIN_FREE_SPACE is not set: 5% of the disk total,
+// but never below 1MB. On very small disks 5% truncates to 0MB, which would
+// disable the reserve entirely (cleanup only once availableMB <= 0), so we floor
+// it at 1MB to preserve the intended "keep some space free" behaviour.
+func defaultReserveMB(totalMB int64) int64 {
+	reserveMB := totalMB * 5 / 100
+	if reserveMB < 1 {
+		reserveMB = 1
+	}
+	return reserveMB
 }
 
 // pickRecordingToCleanup chooses which recording to delete to free space in the
