@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
@@ -347,6 +349,47 @@ func TestUploadVaultResumable_Unsupported(t *testing.T) {
 	}
 	if supported {
 		t.Fatal("expected supported=false so the caller falls back to the legacy upload")
+	}
+}
+
+// TestUploadVaultResumable_NetworkErrorKeepsRetryBudget verifies that when the
+// vault is unreachable (mimicking the internet being disconnected) the resumable
+// upload reports responded=false. That is what stops the caller
+// (UploadKerberosVault) from consuming its retry budget and entering the long
+// back-off timeout on a transient network outage, so the recording keeps being
+// retried until connectivity returns.
+func TestUploadVaultResumable_NetworkErrorKeepsRetryBudget(t *testing.T) {
+	// Bind then immediately release a loopback port so every connection to it is
+	// refused, producing a transport-level error (no HTTP response).
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	addr := ln.Addr().String()
+	if cerr := ln.Close(); cerr != nil {
+		t.Fatalf("close listener: %v", cerr)
+	}
+
+	// Keep the between-attempt back-off tiny so the test stays fast.
+	oldDelay := tusBackoffBaseDelay
+	tusBackoffBaseDelay = time.Millisecond
+	defer func() { tusBackoffBaseDelay = oldDelay }()
+
+	fileName := "1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4"
+	withRecording(t, fileName, bytes.Repeat([]byte("n"), 2048))
+
+	uploaded, responded, supported, _, err := uploadVaultResumable(testVault("http://"+addr), "pk", "dev", fileName, "test", "primary")
+	if uploaded {
+		t.Fatal("expected uploaded=false when the vault is unreachable")
+	}
+	if !supported {
+		t.Fatal("a transport error is not a missing tus endpoint; expected supported=true")
+	}
+	if responded {
+		t.Fatal("expected responded=false for a pure network error so the retry budget is preserved")
+	}
+	if err == nil {
+		t.Fatal("expected an error when the vault is unreachable")
 	}
 }
 
