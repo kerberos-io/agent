@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -199,17 +200,59 @@ func setVaultHeaders(h http.Header, vault models.KStorage, publicKey, deviceKey,
 }
 
 // newVaultHTTPClient builds an HTTP client honouring the AGENT_TLS_INSECURE
-// escape hatch. A timeout of 0 disables the client-level timeout, which is
-// required for streaming large upload bodies.
+// escape hatch. A timeout of 0 disables the *overall* client timeout, which is
+// required for streaming large upload bodies without capping the total transfer
+// time. Transport-level timeouts are still applied so that a lost network
+// connection (for example the internet being disconnected) fails reasonably
+// fast and the upload is retried, instead of the request hanging until the OS
+// TCP timeout (which can be many minutes) and blocking the whole upload loop.
 func newVaultHTTPClient(timeout time.Duration) *http.Client {
-	client := &http.Client{}
+	// Start from a clone of the default transport so we keep its sane dial and
+	// TLS-handshake timeouts, connection pooling and HTTP/2 support even when the
+	// AGENT_TLS_INSECURE escape hatch is enabled (a bare http.Transport would have
+	// no dial/handshake timeouts at all).
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+
+	// ResponseHeaderTimeout bounds how long we wait for the vault's response
+	// headers *after* the request body has been fully written. It does not limit
+	// the time spent streaming the (potentially large) upload body, so big
+	// recordings still upload fine, but a vault/network that disappears while we
+	// wait for the acknowledgement is detected and the upload is retried instead
+	// of hanging indefinitely.
+	transport.ResponseHeaderTimeout = vaultResponseHeaderTimeout()
+
 	if os.Getenv("AGENT_TLS_INSECURE") == "true" {
-		client.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		if transport.TLSClientConfig == nil {
+			transport.TLSClientConfig = &tls.Config{}
 		}
+		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
+
+	client := &http.Client{Transport: transport}
 	if timeout > 0 {
 		client.Timeout = timeout
 	}
 	return client
+}
+
+// vaultResponseHeaderTimeout returns the maximum time to wait for a vault's
+// response headers after the request body has been written. It defaults to 5
+// minutes — generous enough for the vault to persist/finalize a chunk or a full
+// recording to its storage provider — and can be tuned with the
+// AGENT_VAULT_RESPONSE_HEADER_TIMEOUT_SECONDS environment variable. A value of 0
+// (or a negative/invalid value) disables the timeout.
+func vaultResponseHeaderTimeout() time.Duration {
+	const def = 5 * time.Minute
+	v := os.Getenv("AGENT_VAULT_RESPONSE_HEADER_TIMEOUT_SECONDS")
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	if n <= 0 {
+		return 0
+	}
+	return time.Duration(n) * time.Second
 }

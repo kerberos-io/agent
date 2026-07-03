@@ -203,7 +203,8 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_REMOVE_AFTER_UPLOAD`                 | When enabled, recordings uploaded successfully to a storage will be removed from disk.          | "true"                         |
 | `AGENT_OFFLINE`                             | Makes sure no external connection is made.                                                      | "false"                        |
 | `AGENT_AUTO_CLEAN`                          | Cleans up the recordings directory.                                                             | "true"                         |
-| `AGENT_AUTO_CLEAN_MAX_SIZE`                 | If `AUTO_CLEAN` enabled, set the max size of the recordings directory (in MB).                  | "100"                          |
+| `AGENT_AUTO_CLEAN_MAX_SIZE`                 | If `AUTO_CLEAN` enabled, cap the recordings directory at this size (in MB). When unset/0, recordings may use the whole disk instead (see `AGENT_AUTO_CLEAN_MIN_FREE_SPACE`). | "100"                          |
+| `AGENT_AUTO_CLEAN_MIN_FREE_SPACE`           | When `AUTO_CLEAN` is enabled and no `MAX_SIZE` is set, keep at least this much free space (in MB) on the recordings disk before deleting the oldest (already-uploaded first) recordings. Defaults to 5% of the disk. | ""                             |
 | `AGENT_TIME`                                | Enable the timetable for Kerberos Agent                                                         | "false"                        |
 | `AGENT_TIMETABLE`                           | A (weekly) time table to specify when to make recordings "start1,end1,start2,end2;start1..      | ""                             |
 | `AGENT_REGION_POLYGON`                      | A single polygon set for motion detection: "x1,y1;x2,y2;x3,y3;...                               | ""                             |

@@ -22,36 +22,170 @@ import (
 
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
 	autoClean := configuration.Config.AutoClean
-	if autoClean == "true" {
-		maxSize := configuration.Config.MaxDirectorySize
-		if maxSize == 0 {
-			maxSize = 300
+	if autoClean != "true" {
+		log.Log.Info("HandleRecordStream: Autoclean disabled, nothing to do here.")
+		return
+	}
+
+	recordingsDirectory := configDirectory + "/data/recordings"
+	cloudDirectory := configDirectory + "/data/cloud"
+
+	// Decide whether we still need to free up space. See recordingsNeedCleanup
+	// for the two modes: an explicit fixed directory cap
+	// (AGENT_AUTO_CLEAN_MAX_SIZE) or, by default, letting recordings use the whole
+	// disk while keeping a free-space reserve.
+	needsCleanup, err := recordingsNeedCleanup(recordingsDirectory, configuration)
+	if err != nil {
+		log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+		return
+	}
+	if !needsCleanup {
+		return
+	}
+
+	// Remove the oldest recording, but PREFER recordings that have already been
+	// uploaded (i.e. no longer have a pending marker in data/cloud). This stops
+	// auto-clean from deleting recordings that are still queued for upload. That
+	// previously caused silent data loss: during a network outage the upload
+	// backlog grows, cleanup deletes the oldest (still un-uploaded) recording to
+	// stay under MaxDirectorySize, and when connectivity returns the upload loop
+	// finds the marker but the file is gone -> the recording is dropped and never
+	// reaches the vault.
+	//
+	// Only when EVERY recording on disk is still pending upload do we fall back to
+	// deleting the oldest pending one, as a last resort to keep the disk bounded
+	// (otherwise a long outage would fill the disk and stop new recordings).
+	name, pending, err := pickRecordingToCleanup(recordingsDirectory, cloudDirectory)
+	if err != nil {
+		log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+		return
+	}
+
+	if err := os.Remove(recordingsDirectory + "/" + name); err != nil {
+		log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+		return
+	}
+
+	if pending {
+		// Data-loss event: the whole recordings directory is an un-uploaded
+		// backlog (e.g. a prolonged network outage), so we had to drop a recording
+		// that was never uploaded to keep recording new footage. Also remove the
+		// now-dangling upload marker so the upload loop doesn't keep trying to
+		// upload a file that no longer exists.
+		log.Log.Warning("HandleRecordStream: removed oldest recording as part of cleanup, but it was STILL PENDING UPLOAD (disk full of un-uploaded recordings) - " + recordingsDirectory + "/" + name)
+		if err := os.Remove(cloudDirectory + "/" + name); err != nil && !os.IsNotExist(err) {
+			log.Log.Info("HandleRecordStream: could not remove dangling upload marker " + name + ", " + err.Error())
 		}
-		// Total size of the recording directory.
-		recordingsDirectory := configDirectory + "/data/recordings"
+	} else {
+		log.Log.Info("HandleRecordStream: removed oldest file as part of cleanup - " + recordingsDirectory + "/" + name)
+	}
+}
+
+// recordingsNeedCleanup reports whether auto-clean should free up space in the
+// recordings directory. There are two modes:
+//
+//   - AGENT_AUTO_CLEAN_MAX_SIZE (MaxDirectorySize, MB) set: cap the size of the
+//     recordings directory itself (the historical behaviour).
+//   - MaxDirectorySize == 0 (the default): recordings may use the WHOLE disk.
+//     Cleanup only triggers once the free space on the recordings filesystem
+//     drops to/below a reserve. The reserve is AGENT_AUTO_CLEAN_MIN_FREE_SPACE
+//     (MinFreeSpace, MB) when set, otherwise 5% of the disk's total capacity.
+//
+// If disk stats can't be read (e.g. non-Linux dev builds) it falls back to the
+// historical fixed 300 MB directory cap so behaviour stays bounded.
+func recordingsNeedCleanup(recordingsDirectory string, configuration *models.Configuration) (bool, error) {
+	maxSize := configuration.Config.MaxDirectorySize
+
+	// Explicit fixed cap on the recordings directory size.
+	if maxSize > 0 {
 		size, err := utils.DirSize(recordingsDirectory)
-		if err == nil {
-			sizeInMB := size / 1000 / 1000
-			if sizeInMB >= maxSize {
-				// Remove the oldest recording
-				oldestFile, err := utils.FindOldestFile(recordingsDirectory)
-				if err == nil {
-					err := os.Remove(recordingsDirectory + "/" + oldestFile.Name())
-					log.Log.Info("HandleRecordStream: removed oldest file as part of cleanup - " + recordingsDirectory + "/" + oldestFile.Name())
-					if err != nil {
-						log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
-					}
-				} else {
-					log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
-				}
-			}
-		} else {
-			log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+		if err != nil {
+			return false, err
+		}
+		return size/1000/1000 >= maxSize, nil
+	}
+
+	// Default: allow recordings to use the full disk, keeping a reserve free.
+	totalMB, availableMB, err := diskUsageMB(recordingsDirectory)
+	if err != nil {
+		// Disk stats unavailable: fall back to the historical 300 MB cap.
+		size, derr := utils.DirSize(recordingsDirectory)
+		if derr != nil {
+			return false, derr
+		}
+		return size/1000/1000 >= 300, nil
+	}
+
+	reserveMB := configuration.Config.MinFreeSpace
+	if reserveMB <= 0 {
+		reserveMB = defaultReserveMB(totalMB)
+	}
+
+	return availableMB <= reserveMB, nil
+}
+
+// defaultReserveMB returns the free-space reserve (MB) to keep on the recordings
+// disk when AGENT_AUTO_CLEAN_MIN_FREE_SPACE is not set: 5% of the disk total,
+// but never below 1MB. On very small disks 5% truncates to 0MB, which would
+// disable the reserve entirely (cleanup only once availableMB <= 0), so we floor
+// it at 1MB to preserve the intended "keep some space free" behaviour.
+func defaultReserveMB(totalMB int64) int64 {
+	reserveMB := totalMB * 5 / 100
+	if reserveMB < 1 {
+		reserveMB = 1
+	}
+	return reserveMB
+}
+
+// pickRecordingToCleanup chooses which recording to delete to free space in the
+// recordings directory. It returns the oldest recording that has already been
+// uploaded (no pending marker with the same name in cloudDirectory). Only when
+// every recording is still pending upload does it return the oldest recording
+// overall with pending=true, signalling the caller that it is about to drop an
+// un-uploaded recording as a last resort.
+func pickRecordingToCleanup(recordingsDirectory, cloudDirectory string) (string, bool, error) {
+	entries, err := os.ReadDir(recordingsDirectory)
+	if err != nil {
+		return "", false, err
+	}
+
+	var oldestSafeName, oldestAnyName string
+	var oldestSafeTime, oldestAnyTime time.Time
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		modTime := info.ModTime()
+
+		if oldestAnyName == "" || modTime.Before(oldestAnyTime) {
+			oldestAnyName = entry.Name()
+			oldestAnyTime = modTime
 		}
 
-	} else {
-		log.Log.Info("HandleRecordStream: Autoclean disabled, nothing to do here.")
+		// A recording is still pending upload if a marker with the same name
+		// exists in the cloud directory. Skip those when picking a safe candidate.
+		if _, statErr := os.Stat(cloudDirectory + "/" + entry.Name()); statErr == nil {
+			continue
+		}
+
+		if oldestSafeName == "" || modTime.Before(oldestSafeTime) {
+			oldestSafeName = entry.Name()
+			oldestSafeTime = modTime
+		}
 	}
+
+	if oldestSafeName != "" {
+		return oldestSafeName, false, nil
+	}
+	if oldestAnyName != "" {
+		return oldestAnyName, true, nil
+	}
+	return "", false, os.ErrNotExist
 }
 
 func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient) {

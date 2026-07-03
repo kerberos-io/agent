@@ -154,10 +154,20 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 	const maxAttempts = 4
 	restartedAfterComplete := false
 
+	// lastStatus holds the HTTP status code of the most recent tus request. A
+	// value of 0 means the request failed at the transport level (no HTTP
+	// response at all, e.g. the vault was unreachable or the connection dropped
+	// because the internet went down). It lets the final "gave up" return report
+	// whether the vault actually answered, so the caller only advances its
+	// retry/back-off policy on a definitive response and transient network errors
+	// never consume the retry budget (matching the legacy single-POST behaviour).
+	lastStatus := 0
+
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		// (1) Ensure we have an active upload URL, creating one if needed.
 		if uploadURL == "" {
 			created, status, cerr := tusCreate(client, baseURL, size, metadata, setHeaders, fileName)
+			lastStatus = status
 			if cerr != nil {
 				if status == http.StatusNotFound || status == http.StatusMethodNotAllowed || status == http.StatusNotImplemented {
 					// The vault does not implement tus; let the caller fall back.
@@ -173,6 +183,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 
 		// (2) Query the current server-side offset.
 		offset, status, herr := tusHead(client, uploadURL, setHeaders)
+		lastStatus = status
 		if herr != nil {
 			if status == http.StatusNotFound || status == http.StatusGone {
 				// The upload expired/was removed server-side; start over.
@@ -220,6 +231,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 				patchLen = chunkSize
 			}
 			newOffset, status, respBody, perr := tusPatch(client, uploadURL, offset, patchLen, file, setHeaders)
+			lastStatus = status
 			if perr != nil {
 				if status >= 400 {
 					// Definitive rejection (e.g. provider push failed during finalize).
@@ -258,7 +270,13 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 		return true, true, true, lastBody, nil
 	}
 
-	return false, true, true, "resumable upload did not complete after retries", errors.New(label + ": resumable upload did not complete after retries")
+	// Every attempt failed. Only report responded=true when the vault actually
+	// answered on the last attempt (lastStatus > 0). If every attempt failed at
+	// the transport level (lastStatus == 0, e.g. the internet was disconnected),
+	// report responded=false so the caller keeps the recording queued and retries
+	// later instead of consuming its retry budget and entering the long back-off
+	// timeout.
+	return false, lastStatus > 0, true, "resumable upload did not complete after retries", errors.New(label + ": resumable upload did not complete after retries")
 }
 
 // uploadVaultResumable uploads a recording directly to a Kerberos Vault using
@@ -535,10 +553,15 @@ func removeTusResumeState(path string) {
 	_ = os.Remove(path)
 }
 
+// tusBackoffBaseDelay is the base delay used by tusBackoff for the exponential
+// back-off between resume attempts. It is a package variable (rather than a
+// constant) so tests can shrink it to keep them fast.
+var tusBackoffBaseDelay = 500 * time.Millisecond
+
 // tusBackoff sleeps for an exponentially increasing duration (capped) between
 // resume attempts to avoid hammering a temporarily unavailable vault.
 func tusBackoff(attempt int) {
-	delay := time.Duration(500*(1<<uint(attempt))) * time.Millisecond
+	delay := tusBackoffBaseDelay * time.Duration(1<<uint(attempt))
 	if delay > 3*time.Second {
 		delay = 3 * time.Second
 	}

@@ -21,6 +21,7 @@ type Config struct {
 	AutoClean               string       `json:"auto_clean"`
 	RemoveAfterUpload       string       `json:"remove_after_upload"`
 	MaxDirectorySize        int64        `json:"max_directory_size"`
+	MinFreeSpace            int64        `json:"min_free_space,omitempty"`
 	Timezone                string       `json:"timezone"`
 	Capture                 Capture      `json:"capture"`
 	Timetable               []*Timetable `json:"timetable"`

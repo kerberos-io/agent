@@ -327,6 +327,12 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 					configuration.Config.MaxDirectorySize = size
 				}
 				break
+			case "AGENT_AUTO_CLEAN_MIN_FREE_SPACE":
+				size, err := strconv.ParseInt(value, 10, 64)
+				if err == nil {
+					configuration.Config.MinFreeSpace = size
+				}
+				break
 
 			/* Camera configuration */
 			case "AGENT_CAPTURE_IPCAMERA_RTSP":
