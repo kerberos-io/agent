@@ -30,13 +30,26 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 		pixelThreshold = 150
 	}
 
-	if config.Capture.Continuous == "true" {
+	// In motion mode we always run detection. In CONTINUOUS mode recording is
+	// 24/7 so motion detection is normally skipped, BUT if a motion region is
+	// configured we still run it so the live view can visualise the motion boxes
+	// + region. In that case we only emit the motion EVENT — no motion-triggered
+	// recording (continuous already records, and the recorder's motion branch
+	// isn't draining HandleMotion in continuous mode).
+	continuousMode := config.Capture.Continuous == "true"
+	hasMotionRegion := config.Region != nil && len(config.Region.Polygon) > 0
 
-		log.Log.Info("computervision.main.ProcessMotion(): you've enabled continuous recording, so no motion detection required.")
+	if continuousMode && !hasMotionRegion {
+
+		log.Log.Info("computervision.main.ProcessMotion(): continuous recording enabled and no motion region configured, so no motion detection required.")
 
 	} else {
 
-		log.Log.Info("computervision.main.ProcessMotion(): motion detected is enabled, so starting the motion detection.")
+		if continuousMode {
+			log.Log.Info("computervision.main.ProcessMotion(): continuous recording enabled with a motion region, running motion detection for live-view visualisation only (no motion-triggered recording).")
+		} else {
+			log.Log.Info("computervision.main.ProcessMotion(): motion detected is enabled, so starting the motion detection.")
+		}
 
 		hubKey := config.HubKey
 		deviceKey := config.Key
@@ -169,7 +182,11 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 					log.Log.Debug("computervision.main.ProcessMotion(): " + err.Error() + ".")
 				}
 
-				if config.Capture.Motion != "false" {
+				// Run detection when motion is enabled, OR when we're in continuous
+				// mode with a region: there config.Capture.Motion (the motion-RECORDING
+				// switch) is irrelevant, so the configured region alone is enough to
+				// emit motion events for the live-view overlay.
+				if config.Capture.Motion != "false" || continuousMode {
 
 					if detectMotion {
 
@@ -210,7 +227,12 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 								}
 							}
 
-							if config.Capture.Recording != "false" {
+							// Trigger motion-based recording — but NOT in continuous mode:
+							// there the recorder runs the continuous branch and does not
+							// drain HandleMotion, so a (blocking) send would hang the motion
+							// loop. In continuous mode we only publish the motion event above
+							// for the live-view overlay.
+							if config.Capture.Recording != "false" && !continuousMode {
 								dataToPass := models.MotionDataPartial{
 									Timestamp:       time.Now().Unix(),
 									NumberOfChanges: changesToReturn,
