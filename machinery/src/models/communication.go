@@ -52,12 +52,30 @@ type Communication struct {
 	// recorder keeps recording (it does not auto-close on the post-recording
 	// timeout) until the viewer stops it again. It is independent of motion
 	// detection so it also works when nothing is moving.
-	IsRecordingManual   *abool.AtomicBool
-	Queue               *packets.Queue
-	SubQueue            *packets.Queue
-	Image               string
-	CameraConnected     bool
-	MainStreamConnected bool
-	SubStreamConnected  bool
-	HasBackChannel      bool
+	IsRecordingManual *abool.AtomicBool
+	// RecordingManualHeartbeat holds the unix-milliseconds timestamp of the last
+	// heartbeat received from the live view while a manual recording is active.
+	// The frontend re-sends the record command every few seconds while the user
+	// stays on the page; if the heartbeats stop (the viewer closed the tab, went
+	// idle or lost connectivity) the recorder auto-stops the manual recording so
+	// it can't record forever when the "stop" message never arrives.
+	RecordingManualHeartbeat *atomic.Int64
+	// RecordingManualStart holds the unix-milliseconds timestamp at which the
+	// current manual recording started. It bounds a manual recording to a maximum
+	// duration (see capture.manualRecordingMaxDuration) so a forgotten record
+	// button can't record indefinitely even while the viewer stays active.
+	RecordingManualStart *atomic.Int64
+	// RecordingManualHeartbeatSeen is set once the current manual recording has
+	// received at least one heartbeat, i.e. the viewer proved it supports
+	// heartbeating. Only then does the recorder enforce the heartbeat timeout; a
+	// viewer that starts a recording but never heartbeats (an older frontend)
+	// still records up to the max-duration cap instead of being cut off early.
+	RecordingManualHeartbeatSeen *abool.AtomicBool
+	Queue                        *packets.Queue
+	SubQueue                     *packets.Queue
+	Image                        string
+	CameraConnected              bool
+	MainStreamConnected          bool
+	SubStreamConnected           bool
+	HasBackChannel               bool
 }

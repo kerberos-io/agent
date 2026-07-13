@@ -381,23 +381,46 @@ func HandleRecording(mqttClient mqtt.Client, hubKey string, payload models.Paylo
 	}
 
 	if recordPayload.Recording {
-		// Start a manual recording from the live view (record button). Keep it
-		// running until the viewer stops it again — the motion recorder honours
-		// communication.IsRecordingManual and won't auto-close on the
-		// post-recording timeout while it's set. We also inject a motion event
-		// so the recording starts immediately, even when nothing is moving.
-		log.Log.Info("routers.mqtt.main.HandleRecording(): manual recording started.")
-		communication.IsRecordingManual.Set()
-		select {
-		case communication.HandleMotion <- models.MotionDataPartial{Timestamp: timestamp, NumberOfChanges: 100000000}:
-		default:
-			log.Log.Warning("routers.mqtt.main.HandleRecording(): motion channel full, manual recording start not queued.")
+		now := time.Now().UnixMilli()
+		if recordPayload.Heartbeat {
+			// Keep-alive from a viewer that supports heartbeats. Only refresh while
+			// a manual recording is actually running; if it already auto-stopped
+			// (heartbeat timeout / max duration) we IGNORE it so a stray heartbeat
+			// can't restart a recording we just ended. Seeing a heartbeat also arms
+			// the recorder's heartbeat-timeout auto-stop.
+			if communication.IsRecordingManual.IsSet() {
+				communication.RecordingManualHeartbeat.Store(now)
+				communication.RecordingManualHeartbeatSeen.Set()
+				log.Log.Debug("routers.mqtt.main.HandleRecording(): manual recording heartbeat received.")
+			} else {
+				log.Log.Debug("routers.mqtt.main.HandleRecording(): ignoring heartbeat, no active manual recording.")
+			}
+		} else {
+			// Explicit start from the live view (record button). Start a manual
+			// recording and keep it running — the motion recorder honours
+			// communication.IsRecordingManual and won't auto-close on the
+			// post-recording timeout while it's set. We also inject a motion event
+			// so the recording starts immediately, even when nothing is moving.
+			communication.RecordingManualHeartbeat.Store(now)
+			if communication.IsRecordingManual.SetToIf(false, true) {
+				communication.RecordingManualStart.Store(now)
+				communication.RecordingManualHeartbeatSeen.UnSet()
+				log.Log.Info("routers.mqtt.main.HandleRecording(): manual recording started.")
+				select {
+				case communication.HandleMotion <- models.MotionDataPartial{Timestamp: timestamp, NumberOfChanges: 100000000}:
+				default:
+					log.Log.Warning("routers.mqtt.main.HandleRecording(): motion channel full, manual recording start not queued.")
+				}
+			}
 		}
 	} else {
 		// Stop the manual recording; the motion recorder closes the clip once the
-		// post-recording window elapses.
+		// post-recording window elapses. Clear the heartbeat/start markers too.
 		log.Log.Info("routers.mqtt.main.HandleRecording(): manual recording stopped.")
 		communication.IsRecordingManual.UnSet()
+		communication.RecordingManualHeartbeat.Store(0)
+		communication.RecordingManualStart.Store(0)
+		communication.RecordingManualHeartbeatSeen.UnSet()
 	}
 }
 
