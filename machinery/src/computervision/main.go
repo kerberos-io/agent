@@ -204,14 +204,19 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 												DeviceId: configuration.Config.Key,
 												Value: map[string]interface{}{
 													"timestamp": time.Now().Unix(),
-													// Live-view motion-debug overlay data: the frame
-													// dimensions the boxes/region are expressed in, the
-													// detected motion bounding boxes and the detection
-													// region polygon(s).
-													"width":   imageCols,
-													"height":  imageRows,
-													"regions": motionRectangles,
-													"polygon": regionPolygons,
+													// Live-view motion-debug overlay data. The boxes/region
+													// are in the MOTION frame's pixel space (width/height =
+													// the stream motion ran on, i.e. the sub stream when
+													// set). mainWidth/mainHeight are the MAIN stream's
+													// dimensions so the live view can extrapolate the
+													// boxes/region onto the high-res main view it shows —
+													// we know both, so no guessing from the <video> element.
+													"width":      imageCols,
+													"height":     imageRows,
+													"mainWidth":  configuration.Config.Capture.IPCamera.Width,
+													"mainHeight": configuration.Config.Capture.IPCamera.Height,
+													"regions":    motionRectangles,
+													"polygon":    regionPolygons,
 												},
 											},
 										}
