@@ -472,6 +472,14 @@ loop:
 				hasBackChannel = "true"
 			}
 
+			// Whether this camera records continuously (24/7) rather than on
+			// motion. The Hub live view uses this to disable the manual record
+			// button, which is a no-op in continuous mode (already recording).
+			continuousRecording := "false"
+			if config.Capture.Continuous == "true" {
+				continuousRecording = "true"
+			}
+
 			hub_encryption := "false"
 			if config.HubEncryption == "true" {
 				hub_encryption = "true"
@@ -530,6 +538,7 @@ loop:
 						"onvif_events_list": %s,
 						"cameraConnected": "%s",
 						"hasBackChannel": "%s",
+						"continuousRecording": "%s",
 						"livePreviewHttp": true,
 						"numberoffiles" : "33",
 						"timestamp" : 1564747908,
@@ -537,7 +546,7 @@ loop:
 						"docker" : true,
 						"kios" : false,
 						"raspberrypi" : false
-					}`, config.Key, kerberosAgentVersion, hub_encryption, e2e_encryption, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, onvifEventsList, cameraConnected, hasBackChannel)
+					}`, config.Key, kerberosAgentVersion, hub_encryption, e2e_encryption, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, onvifEventsList, cameraConnected, hasBackChannel, continuousRecording)
 
 				// Get the private key to encrypt the data using symmetric encryption: AES.
 				privateKey := config.HubPrivateKey
