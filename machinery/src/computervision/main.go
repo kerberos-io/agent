@@ -22,6 +22,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 	var isPixelChangeThresholdReached = false
 	var changesToReturn = 0
 	var motionRectangle models.MotionRectangle
+	var motionRectangles []models.MotionRectangle
 
 	pixelThreshold := config.Capture.PixelChangeThreshold
 	// Might not be set in the config file, so set it to 150
@@ -100,12 +101,34 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 			}
 		}
 
+		// Frame dimensions + the motion region polygon(s) in image space, shipped
+		// with each motion event so the live view can draw a motion-debug overlay
+		// (the boxes below + the detection region).
+		var imageCols, imageRows int
+		var regionPolygons [][]map[string]int
+		if config.Region != nil {
+			for _, polygon := range config.Region.Polygon {
+				var pts []map[string]int
+				for _, c := range polygon.Coordinates {
+					pts = append(pts, map[string]int{
+						"x": int(c.X * baseWidthRatio),
+						"y": int(c.Y * baseHeightRatio),
+					})
+				}
+				if len(pts) > 0 {
+					regionPolygons = append(regionPolygons, pts)
+				}
+			}
+		}
+
 		img := imageArray[0]
 		var coordinatesToCheck []int
 		if img != nil {
 			bounds := img.Bounds()
 			rows := bounds.Dy()
 			cols := bounds.Dx()
+			imageCols = cols
+			imageRows = rows
 
 			// Make fixed size array of uinty8
 			for y := 0; y < rows; y++ {
@@ -151,7 +174,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 					if detectMotion {
 
 						// Remember additional information about the result of findmotion
-						isPixelChangeThresholdReached, changesToReturn, motionRectangle = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
+						isPixelChangeThresholdReached, changesToReturn, motionRectangle, motionRectangles = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
 						if isPixelChangeThresholdReached {
 
 							// If offline mode is disabled, send a message to the hub
@@ -164,6 +187,14 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 												DeviceId: configuration.Config.Key,
 												Value: map[string]interface{}{
 													"timestamp": time.Now().Unix(),
+													// Live-view motion-debug overlay data: the frame
+													// dimensions the boxes/region are expressed in, the
+													// detected motion bounding boxes and the detection
+													// region polygon(s).
+													"width":   imageCols,
+													"height":  imageRows,
+													"regions": motionRectangles,
+													"polygon": regionPolygons,
 												},
 											},
 										}
@@ -205,17 +236,19 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 	log.Log.Debug("computervision.main.ProcessMotion(): stop the motion detection.")
 }
 
-func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int, motionRectangle models.MotionRectangle) {
+func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int, motionRectangle models.MotionRectangle, motionRectangles []models.MotionRectangle) {
 	image1 := imageArray[0]
 	image2 := imageArray[1]
 	image3 := imageArray[2]
 	threshold := 60
-	changes, motionRectangle := AbsDiffBitwiseAndThreshold(image1, image2, image3, threshold, coordinatesToCheck)
-	return changes > pixelChangeThreshold, changes, motionRectangle
+	changes, motionRectangle, motionRectangles := AbsDiffBitwiseAndThreshold(image1, image2, image3, threshold, coordinatesToCheck)
+	return changes > pixelChangeThreshold, changes, motionRectangle, motionRectangles
 }
 
-func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.Gray, threshold int, coordinatesToCheck []int) (int, models.MotionRectangle) {
+func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.Gray, threshold int, coordinatesToCheck []int) (int, models.MotionRectangle, []models.MotionRectangle) {
 	changes := 0
+	cols := img1.Bounds().Dx()
+	rows := img1.Bounds().Dy()
 	var pixelList [][]int
 	for i := 0; i < len(coordinatesToCheck); i++ {
 		pixel := coordinatesToCheck[i]
@@ -224,7 +257,7 @@ func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.
 		if (diff > threshold || diff < -threshold) && (diff2 > threshold || diff2 < -threshold) {
 			changes++
 			// Store the pixel coordinates where the change is detected
-			pixelList = append(pixelList, []int{pixel % img1.Bounds().Dx(), pixel / img1.Bounds().Dx()})
+			pixelList = append(pixelList, []int{pixel % cols, pixel / cols})
 		}
 	}
 
@@ -258,5 +291,118 @@ func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.
 		}
 		log.Log.Debugf("Motion rectangle: %+v", motionRectangle)
 	}
-	return changes, motionRectangle
+
+	// Cluster the changed pixels into separate bounding boxes so the live view can
+	// visualise WHERE motion happened (a single overall rectangle is useless when
+	// two objects move in opposite corners). Cheap grid-based connected components.
+	motionRectangles := clusterMotionRectangles(pixelList, cols, rows)
+
+	return changes, motionRectangle, motionRectangles
+}
+
+// clusterMotionRectangles groups the changed-pixel coordinates into a handful of
+// bounding boxes using connected-components on a coarse grid (8-connectivity).
+// It is intentionally lightweight — it runs only when the motion threshold is
+// reached and the boxes are meant for a debug overlay, not precise detection.
+func clusterMotionRectangles(pixelList [][]int, cols, rows int) []models.MotionRectangle {
+	if len(pixelList) == 0 || cols <= 0 || rows <= 0 {
+		return nil
+	}
+
+	// ~40 cells across the longest side keeps the grid small (cheap to cluster)
+	// while still separating distinct motion blobs.
+	const gridDim = 40
+	cellW := cols / gridDim
+	if cellW < 1 {
+		cellW = 1
+	}
+	cellH := rows / gridDim
+	if cellH < 1 {
+		cellH = 1
+	}
+	gCols := (cols + cellW - 1) / cellW
+	gRows := (rows + cellH - 1) / cellH
+
+	grid := make([]bool, gCols*gRows)
+	for _, p := range pixelList {
+		cx := p[0] / cellW
+		cy := p[1] / cellH
+		if cx >= 0 && cx < gCols && cy >= 0 && cy < gRows {
+			grid[cy*gCols+cx] = true
+		}
+	}
+
+	visited := make([]bool, gCols*gRows)
+	var rectangles []models.MotionRectangle
+	const maxBoxes = 12
+	stack := make([][2]int, 0, 64)
+
+	for cy := 0; cy < gRows; cy++ {
+		for cx := 0; cx < gCols; cx++ {
+			idx := cy*gCols + cx
+			if !grid[idx] || visited[idx] {
+				continue
+			}
+
+			// Flood-fill this component (8-connectivity) and track its extent.
+			minX, minY, maxX, maxY := cx, cy, cx, cy
+			cellCount := 0
+			stack = stack[:0]
+			stack = append(stack, [2]int{cx, cy})
+			visited[idx] = true
+			for len(stack) > 0 {
+				cur := stack[len(stack)-1]
+				stack = stack[:len(stack)-1]
+				ccx, ccy := cur[0], cur[1]
+				cellCount++
+				if ccx < minX {
+					minX = ccx
+				}
+				if ccy < minY {
+					minY = ccy
+				}
+				if ccx > maxX {
+					maxX = ccx
+				}
+				if ccy > maxY {
+					maxY = ccy
+				}
+				for dy := -1; dy <= 1; dy++ {
+					for dx := -1; dx <= 1; dx++ {
+						nx, ny := ccx+dx, ccy+dy
+						if nx < 0 || ny < 0 || nx >= gCols || ny >= gRows {
+							continue
+						}
+						nIdx := ny*gCols + nx
+						if grid[nIdx] && !visited[nIdx] {
+							visited[nIdx] = true
+							stack = append(stack, [2]int{nx, ny})
+						}
+					}
+				}
+			}
+
+			// Skip single-cell specks (sensor noise) unless it's the only motion.
+			if cellCount < 2 && len(pixelList) > 4 {
+				continue
+			}
+
+			x := minX * cellW
+			y := minY * cellH
+			w := (maxX - minX + 1) * cellW
+			h := (maxY - minY + 1) * cellH
+			if x+w > cols {
+				w = cols - x
+			}
+			if y+h > rows {
+				h = rows - y
+			}
+			rectangles = append(rectangles, models.MotionRectangle{X: x, Y: y, Width: w, Height: h})
+			if len(rectangles) >= maxBoxes {
+				return rectangles
+			}
+		}
+	}
+
+	return rectangles
 }
