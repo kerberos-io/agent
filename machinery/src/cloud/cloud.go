@@ -6,7 +6,6 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -217,6 +216,16 @@ func GetSystemInfo() (models.System, error) {
 	}
 
 	return system, nil
+}
+
+// rawJSONOrEmptyArray returns pre-marshalled JSON bytes as a json.RawMessage.
+// When the input is empty it falls back to an empty JSON array so the
+// surrounding payload always stays valid JSON.
+func rawJSONOrEmptyArray(b []byte) json.RawMessage {
+	if len(b) == 0 {
+		return json.RawMessage("[]")
+	}
+	return json.RawMessage(b)
 }
 
 func HandleHeartBeat(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time) {
@@ -472,6 +481,14 @@ loop:
 				hasBackChannel = "true"
 			}
 
+			// Whether this camera records continuously (24/7) rather than on
+			// motion. The Hub live view uses this to disable the manual record
+			// button, which is a no-op in continuous mode (already recording).
+			continuousRecording := "false"
+			if config.Capture.Continuous == "true" {
+				continuousRecording = "true"
+			}
+
 			hub_encryption := "false"
 			if config.HubEncryption == "true" {
 				hub_encryption = "true"
@@ -496,48 +513,98 @@ loop:
 			// We need a hub URI and hub public key before we will send a heartbeat
 			if hubURI != "" && key != "" {
 
-				var object = fmt.Sprintf(`{
-						"key" : "%s",
-						"version" : "%s",
-						"hub_encryption": "%s",
-						"e2e_encryption": "%s",
-						"release" : "%s",
-						"cpuid" : "%s",
-						"clouduser" : "%s",
-						"cloudpublickey" : "%s",
-						"cameraname" : "%s",
-						"enterprise" : %t,
-						"hostname" : "%s",
-						"architecture" : "%s",
-						"totalMemory" : "%d",
-						"usedMemory" : "%d",
-						"freeMemory" : "%d",
-						"processMemory" : "%d",
-						"mac_list" : %s,
-						"ip_list" : %s,
-						"board" : "",
-						"disk1size" : "%s",
-						"disk3size" : "%s",
-						"diskvdasize" :  "%s",
-						"uptime" : "%s",
-						"boot_time" : "%s",
-						"siteID" : "%s",
-						"onvif" : "%s",
-						"onvif_zoom" : "%s",
-						"onvif_pantilt" : "%s",
-						"onvif_presets": "%s",
-						"onvif_presets_list": %s,
-						"onvif_events_list": %s,
-						"cameraConnected": "%s",
-						"hasBackChannel": "%s",
-						"livePreviewHttp": true,
-						"numberoffiles" : "33",
-						"timestamp" : 1564747908,
-						"cameratype" : "IPCamera",
-						"docker" : true,
-						"kios" : false,
-						"raspberrypi" : false
-					}`, config.Key, kerberosAgentVersion, hub_encryption, e2e_encryption, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, onvifEventsList, cameraConnected, hasBackChannel)
+				heartbeat := struct {
+					Key                 string          `json:"key"`
+					Version             string          `json:"version"`
+					HubEncryption       string          `json:"hub_encryption"`
+					E2EEncryption       string          `json:"e2e_encryption"`
+					Release             string          `json:"release"`
+					CPUId               string          `json:"cpuid"`
+					CloudUser           string          `json:"clouduser"`
+					CloudPublicKey      string          `json:"cloudpublickey"`
+					CameraName          string          `json:"cameraname"`
+					Enterprise          bool            `json:"enterprise"`
+					Hostname            string          `json:"hostname"`
+					Architecture        string          `json:"architecture"`
+					TotalMemory         string          `json:"totalMemory"`
+					UsedMemory          string          `json:"usedMemory"`
+					FreeMemory          string          `json:"freeMemory"`
+					ProcessMemory       string          `json:"processMemory"`
+					MacList             json.RawMessage `json:"mac_list"`
+					IPList              json.RawMessage `json:"ip_list"`
+					Board               string          `json:"board"`
+					Disk1Size           string          `json:"disk1size"`
+					Disk3Size           string          `json:"disk3size"`
+					DiskVdaSize         string          `json:"diskvdasize"`
+					Uptime              string          `json:"uptime"`
+					BootTime            string          `json:"boot_time"`
+					SiteID              string          `json:"siteID"`
+					Onvif               string          `json:"onvif"`
+					OnvifZoom           string          `json:"onvif_zoom"`
+					OnvifPanTilt        string          `json:"onvif_pantilt"`
+					OnvifPresets        string          `json:"onvif_presets"`
+					OnvifPresetsList    json.RawMessage `json:"onvif_presets_list"`
+					OnvifEventsList     json.RawMessage `json:"onvif_events_list"`
+					CameraConnected     string          `json:"cameraConnected"`
+					HasBackChannel      string          `json:"hasBackChannel"`
+					ContinuousRecording string          `json:"continuousRecording"`
+					LivePreviewHTTP     bool            `json:"livePreviewHttp"`
+					NumberOfFiles       string          `json:"numberoffiles"`
+					Timestamp           int64           `json:"timestamp"`
+					CameraType          string          `json:"cameratype"`
+					Docker              bool            `json:"docker"`
+					Kios                bool            `json:"kios"`
+					RaspberryPi         bool            `json:"raspberrypi"`
+				}{
+					Key:                 config.Key,
+					Version:             kerberosAgentVersion,
+					HubEncryption:       hub_encryption,
+					E2EEncryption:       e2e_encryption,
+					Release:             system.Version,
+					CPUId:               system.CPUId,
+					CloudUser:           username,
+					CloudPublicKey:      key,
+					CameraName:          name,
+					Enterprise:          isEnterprise,
+					Hostname:            system.Hostname,
+					Architecture:        system.Architecture,
+					TotalMemory:         strconv.FormatUint(system.TotalMemory, 10),
+					UsedMemory:          strconv.FormatUint(system.UsedMemory, 10),
+					FreeMemory:          strconv.FormatUint(system.FreeMemory, 10),
+					ProcessMemory:       strconv.FormatUint(system.ProcessUsedMemory, 10),
+					MacList:             rawJSONOrEmptyArray(macs),
+					IPList:              rawJSONOrEmptyArray(ips),
+					Board:               "",
+					Disk1Size:           "0",
+					Disk3Size:           "0",
+					DiskVdaSize:         "0",
+					Uptime:              uptimeString,
+					BootTime:            boottimeString,
+					SiteID:              config.HubSite,
+					Onvif:               onvifEnabled,
+					OnvifZoom:           onvifZoom,
+					OnvifPanTilt:        onvifPanTilt,
+					OnvifPresets:        onvifPresets,
+					OnvifPresetsList:    rawJSONOrEmptyArray(onvifPresetsList),
+					OnvifEventsList:     rawJSONOrEmptyArray(onvifEventsList),
+					CameraConnected:     cameraConnected,
+					HasBackChannel:      hasBackChannel,
+					ContinuousRecording: continuousRecording,
+					LivePreviewHTTP:     true,
+					NumberOfFiles:       "33",
+					Timestamp:           1564747908,
+					CameraType:          "IPCamera",
+					Docker:              true,
+					Kios:                false,
+					RaspberryPi:         false,
+				}
+
+				objectBytes, err := json.Marshal(heartbeat)
+				if err != nil {
+					log.Log.Error("cloud.HandleHeartBeat(): error while marshalling heartbeat: " + err.Error())
+					objectBytes = []byte("{}")
+				}
+				object := string(objectBytes)
 
 				// Get the private key to encrypt the data using symmetric encryption: AES.
 				privateKey := config.HubPrivateKey
@@ -551,11 +618,21 @@ loop:
 
 					// Base64 encode the encrypted data.
 					encryptedBase64 := base64.StdEncoding.EncodeToString(encrypted)
-					object = fmt.Sprintf(`{
-						"cloudpublicKey": "%s",
-						"encrypted" : %t,
-						"encryptedData" : "%s"
-					}`, config.HubKey, true, encryptedBase64)
+					encryptedPayload := struct {
+						CloudPublicKey string `json:"cloudpublicKey"`
+						Encrypted      bool   `json:"encrypted"`
+						EncryptedData  string `json:"encryptedData"`
+					}{
+						CloudPublicKey: config.HubKey,
+						Encrypted:      true,
+						EncryptedData:  encryptedBase64,
+					}
+					encryptedBytes, err := json.Marshal(encryptedPayload)
+					if err != nil {
+						log.Log.Error("cloud.HandleHeartBeat(): error while marshalling encrypted heartbeat: " + err.Error())
+						encryptedBytes = []byte("{}")
+					}
+					object = string(encryptedBytes)
 				}
 
 				var jsonStr = []byte(object)
@@ -586,43 +663,86 @@ loop:
 			secretAccessKey := config.KStorage.SecretAccessKey
 			if vaultURI != "" && accessKey != "" && secretAccessKey != "" {
 
-				var object = fmt.Sprintf(`{
-					"key" : "%s",
-					"version" : "%s",
-					"release" : "%s",
-					"cpuid" : "%s",
-					"clouduser" : "%s",
-					"cloudpublickey" : "%s",
-					"cameraname" : "%s",
-					"enterprise" : %t,
-					"hostname" : "%s",
-					"architecture" : "%s",
-					"totalMemory" : "%d",
-					"usedMemory" : "%d",
-					"freeMemory" : "%d",
-					"processMemory" : "%d",
-					"mac_list" : %s,
-					"ip_list" : %s,
-					"board" : "",
-					"disk1size" : "%s",
-					"disk3size" : "%s",
-					"diskvdasize" :  "%s",
-					"uptime" : "%s",
-					"boot_time" : "%s",
-					"siteID" : "%s",
-					"onvif" : "%s",
-					"onvif_zoom" : "%s",
-					"onvif_pantilt" : "%s",
-					"onvif_presets": "%s",
-					"onvif_presets_list": %s,
-					"cameraConnected": "%s",
-					"numberoffiles" : "33",
-					"timestamp" : 1564747908,
-					"cameratype" : "IPCamera",
-					"docker" : true,
-					"kios" : false,
-					"raspberrypi" : false
-				}`, config.Key, kerberosAgentVersion, system.Version, system.CPUId, username, key, name, isEnterprise, system.Hostname, system.Architecture, system.TotalMemory, system.UsedMemory, system.FreeMemory, system.ProcessUsedMemory, macs, ips, "0", "0", "0", uptimeString, boottimeString, config.HubSite, onvifEnabled, onvifZoom, onvifPanTilt, onvifPresets, onvifPresetsList, cameraConnected)
+				heartbeat := struct {
+					Key              string          `json:"key"`
+					Version          string          `json:"version"`
+					Release          string          `json:"release"`
+					CPUId            string          `json:"cpuid"`
+					CloudUser        string          `json:"clouduser"`
+					CloudPublicKey   string          `json:"cloudpublickey"`
+					CameraName       string          `json:"cameraname"`
+					Enterprise       bool            `json:"enterprise"`
+					Hostname         string          `json:"hostname"`
+					Architecture     string          `json:"architecture"`
+					TotalMemory      string          `json:"totalMemory"`
+					UsedMemory       string          `json:"usedMemory"`
+					FreeMemory       string          `json:"freeMemory"`
+					ProcessMemory    string          `json:"processMemory"`
+					MacList          json.RawMessage `json:"mac_list"`
+					IPList           json.RawMessage `json:"ip_list"`
+					Board            string          `json:"board"`
+					Disk1Size        string          `json:"disk1size"`
+					Disk3Size        string          `json:"disk3size"`
+					DiskVdaSize      string          `json:"diskvdasize"`
+					Uptime           string          `json:"uptime"`
+					BootTime         string          `json:"boot_time"`
+					SiteID           string          `json:"siteID"`
+					Onvif            string          `json:"onvif"`
+					OnvifZoom        string          `json:"onvif_zoom"`
+					OnvifPanTilt     string          `json:"onvif_pantilt"`
+					OnvifPresets     string          `json:"onvif_presets"`
+					OnvifPresetsList json.RawMessage `json:"onvif_presets_list"`
+					CameraConnected  string          `json:"cameraConnected"`
+					NumberOfFiles    string          `json:"numberoffiles"`
+					Timestamp        int64           `json:"timestamp"`
+					CameraType       string          `json:"cameratype"`
+					Docker           bool            `json:"docker"`
+					Kios             bool            `json:"kios"`
+					RaspberryPi      bool            `json:"raspberrypi"`
+				}{
+					Key:              config.Key,
+					Version:          kerberosAgentVersion,
+					Release:          system.Version,
+					CPUId:            system.CPUId,
+					CloudUser:        username,
+					CloudPublicKey:   key,
+					CameraName:       name,
+					Enterprise:       isEnterprise,
+					Hostname:         system.Hostname,
+					Architecture:     system.Architecture,
+					TotalMemory:      strconv.FormatUint(system.TotalMemory, 10),
+					UsedMemory:       strconv.FormatUint(system.UsedMemory, 10),
+					FreeMemory:       strconv.FormatUint(system.FreeMemory, 10),
+					ProcessMemory:    strconv.FormatUint(system.ProcessUsedMemory, 10),
+					MacList:          rawJSONOrEmptyArray(macs),
+					IPList:           rawJSONOrEmptyArray(ips),
+					Board:            "",
+					Disk1Size:        "0",
+					Disk3Size:        "0",
+					DiskVdaSize:      "0",
+					Uptime:           uptimeString,
+					BootTime:         boottimeString,
+					SiteID:           config.HubSite,
+					Onvif:            onvifEnabled,
+					OnvifZoom:        onvifZoom,
+					OnvifPanTilt:     onvifPanTilt,
+					OnvifPresets:     onvifPresets,
+					OnvifPresetsList: rawJSONOrEmptyArray(onvifPresetsList),
+					CameraConnected:  cameraConnected,
+					NumberOfFiles:    "33",
+					Timestamp:        1564747908,
+					CameraType:       "IPCamera",
+					Docker:           true,
+					Kios:             false,
+					RaspberryPi:      false,
+				}
+
+				objectBytes, err := json.Marshal(heartbeat)
+				if err != nil {
+					log.Log.Error("cloud.HandleHeartBeat(): error while marshalling vault heartbeat: " + err.Error())
+					objectBytes = []byte("{}")
+				}
+				object := string(objectBytes)
 
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)

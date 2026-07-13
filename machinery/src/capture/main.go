@@ -50,6 +50,55 @@ func publishRecordingState(mqttClient mqtt.Client, hubKey string, configuration 
 	}
 }
 
+const (
+	// manualRecordingHeartbeatTimeout is how long the agent keeps a manual
+	// (live-view / remote) recording alive after the LAST viewer heartbeat. The
+	// frontend re-sends the record command every ~15s while the user stays on the
+	// page; if several heartbeats are missed (the viewer closed the tab, went idle
+	// or lost connectivity) the recorder auto-stops the recording so the camera
+	// doesn't record forever when the "stop" message never arrives.
+	manualRecordingHeartbeatTimeout = 45 * time.Second
+	// manualRecordingMaxDuration caps a single manual recording so a forgotten
+	// record button can't record indefinitely even while the viewer keeps sending
+	// heartbeats. After this the recording auto-stops and the viewer must press
+	// record again to continue.
+	manualRecordingMaxDuration = 5 * time.Minute
+)
+
+// manualRecordingExpired reports whether an active manual (live-view) recording
+// has outlived its viewer heartbeat window or the maximum duration cap. When it
+// has, it clears the manual-recording state (so the motion recorder lets the
+// current clip close normally and broadcasts recording:false) and returns true.
+// It is a no-op returning false when no manual recording is active.
+func manualRecordingExpired(communication *models.Communication, now int64) bool {
+	if communication.IsRecordingManual.IsNotSet() {
+		return false
+	}
+	manualStart := communication.RecordingManualStart.Load()
+	maxDurationReached := manualStart > 0 && now-manualStart > manualRecordingMaxDuration.Milliseconds()
+	// The heartbeat timeout only applies once the viewer has proven it supports
+	// heartbeats (an older frontend that starts a recording but never heartbeats
+	// still records up to the max-duration cap instead of being cut off early).
+	heartbeatExpired := false
+	if communication.RecordingManualHeartbeatSeen.IsSet() {
+		lastHeartbeat := communication.RecordingManualHeartbeat.Load()
+		heartbeatExpired = lastHeartbeat > 0 && now-lastHeartbeat > manualRecordingHeartbeatTimeout.Milliseconds()
+	}
+	if !heartbeatExpired && !maxDurationReached {
+		return false
+	}
+	if heartbeatExpired {
+		log.Log.Info("capture.main.HandleRecordStream(motiondetection): auto-stopping manual recording, no viewer heartbeat within timeout.")
+	} else {
+		log.Log.Info("capture.main.HandleRecordStream(motiondetection): auto-stopping manual recording, maximum duration reached.")
+	}
+	communication.IsRecordingManual.UnSet()
+	communication.RecordingManualHeartbeat.Store(0)
+	communication.RecordingManualStart.Store(0)
+	communication.RecordingManualHeartbeatSeen.UnSet()
+	return true
+}
+
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
 	autoClean := configuration.Config.AutoClean
 	if autoClean != "true" {
@@ -227,6 +276,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 	// Start each capture session with manual recording off, so a leftover
 	// request from before a restart/reconnect doesn't silently persist.
 	communication.IsRecordingManual.UnSet()
+	communication.RecordingManualHeartbeat.Store(0)
+	communication.RecordingManualStart.Store(0)
+	communication.RecordingManualHeartbeatSeen.UnSet()
 
 	if config.Capture.Recording == "false" {
 		log.Log.Info("capture.main.HandleRecordStream(): disabled, we will not record anything.")
@@ -674,7 +726,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// motion timestamp every iteration so the post-recording timeout
 					// never fires. The clip still rolls over at maxRecordingPeriod and
 					// is restarted below, until the viewer stops the manual recording.
-					if communication.IsRecordingManual.IsSet() {
+					// It also auto-stops when the viewer's heartbeat lapses (closed page
+					// or idle) or the max remote-recording duration is reached, so a
+					// missed "stop" message can't keep the camera recording forever.
+					if communication.IsRecordingManual.IsSet() && !manualRecordingExpired(communication, now) {
 						motionTimestamp = now
 					}
 
@@ -751,8 +806,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				// If the viewer still has a manual recording running, this clip just
 				// rolled over at the max length — immediately kick off the next
-				// segment so recording stays continuous until they stop it.
-				if communication.IsRecordingManual.IsSet() {
+				// segment so recording stays continuous until they stop it. Skip the
+				// restart when the recording has expired (heartbeat lapsed or max
+				// duration reached), so it ends here instead of recording forever.
+				if communication.IsRecordingManual.IsSet() && !manualRecordingExpired(communication, time.Now().UnixMilli()) {
 					select {
 					case communication.HandleMotion <- models.MotionDataPartial{Timestamp: time.Now().Unix(), NumberOfChanges: 100000000}:
 					default:

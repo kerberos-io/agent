@@ -76,6 +76,9 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 	communication.HandleLiveHLS = make(chan string, 1)
 	communication.IsConfiguring = abool.New()
 	communication.IsRecordingManual = abool.New()
+	communication.RecordingManualHeartbeat = &atomic.Int64{}
+	communication.RecordingManualStart = &atomic.Int64{}
+	communication.RecordingManualHeartbeatSeen = abool.New()
 
 	cameraSettings := &models.Camera{}
 

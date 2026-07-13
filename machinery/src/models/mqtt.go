@@ -154,6 +154,15 @@ type RecordPayload struct {
 	// recording (and keeps it running), false stops it. Older clients that only
 	// send a timestamp default to false; the live view always sets it explicitly.
 	Recording bool `json:"recording"`
+	// Heartbeat marks a keep-alive re-send (with Recording=true) from a viewer
+	// that supports heartbeating, as opposed to the initial start (the record
+	// button). While a user stays on the page the live view re-sends the record
+	// command every few seconds; the agent uses this flag to (a) refresh the
+	// recording's keep-alive without restarting an already auto-stopped clip from
+	// a stray heartbeat, and (b) only enable the heartbeat-timeout auto-stop once
+	// it has actually seen a heartbeat — so older viewers that never heartbeat
+	// still record up to the max-duration cap instead of being cut off early.
+	Heartbeat bool `json:"heartbeat"`
 }
 
 // We received a preset position request, we'll request it through onvif and send it back.
