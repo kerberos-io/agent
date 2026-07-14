@@ -1,22 +1,39 @@
-
 {
 	"type": "",
-	"key": "",
+	"key": "encrypted",
 	"name": "agent",
+	"friendly_name": "encrypted",
 	"time": "false",
 	"offline": "false",
 	"auto_clean": "true",
 	"remove_after_upload": "true",
 	"max_directory_size": 0,
-	"timezone": "Africa/Ceuta",
+	"timezone": "Europe/Brussels",
 	"capture": {
 		"name": "",
 		"ipcamera": {
-			"rtsp": "",
-			"sub_rtsp": "",
+			"rtsp": "rtsp://admin:thiemenimke2017@192.168.1.69:554/cam/realmonitor?channel=1\u0026subtype=0\u0026unicast=true\u0026proto=Onvif",
+			"width": 1920,
+			"height": 1080,
 			"fps": "",
-			"base_width": 640,
-			"base_height": 0
+			"sub_rtsp": "",
+			"sub_width": 0,
+			"sub_height": 0,
+			"base_width": 0,
+			"base_height": 0,
+			"sub_fps": "",
+			"onvif_xaddr": "",
+			"onvif_username": "",
+			"onvif_password": "",
+			"sps_nalus": [
+				"Z01AKKaAeAIn5UAA"
+			],
+			"pps_nalus": [
+				"aO48gAA="
+			],
+			"vps_nalus": [
+				null
+			]
 		},
 		"usbcamera": {
 			"device": ""
@@ -24,21 +41,21 @@
 		"raspicamera": {
 			"device": ""
 		},
-		"continuous": "false",
 		"recording": "true",
 		"snapshots": "true",
+		"motion": "true",
 		"liveview": "true",
 		"liveview_chunking": "false",
-		"motion": "true",
-		"postrecording": 20,
+		"continuous": "false",
+		"postrecording": 10,
 		"prerecording": 10,
-		"maxlengthrecording": 30,
+		"maxlengthrecording": 5,
 		"transcodingwebrtc": "",
 		"transcodingresolution": 0,
 		"forwardwebrtc": "",
 		"fragmented": "false",
 		"fragmentedduration": 8,
-		"pixelChangeThreshold": 150
+		"pixelChangeThreshold": 1000
 	},
 	"timetable": [
 		{
@@ -92,34 +109,73 @@
 			"x2": 800,
 			"y2": 640
 		},
-		"polygon": []
+		"polygon": [
+			{
+				"id": "0",
+				"coordinates": [
+					{
+						"x": 479.66043307086613,
+						"y": 454.35533216783216
+					},
+					{
+						"x": 646.5108267716536,
+						"y": 740.7069493006993
+					},
+					{
+						"x": 904.3011811023623,
+						"y": 605.869208916084
+					},
+					{
+						"x": 765.9055118110238,
+						"y": 326.12707604895104
+					}
+				]
+			}
+		]
 	},
-	"cloud": "s3",
+	"cloud": "kstorage",
 	"s3": {
 		"proxyuri": "http://proxy.kerberos.io",
 		"bucket": "kerberosaccept",
 		"region": "eu-west-1"
 	},
-	"kstorage": {},
+	"kstorage": {
+		"uri": "https://vault.kerberos.io/api",
+		"access_key": "aB59Gq03isDqRBrp",
+		"secret_access_key": "wB7UrUqh!S%DVeoT8bf!Vacrgg",
+		"provider": "azure-hub-belgium",
+		"directory": "cedricve",
+		"max_retries": 10,
+		"timeout": 120
+	},
 	"kstorage_secondary": {},
 	"dropbox": {},
 	"mqtturi": "tcp://mqtt.kerberos.io:1883",
 	"mqtt_username": "",
 	"mqtt_password": "",
-	"turn_force": "false",
 	"stunuri": "stun:turn-fra1.kerberos.io:3478",
+	"turn_force": "false",
 	"turnuri": "turn:turn-fra1.kerberos.io:3478",
 	"turn_username": "username1",
 	"turn_password": "password1",
 	"heartbeaturi": "",
 	"hub_encryption": "true",
 	"hub_uri": "https://api.cloud.kerberos.io",
-	"hub_key": "",
-	"hub_private_key": "",
+	"hub_key": "AKIA5V6EGLUWXDU4JBEI",
+	"hub_private_key": "DIOXToTpAlYpa4atf7aWtxHd9xEw/Fk4XioL0tek",
 	"hub_site": "",
 	"condition_uri": "",
-	"encryption": {},
-	"signing": {},
+	"encryption": {
+		"enabled": "true",
+		"recordings": "false",
+		"fingerprint": "",
+		"private_key": "-----BEGIN PRIVATE KEY-----\n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\n-----END PRIVATE KEY-----",
+		"symmetric_key": "c732ed2d3559c826f744d5b33604f545"
+	},
+	"signing": {
+		"enabled": "true",
+		"private_key": "-----BEGIN PRIVATE KEY-----\n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\n-----END PRIVATE KEY-----"
+	},
 	"realtimeprocessing": "false",
 	"realtimeprocessing_topic": ""
 }

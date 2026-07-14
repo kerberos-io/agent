@@ -74,7 +74,7 @@ type Capture struct {
 	ForwardWebRTC         string      `json:"forwardwebrtc"`
 	Fragmented            string      `json:"fragmented,omitempty" bson:"fragmented,omitempty"`
 	FragmentedDuration    int64       `json:"fragmentedduration,omitempty" bson:"fragmentedduration,omitempty"`
-	PixelChangeThreshold  int         `json:"pixelChangeThreshold,omitempty"`
+	PixelChangeThreshold  *int        `json:"pixelChangeThreshold,omitempty"`
 }
 
 // IPCamera configuration, such as the RTSP url of the IPCamera and the FPS.
