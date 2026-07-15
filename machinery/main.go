@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
@@ -76,12 +77,14 @@ func main() {
 	var name string
 	var port string
 	var timeout string
+	var subnet string
 
 	flag.StringVar(&action, "action", "version", "Tell us what you want do 'run' or 'version'")
 	flag.StringVar(&configDirectory, "config", ".", "Where is the configuration stored")
 	flag.StringVar(&name, "name", "agent", "Provide a name for the agent")
 	flag.StringVar(&port, "port", "80", "On which port should the agent run")
 	flag.StringVar(&timeout, "timeout", "2000", "Number of milliseconds to wait for the ONVIF discovery to complete")
+	flag.StringVar(&subnet, "subnet", "", "Optional subnet(s) to scan for discovery, e.g. '192.168.1.0/24' (comma-separated). Defaults to the local interfaces.")
 	flag.Parse()
 
 	// Specify the level of loggin: "info", "warning", "debug", "error" or "fatal."
@@ -112,7 +115,13 @@ func main() {
 				log.Log.Fatal("main.Main(): could not parse timeout: " + err.Error())
 				return
 			}
-			onvif.Discover(timeout)
+			var subnets []string
+			for _, part := range strings.Split(subnet, ",") {
+				if trimmed := strings.TrimSpace(part); trimmed != "" {
+					subnets = append(subnets, trimmed)
+				}
+			}
+			onvif.Discover(timeout, subnets...)
 		}
 	case "decrypt":
 		{

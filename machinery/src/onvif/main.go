@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	onvifc "github.com/cedricve/go-onvif"
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -24,20 +23,66 @@ import (
 	xsdonvif "github.com/kerberos-io/onvif/xsd/onvif"
 )
 
-func Discover(timeout time.Duration) {
-	log.Log.Info("onvif.Discover(): Discovering devices")
-	log.Log.Info("Waiting for " + timeout.String())
-	devices, err := onvifc.StartDiscovery(timeout)
-	if err != nil {
-		log.Log.Error("onvif.Discover(): " + err.Error())
-	} else {
-		for _, device := range devices {
-			hostname, _ := device.GetHostname()
-			log.Log.Info("onvif.Discover(): " + hostname.Name + " (" + device.XAddr + ")")
+// Discover performs an advanced Fing/WiFiman-style scan of the local network
+// (ONVIF WS-Discovery + active port scan + MAC/vendor lookup) and prints a
+// human readable summary of everything it finds. It is used by the
+// `-action discover` CLI command. Optional subnets (CIDR, e.g.
+// "192.168.1.0/24") override the auto-detected local subnets.
+func Discover(timeout time.Duration, subnets ...string) {
+	log.Log.Info("onvif.Discover(): starting advanced network discovery")
+	log.Log.Info("onvif.Discover(): this may take up to " + timeout.String() + " for the ONVIF probe plus the port scan")
+
+	devices := DiscoverDevices(timeout, subnets...)
+	if len(devices) == 0 {
+		log.Log.Info("onvif.Discover(): no devices discovered on the local network")
+		return
+	}
+
+	cameraCount := 0
+	for _, device := range devices {
+		if device.IsCamera {
+			cameraCount++
 		}
-		if len(devices) == 0 {
-			log.Log.Info("onvif.Discover(): No devices descovered\n")
+	}
+	log.Log.Info("onvif.Discover(): found " + strconv.Itoa(len(devices)) + " device(s), " + strconv.Itoa(cameraCount) + " likely camera(s)")
+
+	for _, device := range devices {
+		label := "device"
+		if device.IsCamera {
+			label = "camera"
 		}
+		summary := "onvif.Discover(): [" + label + "] " + device.IP
+		if device.Hostname != "" {
+			summary += " (" + device.Hostname + ")"
+		}
+		if device.MAC != "" {
+			summary += " mac=" + device.MAC
+		}
+		if device.Vendor != "" {
+			summary += " vendor=" + device.Vendor
+		}
+		if device.Type != "" {
+			summary += " type=" + device.Type
+		}
+		if device.Manufacturer != "" {
+			summary += " manufacturer=" + device.Manufacturer
+		}
+		if device.Model != "" {
+			summary += " model=" + device.Model
+		}
+		if device.Server != "" {
+			summary += " server=\"" + device.Server + "\""
+		}
+		if device.ONVIF {
+			summary += " onvif=" + device.ONVIFXAddr
+		}
+		if len(device.Services) > 0 {
+			summary += " services=[" + strings.Join(device.Services, ", ") + "]"
+		}
+		if device.RTSPURL != "" {
+			summary += " rtsp=" + device.RTSPURL
+		}
+		log.Log.Info(summary)
 	}
 }
 

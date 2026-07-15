@@ -19,6 +19,27 @@ type CameraStreams struct {
 	SubRTSP string `json:"sub_rtsp"`
 }
 
+// DiscoveredDevice describes a device found on the local network during a
+// discovery scan (fing/wifiman-style). It combines ONVIF WS-Discovery results
+// with an active port scan and MAC/vendor lookup so cameras can be
+// auto-detected and pre-filled in the configuration UI.
+type DiscoveredDevice struct {
+	IP           string   `json:"ip" bson:"ip"`
+	Hostname     string   `json:"hostname,omitempty" bson:"hostname"`
+	MAC          string   `json:"mac,omitempty" bson:"mac"`
+	Vendor       string   `json:"vendor,omitempty" bson:"vendor"`
+	Manufacturer string   `json:"manufacturer,omitempty" bson:"manufacturer"`
+	Model        string   `json:"model,omitempty" bson:"model"`
+	Type         string   `json:"type,omitempty" bson:"type"`
+	Server       string   `json:"server,omitempty" bson:"server"`
+	OpenPorts    []int    `json:"open_ports,omitempty" bson:"open_ports"`
+	Services     []string `json:"services,omitempty" bson:"services"`
+	ONVIF        bool     `json:"onvif" bson:"onvif"`
+	ONVIFXAddr   string   `json:"onvif_xaddr,omitempty" bson:"onvif_xaddr"`
+	RTSPURL      string   `json:"rtsp_url,omitempty" bson:"rtsp_url"`
+	IsCamera     bool     `json:"is_camera" bson:"is_camera"`
+}
+
 type OnvifPanTilt struct {
 	OnvifCredentials OnvifCredentials `json:"onvif_credentials,omitempty" bson:"onvif_credentials"`
 	Pan              float64          `json:"pan,omitempty" bson:"pan"`
