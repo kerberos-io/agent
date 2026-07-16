@@ -24,20 +24,34 @@ type CameraStreams struct {
 // with an active port scan and MAC/vendor lookup so cameras can be
 // auto-detected and pre-filled in the configuration UI.
 type DiscoveredDevice struct {
-	IP           string   `json:"ip" bson:"ip"`
-	Hostname     string   `json:"hostname,omitempty" bson:"hostname"`
-	MAC          string   `json:"mac,omitempty" bson:"mac"`
-	Vendor       string   `json:"vendor,omitempty" bson:"vendor"`
-	Manufacturer string   `json:"manufacturer,omitempty" bson:"manufacturer"`
-	Model        string   `json:"model,omitempty" bson:"model"`
-	Type         string   `json:"type,omitempty" bson:"type"`
-	Server       string   `json:"server,omitempty" bson:"server"`
-	OpenPorts    []int    `json:"open_ports,omitempty" bson:"open_ports"`
-	Services     []string `json:"services,omitempty" bson:"services"`
-	ONVIF        bool     `json:"onvif" bson:"onvif"`
-	ONVIFXAddr   string   `json:"onvif_xaddr,omitempty" bson:"onvif_xaddr"`
-	RTSPURL      string   `json:"rtsp_url,omitempty" bson:"rtsp_url"`
-	IsCamera     bool     `json:"is_camera" bson:"is_camera"`
+	IP           string       `json:"ip" bson:"ip"`
+	Hostname     string       `json:"hostname,omitempty" bson:"hostname"`
+	MAC          string       `json:"mac,omitempty" bson:"mac"`
+	Vendor       string       `json:"vendor,omitempty" bson:"vendor"`
+	Manufacturer string       `json:"manufacturer,omitempty" bson:"manufacturer"`
+	Model        string       `json:"model,omitempty" bson:"model"`
+	Type         string       `json:"type,omitempty" bson:"type"`
+	Server       string       `json:"server,omitempty" bson:"server"`
+	OpenPorts    []int        `json:"open_ports,omitempty" bson:"open_ports"`
+	Services     []string     `json:"services,omitempty" bson:"services"`
+	ONVIF        bool         `json:"onvif" bson:"onvif"`
+	ONVIFXAddr   string       `json:"onvif_xaddr,omitempty" bson:"onvif_xaddr"`
+	RTSPURL      string       `json:"rtsp_url,omitempty" bson:"rtsp_url"`
+	RTSPStreams  []RTSPStream `json:"rtsp_streams,omitempty" bson:"rtsp_streams"`
+	IsCamera     bool         `json:"is_camera" bson:"is_camera"`
+}
+
+// RTSPStream is a candidate RTSP stream URL for a discovered camera, derived
+// from a built-in brand -> RTSP path mapping. When Verified is true the path was
+// confirmed to exist on the device via an unauthenticated RTSP DESCRIBE probe
+// (a 200 OK or a 401/403 "auth required" both prove the path is valid).
+type RTSPStream struct {
+	Brand        string `json:"brand,omitempty" bson:"brand"`
+	Stream       string `json:"stream,omitempty" bson:"stream"` // "main" or "sub"
+	Path         string `json:"path" bson:"path"`
+	URL          string `json:"url" bson:"url"`
+	Verified     bool   `json:"verified" bson:"verified"`
+	RequiresAuth bool   `json:"requires_auth,omitempty" bson:"requires_auth"`
 }
 
 type OnvifPanTilt struct {

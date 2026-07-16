@@ -83,6 +83,20 @@ func Discover(timeout time.Duration, subnets ...string) {
 			summary += " rtsp=" + device.RTSPURL
 		}
 		log.Log.Info(summary)
+
+		// Detail the guessed RTSP stream URLs from the brand -> RTSP mapping.
+		for _, stream := range device.RTSPStreams {
+			status := "guess"
+			if stream.Verified {
+				status = "confirmed"
+			}
+			line := "onvif.Discover():   -> " + stream.Stream + " stream [" + status + "]"
+			if stream.RequiresAuth {
+				line += " (auth required)"
+			}
+			line += ": " + stream.URL
+			log.Log.Info(line)
+		}
 	}
 }
 

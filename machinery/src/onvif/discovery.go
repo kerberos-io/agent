@@ -153,6 +153,22 @@ func DiscoverDevices(timeout time.Duration, subnets ...string) []models.Discover
 			// manufacturer, model and type without any credentials.
 			fingerprint := fingerprintHost(ip, openPorts, dialTimeout)
 
+			// Guess (and actively confirm) the RTSP stream URLs from a built-in
+			// brand -> RTSP path mapping when an RTSP port is open.
+			var rtspPort int
+			for _, port := range openPorts {
+				if port == 554 || port == 8554 {
+					rtspPort = port
+					break
+				}
+			}
+			var rtspStreams []models.RTSPStream
+			detectedBrand := ""
+			detectedModel := ""
+			if rtspPort != 0 {
+				detectedBrand, detectedModel, rtspStreams = guessRTSPStreams(ip, rtspPort, fingerprint.Manufacturer, openPorts, dialTimeout)
+			}
+
 			device := upsert(ip)
 			mutex.Lock()
 			device.OpenPorts = mergeSortedInts(device.OpenPorts, openPorts)
@@ -163,8 +179,18 @@ func DiscoverDevices(timeout time.Duration, subnets ...string) []models.Discover
 			if fingerprint.Manufacturer != "" {
 				device.Manufacturer = fingerprint.Manufacturer
 			}
+			// A brand derived from the RTSP auth realm, a confirmed path probe or
+			// a vendor-specific control port is more reliable than a banner
+			// string, so let it win.
+			if detectedBrand != "" && detectedBrand != "Generic" {
+				device.Manufacturer = detectedBrand
+				device.IsCamera = true
+			}
 			if fingerprint.Model != "" {
 				device.Model = fingerprint.Model
+			}
+			if device.Model == "" && detectedModel != "" {
+				device.Model = detectedModel
 			}
 			if fingerprint.Type != "" {
 				device.Type = fingerprint.Type
@@ -172,11 +198,18 @@ func DiscoverDevices(timeout time.Duration, subnets ...string) []models.Discover
 			if fingerprint.Server != "" {
 				device.Server = fingerprint.Server
 			}
-			for _, port := range openPorts {
-				if port == 554 || port == 8554 {
-					device.RTSPURL = "rtsp://" + ip + ":" + strconv.Itoa(port) + "/"
-					break
+			if len(rtspStreams) > 0 {
+				device.RTSPStreams = rtspStreams
+				// Prefer the first verified stream as the primary RTSP URL.
+				device.RTSPURL = rtspStreams[0].URL
+				for _, stream := range rtspStreams {
+					if stream.Verified {
+						device.RTSPURL = stream.URL
+						break
+					}
 				}
+			} else if rtspPort != 0 {
+				device.RTSPURL = "rtsp://" + ip + ":" + strconv.Itoa(rtspPort) + "/"
 			}
 			mutex.Unlock()
 		}(ip)
