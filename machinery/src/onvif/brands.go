@@ -134,12 +134,22 @@ var brandProfiles = []brandProfile{
 		MainPath: "/media/video1",
 		SubPath:  "/media/video2",
 	},
+	{
+		// Linksys/Cisco IP cameras (e.g. LCAD03FLN, LCAB03VLNOD, LCAM0336OD)
+		// run a mini_httpd server and expose ONVIF-style stream paths with a
+		// capitalised "ONVIF" segment (distinct from the generic "/onvif1").
+		Brand:          "Linksys",
+		Aliases:        []string{"linksys", "lcad", "lcab", "lcam", "lcae"},
+		MainPath:       "/ONVIF/channel1",
+		SubPath:        "/ONVIF/channel2",
+		extraMainPaths: []string{"/img/media.sav", "/live"},
+	},
 }
 
 // genericRTSPPaths are last-resort, vendor-neutral RTSP paths used when the
 // brand is unknown. Many ONVIF/embedded cameras answer on one of these.
 var genericRTSPPaths = []string{
-	"/onvif1", "/live", "/live/ch0", "/11", "/12",
+	"/ONVIF/channel1", "/ONVIF/channel2", "/onvif1", "/live", "/live/ch0", "/11", "/12",
 	"/stream0", "/stream1", "/h264", "/media/video1", "/ch0_0.h264",
 }
 
@@ -189,6 +199,10 @@ var realmBrands = []struct {
 	{"vivotek", "Vivotek"},
 	{"mobotix", "Mobotix"},
 	{"bosch", "Bosch"},
+	{"linksys", "Linksys"},
+	{"lcad", "Linksys"},
+	{"lcab", "Linksys"},
+	{"lcam", "Linksys"},
 }
 
 // brandFromRealm resolves a manufacturer from an auth realm string.

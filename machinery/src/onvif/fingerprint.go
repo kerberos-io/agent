@@ -50,6 +50,7 @@ var bannerVendors = []struct {
 	{"uniview", "Uniview", true},
 	{"tp-link", "TP-Link", true},
 	{"tapo", "TP-Link", true},
+	{"linksys", "Linksys", true},
 	{"hipcam", "Hipcam", true},
 	{"h264dvr", "Generic DVR", true},
 	{"dvrdvs", "Hikvision", true},
