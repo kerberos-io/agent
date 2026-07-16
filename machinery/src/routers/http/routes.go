@@ -96,6 +96,7 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 			})
 
 			// Onvif specific methods.
+			api.GET("/camera/discover", DiscoverCameras)
 			api.POST("/camera/onvif/verify", onvif.VerifyOnvifConnection)
 			api.POST("/camera/onvif/login", LoginToOnvif)
 			api.POST("/camera/onvif/capabilities", GetOnvifCapabilities)

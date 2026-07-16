@@ -1,6 +1,10 @@
 package http
 
 import (
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
@@ -16,6 +20,38 @@ import (
 // @Param credentials body models.Authentication true "Credentials"
 // @Success 200 {object} models.Authorization
 func Login() {}
+
+// DiscoverCameras godoc
+// @Router /api/camera/discover [get]
+// @ID camera-discover
+// @Tags onvif
+// @Param timeout query int false "Discovery timeout in milliseconds (default 2000)"
+// @Param subnet query string false "Optional subnet(s) to scan, e.g. '192.168.1.0/24' (comma-separated). Defaults to the local interfaces."
+// @Summary Discover cameras and other devices on the local network.
+// @Description Runs an advanced Fing/WiFiman-style scan (ONVIF WS-Discovery + TCP port scan + MAC/vendor lookup) and returns the devices found on the local network.
+// @Success 200 {object} models.APIResponse
+func DiscoverCameras(c *gin.Context) {
+	timeout := 2000 * time.Millisecond
+	if raw := c.Query("timeout"); raw != "" {
+		if milliseconds, err := strconv.Atoi(raw); err == nil && milliseconds > 0 {
+			timeout = time.Duration(milliseconds) * time.Millisecond
+		}
+	}
+
+	var subnets []string
+	if raw := c.Query("subnet"); raw != "" {
+		for _, part := range strings.Split(raw, ",") {
+			if trimmed := strings.TrimSpace(part); trimmed != "" {
+				subnets = append(subnets, trimmed)
+			}
+		}
+	}
+
+	devices := onvif.DiscoverDevices(timeout, subnets...)
+	c.JSON(200, models.APIResponse{
+		Data: devices,
+	})
+}
 
 // LoginToOnvif godoc
 // @Router /api/camera/onvif/login [post]

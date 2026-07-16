@@ -175,6 +175,15 @@ type RequestConfigPayload struct {
 	Timestamp int64 `json:"timestamp"` // timestamp of the preset request.
 }
 
+// We received a verify-stream request: probe the given (or configured) RTSP
+// stream and report whether it can be connected/decoded, along with the
+// discovered codec/resolution/fps. Responds with action "verify-stream-result".
+type VerifyStreamPayload struct {
+	Timestamp int64  `json:"timestamp"` // timestamp of the verify request.
+	Stream    string `json:"stream"`    // "main" or "sub".
+	RTSP      string `json:"rtsp"`      // optional RTSP url to verify; falls back to the configured one.
+}
+
 // We received a update config request, we'll update the current config and send a confirmation back.
 type UpdateConfigPayload struct {
 	Timestamp int64  `json:"timestamp"` // timestamp of the preset request.

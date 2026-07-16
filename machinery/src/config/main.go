@@ -401,7 +401,7 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 			case "AGENT_CAPTURE_PIXEL_CHANGE":
 				count, err := strconv.Atoi(value)
 				if err == nil {
-					configuration.Config.Capture.PixelChangeThreshold = count
+					configuration.Config.Capture.PixelChangeThreshold = &count
 				}
 				break
 			case "AGENT_CAPTURE_FRAGMENTED":

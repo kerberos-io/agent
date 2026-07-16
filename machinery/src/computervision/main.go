@@ -24,12 +24,18 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 	var motionRectangle models.MotionRectangle
 	var motionRectangles []models.MotionRectangle
 
-	pixelThreshold := config.Capture.PixelChangeThreshold
-	// Might not be set in the config file, so set it to 150
-	if pixelThreshold == 0 {
-		pixelThreshold = 150
+	// Resolve the motion sensitivity (pixel-change threshold):
+	//   nil (unset) -> default 150
+	//   0           -> motion detection DISABLED (temporary off switch from the UI)
+	//   > 0         -> trigger when the number of changed pixels exceeds it
+	pixelThreshold := 150
+	motionDisabled := false
+	if config.Capture.PixelChangeThreshold != nil {
+		pixelThreshold = *config.Capture.PixelChangeThreshold
+		if pixelThreshold <= 0 {
+			motionDisabled = true
+		}
 	}
-
 	// In motion mode we always run detection. In CONTINUOUS mode recording is
 	// 24/7 so motion detection is normally skipped, BUT if a motion region is
 	// configured we still run it so the live view can visualise the motion boxes
@@ -39,7 +45,11 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 	continuousMode := config.Capture.Continuous == "true"
 	hasMotionRegion := config.Region != nil && len(config.Region.Polygon) > 0
 
-	if continuousMode && !hasMotionRegion {
+	if motionDisabled {
+
+		log.Log.Info("computervision.main.ProcessMotion(): motion detection disabled (pixelChangeThreshold set to 0), skipping.")
+
+	} else if continuousMode && !hasMotionRegion {
 
 		log.Log.Info("computervision.main.ProcessMotion(): continuous recording enabled and no motion region configured, so no motion detection required.")
 
@@ -135,7 +145,8 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 		}
 
 		img := imageArray[0]
-		var coordinatesToCheck []int
+		var coordinatesPerRegion [][]int
+		totalCoordinates := 0
 		if img != nil {
 			bounds := img.Bounds()
 			rows := bounds.Dy()
@@ -143,13 +154,17 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 			imageCols = cols
 			imageRows = rows
 
-			// Make fixed size array of uinty8
+			// Build a SEPARATE coordinate list per region. Motion is evaluated
+			// independently per region: pixels are NOT shared between regions, so
+			// the threshold must be exceeded within a single region to trigger.
+			coordinatesPerRegion = make([][]int, len(polyObjects))
 			for y := 0; y < rows; y++ {
 				for x := 0; x < cols; x++ {
-					for _, poly := range polyObjects {
-						point := geo.NewPoint(float64(x), float64(y))
+					point := geo.NewPoint(float64(x), float64(y))
+					for idx, poly := range polyObjects {
 						if poly.Contains(point) {
-							coordinatesToCheck = append(coordinatesToCheck, y*cols+x)
+							coordinatesPerRegion[idx] = append(coordinatesPerRegion[idx], y*cols+x)
+							totalCoordinates++
 						}
 					}
 				}
@@ -157,7 +172,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 		}
 
 		// If no region is set, we'll skip the motion detection
-		if len(coordinatesToCheck) > 0 {
+		if totalCoordinates > 0 {
 
 			// Start the motion detection
 			i := 0
@@ -191,7 +206,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 					if detectMotion {
 
 						// Remember additional information about the result of findmotion
-						isPixelChangeThresholdReached, changesToReturn, motionRectangle, motionRectangles = FindMotion(imageArray, coordinatesToCheck, pixelThreshold)
+						isPixelChangeThresholdReached, changesToReturn, motionRectangle, motionRectangles = FindMotion(imageArray, coordinatesPerRegion, pixelThreshold)
 						if isPixelChangeThresholdReached {
 
 							// If offline mode is disabled, send a message to the hub
@@ -216,8 +231,12 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 													"mainWidth":  configuration.Config.Capture.IPCamera.Width,
 													"mainHeight": configuration.Config.Capture.IPCamera.Height,
 													"regions":    motionRectangles,
-													"polygon":    regionPolygons,
-												},
+													"polygon":    regionPolygons,												// Motion sensitivity = the pixel-change threshold that must
+												// be exceeded before motion triggers. The live view renders
+												// a reference square of sqrt(threshold) px (in this MOTION
+												// frame's pixel space) so the user can visually gauge how
+												// large a moving object must be before it is detected.
+												"pixelChangeThreshold": pixelThreshold,												},
 											},
 										}
 										payload, err := models.PackageMQTTMessage(configuration, message)
@@ -263,13 +282,67 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 	log.Log.Debug("computervision.main.ProcessMotion(): stop the motion detection.")
 }
 
-func FindMotion(imageArray [3]*image.Gray, coordinatesToCheck []int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int, motionRectangle models.MotionRectangle, motionRectangles []models.MotionRectangle) {
+func FindMotion(imageArray [3]*image.Gray, coordinatesPerRegion [][]int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int, motionRectangle models.MotionRectangle, motionRectangles []models.MotionRectangle) {
 	image1 := imageArray[0]
 	image2 := imageArray[1]
 	image3 := imageArray[2]
 	threshold := 60
-	changes, motionRectangle, motionRectangles := AbsDiffBitwiseAndThreshold(image1, image2, image3, threshold, coordinatesToCheck)
-	return changes > pixelChangeThreshold, changes, motionRectangle, motionRectangles
+
+	// Evaluate each region INDEPENDENTLY — pixels are not shared between regions,
+	// so the threshold must be exceeded within a single region to trigger. The
+	// overall rectangle (recording metadata) and the per-cluster rectangles
+	// (live-view overlay) are aggregated across all regions.
+	var combinedRectangles []models.MotionRectangle
+	var overall models.MotionRectangle
+	haveOverall := false
+	totalChanges := 0
+	for _, coordinatesToCheck := range coordinatesPerRegion {
+		if len(coordinatesToCheck) == 0 {
+			continue
+		}
+		changes, rect, rects := AbsDiffBitwiseAndThreshold(image1, image2, image3, threshold, coordinatesToCheck)
+		totalChanges += changes
+		if changes > pixelChangeThreshold {
+			thresholdReached = true
+		}
+		combinedRectangles = append(combinedRectangles, rects...)
+		if changes > 0 {
+			if !haveOverall {
+				overall = rect
+				haveOverall = true
+			} else {
+				overall = unionMotionRectangle(overall, rect)
+			}
+		}
+	}
+
+	return thresholdReached, totalChanges, overall, combinedRectangles
+}
+
+// unionMotionRectangle returns the smallest rectangle that contains both a and b.
+func unionMotionRectangle(a, b models.MotionRectangle) models.MotionRectangle {
+	minX := a.X
+	if b.X < minX {
+		minX = b.X
+	}
+	minY := a.Y
+	if b.Y < minY {
+		minY = b.Y
+	}
+	maxX := a.X + a.Width
+	if b.X+b.Width > maxX {
+		maxX = b.X + b.Width
+	}
+	maxY := a.Y + a.Height
+	if b.Y+b.Height > maxY {
+		maxY = b.Y + b.Height
+	}
+	return models.MotionRectangle{
+		X:      minX,
+		Y:      minY,
+		Width:  maxX - minX,
+		Height: maxY - minY,
+	}
 }
 
 func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.Gray, threshold int, coordinatesToCheck []int) (int, models.MotionRectangle, []models.MotionRectangle) {

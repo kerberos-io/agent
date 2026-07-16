@@ -864,6 +864,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 							// Get FPS using enhanced method
 							fps := g.getEnhancedFPS(&sps, g.VideoH264Index)
 							g.Streams[g.VideoH264Index].FPS = fps
+							g.persistStreamFPS(configuration, streamType, fps)
 							log.Log.Debug(fmt.Sprintf("capture.golibrtsp.Start(%s): Final FPS=%.2f", streamType, fps))
 							g.VideoH264Forma.SPS = nalu
 							if streamType == "main" && len(nalu) > 0 {
@@ -1061,6 +1062,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					}
 					if ptsFPS := ft.update(pts); ptsFPS > 0 && ptsFPS <= 120 {
 						g.Streams[g.VideoH265Index].FPS = ptsFPS
+						g.persistStreamFPS(configuration, streamType, ptsFPS)
 					}
 				}
 
@@ -1537,6 +1539,21 @@ func (g *Golibrtsp) initFPSCalculation() {
 }
 
 // Get enhanced FPS information from SPS with fallback to PTS-based calculation.
+// persistStreamFPS stores the computed frame rate into the shared config so it
+// is reported to the hub/UI (mirrors how width/height are persisted). The value
+// is rounded to 2 decimals with trailing zeros trimmed (e.g. "25", "29.97").
+func (g *Golibrtsp) persistStreamFPS(configuration *models.Configuration, streamType string, fps float64) {
+	if fps <= 0 {
+		return
+	}
+	fpsStr := strconv.FormatFloat(float64(int(fps*100+0.5))/100, 'f', -1, 64)
+	if streamType == "main" {
+		configuration.Config.Capture.IPCamera.FPS = fpsStr
+	} else if streamType == "sub" {
+		configuration.Config.Capture.IPCamera.SubFPS = fpsStr
+	}
+}
+
 // The PTS-based FPS is computed per completed frame via fpsTracker.update(),
 // so by the time this is called we already have a good estimate.
 func (g *Golibrtsp) getEnhancedFPS(sps *h264.SPS, streamIndex int8) float64 {

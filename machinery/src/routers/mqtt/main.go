@@ -14,7 +14,10 @@ import (
 	"sync"
 	"time"
 
+	"context"
+
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"github.com/kerberos-io/agent/machinery/src/capture"
 	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/log"
@@ -338,6 +341,8 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 					go HandleNavigatePTZ(mqttClient, hubKey, payload, configuration, communication)
 				case "request-config":
 					go HandleRequestConfig(mqttClient, hubKey, payload, configuration, communication)
+				case "verify-stream":
+					go HandleVerifyStream(mqttClient, hubKey, payload, configuration, communication)
 				case "update-config":
 					go HandleUpdateConfig(mqttClient, hubKey, payload, configDirectory, configuration, communication)
 				case "request-sd-stream":
@@ -543,6 +548,98 @@ func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload models.P
 		}
 
 		log.Log.Info("routers.mqtt.main.HandleRequestConfig(): Received a request for the config")
+	}
+}
+
+// HandleVerifyStream probes an RTSP stream (the one supplied in the request, or
+// the currently configured main/sub stream) and reports back whether it can be
+// connected to and decoded, along with the discovered codec/resolution/fps.
+func HandleVerifyStream(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {
+	value := payload.Value
+
+	// Convert map[string]interface{} to VerifyStreamPayload
+	jsonData, _ := json.Marshal(value)
+	var verifyPayload models.VerifyStreamPayload
+	json.Unmarshal(jsonData, &verifyPayload)
+
+	if verifyPayload.Timestamp == 0 {
+		return
+	}
+
+	stream := verifyPayload.Stream
+	if stream != "sub" {
+		stream = "main"
+	}
+
+	// Resolve which RTSP url to verify: prefer the one supplied in the request
+	// (so users can verify unsaved edits), otherwise fall back to the configured
+	// stream url for the requested stream type.
+	rtspUrl := verifyPayload.RTSP
+	if rtspUrl == "" {
+		if stream == "sub" {
+			rtspUrl = configuration.Config.Capture.IPCamera.SubRTSP
+		} else {
+			rtspUrl = configuration.Config.Capture.IPCamera.RTSP
+		}
+	}
+
+	success := false
+	errMsg := ""
+	width := 0
+	height := 0
+	codec := ""
+	fps := 0.0
+
+	if rtspUrl == "" {
+		errMsg = "No RTSP url configured for this stream."
+	} else {
+		// Probe the stream with a bounded timeout so a dead/unreachable camera
+		// can't hang the handler goroutine.
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		rtspClient := &capture.Golibrtsp{Url: rtspUrl}
+		errConnect := rtspClient.Connect(ctx, ctx)
+		if errConnect != nil {
+			errMsg = errConnect.Error()
+		} else {
+			videoStreams, errStreams := rtspClient.GetVideoStreams()
+			if errStreams != nil || len(videoStreams) == 0 {
+				errMsg = "Connected, but no decodable video stream was found."
+			} else {
+				success = true
+				vs := videoStreams[0]
+				width = vs.Width
+				height = vs.Height
+				codec = vs.Name
+				fps = vs.FPS
+			}
+		}
+		// Always release the connection.
+		rtspClient.Close(ctx)
+	}
+
+	message := models.Message{
+		Payload: models.Payload{
+			Action:   "verify-stream-result",
+			DeviceId: configuration.Config.Key,
+			Value: map[string]interface{}{
+				"timestamp": verifyPayload.Timestamp,
+				"stream":    stream,
+				"success":   success,
+				"error":     errMsg,
+				"width":     width,
+				"height":    height,
+				"codec":     codec,
+				"fps":       fps,
+			},
+		},
+	}
+	packagedPayload, err := models.PackageMQTTMessage(configuration, message)
+	if err == nil {
+		mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, packagedPayload)
+	} else {
+		log.Log.Info("routers.mqtt.main.HandleVerifyStream(): something went wrong while sending result to hub: " + string(packagedPayload))
 	}
 }
 
