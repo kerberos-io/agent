@@ -50,6 +50,8 @@ func Discover(timeout time.Duration, subnets ...string) {
 		label := "device"
 		if device.IsCamera {
 			label = "camera"
+		} else if device.IsAudio {
+			label = "speaker"
 		}
 		summary := "onvif.Discover(): [" + label + "] " + device.IP
 		if device.Hostname != "" {

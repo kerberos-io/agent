@@ -153,6 +153,20 @@ func DiscoverDevices(timeout time.Duration, subnets ...string) []models.Discover
 			// manufacturer, model and type without any credentials.
 			fingerprint := fingerprintHost(ip, openPorts, dialTimeout)
 
+			// Resolve a hostname now (ONVIF WS-Discovery may already have set
+			// one; otherwise fall back to reverse DNS). Camera hostnames often
+			// encode the model (e.g. Reolink "RLC-823S2"), which is a useful
+			// brand hint when the RTSP/HTTP banners are anonymous.
+			mutex.Lock()
+			hostname := ""
+			if existing, ok := devicesByIP[ip]; ok {
+				hostname = existing.Hostname
+			}
+			mutex.Unlock()
+			if hostname == "" {
+				hostname = reverseDNS(ip, dialTimeout)
+			}
+
 			// Guess (and actively confirm) the RTSP stream URLs from a built-in
 			// brand -> RTSP path mapping when an RTSP port is open.
 			var rtspPort int
@@ -162,19 +176,33 @@ func DiscoverDevices(timeout time.Duration, subnets ...string) []models.Discover
 					break
 				}
 			}
+			// The banner manufacturer is most reliable; fall back to the
+			// hostname (model code) so devices that only reveal themselves via
+			// their name (e.g. Reolink RLC-*) still get the right stream paths.
+			brandHint := fingerprint.Manufacturer
+			if brandHint == "" {
+				brandHint = hostname
+			}
 			var rtspStreams []models.RTSPStream
 			detectedBrand := ""
 			detectedModel := ""
-			if rtspPort != 0 {
-				detectedBrand, detectedModel, rtspStreams = guessRTSPStreams(ip, rtspPort, fingerprint.Manufacturer, openPorts, dialTimeout)
+			if rtspPort != 0 && !fingerprint.IsAudio {
+				detectedBrand, detectedModel, rtspStreams = guessRTSPStreams(ip, rtspPort, brandHint, openPorts, dialTimeout)
 			}
 
 			device := upsert(ip)
 			mutex.Lock()
 			device.OpenPorts = mergeSortedInts(device.OpenPorts, openPorts)
 			device.Services = mergeUniqueStrings(device.Services, services)
+			if hostname != "" && device.Hostname == "" {
+				device.Hostname = hostname
+			}
 			if isCamera || fingerprint.IsCamera {
 				device.IsCamera = true
+			}
+			if fingerprint.IsAudio {
+				device.IsAudio = true
+				device.IsCamera = false
 			}
 			if fingerprint.Manufacturer != "" {
 				device.Manufacturer = fingerprint.Manufacturer
@@ -208,7 +236,7 @@ func DiscoverDevices(timeout time.Duration, subnets ...string) []models.Discover
 						break
 					}
 				}
-			} else if rtspPort != 0 {
+			} else if rtspPort != 0 && !fingerprint.IsAudio {
 				device.RTSPURL = "rtsp://" + ip + ":" + strconv.Itoa(rtspPort) + "/"
 			}
 			mutex.Unlock()

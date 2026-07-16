@@ -20,9 +20,16 @@ type deviceFingerprint struct {
 	// realm is the WWW-Authenticate realm advertised by the HTTP service. Many
 	// cameras expose their model or vendor here (e.g. realm="Hikvision").
 	realm string
+	// body holds a lower-cased slice of the HTTP landing page, fetched only when
+	// the banners are anonymous. Rebadged/OEM cameras often reveal their vendor
+	// there (logo filenames, embedded scripts), e.g. ADI "Capture".
+	body string
 	// IsCamera is set when the collected evidence confidently identifies the
 	// device as a camera, NVR or DVR.
 	IsCamera bool
+	// IsAudio is set for audio-only devices (IP speakers / intercoms, e.g. TOA)
+	// that use RTSP for audio rather than video.
+	IsAudio bool
 }
 
 // bannerVendors maps a lower-cased substring commonly found in RTSP/HTTP
@@ -51,6 +58,13 @@ var bannerVendors = []struct {
 	{"tp-link", "TP-Link", true},
 	{"tapo", "TP-Link", true},
 	{"linksys", "Linksys", true},
+	{"d-link", "D-Link", true},
+	{"dlink", "D-Link", true},
+	{"trendnet", "Trendnet", true},
+	{"lorex", "Lorex", true},
+	{"honeywell", "Honeywell", true},
+	{"pelco", "Pelco", true},
+	{"toa rtsp", "TOA", false},
 	{"hipcam", "Hipcam", true},
 	{"h264dvr", "Generic DVR", true},
 	{"dvrdvs", "Hikvision", true},
@@ -58,6 +72,20 @@ var bannerVendors = []struct {
 	{"rtsp server", "", true},
 	{"gstreamer", "", true},
 	{"live555", "", true},
+}
+
+// bodyVendors maps a distinctive lower-cased substring found in a camera's HTML
+// landing page (logo filename, embedded script, product string) to a
+// manufacturer. Used only when the RTSP/HTTP banners are anonymous, so it can
+// identify rebadged/OEM cameras (e.g. ADI "Capture") that hide their model
+// behind a generic "httpd" server and an "RTSP" realm.
+var bodyVendors = []struct {
+	Match    string
+	Vendor   string
+	IsCamera bool
+}{
+	{"logo_white(capture)", "Capture", true},
+	{"logo_capture", "Capture", true},
 }
 
 // genericRealms are auth realms that carry no useful model/vendor information.
@@ -74,6 +102,8 @@ var genericRealms = map[string]struct{}{
 	"web":                   {},
 	"protected":             {},
 	"authorized users only": {},
+	"please log in with a valid username.": {},
+	"please log in with a valid username":  {},
 }
 
 // fingerprintHost grabs the RTSP and HTTP banners for the given host (based on
@@ -98,6 +128,7 @@ func fingerprintHost(ip string, openPorts []int, timeout time.Duration) deviceFi
 	// 2) HTTP banner + auth realm on the first open HTTP/ONVIF port. Cameras
 	//    frequently expose their vendor/model in the Server header or the
 	//    WWW-Authenticate realm.
+	httpPort := 0
 	for _, port := range openPorts {
 		if port == 80 || port == 8080 || port == 8000 {
 			server, realm := httpBanner(ip, port, timeout)
@@ -105,12 +136,66 @@ func fingerprintHost(ip string, openPorts []int, timeout time.Duration) deviceFi
 				fp.Server = server
 			}
 			fp.realm = realm
+			httpPort = port
 			break
 		}
 	}
 
+	// 3) When the banners are anonymous (generic server, no vendor realm), fetch
+	//    a slice of the landing page. Rebadged/OEM cameras (e.g. ADI "Capture")
+	//    only reveal their vendor in the HTML.
+	if httpPort != 0 && isGenericServer(fp.Server) {
+		fp.body = httpBody(ip, httpPort, timeout)
+	}
+
 	classifyFingerprint(&fp, openPorts)
 	return fp
+}
+
+// isGenericServer reports whether an HTTP Server header is a generic embedded
+// web server that carries no vendor information (so the HTML body is worth a
+// look).
+func isGenericServer(server string) bool {
+	s := strings.ToLower(strings.TrimSpace(server))
+	if s == "" {
+		return true
+	}
+	for _, generic := range []string{"httpd", "webs", "boa", "lighttpd", "nginx", "gsoap", "mini_httpd", "thttpd", "apache"} {
+		if strings.Contains(s, generic) {
+			return true
+		}
+	}
+	return false
+}
+
+// httpBody issues an unauthenticated HTTP GET / and returns a lower-cased,
+// size-bounded slice of the response (headers + body). Best-effort; empty on
+// error.
+func httpBody(ip string, port int, timeout time.Duration) string {
+	address := net.JoinHostPort(ip, strconv.Itoa(port))
+	conn, err := net.DialTimeout("tcp", address, timeout)
+	if err != nil {
+		return ""
+	}
+	defer conn.Close()
+
+	_ = conn.SetDeadline(time.Now().Add(timeout))
+	request := "GET / HTTP/1.0\r\nHost: " + ip + "\r\nUser-Agent: KerberosDiscovery\r\nAccept: */*\r\n\r\n"
+	if _, err := conn.Write([]byte(request)); err != nil {
+		return ""
+	}
+	var builder strings.Builder
+	buf := make([]byte, 4096)
+	for builder.Len() < 65536 {
+		n, err := conn.Read(buf)
+		if n > 0 {
+			builder.Write(buf[:n])
+		}
+		if err != nil {
+			break
+		}
+	}
+	return strings.ToLower(builder.String())
 }
 
 // rtspServerBanner issues an unauthenticated RTSP OPTIONS request and returns
@@ -238,10 +323,37 @@ func classifyFingerprint(fp *deviceFingerprint, openPorts []int) {
 		}
 	}
 
+	// Vendor from the HTML landing page when the banners revealed nothing.
+	// Rebadged/OEM cameras (e.g. ADI "Capture") only identify themselves via
+	// logo filenames or embedded scripts.
+	if fp.Manufacturer == "" && fp.body != "" {
+		for _, entry := range bodyVendors {
+			if strings.Contains(fp.body, entry.Match) {
+				fp.Manufacturer = entry.Vendor
+				if entry.IsCamera {
+					fp.IsCamera = true
+				}
+				break
+			}
+		}
+	}
+
 	// Device type from ports and banners.
 	hasRTSP := containsInt(openPorts, 554) || containsInt(openPorts, 8554)
 	hasONVIF := containsInt(openPorts, 8000) || containsInt(openPorts, 8899)
 	hasDVRPort := containsInt(openPorts, 37777) || containsInt(openPorts, 34567)
+
+	// Audio devices (IP speakers / intercoms) also speak RTSP, but for audio
+	// rather than video, so classify them separately and never as a camera.
+	if fp.Manufacturer == "TOA" ||
+		strings.Contains(haystack, "speaker") ||
+		strings.Contains(haystack, "sip audio") ||
+		strings.Contains(haystack, "audio server") {
+		fp.IsAudio = true
+		fp.IsCamera = false
+		fp.Type = "IP Speaker/Audio"
+		return
+	}
 
 	switch {
 	case strings.Contains(haystack, "nvr"):

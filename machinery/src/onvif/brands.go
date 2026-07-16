@@ -63,7 +63,7 @@ var brandProfiles = []brandProfile{
 	},
 	{
 		Brand:          "Reolink",
-		Aliases:        []string{"reolink"},
+		Aliases:        []string{"reolink", "rlc", "rln", "rlc-", "rln-", "trackmix", "duo"},
 		MainPath:       "/h264Preview_01_main",
 		SubPath:        "/h264Preview_01_sub",
 		extraMainPaths: []string{"/Preview_01_main"},
@@ -80,7 +80,7 @@ var brandProfiles = []brandProfile{
 		Aliases:        []string{"bosch"},
 		MainPath:       "/rtsp_tunnel",
 		SubPath:        "/rtsp_tunnel?inst=2",
-		extraMainPaths: []string{"/?inst=1"},
+		extraMainPaths: []string{"/rtsp_tunnel?inst=1", "/?inst=1"},
 	},
 	{
 		Brand:          "Vivotek",
@@ -133,6 +133,62 @@ var brandProfiles = []brandProfile{
 		Aliases:  []string{"sony"},
 		MainPath: "/media/video1",
 		SubPath:  "/media/video2",
+	},
+	{
+		// D-Link mydlink IP cameras. Older models stream MJPEG over HTTP; the
+		// RTSP-capable ones expose SDP-named streams, newer DCS models use
+		// "/live/profile.0".
+		Brand:          "D-Link",
+		Aliases:        []string{"d-link", "dlink", "dcs-", "dcs"},
+		MainPath:       "/live1.sdp",
+		SubPath:        "/live2.sdp",
+		extraMainPaths: []string{"/live.sdp", "/live/profile.0", "/play1.sdp"},
+	},
+	{
+		// TRENDnet. Newer PoE bullet/dome models (TV-IPxxxPI) use a
+		// Hikvision-style path; older ones expose SDP streams.
+		Brand:          "Trendnet",
+		Aliases:        []string{"trendnet", "tv-ip"},
+		MainPath:       "/Streaming/Channels/101",
+		SubPath:        "/Streaming/Channels/102",
+		extraMainPaths: []string{"/play1.sdp", "/play2.sdp", "/ch0_0.h264", "/live/av0"},
+	},
+	{
+		// Lorex is built largely on Dahua hardware, so it shares Dahua's
+		// realmonitor path scheme.
+		Brand:          "Lorex",
+		Aliases:        []string{"lorex"},
+		MainPath:       "/cam/realmonitor?channel=1&subtype=0",
+		SubPath:        "/cam/realmonitor?channel=1&subtype=1",
+		extraMainPaths: []string{"/ch01/0"},
+	},
+	{
+		// Honeywell ships both Dahua-OEM models (realmonitor) and in-house
+		// firmwares exposing "/h264" or "/media".
+		Brand:          "Honeywell",
+		Aliases:        []string{"honeywell"},
+		MainPath:       "/cam/realmonitor?channel=1&subtype=0",
+		SubPath:        "/cam/realmonitor?channel=1&subtype=1",
+		extraMainPaths: []string{"/h264", "/media", "/live.sdp"},
+	},
+	{
+		Brand:          "Pelco",
+		Aliases:        []string{"pelco"},
+		MainPath:       "/stream1",
+		SubPath:        "/stream2",
+		extraMainPaths: []string{"/1/stream1"},
+	},
+	{
+		// TOA network audio devices (IP horn speakers / intercoms, banner
+		// "TOA rtsp server") expose their stream through ONVIF rather than a
+		// documented fixed RTSP path. These ONVIF-style paths are a best-effort
+		// default; the authoritative URL should come from an ONVIF GetStreamUri
+		// query with credentials.
+		Brand:          "TOA",
+		Aliases:        []string{"toa"},
+		MainPath:       "/ONVIF/channel1",
+		SubPath:        "/ONVIF/channel2",
+		extraMainPaths: []string{"/media/video1", "/live"},
 	},
 	{
 		// Linksys/Cisco IP cameras (e.g. LCAD03FLN, LCAB03VLNOD, LCAM0336OD)
@@ -199,6 +255,13 @@ var realmBrands = []struct {
 	{"vivotek", "Vivotek"},
 	{"mobotix", "Mobotix"},
 	{"bosch", "Bosch"},
+	{"please log in with a valid username", "Bosch"},
+	{"d-link", "D-Link"},
+	{"dcs-", "D-Link"},
+	{"trendnet", "Trendnet"},
+	{"lorex", "Lorex"},
+	{"honeywell", "Honeywell"},
+	{"pelco", "Pelco"},
 	{"linksys", "Linksys"},
 	{"lcad", "Linksys"},
 	{"lcab", "Linksys"},

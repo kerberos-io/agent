@@ -39,6 +39,9 @@ type DiscoveredDevice struct {
 	RTSPURL      string       `json:"rtsp_url,omitempty" bson:"rtsp_url"`
 	RTSPStreams  []RTSPStream `json:"rtsp_streams,omitempty" bson:"rtsp_streams"`
 	IsCamera     bool         `json:"is_camera" bson:"is_camera"`
+	// IsAudio marks audio-only devices (e.g. IP speakers / intercoms such as
+	// TOA) that expose RTSP to receive/stream audio rather than video.
+	IsAudio bool `json:"is_audio" bson:"is_audio"`
 }
 
 // RTSPStream is a candidate RTSP stream URL for a discovered camera, derived
