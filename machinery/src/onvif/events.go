@@ -3,6 +3,7 @@ package onvif
 import (
 	"context"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -116,18 +117,16 @@ func runStreamOnce(ctx context.Context, configuration *models.Configuration, com
 // closes HandleMotion shortly after cancelling ctx, and a stale event
 // reaching the send would otherwise panic on a closed channel.
 func dispatchEvent(ctx context.Context, ev stream.Event, configuration *models.Configuration, communication *models.Communication) {
+	topic := sanitiseTopic(ev.Topic)
 	if ev.Kind != stream.KindMotion {
-		log.Log.Debug("onvif.dispatchEvent(): non-motion event " + ev.Kind.String() + " topic=" + ev.Topic)
+		log.Log.Debug("onvif.dispatchEvent(): non-motion event " + ev.Kind.String() + " topic=" + topic)
 		return
 	}
 	if ev.State != stream.StateActive {
 		return
 	}
-	// A camera replays every property topic's current state as
-	// Initialized on each new subscription, so treating that as a
-	// trigger lets a flapping pull-point manufacture motion.
-	if ev.Operation == stream.PropertyInitialized {
-		log.Log.Debug("onvif.dispatchEvent(): subscription state replay, not a trigger: topic=" + ev.Topic)
+	if !isTransition(ev.Operation) {
+		log.Log.Debug("onvif.dispatchEvent(): " + ev.Operation.String() + " is not a transition, not a trigger: topic=" + topic)
 		return
 	}
 	if configuration.Config.Capture.Recording == "false" {
@@ -136,9 +135,6 @@ func dispatchEvent(ctx context.Context, ev stream.Event, configuration *models.C
 	if ctx.Err() != nil {
 		return
 	}
-	// The topic that actually started a recording is the one on-call
-	// needs; the reject path below already names the ones that didn't.
-	log.Log.Debug("onvif.dispatchEvent(): recording trigger " + ev.Kind.String() + " topic=" + ev.Topic)
 
 	dataToPass := models.MotionDataPartial{
 		Timestamp:       time.Now().Unix(),
@@ -147,9 +143,37 @@ func dispatchEvent(ctx context.Context, ev stream.Event, configuration *models.C
 	select {
 	case <-ctx.Done():
 	case communication.HandleMotion <- dataToPass:
+		// Logged on the send, not before it: this line records that a
+		// recording started, so a dropped event must not leave one.
+		log.Log.Debug("onvif.dispatchEvent(): recording trigger " + ev.Kind.String() + " topic=" + topic)
 	default:
 		log.Log.Debug("onvif.dispatchEvent(): HandleMotion full, dropping ONVIF motion event")
 	}
+}
+
+// isTransition reports whether an operation represents a state change.
+// A camera replays every property's current state as Initialized on
+// each new subscription and announces removals as Deleted; neither is
+// motion starting. Absent (Unknown) counts — PropertyOperation is
+// optional per WS-Notification and many non-property events omit it.
+func isTransition(op stream.PropertyOperation) bool {
+	return op == stream.PropertyChanged || op == stream.PropertyUnknown
+}
+
+// maxLoggedTopic bounds a topic in the log; the wire imposes no limit,
+// and the reject path logs every event received.
+const maxLoggedTopic = 256
+
+// sanitiseTopic makes a camera-controlled topic safe to concatenate
+// into a log line. logrus's coloured text formatter writes the message
+// unquoted, so a raw newline would let a camera forge entries in the
+// log being used to diagnose it.
+func sanitiseTopic(topic string) string {
+	if len(topic) > maxLoggedTopic {
+		topic = topic[:maxLoggedTopic] + "…(truncated)"
+	}
+	quoted := strconv.Quote(topic)
+	return quoted[1 : len(quoted)-1]
 }
 
 // logStreamError logs at a level matching severity: recreate is loud

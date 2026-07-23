@@ -3,6 +3,7 @@ package onvif
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/kerberos-io/onvif/event/stream"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func makeConfig(recording, onvifMotion, name string) *models.Configuration {
@@ -275,4 +277,99 @@ func TestResolveDeviceID_FallbackChain(t *testing.T) {
 			assert.Equal(t, tc.want, resolveDeviceID(tc.cfgName, tc.xaddr))
 		})
 	}
+}
+
+// TestDispatchEvent_OnlyRealTransitionsTrigger — a camera replays every
+// property topic's state on each new subscription (Initialized) and
+// announces removals (Deleted). Neither is a motion transition, and a
+// flapping pull-point would otherwise manufacture recordings out of
+// replayed state. PropertyOperation is optional per WS-Notification, so
+// absent (Unknown) still counts — many non-property events omit it.
+func TestDispatchEvent_OnlyRealTransitionsTrigger(t *testing.T) {
+	tests := []struct {
+		op       stream.PropertyOperation
+		wantSend bool
+	}{
+		{stream.PropertyChanged, true},
+		{stream.PropertyUnknown, true},
+		{stream.PropertyInitialized, false},
+		{stream.PropertyDeleted, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.op.String(), func(t *testing.T) {
+			cfg := makeConfig("true", "true", "cam-1")
+			comm := makeCommunication(1)
+			ev := stream.Event{Kind: stream.KindMotion, State: stream.StateActive, Operation: tt.op}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			dispatchEvent(ctx, ev, cfg, comm)
+
+			if tt.wantSend {
+				require.Len(t, comm.HandleMotion, 1, "%v must trigger a recording", tt.op)
+				return
+			}
+			require.Empty(t, comm.HandleMotion, "%v must not trigger a recording", tt.op)
+		})
+	}
+}
+
+// TestSanitiseTopic — ev.Topic is camera-controlled and reaches the log
+// unmodified. logrus's coloured text formatter (the default) writes the
+// message without quoting, so an embedded newline forges whole log
+// lines: a compromised camera can fabricate ERROR entries or spoof
+// another device's id, in the logs an operator is reading to diagnose
+// that very camera. Length is also unbounded on the wire, and the
+// reject path logs every event, so an oversized topic is a cheap way to
+// evict a container's whole retained history.
+func TestSanitiseTopic(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"ordinary topic passes through", "tns1:RuleEngine/tnsaxis:VMD3/vmd3_video_1", "tns1:RuleEngine/tnsaxis:VMD3/vmd3_video_1"},
+		{"newline cannot forge a line", "a\nERRO[fake] boom", `a\nERRO[fake] boom`},
+		{"carriage return", "a\rb", `a\rb`},
+		{"tab", "a\tb", `a\tb`},
+		{"NUL", "a\x00b", `a\x00b`},
+		{"empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitiseTopic(tt.in)
+			assert.Equal(t, tt.want, got)
+			assert.NotContains(t, got, "\n", "no raw newline may survive")
+			assert.NotContains(t, got, "\r", "no raw carriage return may survive")
+		})
+	}
+}
+
+func TestSanitiseTopic_Truncates(t *testing.T) {
+	got := sanitiseTopic(strings.Repeat("x", maxLoggedTopic*2))
+	assert.LessOrEqual(t, len(got), maxLoggedTopic+len("…(truncated)"))
+	assert.Contains(t, got, "truncated")
+}
+
+// TestDispatchEvent_LogsTriggerOnlyWhenSent — the trigger line is the
+// record that a recording started. Logging it before the send means a
+// dropped event (full channel, or shutdown) leaves a line claiming a
+// recording that never began.
+func TestDispatchEvent_LogsTriggerOnlyWhenSent(t *testing.T) {
+	buf := captureDebugLog(t)
+
+	cfg := makeConfig("true", "true", "cam-1")
+	comm := &models.Communication{HandleMotion: make(chan models.MotionDataPartial, 1)}
+	comm.HandleMotion <- models.MotionDataPartial{} // full
+	ev := stream.Event{Kind: stream.KindMotion, State: stream.StateActive, Topic: "tns1:VideoSource/MotionAlarm"}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dispatchEvent(ctx, ev, cfg, comm)
+
+	assert.NotContains(t, buf.String(), "recording trigger",
+		"a dropped event must not be logged as a trigger")
+	assert.Contains(t, buf.String(), "dropping", "the drop itself must still be logged")
 }
