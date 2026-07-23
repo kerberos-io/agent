@@ -129,6 +129,10 @@ func dispatchEvent(ctx context.Context, ev stream.Event, configuration *models.C
 	if ctx.Err() != nil {
 		return
 	}
+	// The topic that actually started a recording is the one on-call
+	// needs; the reject path below already names the ones that didn't.
+	log.Log.Debug("onvif.dispatchEvent(): recording trigger " + ev.Kind.String() + " topic=" + ev.Topic)
+
 	dataToPass := models.MotionDataPartial{
 		Timestamp:       time.Now().Unix(),
 		NumberOfChanges: 0, // ONVIF does not quantify motion area.

@@ -1,12 +1,14 @@
 package onvif
 
 import (
+	"bytes"
 	"context"
 	"testing"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/onvif/event/stream"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,6 +79,48 @@ func TestDispatchEvent_NonMotionKindIgnored(t *testing.T) {
 		t.Fatal("non-motion kinds must not reach HandleMotion")
 	case <-time.After(100 * time.Millisecond):
 	}
+}
+
+// captureDebugLog redirects logrus to a buffer at debug level for the
+// duration of a test and returns what was written. It mutates package
+// globals, so callers must not run in parallel.
+func captureDebugLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	prevOut, prevLevel := logrus.StandardLogger().Out, logrus.GetLevel()
+	logrus.SetOutput(&buf)
+	logrus.SetLevel(logrus.DebugLevel)
+	t.Cleanup(func() {
+		logrus.SetOutput(prevOut)
+		logrus.SetLevel(prevLevel)
+	})
+	return &buf
+}
+
+// TestDispatchEvent_LogsTheTriggeringTopic — a dispatched event is what
+// actually starts a recording, so its topic is the one an operator needs
+// when a camera records for the wrong reason (or the right reason and
+// nobody can prove which). Rejected events were already logged; without
+// this the triggering topic is only knowable by elimination.
+func TestDispatchEvent_LogsTheTriggeringTopic(t *testing.T) {
+	buf := captureDebugLog(t)
+
+	cfg := makeConfig("true", "true", "cam-1")
+	comm := makeCommunication(1)
+	ev := stream.Event{
+		Kind:  stream.KindMotion,
+		State: stream.StateActive,
+		Topic: "tns1:RuleEngine/tnsaxis:VMD3/vmd3_video_1",
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	dispatchEvent(ctx, ev, cfg, comm)
+
+	assert.Contains(t, buf.String(), "tns1:RuleEngine/tnsaxis:VMD3/vmd3_video_1",
+		"the dispatched event's topic must appear in the log")
+	assert.Contains(t, buf.String(), "Motion",
+		"the dispatched event's Kind must appear in the log")
 }
 
 func TestDispatchEvent_RecordingDisabled_DoesNotSend(t *testing.T) {
