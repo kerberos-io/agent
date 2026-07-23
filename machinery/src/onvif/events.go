@@ -123,6 +123,13 @@ func dispatchEvent(ctx context.Context, ev stream.Event, configuration *models.C
 	if ev.State != stream.StateActive {
 		return
 	}
+	// A camera replays every property topic's current state as
+	// Initialized on each new subscription, so treating that as a
+	// trigger lets a flapping pull-point manufacture motion.
+	if ev.Operation == stream.PropertyInitialized {
+		log.Log.Debug("onvif.dispatchEvent(): subscription state replay, not a trigger: topic=" + ev.Topic)
+		return
+	}
 	if configuration.Config.Capture.Recording == "false" {
 		return
 	}
