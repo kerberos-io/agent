@@ -163,6 +163,15 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 	// never consume the retry budget (matching the legacy single-POST behaviour).
 	lastStatus := 0
 
+	// highWaterOffset is the furthest server-acknowledged offset observed across
+	// all attempts (via HEAD or PATCH). It lets the retry budget be refreshed only
+	// on GENUINE net forward progress. Without it, a server that keeps resetting the
+	// offset — e.g. a persistent 409 ERR_MISMATCHED_OFFSET where HEAD reports 0 again
+	// while the first chunk still "succeeds" — would refresh the budget every attempt
+	// and loop forever, wedging the upload worker on one recording and saturating the
+	// uplink.
+	highWaterOffset := int64(0)
+
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		// (1) Ensure we have an active upload URL, creating one if needed.
 		if uploadURL == "" {
@@ -196,6 +205,15 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 			continue
 		}
 
+		// The furthest offset any previous attempt reached. If this attempt pushes
+		// past it (via HEAD showing server-side progress or a successful PATCH) we made
+		// genuine net progress and may refresh the retry budget; if not, a repeated
+		// failure at the same spot must count against maxAttempts.
+		startHighWater := highWaterOffset
+		if offset > highWaterOffset {
+			highWaterOffset = offset
+		}
+
 		// (3) All bytes are present but the upload was not finalized (e.g. the
 		// completion hook failed). A completed tus upload cannot be re-finalized
 		// with another PATCH, so delete it and re-upload to force a clean finalize.
@@ -216,7 +234,6 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 		// checkpointing the offset after each one so an interruption resumes from the
 		// last completed chunk instead of re-uploading everything.
 		chunkSize := tusChunkSize()
-		progressed := false
 		patchFailed := false
 		var lastBody string
 		loggedProgressBucket := tusProgressBucket(offset, size)
@@ -244,10 +261,10 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 				patchFailed = true
 				break
 			}
-			if newOffset > offset {
-				progressed = true
-			}
 			offset = newOffset
+			if offset > highWaterOffset {
+				highWaterOffset = offset
+			}
 			lastBody = respBody
 			logTusUploadProgress(label, offset, size, &loggedProgressBucket)
 			if offset < size {
@@ -256,10 +273,13 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 			}
 		}
 		if patchFailed {
-			if progressed {
-				// Forward progress refreshes the retry budget: maxAttempts bounds the
-				// number of consecutive failures, not the number of chunks needed for
-				// a large recording.
+			if highWaterOffset > startHighWater {
+				// Genuine net progress (we advanced past the furthest point any previous
+				// attempt reached) refreshes the retry budget: maxAttempts bounds the
+				// number of consecutive *non-progressing* failures, not the number of
+				// chunks needed for a large recording. A server that keeps rejecting the
+				// same offset (no net progress, e.g. a persistent ERR_MISMATCHED_OFFSET)
+				// therefore gives up after maxAttempts instead of retrying forever.
 				attempt = -1
 			}
 			continue
