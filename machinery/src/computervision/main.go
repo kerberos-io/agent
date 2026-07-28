@@ -47,7 +47,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 
 	if motionDisabled {
 
-		log.Log.Info("computervision.main.ProcessMotion(): motion detection disabled (pixelChangeThreshold set to 0), skipping.")
+		log.Log.Warning("computervision.main.ProcessMotion(): motion detection is DISABLED because pixelChangeThreshold is set to 0 (nil/unset would default to 150). If motion detection is expected to be running, set capture.pixelChangeThreshold to a positive value (150 recommended) or AGENT_CAPTURE_PIXEL_CHANGE, then restart/update the agent.")
 
 	} else if continuousMode && !hasMotionRegion {
 
