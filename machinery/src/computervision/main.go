@@ -231,12 +231,12 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 													"mainWidth":  configuration.Config.Capture.IPCamera.Width,
 													"mainHeight": configuration.Config.Capture.IPCamera.Height,
 													"regions":    motionRectangles,
-													"polygon":    regionPolygons,												// Motion sensitivity = the pixel-change threshold that must
-												// be exceeded before motion triggers. The live view renders
-												// a reference square of sqrt(threshold) px (in this MOTION
-												// frame's pixel space) so the user can visually gauge how
-												// large a moving object must be before it is detected.
-												"pixelChangeThreshold": pixelThreshold,												},
+													"polygon":    regionPolygons, // Motion sensitivity = the pixel-change threshold that must
+													// be exceeded before motion triggers. The live view renders
+													// a reference square of sqrt(threshold) px (in this MOTION
+													// frame's pixel space) so the user can visually gauge how
+													// large a moving object must be before it is detected.
+													"pixelChangeThreshold": pixelThreshold},
 											},
 										}
 										payload, err := models.PackageMQTTMessage(configuration, message)
