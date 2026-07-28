@@ -236,8 +236,9 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 													// a reference square of sqrt(threshold) px (in this MOTION
 													// frame's pixel space) so the user can visually gauge how
 													// large a moving object must be before it is detected.
-													"pixelChangeThreshold": pixelThreshold},
+												"pixelChangeThreshold": pixelThreshold,
 											},
+										},
 										}
 										payload, err := models.PackageMQTTMessage(configuration, message)
 										if err == nil {
