@@ -651,6 +651,17 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 		}
 	}
 
+	// Motion sensitivity: nil/unset must still resolve to the default (150), not
+	// be left nil. An explicit 0 (temporary "disable motion detection" switch
+	// from the UI) is a real, non-nil value and must NOT be touched here. Only
+	// applied for the effective configuration (applyDefaults), not for the
+	// separate global/custom views, so a missing value in one layer can still be
+	// inherited from the other instead of being masked by this default.
+	if applyDefaults && configuration.Config.Capture.PixelChangeThreshold == nil {
+		defaultPixelChangeThreshold := 150
+		configuration.Config.Capture.PixelChangeThreshold = &defaultPixelChangeThreshold
+	}
+
 	// Signing is a new feature, so if empty we set default values. Only applied
 	// for the effective configuration (applyDefaults), not for the separate
 	// global/custom views.

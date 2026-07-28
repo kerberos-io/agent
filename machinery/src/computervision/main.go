@@ -47,7 +47,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 
 	if motionDisabled {
 
-		log.Log.Info("computervision.main.ProcessMotion(): motion detection disabled (pixelChangeThreshold set to 0), skipping.")
+		log.Log.Warning("computervision.main.ProcessMotion(): motion detection is DISABLED because pixelChangeThreshold is set to 0 or less (nil/unset would default to 150). If motion detection is expected to be running, set capture.pixelChangeThreshold to a positive value (150 recommended) or AGENT_CAPTURE_PIXEL_CHANGE, then restart/update the agent.")
 
 	} else if continuousMode && !hasMotionRegion {
 
@@ -231,13 +231,14 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 													"mainWidth":  configuration.Config.Capture.IPCamera.Width,
 													"mainHeight": configuration.Config.Capture.IPCamera.Height,
 													"regions":    motionRectangles,
-													"polygon":    regionPolygons,												// Motion sensitivity = the pixel-change threshold that must
-												// be exceeded before motion triggers. The live view renders
-												// a reference square of sqrt(threshold) px (in this MOTION
-												// frame's pixel space) so the user can visually gauge how
-												// large a moving object must be before it is detected.
-												"pixelChangeThreshold": pixelThreshold,												},
+													"polygon":    regionPolygons, // Motion sensitivity = the pixel-change threshold that must
+													// be exceeded before motion triggers. The live view renders
+													// a reference square of sqrt(threshold) px (in this MOTION
+													// frame's pixel space) so the user can visually gauge how
+													// large a moving object must be before it is detected.
+												"pixelChangeThreshold": pixelThreshold,
 											},
+										},
 										}
 										payload, err := models.PackageMQTTMessage(configuration, message)
 										if err == nil {
