@@ -377,6 +377,9 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 			case "AGENT_CAPTURE_MOTION":
 				configuration.Config.Capture.Motion = value
 				break
+			case "AGENT_CAPTURE_ONVIF_MOTION":
+				configuration.Config.Capture.ONVIFMotion = value
+				break
 			case "AGENT_CAPTURE_SNAPSHOTS":
 				configuration.Config.Capture.Snapshots = value
 				break
