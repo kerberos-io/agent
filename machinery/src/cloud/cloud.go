@@ -231,14 +231,20 @@ func rawJSONOrEmptyArray(b []byte) json.RawMessage {
 func HandleHeartBeat(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time) {
 	log.Log.Debug("cloud.HandleHeartBeat(): started")
 
+	// Bound every heartbeat POST so a stalled connection (e.g. a saturated uplink
+	// or an unresponsive Hub/Vault) fails fast on this cycle instead of blocking
+	// the whole heartbeat loop indefinitely. A hung POST would otherwise stop all
+	// further heartbeats, and Hub marks a camera offline once its last heartbeat is
+	// older than 180s even while capture is healthy.
+	const heartbeatHTTPTimeout = 30 * time.Second
 	var client *http.Client
 	if os.Getenv("AGENT_TLS_INSECURE") == "true" {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
-		client = &http.Client{Transport: tr}
+		client = &http.Client{Transport: tr, Timeout: heartbeatHTTPTimeout}
 	} else {
-		client = &http.Client{}
+		client = &http.Client{Timeout: heartbeatHTTPTimeout}
 	}
 
 	kerberosAgentVersion := utils.VERSION

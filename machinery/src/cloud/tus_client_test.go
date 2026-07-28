@@ -49,6 +49,14 @@ type fakeTus struct {
 	// after storing the bytes, simulating a failed completion hook.
 	failFinalize int
 
+	// loseProgress simulates a vault that never durably retains the in-progress
+	// upload: every PATCH is acknowledged (the response advertises the advanced
+	// offset) but the stored offset is immediately reset to 0. HEAD therefore
+	// keeps reporting 0 and the next chunk — sent at the advanced offset — is
+	// rejected with 409, reproducing the cross-replica ERR_MISMATCHED_OFFSET
+	// loop that previously wedged the agent's upload worker forever.
+	loseProgress bool
+
 	// requests records the headers of every received request (in order) so
 	// tests can assert which auth/routing headers the client sent per method.
 	requests []recordedRequest
@@ -153,6 +161,31 @@ func (s *fakeTus) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.mu.Unlock()
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if s.loseProgress {
+			reqOffset, _ := strconv.ParseInt(r.Header.Get("Upload-Offset"), 10, 64)
+			s.mu.Lock()
+			cur := u.offset
+			if reqOffset != cur {
+				// The offset the client resumes from no longer matches what this
+				// "replica" retained, so reject like a vault returning
+				// ERR_MISMATCHED_OFFSET.
+				s.mu.Unlock()
+				w.Header().Set("Upload-Offset", strconv.FormatInt(cur, 10))
+				w.WriteHeader(http.StatusConflict)
+				return
+			}
+			n, _ := io.Copy(io.Discard, r.Body)
+			s.lastPatchBytes = n
+			s.patchSizes = append(s.patchSizes, n)
+			// Advertise progress to the client, then immediately forget it so the
+			// next chunk (sent at the advanced offset) mismatches again.
+			reported := cur + n
+			u.offset = 0
+			s.mu.Unlock()
+			w.Header().Set("Upload-Offset", strconv.FormatInt(reported, 10))
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		n, _ := io.Copy(io.Discard, r.Body)
@@ -390,6 +423,61 @@ func TestUploadVaultResumable_NetworkErrorKeepsRetryBudget(t *testing.T) {
 	}
 	if err == nil {
 		t.Fatal("expected an error when the vault is unreachable")
+	}
+}
+
+func TestUploadVaultResumable_MismatchedOffsetGivesUp(t *testing.T) {
+	// A vault that never durably retains the in-progress upload (offset resets to
+	// 0 between chunks) makes every resume "progress" by one chunk and then fail
+	// the next chunk with 409. Before the high-water gating fix this refreshed the
+	// retry budget every attempt and looped forever, wedging the upload worker and
+	// saturating the uplink (which starved heartbeats and reported the camera
+	// offline). The loop must now be bounded: give up after a fixed number of
+	// non-progressing attempts and report responded=true so the caller re-queues.
+	srv := newFakeTus()
+	srv.loseProgress = true
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	// Keep the between-attempt back-off tiny so the test stays fast.
+	oldDelay := tusBackoffBaseDelay
+	tusBackoffBaseDelay = time.Millisecond
+	defer func() { tusBackoffBaseDelay = oldDelay }()
+
+	// Force multiple chunks so there is always a second chunk to be rejected.
+	t.Setenv("AGENT_TUS_CHUNK_SIZE_BYTES", "4096")
+
+	fileName := "1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4"
+	withRecording(t, fileName, bytes.Repeat([]byte("m"), 12288))
+
+	done := make(chan struct{})
+	var uploaded, responded bool
+	var upErr error
+	go func() {
+		uploaded, responded, _, _, upErr = uploadVaultResumable(testVault(ts.URL), "pk", "dev", fileName, "test", "primary")
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("resumable upload did not terminate: the retry loop is unbounded on a persistent mismatched offset")
+	}
+
+	if uploaded {
+		t.Fatal("expected uploaded=false when the vault never retains the offset")
+	}
+	if !responded {
+		t.Fatal("expected responded=true (the vault answered) so the caller re-queues the recording")
+	}
+	if upErr == nil {
+		t.Fatal("expected an error when the upload cannot complete")
+	}
+
+	// The bounded retry budget must cap the number of PATCH requests. Two PATCHes
+	// per attempt across a handful of attempts stays comfortably below this.
+	if count, _ := srv.patchCounts(); count > 50 {
+		t.Fatalf("expected a bounded number of PATCH requests, got %d (retry loop not bounded)", count)
 	}
 }
 
