@@ -312,6 +312,7 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 		"provider":  vault.Provider,
 		"capture":   "IPCamera",
 		"cloudkey":  publicKey,
+		"fps":       queuedRecordingFPS(fileName),
 	})
 	setHeaders := func(h http.Header, fn string) {
 		setVaultTusHeaders(h, vault, publicKey, deviceKey, fn)
@@ -330,6 +331,7 @@ func uploadHubResumable(config *models.Config, fileName, label, slot string) (bo
 		"filename": fileName,
 		"device":   config.Key,
 		"capture":  "IPCamera",
+		"fps":      queuedRecordingFPS(fileName),
 	})
 	setHeaders := func(h http.Header, fn string) {
 		setHubTusHeaders(h, config, fn)

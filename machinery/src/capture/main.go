@@ -5,8 +5,11 @@ import (
 	"context"
 	"encoding/base64"
 	"image"
+	"math"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -47,6 +50,42 @@ func publishRecordingState(mqttClient mqtt.Client, hubKey string, configuration 
 		mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 	} else {
 		log.Log.Error("capture.main.publishRecordingState(): failed to package MQTT message: " + err.Error())
+	}
+}
+
+// queueRecordingForUpload creates the marker consumed by the upload worker and
+// snapshots the main-stream FPS into it. Keeping the value with the recording
+// prevents a delayed upload from using the FPS of a later camera configuration.
+// Empty markers remain valid for recordings whose FPS is not yet known.
+func queueRecordingForUpload(configDirectory, name string, configuration *models.Configuration) {
+	fps := ""
+	if configuration != nil {
+		candidate := strings.TrimSpace(configuration.Config.Capture.IPCamera.FPS)
+		if parsed, err := strconv.ParseFloat(candidate, 64); err == nil && parsed > 0 && parsed <= 240 && !math.IsInf(parsed, 0) && !math.IsNaN(parsed) {
+			fps = candidate
+		}
+	}
+
+	// Publish the marker with a same-filesystem rename. Writing directly to the
+	// watched directory would briefly expose an empty file to the upload poller.
+	marker, err := os.CreateTemp(filepath.Join(configDirectory, "data"), ".upload-marker-*")
+	if err == nil {
+		_, err = marker.WriteString(fps)
+	}
+	if err == nil {
+		err = marker.Chmod(0644)
+	}
+	if marker != nil {
+		if closeErr := marker.Close(); err == nil {
+			err = closeErr
+		}
+		defer os.Remove(marker.Name())
+	}
+	if err == nil {
+		err = os.Rename(marker.Name(), filepath.Join(configDirectory, "data", "cloud", filepath.Base(name)))
+	}
+	if err != nil {
+		log.Log.Error("capture.main.queueRecordingForUpload(): " + err.Error())
 	}
 }
 
@@ -438,9 +477,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					// Create a symbol link.
-					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
-					fc.Close()
+					queueRecordingForUpload(configDirectory, name, configuration)
 
 					recordingStatus = "idle"
 
@@ -597,9 +634,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					// Create a symbol link.
-					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
-					fc.Close()
+					queueRecordingForUpload(configDirectory, name, configuration)
 
 					recordingStatus = "idle"
 
@@ -869,9 +904,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 				}
 
-				// Create a symbol linc.
-				fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
-				fc.Close()
+				queueRecordingForUpload(configDirectory, name, configuration)
 
 				// Clean up the recording directory if necessary.
 				CleanupRecordingDirectory(configDirectory, configuration)
