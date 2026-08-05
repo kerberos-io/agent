@@ -419,6 +419,30 @@ By running the `docker build` command, you will create the Kerberos Agent Docker
 
     docker build -t kerberos/agent .
 
+### Building with Media over QUIC
+
+The optional MoQ publisher uses a Rust FFI archive that requires CGO and glibc
+2.38 or newer. Build it with the Debian-based image instead of the standard
+static Alpine image:
+
+    docker build -f Dockerfile.moq -t kerberos/agent:moq .
+
+The publisher is still disabled unless explicitly enabled at runtime:
+
+    docker run --rm -p 80:80 \
+      -e AGENT_LIVE_MOQ_ENABLED=true \
+      -e AGENT_LIVE_MOQ_URL=https://relay.uug.ai/anon \
+      kerberos/agent:moq
+
+`AGENT_LIVE_MOQ_BROADCAST_PREFIX` defaults to `devices`, producing the broadcast
+`devices/<agent-key>/live.hang`. `AGENT_LIVE_MOQ_QUALITY` accepts `auto` (the
+default), `high`, or `low` and selects the main or sub camera stream when the
+Agent starts. The initial implementation publishes H.264 video only.
+
+The `/anon` relay route is intended for interoperability testing. Production
+deployments must set `AGENT_LIVE_MOQ_URL` to a short-lived, device-scoped
+publisher URL issued by Hub API.
+
 ## What is new?
 
 This repository contains the next generation of Kerberos.io, **Kerberos Agent (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/agent/tree/develop) and [project overview](https://github.com/kerberos-io/agent/projects/1).
