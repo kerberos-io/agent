@@ -651,13 +651,12 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 		}
 	}
 
-	// Motion sensitivity: nil/unset must still resolve to the default (150), not
-	// be left nil. An explicit 0 (temporary "disable motion detection" switch
-	// from the UI) is a real, non-nil value and must NOT be touched here. Only
-	// applied for the effective configuration (applyDefaults), not for the
-	// separate global/custom views, so a missing value in one layer can still be
-	// inherited from the other instead of being masked by this default.
-	if applyDefaults && configuration.Config.Capture.PixelChangeThreshold == nil {
+	// Motion sensitivity historically used 0 to mean "use the default". Preserve
+	// that behaviour for configurations created before this field became a
+	// pointer, and also recover invalid negative values. Only apply this to the
+	// effective configuration so missing values can still be inherited between
+	// the separate global and custom layers.
+	if applyDefaults && (configuration.Config.Capture.PixelChangeThreshold == nil || *configuration.Config.Capture.PixelChangeThreshold <= 0) {
 		defaultPixelChangeThreshold := 150
 		configuration.Config.Capture.PixelChangeThreshold = &defaultPixelChangeThreshold
 	}
