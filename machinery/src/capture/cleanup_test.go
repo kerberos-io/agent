@@ -28,7 +28,8 @@ func writeRecording(t *testing.T, recordingsDir, name string, ageMinutes int) {
 // marking it as still queued for upload.
 func markPending(t *testing.T, cloudDir, name string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(cloudDir, name), nil, 0o644); err != nil {
+	markerName := models.RecordingUploadMetadataFileName(name)
+	if err := os.WriteFile(filepath.Join(cloudDir, markerName), nil, 0o644); err != nil {
 		t.Fatalf("write marker %s: %v", name, err)
 	}
 }
@@ -68,6 +69,24 @@ func TestPickRecordingToCleanup_PrefersUploaded(t *testing.T) {
 	}
 	if name != "newer_uploaded.mp4" {
 		t.Fatalf("cleanup picked %q, want the uploaded recording newer_uploaded.mp4", name)
+	}
+}
+
+func TestPickRecordingToCleanup_RecognizesLegacyMarkerName(t *testing.T) {
+	recordingsDir, cloudDir := newCleanupDirs(t)
+
+	writeRecording(t, recordingsDir, "legacy_pending.mp4", 30)
+	if err := os.WriteFile(filepath.Join(cloudDir, "legacy_pending.mp4"), nil, 0o644); err != nil {
+		t.Fatalf("write legacy marker: %v", err)
+	}
+	writeRecording(t, recordingsDir, "uploaded.mp4", 10)
+
+	name, pending, err := pickRecordingToCleanup(recordingsDir, cloudDir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pending || name != "uploaded.mp4" {
+		t.Fatalf("cleanup picked name=%q pending=%v, want uploaded.mp4 pending=false", name, pending)
 	}
 }
 

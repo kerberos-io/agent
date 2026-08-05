@@ -78,7 +78,8 @@ func HandleUpload(configDirectory string, configuration *models.Configuration, c
 					default:
 					}
 
-					fileName := f.Name()
+					markerFileName := f.Name()
+					fileName := models.RecordingFileNameFromUploadMarker(markerFileName)
 					uploaded := false
 					configured := false
 					err = nil
@@ -113,7 +114,7 @@ func HandleUpload(configDirectory string, configuration *models.Configuration, c
 					// Check if the file is uploaded, if so, remove it.
 					if uploaded {
 						delay = 500 * time.Millisecond // reset
-						err := os.Remove(watchDirectory + fileName)
+						err := os.Remove(watchDirectory + markerFileName)
 						if err != nil {
 							log.Log.Error("HandleUpload: " + err.Error())
 						}
@@ -127,7 +128,7 @@ func HandleUpload(configDirectory string, configuration *models.Configuration, c
 							}
 						}
 					} else if !configured {
-						err := os.Remove(watchDirectory + fileName)
+						err := os.Remove(watchDirectory + markerFileName)
 						if err != nil {
 							log.Log.Error("HandleUpload: " + err.Error())
 						}
