@@ -305,7 +305,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 // is additionally carried in the tus Upload-Metadata.
 func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName, label, slot string) (bool, bool, bool, string, error) {
 	baseURL := strings.TrimRight(vault.URI, "/") + tusUploadPath
-	metadata := encodeTusMetadata(map[string]string{
+	metadataValues := map[string]string{
 		"filename":  fileName,
 		"device":    deviceKey,
 		"directory": vault.Directory,
@@ -313,7 +313,9 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 		"capture":   "IPCamera",
 		"cloudkey":  publicKey,
 		"fps":       queuedRecordingFPS(fileName),
-	})
+	}
+	addRecordingTusMetadata(metadataValues, fileName)
+	metadata := encodeTusMetadata(metadataValues)
 	setHeaders := func(h http.Header, fn string) {
 		setVaultTusHeaders(h, vault, publicKey, deviceKey, fn)
 	}
@@ -327,16 +329,31 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 // intentionally omitted from the metadata here.
 func uploadHubResumable(config *models.Config, fileName, label, slot string) (bool, bool, bool, string, error) {
 	baseURL := strings.TrimRight(config.HubURI, "/") + tusUploadPath
-	metadata := encodeTusMetadata(map[string]string{
+	metadataValues := map[string]string{
 		"filename": fileName,
 		"device":   config.Key,
 		"capture":  "IPCamera",
 		"fps":      queuedRecordingFPS(fileName),
-	})
+	}
+	addRecordingTusMetadata(metadataValues, fileName)
+	metadata := encodeTusMetadata(metadataValues)
 	setHeaders := func(h http.Header, fn string) {
 		setHubTusHeaders(h, config, fn)
 	}
 	return runTusUpload(baseURL, metadata, fileName, label, slot, setHeaders)
+}
+
+func addRecordingTusMetadata(values map[string]string, fileName string) {
+	metadata, ok := queuedRecordingMetadata(fileName)
+	if !ok {
+		return
+	}
+	if metadata.Duration > 0 {
+		values["duration"] = strconv.FormatUint(metadata.Duration, 10)
+	}
+	if metadata.Timestamp > 0 {
+		values["timestamp"] = strconv.FormatInt(metadata.Timestamp, 10)
+	}
 }
 
 // tusCreate performs the tus "creation" request (POST). On success it returns

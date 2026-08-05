@@ -165,7 +165,7 @@ func uploadVaultLegacy(vault models.KStorage, publicKey, deviceKey, fileName, la
 	}
 	req.Header.Set("Content-Type", "video/mp4")
 	setVaultHeaders(req.Header, vault, publicKey, deviceKey, fileName)
-	setQueuedRecordingFPSHeader(req.Header, fileName)
+	setQueuedRecordingMetadataHeaders(req.Header, fileName)
 
 	client := newVaultHTTPClient(0)
 	resp, err := client.Do(req)

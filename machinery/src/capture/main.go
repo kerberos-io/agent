@@ -53,16 +53,23 @@ func publishRecordingState(mqttClient mqtt.Client, hubKey string, configuration 
 	}
 }
 
-// queueRecordingForUpload creates the marker consumed by the upload worker and
-// stores the average FPS of the finalized recording in it. Empty markers remain
-// valid for recordings whose FPS cannot be determined.
-func queueRecordingForUpload(configDirectory, name string, value float64) {
-	metadata := models.RecordingUploadMetadata{}
-	if value > 0 && value <= 240 && !math.IsInf(value, 0) && !math.IsNaN(value) {
-		if rounded := int(math.Floor(value)); rounded > 0 {
-			metadata.FPS = rounded
-		}
+func recordingUploadMetadata(name, deviceKey string, timestamp int64, mp4Video *video.MP4) models.RecordingUploadMetadata {
+	metadata := models.RecordingUploadMetadata{
+		FileName:  filepath.Base(name),
+		DeviceKey: deviceKey,
+		Timestamp: timestamp,
+		Duration:  mp4Video.VideoTotalDuration,
 	}
+	value := mp4Video.AverageFPS()
+	if value > 0 && value <= 240 && !math.IsInf(value, 0) && !math.IsNaN(value) {
+		metadata.FPS = int(math.Floor(value))
+	}
+	return metadata
+}
+
+// queueRecordingForUpload creates the marker consumed by the upload worker and
+// stores metadata captured from the finalized recording.
+func queueRecordingForUpload(configDirectory string, metadata models.RecordingUploadMetadata) {
 	payload, err := json.Marshal(metadata)
 	if err != nil {
 		log.Log.Error("capture.main.queueRecordingForUpload(): " + err.Error())
@@ -85,7 +92,7 @@ func queueRecordingForUpload(configDirectory, name string, value float64) {
 		defer os.Remove(marker.Name())
 	}
 	if err == nil {
-		err = os.Rename(marker.Name(), filepath.Join(configDirectory, "data", "cloud", models.RecordingUploadMetadataFileName(name)))
+		err = os.Rename(marker.Name(), filepath.Join(configDirectory, "data", "cloud", models.RecordingUploadMetadataFileName(metadata.FileName)))
 	}
 	if err != nil {
 		log.Log.Error("capture.main.queueRecordingForUpload(): " + err.Error())
@@ -495,7 +502,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					queueRecordingForUpload(configDirectory, name, mp4Video.AverageFPS())
+					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video))
 
 					recordingStatus = "idle"
 
@@ -652,7 +659,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					queueRecordingForUpload(configDirectory, name, mp4Video.AverageFPS())
+					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video))
 
 					recordingStatus = "idle"
 
@@ -922,7 +929,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 				}
 
-				queueRecordingForUpload(configDirectory, name, mp4Video.AverageFPS())
+				queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, displayTime, mp4Video))
 
 				// Clean up the recording directory if necessary.
 				CleanupRecordingDirectory(configDirectory, configuration)

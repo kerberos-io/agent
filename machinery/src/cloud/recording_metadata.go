@@ -13,6 +13,8 @@ import (
 )
 
 const recordingFPSHeader = "X-Kerberos-Storage-Fps"
+const recordingDurationHeader = "X-Kerberos-Storage-Duration"
+const recordingTimestampHeader = "X-Kerberos-Storage-Timestamp"
 
 // queuedRecordingFPS reads the FPS snapshot written into the upload marker
 // when the recording was finalized. Historical empty markers intentionally
@@ -25,8 +27,8 @@ func queuedRecordingFPS(fileName string) string {
 
 	marker := strings.TrimSpace(string(value))
 	if strings.HasPrefix(marker, "{") {
-		var metadata models.RecordingUploadMetadata
-		if err := json.Unmarshal(value, &metadata); err != nil || metadata.FPS <= 0 || metadata.FPS > 240 {
+		metadata, ok := decodeRecordingUploadMetadata(value)
+		if !ok || metadata.FPS <= 0 || metadata.FPS > 240 {
 			return ""
 		}
 		return strconv.Itoa(metadata.FPS)
@@ -39,6 +41,22 @@ func queuedRecordingFPS(fileName string) string {
 		return ""
 	}
 	return fps
+}
+
+func queuedRecordingMetadata(fileName string) (models.RecordingUploadMetadata, bool) {
+	value, ok := readRecordingUploadMetadata(fileName)
+	if !ok || !strings.HasPrefix(strings.TrimSpace(string(value)), "{") {
+		return models.RecordingUploadMetadata{}, false
+	}
+	return decodeRecordingUploadMetadata(value)
+}
+
+func decodeRecordingUploadMetadata(value []byte) (models.RecordingUploadMetadata, bool) {
+	var metadata models.RecordingUploadMetadata
+	if err := json.Unmarshal(value, &metadata); err != nil {
+		return models.RecordingUploadMetadata{}, false
+	}
+	return metadata, true
 }
 
 func readRecordingUploadMetadata(fileName string) ([]byte, bool) {
@@ -55,8 +73,16 @@ func readRecordingUploadMetadata(fileName string) ([]byte, bool) {
 	return nil, false
 }
 
-func setQueuedRecordingFPSHeader(header http.Header, fileName string) {
+func setQueuedRecordingMetadataHeaders(header http.Header, fileName string) {
 	if fps := queuedRecordingFPS(fileName); fps != "" {
 		header.Set(recordingFPSHeader, fps)
+	}
+	if metadata, ok := queuedRecordingMetadata(fileName); ok {
+		if metadata.Duration > 0 {
+			header.Set(recordingDurationHeader, strconv.FormatUint(metadata.Duration, 10))
+		}
+		if metadata.Timestamp > 0 {
+			header.Set(recordingTimestampHeader, strconv.FormatInt(metadata.Timestamp, 10))
+		}
 	}
 }

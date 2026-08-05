@@ -85,7 +85,7 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 	req.Header.Set("X-Kerberos-Hub-PublicKey", config.HubKey)
 	req.Header.Set("X-Kerberos-Hub-PrivateKey", config.HubPrivateKey)
 	req.Header.Set("X-Kerberos-Hub-Region", config.S3.Region)
-	setQueuedRecordingFPSHeader(req.Header, fileName)
+	setQueuedRecordingMetadataHeaders(req.Header, fileName)
 
 	var client *http.Client
 	if os.Getenv("AGENT_TLS_INSECURE") == "true" {
@@ -129,7 +129,7 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 	req.Header.Set("X-Kerberos-Hub-PublicKey", config.HubKey)
 	req.Header.Set("X-Kerberos-Hub-PrivateKey", config.HubPrivateKey)
 	req.Header.Set("X-Kerberos-Hub-Region", config.S3.Region)
-	setQueuedRecordingFPSHeader(req.Header, fileName)
+	setQueuedRecordingMetadataHeaders(req.Header, fileName)
 	resp, err = client.Do(req)
 	if resp != nil {
 		defer resp.Body.Close()

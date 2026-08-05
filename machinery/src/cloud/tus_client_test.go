@@ -272,7 +272,7 @@ func TestUploadVaultResumable_HappyPath(t *testing.T) {
 	fileName := "1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4"
 	payload := bytes.Repeat([]byte("x"), 4096)
 	withRecording(t, fileName, payload)
-	withQueuedRecordingFPS(t, fileName, `{"fps":29}`)
+	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","timestamp":1785934709414,"duration":20452,"fps":29}`)
 
 	uploaded, responded, supported, _, err := uploadVaultResumable(testVault(ts.URL), "pk", "dev", fileName, "test", "primary")
 	if err != nil {
@@ -288,8 +288,15 @@ func TestUploadVaultResumable_HappyPath(t *testing.T) {
 		t.Fatalf("expected sidecar to be removed after success, stat err = %v", err)
 	}
 	posts := srv.requestsForMethod(http.MethodPost)
-	if got := decodeTusMetadata(posts[0].header.Get("Upload-Metadata"))["fps"]; got != "29" {
+	metadata := decodeTusMetadata(posts[0].header.Get("Upload-Metadata"))
+	if got := metadata["fps"]; got != "29" {
 		t.Fatalf("POST metadata fps = %q, want %q", got, "29")
+	}
+	if got := metadata["duration"]; got != "20452" {
+		t.Fatalf("POST metadata duration = %q, want %q", got, "20452")
+	}
+	if got := metadata["timestamp"]; got != "1785934709414" {
+		t.Fatalf("POST metadata timestamp = %q, want %q", got, "1785934709414")
 	}
 }
 
@@ -323,7 +330,7 @@ func TestQueuedRecordingFPSValidation(t *testing.T) {
 			}
 
 			header := make(http.Header)
-			setQueuedRecordingFPSHeader(header, fileName)
+			setQueuedRecordingMetadataHeaders(header, fileName)
 			if got := header.Get(recordingFPSHeader); got != test.want {
 				t.Fatalf("legacy FPS header = %q, want %q", got, test.want)
 			}
@@ -339,9 +346,27 @@ func TestQueuedRecordingFPSAllowsMissingHistoricalMarker(t *testing.T) {
 		t.Fatalf("queuedRecordingFPS() = %q, want empty for missing marker", got)
 	}
 	header := make(http.Header)
-	setQueuedRecordingFPSHeader(header, fileName)
+	setQueuedRecordingMetadataHeaders(header, fileName)
 	if got := header.Get(recordingFPSHeader); got != "" {
 		t.Fatalf("legacy FPS header = %q, want empty for missing marker", got)
+	}
+}
+
+func TestQueuedRecordingMetadataHeaders(t *testing.T) {
+	fileName := "recording.mp4"
+	withRecording(t, fileName, []byte("recording"))
+	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","timestamp":1785934709414,"duration":20452,"fps":25}`)
+
+	header := make(http.Header)
+	setQueuedRecordingMetadataHeaders(header, fileName)
+	if got := header.Get(recordingFPSHeader); got != "25" {
+		t.Fatalf("FPS header = %q", got)
+	}
+	if got := header.Get(recordingDurationHeader); got != "20452" {
+		t.Fatalf("duration header = %q", got)
+	}
+	if got := header.Get(recordingTimestampHeader); got != "1785934709414" {
+		t.Fatalf("timestamp header = %q", got)
 	}
 }
 
