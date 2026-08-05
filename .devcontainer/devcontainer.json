@@ -1,7 +1,7 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/python
 {
-	"name": "go:1.24-bookworm",
+	"name": "go:1.24-trixie",
 	"runArgs": [
 		"--name=agent",
 		"--network=host"
@@ -20,5 +20,5 @@
 		3000,
 		8080
 	],
-	"postCreateCommand": "cd ui && yarn install && yarn build && cd ../machinery && go mod download"
+	"postCreateCommand": "cd ui && yarn install && yarn build && cd ../machinery && go mod download && bash ./verify-moq-devcontainer.sh"
 }

@@ -443,6 +443,17 @@ The `/anon` relay route is intended for interoperability testing. Production
 deployments must set `AGENT_LIVE_MOQ_URL` to a short-lived, device-scoped
 publisher URL issued by Hub API.
 
+To verify the native SDK in a development container, rebuild the Agent or shared
+monorepo devcontainer so it uses the Trixie base, then run the VS Code task
+`agent: moq verify`. The same check is available from a terminal:
+
+    cd machinery
+    bash ./verify-moq-devcontainer.sh
+
+The check requires glibc 2.38 or newer, runs the tagged package tests, links the
+complete Agent with `-tags moq`, and executes the resulting binary's version
+command. Both devcontainers also run this check during their post-create setup.
+
 ## What is new?
 
 This repository contains the next generation of Kerberos.io, **Kerberos Agent (v3)**, and is the successor of the machinery and web repositories. A switch in technologies and architecture has been made. This version is still under active development and can be followed on the [develop branch](https://github.com/kerberos-io/agent/tree/develop) and [project overview](https://github.com/kerberos-io/agent/projects/1).

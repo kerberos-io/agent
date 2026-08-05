@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "agent: moq verify",
+      "type": "shell",
+      "command": "bash ./verify-moq-devcontainer.sh",
+      "options": {
+        "cwd": "${workspaceFolder}/machinery"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
