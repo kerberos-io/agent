@@ -24,17 +24,12 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 	var motionRectangle models.MotionRectangle
 	var motionRectangles []models.MotionRectangle
 
-	// Resolve the motion sensitivity (pixel-change threshold):
-	//   nil (unset) -> default 150
-	//   0           -> motion detection DISABLED (temporary off switch from the UI)
-	//   > 0         -> trigger when the number of changed pixels exceeds it
+	// Resolve the motion sensitivity (pixel-change threshold). Nil, zero, and
+	// negative values use the historical default so older configurations keep
+	// recording after an upgrade.
 	pixelThreshold := 150
-	motionDisabled := false
-	if config.Capture.PixelChangeThreshold != nil {
+	if config.Capture.PixelChangeThreshold != nil && *config.Capture.PixelChangeThreshold > 0 {
 		pixelThreshold = *config.Capture.PixelChangeThreshold
-		if pixelThreshold <= 0 {
-			motionDisabled = true
-		}
 	}
 	// In motion mode we always run detection. In CONTINUOUS mode recording is
 	// 24/7 so motion detection is normally skipped, BUT if a motion region is
@@ -45,11 +40,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 	continuousMode := config.Capture.Continuous == "true"
 	hasMotionRegion := config.Region != nil && len(config.Region.Polygon) > 0
 
-	if motionDisabled {
-
-		log.Log.Warning("computervision.main.ProcessMotion(): motion detection is DISABLED because pixelChangeThreshold is set to 0 or less (nil/unset would default to 150). If motion detection is expected to be running, set capture.pixelChangeThreshold to a positive value (150 recommended) or AGENT_CAPTURE_PIXEL_CHANGE, then restart/update the agent.")
-
-	} else if continuousMode && !hasMotionRegion {
+	if continuousMode && !hasMotionRegion {
 
 		log.Log.Info("computervision.main.ProcessMotion(): continuous recording enabled and no motion region configured, so no motion detection required.")
 
@@ -236,9 +227,9 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 													// a reference square of sqrt(threshold) px (in this MOTION
 													// frame's pixel space) so the user can visually gauge how
 													// large a moving object must be before it is detected.
-												"pixelChangeThreshold": pixelThreshold,
+													"pixelChangeThreshold": pixelThreshold,
+												},
 											},
-										},
 										}
 										payload, err := models.PackageMQTTMessage(configuration, message)
 										if err == nil {
