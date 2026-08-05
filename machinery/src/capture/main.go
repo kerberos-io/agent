@@ -54,16 +54,12 @@ func publishRecordingState(mqttClient mqtt.Client, hubKey string, configuration 
 }
 
 // queueRecordingForUpload creates the marker consumed by the upload worker and
-// snapshots the main-stream FPS into it. Keeping the value with the recording
-// prevents a delayed upload from using the FPS of a later camera configuration.
-// Empty markers remain valid for recordings whose FPS is not yet known.
-func queueRecordingForUpload(configDirectory, name string, configuration *models.Configuration) {
+// stores the average FPS of the finalized recording in it. Empty markers remain
+// valid for recordings whose FPS cannot be determined.
+func queueRecordingForUpload(configDirectory, name string, value float64) {
 	fps := ""
-	if configuration != nil {
-		candidate := strings.TrimSpace(configuration.Config.Capture.IPCamera.FPS)
-		if parsed, err := strconv.ParseFloat(candidate, 64); err == nil && parsed > 0 && parsed <= 240 && !math.IsInf(parsed, 0) && !math.IsNaN(parsed) {
-			fps = candidate
-		}
+	if value > 0 && value <= 240 && !math.IsInf(value, 0) && !math.IsNaN(value) {
+		fps = strings.TrimRight(strings.TrimRight(strconv.FormatFloat(value, 'f', 2, 64), "0"), ".")
 	}
 
 	// Publish the marker with a same-filesystem rename. Writing directly to the
@@ -477,7 +473,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					queueRecordingForUpload(configDirectory, name, configuration)
+					queueRecordingForUpload(configDirectory, name, mp4Video.AverageFPS())
 
 					recordingStatus = "idle"
 
@@ -634,7 +630,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					queueRecordingForUpload(configDirectory, name, configuration)
+					queueRecordingForUpload(configDirectory, name, mp4Video.AverageFPS())
 
 					recordingStatus = "idle"
 
@@ -904,7 +900,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 				}
 
-				queueRecordingForUpload(configDirectory, name, configuration)
+				queueRecordingForUpload(configDirectory, name, mp4Video.AverageFPS())
 
 				// Clean up the recording directory if necessary.
 				CleanupRecordingDirectory(configDirectory, configuration)

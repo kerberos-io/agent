@@ -1,22 +1,19 @@
 package capture
 
 import (
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
-func TestQueueRecordingForUploadSnapshotsFPS(t *testing.T) {
+func TestQueueRecordingForUploadStoresFinalizedFPS(t *testing.T) {
 	configDirectory := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(configDirectory, "data", "cloud"), 0o755); err != nil {
 		t.Fatalf("mkdir cloud queue: %v", err)
 	}
 
-	configuration := &models.Configuration{}
-	configuration.Config.Capture.IPCamera.FPS = "29.97"
-	queueRecordingForUpload(configDirectory, "recording.mp4", configuration)
+	queueRecordingForUpload(configDirectory, "recording.mp4", 29.970029)
 
 	got, err := os.ReadFile(filepath.Join(configDirectory, "data", "cloud", "recording.mp4"))
 	if err != nil {
@@ -28,16 +25,14 @@ func TestQueueRecordingForUploadSnapshotsFPS(t *testing.T) {
 }
 
 func TestQueueRecordingForUploadKeepsUnknownFPSCompatible(t *testing.T) {
-	for _, fps := range []string{"", "invalid", "0", "NaN", "241"} {
-		t.Run(fps, func(t *testing.T) {
+	for _, fps := range []float64{0, -1, math.NaN(), math.Inf(1), 241} {
+		t.Run("invalid FPS", func(t *testing.T) {
 			configDirectory := t.TempDir()
 			if err := os.MkdirAll(filepath.Join(configDirectory, "data", "cloud"), 0o755); err != nil {
 				t.Fatalf("mkdir cloud queue: %v", err)
 			}
 
-			configuration := &models.Configuration{}
-			configuration.Config.Capture.IPCamera.FPS = fps
-			queueRecordingForUpload(configDirectory, "recording.mp4", configuration)
+			queueRecordingForUpload(configDirectory, "recording.mp4", fps)
 
 			got, err := os.ReadFile(filepath.Join(configDirectory, "data", "cloud", "recording.mp4"))
 			if err != nil {
