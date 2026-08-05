@@ -129,7 +129,7 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	}
 	defer broadcast.Finish()
 
-	stream, err := broadcast.PublishMediaStream("avc3")
+	stream, err := broadcast.PublishMedia("avc3", nil)
 	if err != nil {
 		return fmt.Errorf("create H.264 media stream: %w", err)
 	}
@@ -152,7 +152,19 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 			writing = true
 			log.Log.Info("cloud.publishLiveStreamMoQ(): first H.264 keyframe received; broadcast is live")
 		}
-		if err := stream.Write(livemoq.EnsureAnnexB(packet.Data)); err != nil {
+		presentationTimeMs := packet.Time + packet.CompositionTime
+		if presentationTimeMs < 0 {
+			presentationTimeMs = 0
+		}
+		payload, err := livemoq.NormalizeH264AccessUnit(packet.Data)
+		if err != nil {
+			return fmt.Errorf("normalize H.264 access unit: %w", err)
+		}
+		frame := moq.Frame{
+			Payload:     payload,
+			TimestampUs: uint64(presentationTimeMs) * 1000,
+		}
+		if err := stream.WriteFrame(frame); err != nil {
 			return fmt.Errorf("write H.264 access unit: %w", err)
 		}
 	}
