@@ -108,7 +108,7 @@ jobs:
           length: 7
       - name: Run Build
         run: |
-          docker build --provenance=false --build-arg VERSION=${{ needs.bump-release.outputs.tag }} -t ${{matrix.architecture}} -f Dockerfile.arm64 .
+          docker build --provenance=false --build-arg VERSION=${{ needs.bump-release.outputs.tag }} -t ${{matrix.architecture}} .
           CID=$(docker create ${{matrix.architecture}})
           docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
           docker rm ${CID}

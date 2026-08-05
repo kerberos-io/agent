@@ -412,27 +412,22 @@ Remember the build step of the `web` part, during build time we move the build d
 
 ## Building for Docker
 
-Inside the root of this `agent` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping a **Kerberos Agent**. Important to note is that you start from a prebuilt base image, `kerberos/base:xxx`.
-This base image already contains a couple of tools, such as Golang, FFmpeg and OpenCV. We do this for faster compilation times.
+Inside the root of this `agent` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping a **Kerberos Agent**. It uses Debian Trixie to support the native dependencies used by the Agent, including Media over QUIC.
 
 By running the `docker build` command, you will create the Kerberos Agent Docker image. After building you can simply run the image as a Docker container.
 
     docker build -t kerberos/agent .
 
-### Building with Media over QUIC
+### Media over QUIC
 
-The optional MoQ publisher uses a Rust FFI archive that requires CGO and glibc
-2.38 or newer. Build it with the Debian-based image instead of the standard
-static Alpine image:
-
-    docker build -f Dockerfile.moq -t kerberos/agent:moq .
-
-The publisher is still disabled unless explicitly enabled at runtime:
+The standard AMD64 and ARM64 images include the optional MoQ publisher. Its Rust
+FFI archive requires CGO and glibc 2.38 or newer, which is why the standard image
+uses Debian Trixie. The publisher is disabled unless explicitly enabled at runtime:
 
     docker run --rm -p 80:80 \
       -e AGENT_LIVE_MOQ_ENABLED=true \
       -e AGENT_LIVE_MOQ_URL=https://relay.uug.ai/anon \
-      kerberos/agent:moq
+      kerberos/agent
 
 `AGENT_LIVE_MOQ_BROADCAST_PREFIX` defaults to `devices`, producing the broadcast
 `devices/<agent-key>/live.hang`. `AGENT_LIVE_MOQ_QUALITY` accepts `auto` (the
