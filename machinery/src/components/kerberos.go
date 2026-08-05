@@ -305,6 +305,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// watching.
 	go cloud.HandleLiveStreamHLS(configuration, communication, mqttClient, subStreamEnabled)
 
+	// MoQ is available only in the dedicated CGO/glibc build. The standard
+	// static Alpine build resolves this hook to a no-op.
+	cloud.StartLiveStreamMoQ(configuration, communication, subStreamEnabled)
+
 	// Handle livestream HD (high resolution over WEBRTC). Both the main and sub
 	// stream are exposed as separate broadcasters so a viewer can request the
 	// high (main) or low (sub) resolution per peer connection; "auto" prefers the
