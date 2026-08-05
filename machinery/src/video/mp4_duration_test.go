@@ -2,6 +2,7 @@ package video
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"testing"
 
@@ -172,5 +173,11 @@ func TestMP4Duration(t *testing.T) {
 	if parsedFile.Moov.Traks[0].Mdia.Mdhd.Duration != 0 {
 		t.Errorf("MISMATCH: mdhd.Duration should be 0 for fragmented MP4, got %d",
 			parsedFile.Moov.Traks[0].Mdia.Mdhd.Duration)
+	}
+	if mp4Video.SampleCount != sampleCount {
+		t.Errorf("SampleCount = %d, finalized MP4 contains %d video samples", mp4Video.SampleCount, sampleCount)
+	}
+	if fps := mp4Video.AverageFPS(); math.Abs(fps-25) > 0.001 {
+		t.Errorf("AverageFPS() = %.3f, want 25", fps)
 	}
 }

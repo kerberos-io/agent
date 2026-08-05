@@ -283,6 +283,8 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 	err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, uint32(mp4.VideoTrack))
 	if err != nil {
 		log.Log.Error("mp4.flushPendingVideoSample(): error adding sample: " + err.Error())
+	} else {
+		mp4.SampleCount++
 	}
 	if isKF {
 		mp4.TotalKeyframesWritten++
@@ -294,6 +296,15 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 	mp4.VideoFullSample = nil
 	mp4.PendingSampleIsKeyframe = false
 	return true
+}
+
+// AverageFPS returns the average frame rate of the video samples actually
+// committed to this recording.
+func (mp4 *MP4) AverageFPS() float64 {
+	if mp4.SampleCount == 0 || mp4.VideoTotalDuration == 0 {
+		return 0
+	}
+	return float64(mp4.SampleCount) * 1000 / float64(mp4.VideoTotalDuration)
 }
 
 // AddSampleToTrack appends a sample to the given track.

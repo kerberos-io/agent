@@ -243,6 +243,17 @@ func withRecording(t *testing.T, fileName string, payload []byte) {
 	}
 }
 
+func withQueuedRecordingFPS(t *testing.T, fileName, fps string) {
+	t.Helper()
+	if err := os.MkdirAll("data/cloud", 0o755); err != nil {
+		t.Fatalf("mkdir cloud queue: %v", err)
+	}
+	markerName := models.RecordingUploadMetadataFileName(fileName)
+	if err := os.WriteFile(filepath.Join("data/cloud", markerName), []byte(fps), 0o644); err != nil {
+		t.Fatalf("write cloud queue marker: %v", err)
+	}
+}
+
 func testVault(uri string) models.KStorage {
 	return models.KStorage{
 		URI:             uri,
@@ -261,6 +272,7 @@ func TestUploadVaultResumable_HappyPath(t *testing.T) {
 	fileName := "1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4"
 	payload := bytes.Repeat([]byte("x"), 4096)
 	withRecording(t, fileName, payload)
+	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","timestamp":1785934709414,"duration":20452,"fps":29}`)
 
 	uploaded, responded, supported, _, err := uploadVaultResumable(testVault(ts.URL), "pk", "dev", fileName, "test", "primary")
 	if err != nil {
@@ -274,6 +286,102 @@ func TestUploadVaultResumable_HappyPath(t *testing.T) {
 	}
 	if _, err := os.Stat(tusSidecarPath(fileName, "primary")); !os.IsNotExist(err) {
 		t.Fatalf("expected sidecar to be removed after success, stat err = %v", err)
+	}
+	posts := srv.requestsForMethod(http.MethodPost)
+	metadata := decodeTusMetadata(posts[0].header.Get("Upload-Metadata"))
+	if got := metadata["fps"]; got != "29" {
+		t.Fatalf("POST metadata fps = %q, want %q", got, "29")
+	}
+	if got := metadata["duration"]; got != "20452" {
+		t.Fatalf("POST metadata duration = %q, want %q", got, "20452")
+	}
+	if got := metadata["timestamp"]; got != "1785934709414" {
+		t.Fatalf("POST metadata timestamp = %q, want %q", got, "1785934709414")
+	}
+}
+
+func TestQueuedRecordingFPSValidation(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		fps  string
+		want string
+	}{
+		{name: "json", fps: `{"fps":29}`, want: "29"},
+		{name: "json with future field", fps: `{"fps":29,"codec":"h264"}`, want: "29"},
+		{name: "json without fps", fps: `{}`},
+		{name: "json invalid fps", fps: `{"fps":241}`},
+		{name: "legacy fractional", fps: "29.97", want: "29.97"},
+		{name: "legacy trimmed", fps: " 25 \n", want: "25"},
+		{name: "empty"},
+		{name: "invalid", fps: "invalid"},
+		{name: "zero", fps: "0"},
+		{name: "negative", fps: "-1"},
+		{name: "nan", fps: "NaN"},
+		{name: "infinite", fps: "+Inf"},
+		{name: "unreasonable", fps: "241"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fileName := "recording.mp4"
+			withRecording(t, fileName, []byte("recording"))
+			withQueuedRecordingFPS(t, fileName, test.fps)
+
+			if got := queuedRecordingFPS(fileName); got != test.want {
+				t.Fatalf("queuedRecordingFPS() = %q, want %q", got, test.want)
+			}
+
+			header := make(http.Header)
+			setQueuedRecordingMetadataHeaders(header, fileName)
+			if got := header.Get(recordingFPSHeader); got != test.want {
+				t.Fatalf("legacy FPS header = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestQueuedRecordingFPSAllowsMissingHistoricalMarker(t *testing.T) {
+	fileName := "recording.mp4"
+	withRecording(t, fileName, []byte("recording"))
+
+	if got := queuedRecordingFPS(fileName); got != "" {
+		t.Fatalf("queuedRecordingFPS() = %q, want empty for missing marker", got)
+	}
+	header := make(http.Header)
+	setQueuedRecordingMetadataHeaders(header, fileName)
+	if got := header.Get(recordingFPSHeader); got != "" {
+		t.Fatalf("legacy FPS header = %q, want empty for missing marker", got)
+	}
+}
+
+func TestQueuedRecordingMetadataHeaders(t *testing.T) {
+	fileName := "recording.mp4"
+	withRecording(t, fileName, []byte("recording"))
+	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","timestamp":1785934709414,"duration":20452,"fps":25}`)
+
+	header := make(http.Header)
+	setQueuedRecordingMetadataHeaders(header, fileName)
+	if got := header.Get(recordingFPSHeader); got != "25" {
+		t.Fatalf("FPS header = %q", got)
+	}
+	if got := header.Get(recordingDurationHeader); got != "20452" {
+		t.Fatalf("duration header = %q", got)
+	}
+	if got := header.Get(recordingTimestampHeader); got != "1785934709414" {
+		t.Fatalf("timestamp header = %q", got)
+	}
+}
+
+func TestQueuedRecordingFPSAllowsLegacyMarkerFileName(t *testing.T) {
+	fileName := "recording.mp4"
+	withRecording(t, fileName, []byte("recording"))
+	if err := os.MkdirAll("data/cloud", 0o755); err != nil {
+		t.Fatalf("mkdir cloud queue: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join("data/cloud", fileName), []byte("25"), 0o644); err != nil {
+		t.Fatalf("write legacy cloud queue marker: %v", err)
+	}
+
+	if got := queuedRecordingFPS(fileName); got != "25" {
+		t.Fatalf("queuedRecordingFPS() = %q, want legacy marker FPS", got)
 	}
 }
 
@@ -579,6 +687,7 @@ func TestUploadHubResumable_HappyPath(t *testing.T) {
 	fileName := "1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4"
 	payload := bytes.Repeat([]byte("h"), 4096)
 	withRecording(t, fileName, payload)
+	withQueuedRecordingFPS(t, fileName, "29.97")
 
 	uploaded, _, supported, _, err := uploadHubResumable(testHubConfig(ts.URL), fileName, "test", "hub")
 	if err != nil {
@@ -648,6 +757,9 @@ func TestUploadHubResumable_HappyPath(t *testing.T) {
 	}
 	if meta["capture"] != "IPCamera" {
 		t.Errorf("hub metadata capture = %q, want %q", meta["capture"], "IPCamera")
+	}
+	if meta["fps"] != "29.97" {
+		t.Errorf("hub metadata fps = %q, want %q", meta["fps"], "29.97")
 	}
 }
 

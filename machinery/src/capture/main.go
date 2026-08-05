@@ -4,8 +4,11 @@ package capture
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"image"
+	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -47,6 +50,52 @@ func publishRecordingState(mqttClient mqtt.Client, hubKey string, configuration 
 		mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 	} else {
 		log.Log.Error("capture.main.publishRecordingState(): failed to package MQTT message: " + err.Error())
+	}
+}
+
+func recordingUploadMetadata(name, deviceKey string, timestamp int64, mp4Video *video.MP4) models.RecordingUploadMetadata {
+	metadata := models.RecordingUploadMetadata{
+		FileName:  filepath.Base(name),
+		DeviceKey: deviceKey,
+		Timestamp: timestamp,
+		Duration:  mp4Video.VideoTotalDuration,
+	}
+	value := mp4Video.AverageFPS()
+	if value > 0 && value <= 240 && !math.IsInf(value, 0) && !math.IsNaN(value) {
+		metadata.FPS = int(math.Floor(value))
+	}
+	return metadata
+}
+
+// queueRecordingForUpload creates the marker consumed by the upload worker and
+// stores metadata captured from the finalized recording.
+func queueRecordingForUpload(configDirectory string, metadata models.RecordingUploadMetadata) {
+	payload, err := json.Marshal(metadata)
+	if err != nil {
+		log.Log.Error("capture.main.queueRecordingForUpload(): " + err.Error())
+		return
+	}
+
+	// Publish the marker with a same-filesystem rename. Writing directly to the
+	// watched directory would briefly expose an empty file to the upload poller.
+	marker, err := os.CreateTemp(filepath.Join(configDirectory, "data"), ".upload-marker-*")
+	if err == nil {
+		_, err = marker.Write(payload)
+	}
+	if err == nil {
+		err = marker.Chmod(0644)
+	}
+	if marker != nil {
+		if closeErr := marker.Close(); err == nil {
+			err = closeErr
+		}
+		defer os.Remove(marker.Name())
+	}
+	if err == nil {
+		err = os.Rename(marker.Name(), filepath.Join(configDirectory, "data", "cloud", models.RecordingUploadMetadataFileName(metadata.FileName)))
+	}
+	if err != nil {
+		log.Log.Error("capture.main.queueRecordingForUpload(): " + err.Error())
 	}
 }
 
@@ -152,8 +201,10 @@ func CleanupRecordingDirectory(configDirectory string, configuration *models.Con
 		// now-dangling upload marker so the upload loop doesn't keep trying to
 		// upload a file that no longer exists.
 		log.Log.Warning("HandleRecordStream: removed oldest recording as part of cleanup, but it was STILL PENDING UPLOAD (disk full of un-uploaded recordings) - " + recordingsDirectory + "/" + name)
-		if err := os.Remove(cloudDirectory + "/" + name); err != nil && !os.IsNotExist(err) {
-			log.Log.Info("HandleRecordStream: could not remove dangling upload marker " + name + ", " + err.Error())
+		for _, markerName := range uploadMarkerNames(name) {
+			if err := os.Remove(filepath.Join(cloudDirectory, markerName)); err != nil && !os.IsNotExist(err) {
+				log.Log.Info("HandleRecordStream: could not remove dangling upload marker " + markerName + ", " + err.Error())
+			}
 		}
 	} else {
 		log.Log.Info("HandleRecordStream: removed oldest file as part of cleanup - " + recordingsDirectory + "/" + name)
@@ -246,9 +297,9 @@ func pickRecordingToCleanup(recordingsDirectory, cloudDirectory string) (string,
 			oldestAnyTime = modTime
 		}
 
-		// A recording is still pending upload if a marker with the same name
-		// exists in the cloud directory. Skip those when picking a safe candidate.
-		if _, statErr := os.Stat(cloudDirectory + "/" + entry.Name()); statErr == nil {
+		// A recording is still pending upload if either its current .metadata
+		// marker or a marker created by an older agent exists.
+		if recordingPendingUpload(cloudDirectory, entry.Name()) {
 			continue
 		}
 
@@ -265,6 +316,19 @@ func pickRecordingToCleanup(recordingsDirectory, cloudDirectory string) (string,
 		return oldestAnyName, true, nil
 	}
 	return "", false, os.ErrNotExist
+}
+
+func uploadMarkerNames(recordingName string) []string {
+	return []string{models.RecordingUploadMetadataFileName(recordingName), filepath.Base(recordingName)}
+}
+
+func recordingPendingUpload(cloudDirectory, recordingName string) bool {
+	for _, markerName := range uploadMarkerNames(recordingName) {
+		if _, err := os.Stat(filepath.Join(cloudDirectory, markerName)); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient, mqttClient mqtt.Client) {
@@ -438,9 +502,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					// Create a symbol link.
-					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
-					fc.Close()
+					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video))
 
 					recordingStatus = "idle"
 
@@ -597,9 +659,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					// Create a symbol link.
-					fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
-					fc.Close()
+					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video))
 
 					recordingStatus = "idle"
 
@@ -869,9 +929,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 				}
 
-				// Create a symbol linc.
-				fc, _ := os.Create(configDirectory + "/data/cloud/" + name)
-				fc.Close()
+				queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, displayTime, mp4Video))
 
 				// Clean up the recording directory if necessary.
 				CleanupRecordingDirectory(configDirectory, configuration)
