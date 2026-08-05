@@ -774,8 +774,8 @@ github.com/kellydunn/golang-geo v0.7.0 h1:A5j0/BvNgGwY6Yb6inXQxzYwlPHc6WVZR+Mrar
 github.com/kellydunn/golang-geo v0.7.0/go.mod h1:YYlQPJ+DPEzrHx8kT3oPHC/NjyvCCXE+IuKGKdrjrcU=
 github.com/kerberos-io/joy4 v1.0.64 h1:gTUSotHSOhp9mNqEecgq88tQHvpj7TjmrvPUsPm0idg=
 github.com/kerberos-io/joy4 v1.0.64/go.mod h1:nZp4AjvKvTOXRrmDyAIOw+Da+JA5OcSo/JundGfOlFU=
-github.com/kerberos-io/onvif v1.2.1 h1:+vxyHPylt0ufK8gv7FL+KzhJUeComMGrTmP5KxT2YEc=
-github.com/kerberos-io/onvif v1.2.1/go.mod h1:XSgEQXmEDjUQTbdXvsaRJt6Az8YPGj7L+j5iXKEGijU=
+github.com/kerberos-io/onvif v1.2.2 h1:QnxITps7xvAVD2abWRsa3+p9QexjKESQQldUFMx/mYA=
+github.com/kerberos-io/onvif v1.2.2/go.mod h1:XSgEQXmEDjUQTbdXvsaRJt6Az8YPGj7L+j5iXKEGijU=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/asmfmt v1.3.2/go.mod h1:AG8TuvYojzulgDAMCnYn50l/5QV3Bs/tp6j0HLHbNSE=
