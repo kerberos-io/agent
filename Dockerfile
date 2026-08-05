@@ -1,13 +1,15 @@
 
-ARG BASE_IMAGE_VERSION=amd64-ddbe40e
+ARG GO_IMAGE=golang:1.24-trixie
+ARG RUNTIME_IMAGE=debian:trixie-slim
 ARG VERSION=0.0.0
-FROM kerberos/base:${BASE_IMAGE_VERSION} AS build-machinery
+FROM ${GO_IMAGE} AS build-machinery
 LABEL AUTHOR=uug.ai
 
 # Re-declare VERSION inside this stage so the value passed via
 # `--build-arg VERSION=...` (e.g. the release tag) is available below.
 # ARGs declared before the first FROM are not visible inside build stages.
 ARG VERSION
+ARG TARGETARCH
 
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
@@ -17,9 +19,10 @@ ENV GOSUMDB=off
 ##########################################
 # Installing some additional dependencies.
 
-RUN apt-get upgrade -y && apt-get update && apt-get install -y --fix-missing --no-install-recommends \
+RUN apt-get update && apt-get install -y --fix-missing --no-install-recommends \
 	git build-essential cmake pkg-config unzip libgtk2.0-dev \
-	curl ca-certificates libcurl4-openssl-dev libssl-dev libjpeg62-turbo-dev && \
+	curl ca-certificates libavcodec-dev libavutil-dev libcurl4-openssl-dev \
+	libssl-dev libjpeg62-turbo-dev libswscale-dev && \
 	rm -rf /var/lib/apt/lists/*
 
 ##############################################################################
@@ -43,7 +46,9 @@ RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
 	if [ -z "${VERSION}" ] || [ "${VERSION}" = "0.0.0" ]; then \
 		VERSION=$(cd /go/src/github.com/kerberos-io/agent && git describe --tags --always 2>/dev/null || echo "0.0.0"); \
 	fi && \
-	go build -tags timetzdata,netgo,osusergo --ldflags "-s -w -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${VERSION} -extldflags '-static -latomic'" main.go && \
+	BUILD_TAGS=timetzdata,netgo,osusergo && \
+	case "${TARGETARCH:-$(go env GOARCH)}" in amd64|arm64) BUILD_TAGS="moq,${BUILD_TAGS}" ;; esac && \
+	go build -tags "${BUILD_TAGS}" --ldflags "-s -w -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${VERSION}" main.go && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv version /agent && \
@@ -89,20 +94,22 @@ RUN mkdir -p ./agent && cp -r /go/src/github.com/kerberos-io/agent/machinery/www
 ############################################
 # Publish main binary to GitHub release
 
-FROM alpine:latest
+FROM ${RUNTIME_IMAGE}
 
 ############################
 # Protect by non-root user.
 
-RUN addgroup -S kerberosio && adduser -S agent -G kerberosio && addgroup agent video
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	ca-certificates curl ffmpeg libatomic1 libcap2-bin libstdc++6 && \
+	rm -rf /var/lib/apt/lists/* && \
+	groupadd --system kerberosio && \
+	useradd --system --gid kerberosio --groups video --create-home agent
 
 #################################
 # Copy files from previous images
 
 COPY --chown=0:0 --from=build-machinery /dist /
 COPY --chown=0:0 --from=build-ui /dist /
-
-RUN apk update && apk add ca-certificates curl ffmpeg libstdc++ libc6-compat --no-cache && rm -rf /var/cache/apk/*
 
 ##################
 # Try running agent
@@ -123,7 +130,7 @@ RUN chown -R agent:kerberosio /home/agent/www
 
 ###########################
 # Grant the necessary root capabilities to the process trying to bind to the privileged port
-RUN apk add libcap && setcap 'cap_net_bind_service=+ep' /home/agent/main
+RUN setcap 'cap_net_bind_service=+ep' /home/agent/main
 
 ###################
 # Run non-root user

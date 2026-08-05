@@ -26,6 +26,7 @@ require (
 	github.com/kerberos-io/joy4 v1.0.64
 	github.com/kerberos-io/onvif v1.2.2
 	github.com/minio/minio-go/v6 v6.0.57
+	github.com/moq-dev/moq-go v0.5.7
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pion/interceptor v0.1.40
@@ -95,6 +96,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
+	github.com/moq-dev/moq-go-ffi v0.3.7 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/pion/datachannel v1.5.10 // indirect

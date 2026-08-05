@@ -412,12 +412,42 @@ Remember the build step of the `web` part, during build time we move the build d
 
 ## Building for Docker
 
-Inside the root of this `agent` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping a **Kerberos Agent**. Important to note is that you start from a prebuilt base image, `kerberos/base:xxx`.
-This base image already contains a couple of tools, such as Golang, FFmpeg and OpenCV. We do this for faster compilation times.
+Inside the root of this `agent` repository, you will find a `Dockerfile`. This file contains the instructions for building and shipping a **Kerberos Agent**. It uses Debian Trixie to support the native dependencies used by the Agent, including Media over QUIC.
 
 By running the `docker build` command, you will create the Kerberos Agent Docker image. After building you can simply run the image as a Docker container.
 
     docker build -t kerberos/agent .
+
+### Media over QUIC
+
+The standard AMD64 and ARM64 images include the optional MoQ publisher. Its Rust
+FFI archive requires CGO and glibc 2.38 or newer, which is why the standard image
+uses Debian Trixie. The publisher is disabled unless explicitly enabled at runtime:
+
+    docker run --rm -p 80:80 \
+      -e AGENT_LIVE_MOQ_ENABLED=true \
+      -e AGENT_LIVE_MOQ_URL=https://relay.uug.ai/anon \
+      kerberos/agent
+
+`AGENT_LIVE_MOQ_BROADCAST_PREFIX` defaults to `devices`, producing the broadcast
+`devices/<agent-key>/live.hang`. `AGENT_LIVE_MOQ_QUALITY` accepts `auto` (the
+default), `high`, or `low` and selects the main or sub camera stream when the
+Agent starts. The initial implementation publishes H.264 video only.
+
+The `/anon` relay route is intended for interoperability testing. Production
+deployments must set `AGENT_LIVE_MOQ_URL` to a short-lived, device-scoped
+publisher URL issued by Hub API.
+
+To verify the native SDK in a development container, rebuild the Agent or shared
+monorepo devcontainer so it uses the Trixie base, then run the VS Code task
+`agent: moq verify`. The same check is available from a terminal:
+
+    cd machinery
+    bash ./verify-moq-devcontainer.sh
+
+The check requires glibc 2.38 or newer, runs the tagged package tests, links the
+complete Agent with `-tags moq`, and executes the resulting binary's version
+command. Both devcontainers also run this check during their post-create setup.
 
 ## What is new?
 

@@ -16,10 +16,8 @@ jobs:
         include:
           - architecture: amd64
             runner: ubuntu-24.04
-            dockerfile: Dockerfile
           - architecture: arm64
             runner: ubuntu-24.04-arm
-            dockerfile: Dockerfile.arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -34,7 +32,7 @@ jobs:
           length: 7
       - name: Run Build
         run: |
-          docker build -t ${{ matrix.architecture }} -f ${{ matrix.dockerfile }} .
+          docker build -t ${{ matrix.architecture }} .
           CID=$(docker create ${{matrix.architecture}})
           docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
           docker rm ${CID}
