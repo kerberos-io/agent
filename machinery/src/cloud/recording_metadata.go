@@ -28,10 +28,10 @@ func queuedRecordingFPS(fileName string) string {
 	marker := strings.TrimSpace(string(value))
 	if strings.HasPrefix(marker, "{") {
 		metadata, ok := decodeRecordingUploadMetadata(value)
-		if !ok || metadata.FPS <= 0 || metadata.FPS > 240 {
+		if !ok || metadata.FPS <= 0 || metadata.FPS > 240 || math.IsInf(metadata.FPS, 0) || math.IsNaN(metadata.FPS) {
 			return ""
 		}
-		return strconv.Itoa(metadata.FPS)
+		return strconv.FormatFloat(metadata.FPS, 'f', -1, 64)
 	}
 
 	// Compatibility with markers created before upload metadata used JSON.

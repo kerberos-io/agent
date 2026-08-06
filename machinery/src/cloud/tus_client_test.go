@@ -272,7 +272,7 @@ func TestUploadVaultResumable_HappyPath(t *testing.T) {
 	fileName := "1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4"
 	payload := bytes.Repeat([]byte("x"), 4096)
 	withRecording(t, fileName, payload)
-	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","timestamp":1785934709414,"duration":20452,"fps":29}`)
+	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","timestamp":1785934709414,"duration":20452,"fps":29.97}`)
 
 	uploaded, responded, supported, _, err := uploadVaultResumable(testVault(ts.URL), "pk", "dev", fileName, "test", "primary")
 	if err != nil {
@@ -289,8 +289,8 @@ func TestUploadVaultResumable_HappyPath(t *testing.T) {
 	}
 	posts := srv.requestsForMethod(http.MethodPost)
 	metadata := decodeTusMetadata(posts[0].header.Get("Upload-Metadata"))
-	if got := metadata["fps"]; got != "29" {
-		t.Fatalf("POST metadata fps = %q, want %q", got, "29")
+	if got := metadata["fps"]; got != "29.97" {
+		t.Fatalf("POST metadata fps = %q, want %q", got, "29.97")
 	}
 	if got := metadata["duration"]; got != "20452" {
 		t.Fatalf("POST metadata duration = %q, want %q", got, "20452")
@@ -307,6 +307,7 @@ func TestQueuedRecordingFPSValidation(t *testing.T) {
 		want string
 	}{
 		{name: "json", fps: `{"fps":29}`, want: "29"},
+		{name: "json fractional", fps: `{"fps":17.35}`, want: "17.35"},
 		{name: "json with future field", fps: `{"fps":29,"codec":"h264"}`, want: "29"},
 		{name: "json without fps", fps: `{}`},
 		{name: "json invalid fps", fps: `{"fps":241}`},
