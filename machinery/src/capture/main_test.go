@@ -29,8 +29,12 @@ func TestQueueRecordingForUploadStoresFinalizedMetadata(t *testing.T) {
 	if err := json.Unmarshal(got, &stored); err != nil {
 		t.Fatalf("decode upload marker: %v", err)
 	}
-	if stored.FileName != "recording.mp4" || stored.DeviceKey != "device-key" || stored.Timestamp != 1785934709414 || stored.Duration != 20452 || stored.FPS != 29 {
+	expectedFPS := mp4Video.AverageFPS()
+	if stored.FileName != "recording.mp4" || stored.DeviceKey != "device-key" || stored.Timestamp != 1785934709414 || stored.Duration != 20452 || math.Abs(stored.FPS-expectedFPS) > 1e-9 {
 		t.Fatalf("upload marker = %+v", stored)
+	}
+	if stored.FPS == math.Floor(stored.FPS) {
+		t.Fatalf("upload marker FPS = %v, want fractional precision", stored.FPS)
 	}
 }
 
@@ -44,7 +48,7 @@ func TestQueueRecordingForUploadKeepsUnknownFPSCompatible(t *testing.T) {
 
 			metadata := models.RecordingUploadMetadata{FileName: "recording.mp4"}
 			if fps >= 1 && fps <= 240 && !math.IsNaN(fps) && !math.IsInf(fps, 0) {
-				metadata.FPS = int(math.Floor(fps))
+				metadata.FPS = fps
 			}
 			queueRecordingForUpload(configDirectory, metadata)
 

@@ -62,7 +62,7 @@ func recordingUploadMetadata(name, deviceKey string, timestamp int64, mp4Video *
 	}
 	value := mp4Video.AverageFPS()
 	if value > 0 && value <= 240 && !math.IsInf(value, 0) && !math.IsNaN(value) {
-		metadata.FPS = int(math.Floor(value))
+		metadata.FPS = value
 	}
 	return metadata
 }
