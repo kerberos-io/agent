@@ -59,6 +59,16 @@ func BroadcastPath(prefix string, deviceKey string) string {
 	return prefix + "/" + strings.Trim(deviceKey, "/") + "/live.hang"
 }
 
+// TimestampUs converts the capture presentation timestamp from milliseconds.
+// CompositionTime must not be added: it is already represented in the PTS and
+// is only used by muxers to derive DTS for streams containing B-frames.
+func TimestampUs(presentationTimeMs int64) uint64 {
+	if presentationTimeMs < 0 {
+		return 0
+	}
+	return uint64(presentationTimeMs) * 1000
+}
+
 func hasAnnexBStartCode(payload []byte) bool {
 	return len(payload) >= 4 && payload[0] == 0 && payload[1] == 0 &&
 		((payload[2] == 0 && payload[3] == 1) || payload[2] == 1)

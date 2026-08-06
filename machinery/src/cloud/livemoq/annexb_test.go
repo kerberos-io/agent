@@ -72,3 +72,12 @@ func TestBroadcastPath(t *testing.T) {
 		t.Fatalf("BroadcastPath() default = %q", got)
 	}
 }
+
+func TestTimestampUs(t *testing.T) {
+	if got := TimestampUs(1234); got != 1_234_000 {
+		t.Fatalf("TimestampUs() = %d, want 1234000", got)
+	}
+	if got := TimestampUs(-1); got != 0 {
+		t.Fatalf("TimestampUs() negative = %d, want 0", got)
+	}
+}
