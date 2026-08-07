@@ -429,10 +429,20 @@ uses Debian Trixie. The publisher is disabled unless explicitly enabled at runti
       -e AGENT_LIVE_MOQ_URL=https://relay.uug.ai/anon \
       kerberos/agent
 
-`AGENT_LIVE_MOQ_BROADCAST_PREFIX` defaults to `devices`, producing the broadcast
-`devices/<agent-key>/live.hang`. `AGENT_LIVE_MOQ_QUALITY` accepts `auto` (the
-default), `high`, or `low` and selects the main or sub camera stream when the
-Agent starts. The initial implementation publishes H.264 video only.
+`AGENT_LIVE_MOQ_BROADCAST_PREFIX` defaults to `devices`. MoQ viewers subscribe to
+a relay and never negotiate with the Agent, so every quality tier is published as
+its own broadcast and switching quality is simply a resubscribe:
+
+| Tier   | Broadcast                             | Source                                     |
+| ------ | ------------------------------------- | ------------------------------------------ |
+| `high` | `devices/<agent-key>/live.hang`       | highest-resolution camera stream           |
+| `low`  | `devices/<agent-key>/live-low.hang`   | sub stream (main stream when none is set)  |
+
+Each tier only uploads while it has at least one subscriber, so the tier nobody
+watches costs virtually no bandwidth. `AGENT_LIVE_MOQ_QUALITY` accepts `high` or
+`low` to pin the Agent to a single tier; viewers requesting the other tier then
+find no broadcast. Any other value (including the default) publishes both. The
+initial implementation publishes H.264 video only.
 
 The `/anon` relay route is intended for interoperability testing. Production
 deployments must set `AGENT_LIVE_MOQ_URL` to a short-lived, device-scoped

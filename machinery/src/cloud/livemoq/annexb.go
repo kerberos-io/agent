@@ -5,9 +5,15 @@ import (
 	"strings"
 
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
+	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
 var annexBStartCode = []byte{0x00, 0x00, 0x00, 0x01}
+
+// H264NormalizationStats reports malformed duplication removed from an access unit.
+type H264NormalizationStats struct {
+	DuplicateIDRNALUs int
+}
 
 // EnsureAnnexB restores the start code stripped by the Agent capture queue.
 func EnsureAnnexB(payload []byte) []byte {
@@ -20,20 +26,28 @@ func EnsureAnnexB(payload []byte) []byte {
 	return append(framed, payload...)
 }
 
-// NormalizeH264AccessUnit removes delimiters and duplicate parameter sets that
-// can make older MoQ splitters emit a parameter-only frame before the IDR.
+// NormalizeH264AccessUnit removes delimiters and exact duplicate parameter-set
+// or IDR NALUs that can confuse older MoQ splitters and decoders.
 func NormalizeH264AccessUnit(payload []byte) ([]byte, error) {
+	normalized, _, err := NormalizeH264AccessUnitWithStats(payload)
+	return normalized, err
+}
+
+// NormalizeH264AccessUnitWithStats also reports exact duplicate IDR NALUs.
+func NormalizeH264AccessUnitWithStats(payload []byte) ([]byte, H264NormalizationStats, error) {
 	nalus, err := h264.AnnexBUnmarshal(EnsureAnnexB(payload))
 	if err != nil {
-		return nil, err
+		return nil, H264NormalizationStats{}, err
 	}
 
+	stats := H264NormalizationStats{}
 	normalized := make([][]byte, 0, len(nalus))
 	for _, nalu := range nalus {
 		if len(nalu) == 0 || nalu[0]&0x1f == 9 {
 			continue
 		}
-		if nalu[0]&0x1f == 7 || nalu[0]&0x1f == 8 {
+		naluType := nalu[0] & 0x1f
+		if naluType == 7 || naluType == 8 || naluType == 5 {
 			duplicate := false
 			for _, existing := range normalized {
 				if bytes.Equal(existing, nalu) {
@@ -42,21 +56,35 @@ func NormalizeH264AccessUnit(payload []byte) ([]byte, error) {
 				}
 			}
 			if duplicate {
+				if naluType == 5 {
+					stats.DuplicateIDRNALUs++
+				}
 				continue
 			}
 		}
 		normalized = append(normalized, nalu)
 	}
 
-	return h264.AnnexBMarshal(normalized)
+	result, err := h264.AnnexBMarshal(normalized)
+	return result, stats, err
 }
 
-func BroadcastPath(prefix string, deviceKey string) string {
+// BroadcastPath returns the relay path a quality tier is published on. Every
+// tier gets its own broadcast so a viewer switches between the camera's main and
+// sub stream by resubscribing to another path, without any control channel back
+// to the Agent. The high tier keeps the historical ".../live.hang" path so
+// existing viewers keep working; the low tier lives next to it on
+// ".../live-low.hang".
+func BroadcastPath(prefix string, deviceKey string, quality string) string {
 	prefix = strings.Trim(prefix, "/")
 	if prefix == "" {
 		prefix = "devices"
 	}
-	return prefix + "/" + strings.Trim(deviceKey, "/") + "/live.hang"
+	name := "live.hang"
+	if quality == models.StreamQualityLow {
+		name = "live-low.hang"
+	}
+	return prefix + "/" + strings.Trim(deviceKey, "/") + "/" + name
 }
 
 // TimestampUs converts the capture presentation timestamp from milliseconds.
