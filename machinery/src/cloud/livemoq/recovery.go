@@ -21,11 +21,13 @@ type FrameGate struct {
 func (g *FrameGate) Allow(isKeyFrame bool, capturedAtMs int64, now time.Time, maxAge time.Duration) (bool, FrameGateEvent) {
 	if capturedAtMs > 0 && now.Sub(time.UnixMilli(capturedAtMs)) > maxAge {
 		event := FrameGateEventNone
-		if !g.recovering {
-			event = FrameGateEventLagging
+		if g.started {
+			if !g.recovering {
+				event = FrameGateEventLagging
+			}
+			g.started = false
+			g.recovering = true
 		}
-		g.started = false
-		g.recovering = true
 		return false, event
 	}
 
