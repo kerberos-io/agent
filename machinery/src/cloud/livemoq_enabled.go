@@ -24,6 +24,7 @@ const (
 	maxMoQLivePacketAge     = 1500 * time.Millisecond
 	slowMoQWriteThreshold   = 100 * time.Millisecond
 	moQWriteWarningInterval = 10 * time.Second
+	duplicateKeyframeWindow = 500 * time.Millisecond
 )
 
 type liveMoQConfig struct {
@@ -174,7 +175,9 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 
 	cursor := config.queue.Latest()
 	gate := livemoq.FrameGate{}
+	deduplicator := livemoq.KeyframeDeduplicator{}
 	var lastSlowWriteWarning time.Time
+	var lastDuplicateKeyframeWarning time.Time
 	idle := false
 	for {
 		packet, err := cursor.ReadPacket()
@@ -186,6 +189,7 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 			// nothing. The gate is closed so the next viewer resumes on a keyframe.
 			if !idle {
 				gate.Reset()
+				deduplicator.Reset()
 				idle = true
 			}
 			continue
@@ -206,9 +210,26 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 		if !allowed {
 			continue
 		}
-		payload, err := livemoq.NormalizeH264AccessUnit(packet.Data)
+		payload, normalizationStats, err := livemoq.NormalizeH264AccessUnitWithStats(packet.Data)
 		if err != nil {
 			return fmt.Errorf("normalize H.264 access unit: %w", err)
+		}
+		if normalizationStats.DuplicateIDRNALUs > 0 && time.Since(lastDuplicateKeyframeWarning) >= moQWriteWarningInterval {
+			log.Log.Warning(fmt.Sprintf(
+				"cloud.publishLiveStreamMoQ(): %s removed %d duplicate IDR NALU(s) from H.264 keyframe (timestamp_ms=%d)",
+				config.label(), normalizationStats.DuplicateIDRNALUs, packet.Time,
+			))
+			lastDuplicateKeyframeWarning = time.Now()
+		}
+		if packet.IsKeyFrame && deduplicator.IsDuplicate(packet.Time, packet.CurrentTime, payload, time.Now(), duplicateKeyframeWindow) {
+			if time.Since(lastDuplicateKeyframeWarning) >= moQWriteWarningInterval {
+				log.Log.Warning(fmt.Sprintf(
+					"cloud.publishLiveStreamMoQ(): %s dropping duplicate H.264 keyframe (timestamp_ms=%d)",
+					config.label(), packet.Time,
+				))
+				lastDuplicateKeyframeWarning = time.Now()
+			}
+			continue
 		}
 		frame := moq.Frame{
 			Payload:     payload,
