@@ -17,9 +17,12 @@ import (
 )
 
 const (
-	defaultMoQRelayURL = "https://relay.uug.ai/anon"
-	minMoQRetryDelay   = time.Second
-	maxMoQRetryDelay   = 30 * time.Second
+	defaultMoQRelayURL      = "https://relay.uug.ai/anon"
+	minMoQRetryDelay        = time.Second
+	maxMoQRetryDelay        = 30 * time.Second
+	maxMoQLivePacketAge     = 1500 * time.Millisecond
+	slowMoQWriteThreshold   = 100 * time.Millisecond
+	moQWriteWarningInterval = 10 * time.Second
 )
 
 type liveMoQConfig struct {
@@ -136,7 +139,8 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	defer stream.Finish()
 
 	cursor := config.queue.Latest()
-	writing := false
+	gate := livemoq.FrameGate{}
+	var lastSlowWriteWarning time.Time
 	for {
 		packet, err := cursor.ReadPacket()
 		if err != nil {
@@ -145,12 +149,17 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 		if !packet.IsVideo || len(packet.Data) == 0 || !strings.EqualFold(packet.Codec, "H264") {
 			continue
 		}
-		if !writing {
-			if !packet.IsKeyFrame {
-				continue
-			}
-			writing = true
+		allowed, event := gate.Allow(packet.IsKeyFrame, packet.CurrentTime, time.Now(), maxMoQLivePacketAge)
+		switch event {
+		case livemoq.FrameGateEventStarted:
 			log.Log.Info("cloud.publishLiveStreamMoQ(): first H.264 keyframe received; broadcast is live")
+		case livemoq.FrameGateEventLagging:
+			log.Log.Warning("cloud.publishLiveStreamMoQ(): stream is lagging; dropping packets until a recent keyframe")
+		case livemoq.FrameGateEventRecovered:
+			log.Log.Info("cloud.publishLiveStreamMoQ(): caught up with live stream at a recent keyframe")
+		}
+		if !allowed {
+			continue
 		}
 		payload, err := livemoq.NormalizeH264AccessUnit(packet.Data)
 		if err != nil {
@@ -160,8 +169,24 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 			Payload:     payload,
 			TimestampUs: livemoq.TimestampUs(packet.Time),
 		}
+		writeStartedAt := time.Now()
 		if err := stream.WriteFrame(frame); err != nil {
 			return fmt.Errorf("write H.264 access unit: %w", err)
+		}
+		writeDuration := time.Since(writeStartedAt)
+		if writeDuration >= slowMoQWriteThreshold && time.Since(lastSlowWriteWarning) >= moQWriteWarningInterval {
+			packetAge := time.Duration(0)
+			if packet.CurrentTime > 0 {
+				packetAge = time.Since(time.UnixMilli(packet.CurrentTime))
+				if packetAge < 0 {
+					packetAge = 0
+				}
+			}
+			log.Log.Warning(fmt.Sprintf(
+				"cloud.publishLiveStreamMoQ(): WriteFrame blocked for %s (packet_age=%s keyframe=%t)",
+				writeDuration.Round(time.Millisecond), packetAge.Round(time.Millisecond), packet.IsKeyFrame,
+			))
+			lastSlowWriteWarning = time.Now()
 		}
 	}
 }
