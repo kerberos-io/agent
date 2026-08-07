@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
+	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
 var annexBStartCode = []byte{0x00, 0x00, 0x00, 0x01}
@@ -51,12 +52,22 @@ func NormalizeH264AccessUnit(payload []byte) ([]byte, error) {
 	return h264.AnnexBMarshal(normalized)
 }
 
-func BroadcastPath(prefix string, deviceKey string) string {
+// BroadcastPath returns the relay path a quality tier is published on. Every
+// tier gets its own broadcast so a viewer switches between the camera's main and
+// sub stream by resubscribing to another path, without any control channel back
+// to the Agent. The high tier keeps the historical ".../live.hang" path so
+// existing viewers keep working; the low tier lives next to it on
+// ".../live-low.hang".
+func BroadcastPath(prefix string, deviceKey string, quality string) string {
 	prefix = strings.Trim(prefix, "/")
 	if prefix == "" {
 		prefix = "devices"
 	}
-	return prefix + "/" + strings.Trim(deviceKey, "/") + "/live.hang"
+	name := "live.hang"
+	if quality == models.StreamQualityLow {
+		name = "live-low.hang"
+	}
+	return prefix + "/" + strings.Trim(deviceKey, "/") + "/" + name
 }
 
 // TimestampUs converts the capture presentation timestamp from milliseconds.

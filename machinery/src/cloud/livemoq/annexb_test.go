@@ -3,6 +3,8 @@ package livemoq
 import (
 	"bytes"
 	"testing"
+
+	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
 func TestEnsureAnnexB(t *testing.T) {
@@ -65,11 +67,14 @@ func TestNormalizeH264AccessUnit(t *testing.T) {
 }
 
 func TestBroadcastPath(t *testing.T) {
-	if got := BroadcastPath("/devices/", "/camera-1/"); got != "devices/camera-1/live.hang" {
-		t.Fatalf("BroadcastPath() = %q", got)
+	if got := BroadcastPath("/devices/", "/camera-1/", models.StreamQualityHigh); got != "devices/camera-1/live.hang" {
+		t.Fatalf("BroadcastPath() high = %q", got)
 	}
-	if got := BroadcastPath("", "camera-1"); got != "devices/camera-1/live.hang" {
+	if got := BroadcastPath("", "camera-1", models.StreamQualityHigh); got != "devices/camera-1/live.hang" {
 		t.Fatalf("BroadcastPath() default = %q", got)
+	}
+	if got := BroadcastPath("", "camera-1", models.StreamQualityLow); got != "devices/camera-1/live-low.hang" {
+		t.Fatalf("BroadcastPath() low = %q", got)
 	}
 }
 
