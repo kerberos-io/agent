@@ -74,6 +74,7 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 	communication.HandleLiveHDKeepalive = make(chan string, 1)
 	communication.HandleLiveHDPeers = make(chan string, 1)
 	communication.HandleLiveHLS = make(chan string, 1)
+	communication.HandleAudio = make(chan models.AudioDataPartial, 10)
 	communication.IsConfiguring = abool.New()
 	communication.IsRecordingManual = abool.New()
 	communication.RecordingManualHeartbeat = &atomic.Int64{}
@@ -269,11 +270,11 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	communication.MainStreamConnected = true
 
 	// Try to create backchannel
+	communication.HasBackChannel = false
 	rtspBackChannelClient := captureDevice.SetBackChannelClient(rtspUrl)
 	err = rtspBackChannelClient.ConnectBackChannel(ctx, ctxRunAgent)
 	if err == nil {
 		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP backchannel stream: " + rtspUrl)
-		go rtspBackChannelClient.StartBackChannel(ctx, ctxRunAgent)
 	}
 
 	rtspSubClient := captureDevice.RTSPSubClient
@@ -350,7 +351,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// is a no-op if ONVIFMotion is not enabled.
 	go onvif.HandleONVIFEventStream(*communication.Context, configuration, communication)
 
-	communication.HandleAudio = make(chan models.AudioDataPartial, 10)
 	if rtspBackChannelClient.HasBackChannel {
 		communication.HasBackChannel = true
 		go WriteAudioToBackchannel(communication, rtspBackChannelClient)
@@ -440,9 +440,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	close(communication.HandleMotion)
 	communication.HandleMotion = nil
-
-	close(communication.HandleAudio)
-	communication.HandleAudio = nil
 
 	close(communication.HandleONVIF)
 	communication.HandleONVIF = nil
