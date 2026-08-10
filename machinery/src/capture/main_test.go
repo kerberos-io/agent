@@ -6,10 +6,34 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/video"
 )
+
+func TestPTSToDuration(t *testing.T) {
+	tests := []struct {
+		name      string
+		pts       int64
+		clockRate int
+		want      time.Duration
+	}{
+		{name: "one video second", pts: 90_000, clockRate: 90_000, want: time.Second},
+		{name: "one audio frame", pts: 1_024, clockRate: 8_000, want: 128 * time.Millisecond},
+		{name: "fractional millisecond", pts: 45_045, clockRate: 90_000, want: 500*time.Millisecond + 500*time.Microsecond},
+		{name: "negative timestamp", pts: -45_045, clockRate: 90_000, want: -500*time.Millisecond - 500*time.Microsecond},
+		{name: "large timestamp", pts: 90_000 * 60 * 60 * 24, clockRate: 90_000, want: 24 * time.Hour},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := ptsToDuration(test.pts, test.clockRate); got != test.want {
+				t.Fatalf("ptsToDuration(%d, %d) = %s, want %s", test.pts, test.clockRate, got, test.want)
+			}
+		})
+	}
+}
 
 func TestQueueRecordingForUploadStoresFinalizedMetadata(t *testing.T) {
 	configDirectory := t.TempDir()

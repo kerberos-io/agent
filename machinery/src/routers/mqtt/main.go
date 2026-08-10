@@ -332,7 +332,7 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 				case "record":
 					go HandleRecording(mqttClient, hubKey, payload, configuration, communication)
 				case "get-audio-backchannel":
-					go HandleAudio(mqttClient, hubKey, payload, configuration, communication)
+					HandleAudio(mqttClient, hubKey, payload, configuration, communication)
 				case "get-ptz-position":
 					go HandleGetPTZPosition(mqttClient, hubKey, payload, configuration, communication)
 				case "update-ptz-position":
@@ -442,8 +442,29 @@ func HandleAudio(mqttClient mqtt.Client, hubKey string, payload models.Payload, 
 			Timestamp: audioPayload.Timestamp,
 			Data:      audioPayload.Data,
 		}
-		communication.HandleAudio <- audioDataPartial
+		if enqueueLatestAudio(communication.HandleAudio, audioDataPartial) {
+			log.Log.Debug("routers.mqtt.main.HandleAudio(): dropped stale audio because the backchannel queue was full")
+		}
 	}
+}
+
+func enqueueLatestAudio(audioChannel chan models.AudioDataPartial, audio models.AudioDataPartial) bool {
+	select {
+	case audioChannel <- audio:
+		return false
+	default:
+	}
+
+	select {
+	case <-audioChannel:
+	default:
+	}
+
+	select {
+	case audioChannel <- audio:
+	default:
+	}
+	return true
 }
 
 func HandleGetPTZPosition(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {

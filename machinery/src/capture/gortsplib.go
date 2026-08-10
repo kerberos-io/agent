@@ -17,15 +17,15 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/bluenviron/gortsplib/v4"
-	"github.com/bluenviron/gortsplib/v4/pkg/base"
-	"github.com/bluenviron/gortsplib/v4/pkg/description"
-	"github.com/bluenviron/gortsplib/v4/pkg/format"
-	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
-	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph265"
-	"github.com/bluenviron/gortsplib/v4/pkg/format/rtplpcm"
-	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpmpeg4audio"
-	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpsimpleaudio"
+	"github.com/bluenviron/gortsplib/v5"
+	"github.com/bluenviron/gortsplib/v5/pkg/base"
+	"github.com/bluenviron/gortsplib/v5/pkg/description"
+	"github.com/bluenviron/gortsplib/v5/pkg/format"
+	"github.com/bluenviron/gortsplib/v5/pkg/format/rtph264"
+	"github.com/bluenviron/gortsplib/v5/pkg/format/rtph265"
+	"github.com/bluenviron/gortsplib/v5/pkg/format/rtplpcm"
+	"github.com/bluenviron/gortsplib/v5/pkg/format/rtpmpeg4audio"
+	"github.com/bluenviron/gortsplib/v5/pkg/format/rtpsimpleaudio"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
 	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4audio"
@@ -317,11 +317,11 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	_, span := tracer.Start(ctxOtel, "Connect")
 	defer span.End()
 
-	transport := gortsplib.TransportTCP
+	protocol := gortsplib.ProtocolTCP
 	g.health = newStreamHealth()
 	g.Client = gortsplib.Client{
 		RequestBackChannels: false,
-		Transport:           &transport,
+		Protocol:            &protocol,
 		// Route gortsplib's packet-loss / decode-error reporting through our
 		// structured logger with stream context (replaces its plain stdout
 		// logging). These hooks are what let us tell whether the camera is
@@ -342,7 +342,9 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	}
 
 	// connect to the server
-	err = g.Client.Start(u.Scheme, u.Host)
+	g.Client.Scheme = u.Scheme
+	g.Client.Host = u.Host
+	err = g.Client.Start()
 	if err != nil {
 		log.Log.Debug("capture.golibrtsp.Connect(Start): " + err.Error())
 	}
@@ -593,10 +595,10 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 	defer span.End()
 
 	// Transport TCP
-	transport := gortsplib.TransportTCP
+	protocol := gortsplib.ProtocolTCP
 	g.Client = gortsplib.Client{
 		RequestBackChannels: true,
-		Transport:           &transport,
+		Protocol:            &protocol,
 	}
 	// parse URL
 	u, err := base.ParseURL(g.Url)
@@ -606,7 +608,9 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 	}
 
 	// connect to the server
-	err = g.Client.Start(u.Scheme, u.Host)
+	g.Client.Scheme = u.Scheme
+	g.Client.Host = u.Host
+	err = g.Client.Start()
 	if err != nil {
 		log.Log.Error("capture.golibrtsp.ConnectBackChannel(): " + err.Error())
 	}
@@ -680,6 +684,12 @@ func compositionOffsetMs(ext dtsExtractor, au [][]byte, pts int64, clockRate int
 	return offset * 1000 / int64(clockRate)
 }
 
+func ptsToDuration(pts int64, clockRate int) time.Duration {
+	rate := int64(clockRate)
+	return time.Duration(pts/rate)*time.Second +
+		time.Duration(pts%rate)*time.Second/time.Duration(rate)
+}
+
 // Start the RTSP client, and start reading packets.
 func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) (err error) {
 	log.Log.Debug("capture.golibrtsp.Start(): started")
@@ -693,13 +703,13 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	// called when a MULAW audio RTP packet arrives
 	if g.AudioG711Media != nil && g.AudioG711Forma != nil {
 		g.Client.OnPacketRTP(g.AudioG711Media, g.AudioG711Forma, func(rtppkt *rtp.Packet) {
-			pts, ok := g.Client.PacketPTS(g.AudioG711Media, rtppkt)
 			// decode timestamp
-			pts2, ok := g.Client.PacketPTS2(g.AudioG711Media, rtppkt)
+			pts2, ok := g.Client.PacketPTS(g.AudioG711Media, rtppkt)
 			if !ok {
 				log.Log.Debug("capture.golibrtsp.Start(): " + "unable to get PTS")
 				return
 			}
+			pts := ptsToDuration(pts2, g.AudioG711Forma.ClockRate())
 
 			// extract LPCM samples from RTP packets
 			op, err := g.AudioG711Decoder.Decode(rtppkt)
@@ -729,12 +739,12 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	if g.AudioMPEG4Media != nil && g.AudioMPEG4Forma != nil {
 		g.Client.OnPacketRTP(g.AudioMPEG4Media, g.AudioMPEG4Forma, func(rtppkt *rtp.Packet) {
 			// decode timestamp
-			pts, ok := g.Client.PacketPTS(g.AudioMPEG4Media, rtppkt)
-			pts2, ok := g.Client.PacketPTS2(g.AudioMPEG4Media, rtppkt)
+			pts2, ok := g.Client.PacketPTS(g.AudioMPEG4Media, rtppkt)
 			if !ok {
 				log.Log.Error("capture.golibrtsp.Start(): " + "unable to get PTS")
 				return
 			}
+			pts := ptsToDuration(pts2, g.AudioMPEG4Forma.ClockRate())
 
 			// Encode the AAC samples from RTP packets
 			// extract access units from RTP packets
@@ -788,12 +798,12 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 			if len(rtppkt.Payload) > 0 {
 
 				// decode timestamps — validate each call separately
-				pts, okPTS := g.Client.PacketPTS(g.VideoH264Media, rtppkt)
-				pts2, okPTS2 := g.Client.PacketPTS2(g.VideoH264Media, rtppkt)
+				pts2, okPTS2 := g.Client.PacketPTS(g.VideoH264Media, rtppkt)
 				if !okPTS2 {
-					log.Log.Debug("capture.golibrtsp.Start(): unable to get PTS2 from PacketPTS2")
+					log.Log.Debug("capture.golibrtsp.Start(): unable to get PTS")
 					return
 				}
+				pts := ptsToDuration(pts2, g.VideoH264Forma.ClockRate())
 
 				// Extract access units from RTP packets.
 				// We need a complete access unit to determine whether
@@ -807,15 +817,13 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				}
 
 				// Frame is complete — update per-stream FPS from PTS.
-				if okPTS {
-					ft := g.fpsTrackers[g.VideoH264Index]
-					if ft == nil {
-						ft = newFPSTracker(30)
-						g.fpsTrackers[g.VideoH264Index] = ft
-					}
-					if ptsFPS := ft.update(pts); ptsFPS > 0 && ptsFPS <= 120 {
-						g.Streams[g.VideoH264Index].FPS = ptsFPS
-					}
+				ft := g.fpsTrackers[g.VideoH264Index]
+				if ft == nil {
+					ft = newFPSTracker(30)
+					g.fpsTrackers[g.VideoH264Index] = ft
+				}
+				if ptsFPS := ft.update(pts); ptsFPS > 0 && ptsFPS <= 120 {
+					g.Streams[g.VideoH264Index].FPS = ptsFPS
 				}
 
 				// We'll need to read out a few things.
@@ -1035,12 +1043,12 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 			if len(rtppkt.Payload) > 0 {
 
 				// decode timestamps — validate each call separately
-				pts, okPTS := g.Client.PacketPTS(g.VideoH265Media, rtppkt)
-				pts2, okPTS2 := g.Client.PacketPTS2(g.VideoH265Media, rtppkt)
+				pts2, okPTS2 := g.Client.PacketPTS(g.VideoH265Media, rtppkt)
 				if !okPTS2 {
 					log.Log.Debug("capture.golibrtsp.Start(): unable to get PTS")
 					return
 				}
+				pts := ptsToDuration(pts2, g.VideoH265Forma.ClockRate())
 
 				// Extract access units from RTP packets.
 				// We need a complete access unit to determine whether
@@ -1054,16 +1062,14 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				}
 
 				// Frame is complete — update per-stream FPS from PTS.
-				if okPTS {
-					ft := g.fpsTrackers[g.VideoH265Index]
-					if ft == nil {
-						ft = newFPSTracker(30)
-						g.fpsTrackers[g.VideoH265Index] = ft
-					}
-					if ptsFPS := ft.update(pts); ptsFPS > 0 && ptsFPS <= 120 {
-						g.Streams[g.VideoH265Index].FPS = ptsFPS
-						g.persistStreamFPS(configuration, streamType, ptsFPS)
-					}
+				ft := g.fpsTrackers[g.VideoH265Index]
+				if ft == nil {
+					ft = newFPSTracker(30)
+					g.fpsTrackers[g.VideoH265Index] = ft
+				}
+				if ptsFPS := ft.update(pts); ptsFPS > 0 && ptsFPS <= 120 {
+					g.Streams[g.VideoH265Index].FPS = ptsFPS
+					g.persistStreamFPS(configuration, streamType, ptsFPS)
 				}
 
 				// Preserve the decoded access unit (in decode order) for DTS
