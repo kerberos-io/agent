@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/devcontainers/go:1.24-trixie
+FROM mcr.microsoft.com/devcontainers/go:1.25-trixie
 
 # Install node environment
 RUN apt-get update && \

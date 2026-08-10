@@ -1,5 +1,5 @@
 
-ARG GO_IMAGE=golang:1.24-trixie
+ARG GO_IMAGE=golang:1.25-trixie
 ARG RUNTIME_IMAGE=debian:trixie-slim
 ARG VERSION=0.0.0
 FROM ${GO_IMAGE} AS build-machinery
