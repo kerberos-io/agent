@@ -2,6 +2,7 @@ package mqtt
 
 import (
 	"testing"
+	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
@@ -32,7 +33,7 @@ func TestEnqueueLatestAudioDoesNotBlockNilChannel(t *testing.T) {
 
 	select {
 	case <-done:
-	default:
+	case <-time.After(100 * time.Millisecond):
 		t.Fatal("enqueueLatestAudio() blocked on a nil channel")
 	}
 }
