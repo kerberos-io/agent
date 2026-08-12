@@ -345,12 +345,15 @@ an already-running process reloads it.
 
 The default production mode retains the image's normal public roots in addition
 to the private camera CA. For a deliberately private-CA-only deployment, mount
-an empty directory and set `SSL_CERT_DIR` to it:
+an empty directory and set `SSL_CERT_DIR` to its path:
 
 ```bash
 -v /secure/config/empty-ca-dir:/home/agent/data/config/empty-ca-dir:ro \
 -e SSL_CERT_DIR=/home/agent/data/config/empty-ca-dir
 ```
+
+Do not use `SSL_CERT_DIR=`. Go treats an empty value as unset and scans its
+default certificate directories.
 
 Only use that mode when the Agent does not need public roots for other TLS
 connections.
@@ -446,6 +449,24 @@ On Unix, Go uses `SSL_CERT_FILE` instead of its default aggregate CA file, but i
 still scans default certificate directories such as `/etc/ssl/certs`. Setting
 `SSL_CERT_FILE` alone therefore does not remove CA certificates installed with
 `update-ca-certificates`.
+
+Blank values do not select empty trust sources. Both `SSL_CERT_FILE=` and
+`SSL_CERT_DIR=` are treated as unset, so Go falls back to its default aggregate
+CA file and certificate directories. To test with no trusted certificates on
+Linux, use a non-empty file path that contains no certificates and a non-empty
+directory path that contains no certificates:
+
+```bash
+mkdir -p /tmp/empty-ca-dir
+SSL_CERT_FILE=/dev/null \
+SSL_CERT_DIR=/tmp/empty-ca-dir \
+AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=false \
+GOWORK=off \
+go run -tags moq . -action run -port 8080
+```
+
+That fresh process must fail with `x509: certificate signed by unknown
+authority`.
 
 Use exactly one trust-distribution approach when possible:
 
