@@ -202,6 +202,8 @@ Certificate verification is enabled by default. The URL hostname or IP address m
 
 For a private CA, mount a PEM trust bundle containing every CA certificate needed to build the camera certificate chain and set `SSL_CERT_FILE` to that file. This Bosch firmware presents only its leaf certificate, so include both the issuing intermediate and root certificates in the bundle. As a temporary fallback, `AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=true` disables certificate verification for camera streams only.
 
+See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI, private-CA, deployment, validation, and troubleshooting procedure.
+
 | Name                                    | Description                                                                                     | Default Value                  |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
 | `LOG_LEVEL`                                 | Level for logging, could be "info", "warning", "debug", "error" or "fatal".                     | "info"                         |
