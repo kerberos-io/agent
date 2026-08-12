@@ -198,7 +198,9 @@ AGENT_CAPTURE_IPCAMERA_RTSP='rtsps://username:password@camera.example:9554/?inst
 AGENT_CAPTURE_IPCAMERA_SUB_RTSP='rtsps://username:password@camera.example:9554/?inst=2'
 ```
 
-Certificate verification is enabled by default. The URL hostname must match the camera certificate. For a private CA or self-signed camera certificate, mount its CA certificate and set `SSL_CERT_FILE` to that PEM file. As a temporary fallback, `AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=true` disables certificate verification for camera streams only.
+Certificate verification is enabled by default. The URL hostname or IP address must match the camera certificate SAN. On this Bosch firmware, RTSPS presents the certificate assigned to **HTTPS**; there is no separate SRTSP certificate usage. Leave **CBS client** assigned to the Bosch device certificate.
+
+For a private CA, mount a PEM trust bundle containing every CA certificate needed to build the camera certificate chain and set `SSL_CERT_FILE` to that file. This Bosch firmware presents only its leaf certificate, so include both the issuing intermediate and root certificates in the bundle. As a temporary fallback, `AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=true` disables certificate verification for camera streams only.
 
 | Name                                    | Description                                                                                     | Default Value                  |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
