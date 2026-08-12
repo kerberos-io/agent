@@ -8,6 +8,11 @@ bundles can still allow a connection.
 The camera-specific steps were verified with a Bosch FLEXIDOME micro 3100i.
 Other Bosch firmware versions may use different labels or ports.
 
+The commands were tested with Smallstep CLI `0.30.6` and OpenSSL `3.5.6` on
+Debian. Check `step certificate sign --help` when using an older Smallstep CLI.
+The OpenSSL isolation flags `-no-CApath` and `-no-CAstore` require a version that
+lists them in `openssl s_client -help`.
+
 ## Tested configuration
 
 | Setting | Value |
@@ -317,16 +322,17 @@ For a process running directly in the same environment:
 AGENT_CAPTURE_IPCAMERA_RTSP="rtsps://<user>:<password>@10.0.30.11:9554/?inst=1"
 AGENT_CAPTURE_IPCAMERA_SUB_RTSP="rtsps://<user>:<password>@10.0.30.11:9554/?inst=2"
 AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=false
-SSL_CERT_FILE=/home/agent/certs/uug-camera-trust-bundle.pem
+SSL_CERT_FILE=/home/agent/data/config/uug-camera-trust-bundle.pem
 ```
 
 For a container, mount the public bundle read-only at the exact path visible
-inside the container:
+inside the container. The Agent image creates `/home/agent/data/config` and
+includes Debian's `ca-certificates` package:
 
 ```bash
 docker run \
-  -v /secure/config/uug-camera-trust-bundle.pem:/home/agent/certs/uug-camera-trust-bundle.pem:ro \
-  -e SSL_CERT_FILE=/home/agent/certs/uug-camera-trust-bundle.pem \
+  -v /secure/config/uug-camera-trust-bundle.pem:/home/agent/data/config/uug-camera-trust-bundle.pem:ro \
+  -e SSL_CERT_FILE=/home/agent/data/config/uug-camera-trust-bundle.pem \
   -e AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=false \
   -e 'AGENT_CAPTURE_IPCAMERA_RTSP=rtsps://<user>:<password>@10.0.30.11:9554/?inst=1' \
   -e 'AGENT_CAPTURE_IPCAMERA_SUB_RTSP=rtsps://<user>:<password>@10.0.30.11:9554/?inst=2' \
@@ -336,6 +342,18 @@ docker run \
 Restart the Agent after changing trust files. Go can cache the process system
 certificate pool after its first use, so editing a file does not guarantee that
 an already-running process reloads it.
+
+The default production mode retains the image's normal public roots in addition
+to the private camera CA. For a deliberately private-CA-only deployment, mount
+an empty directory and set `SSL_CERT_DIR` to it:
+
+```bash
+-v /secure/config/empty-ca-dir:/home/agent/data/config/empty-ca-dir:ro \
+-e SSL_CERT_DIR=/home/agent/data/config/empty-ca-dir
+```
+
+Only use that mode when the Agent does not need public roots for other TLS
+connections.
 
 ## Validate the live endpoints
 
@@ -356,6 +374,10 @@ openssl s_client \
 ```
 
 Repeat with port `443`. Both must report `Verification: OK`.
+
+Confirm that identity checking is active by repeating the command with a wrong
+address, such as `-verify_ip 10.0.30.12`. It must fail with an IP address
+mismatch.
 
 ### Confirm the live leaf is the generated leaf
 
@@ -475,6 +497,22 @@ openssl verify \
 
 Store and compare approved SHA-256 fingerprints when detecting unauthorized
 certificate-file changes is a requirement.
+
+Restore an accidentally edited bundle from the protected CA certificates, then
+restart the Agent:
+
+```bash
+step certificate bundle -f \
+  "$HOME/.step/certs/intermediate_ca.crt" \
+  "$HOME/.step/certs/root_ca.crt" \
+  "$HOME/.step/camera/uug-camera-trust-bundle.pem"
+
+openssl verify \
+  -CAfile "$HOME/.step/certs/root_ca.crt" \
+  -no-CApath \
+  -no-CAstore \
+  "$HOME/.step/certs/intermediate_ca.crt"
+```
 
 ## Optional system trust installation
 
