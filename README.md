@@ -189,6 +189,17 @@ Next to attaching the configuration file, it is also possible to override the co
     -e AGENT_CAPTURE_CONTINUOUS=true \
     -d --restart=always kerberos/agent:latest
 
+### Secure camera streams (RTSPS)
+
+The Agent accepts `rtsps://` camera URLs. Do not use `srtsp://`; RTSPS is RTSP over TLS. For a Bosch FLEXIDOME micro 3100i, enable **Secure RTSP** under **Network > Network Services** and use port `9554`:
+
+```bash
+AGENT_CAPTURE_IPCAMERA_RTSP='rtsps://username:password@camera.example:9554/?inst=1'
+AGENT_CAPTURE_IPCAMERA_SUB_RTSP='rtsps://username:password@camera.example:9554/?inst=2'
+```
+
+Certificate verification is enabled by default. The URL hostname must match the camera certificate. For a private CA or self-signed camera certificate, mount its CA certificate and set `SSL_CERT_FILE` to that PEM file. As a temporary fallback, `AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=true` disables certificate verification for camera streams only.
+
 | Name                                    | Description                                                                                     | Default Value                  |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
 | `LOG_LEVEL`                                 | Level for logging, could be "info", "warning", "debug", "error" or "fatal".                     | "info"                         |
@@ -208,8 +219,9 @@ Next to attaching the configuration file, it is also possible to override the co
 | `AGENT_TIME`                                | Enable the timetable for Kerberos Agent                                                         | "false"                        |
 | `AGENT_TIMETABLE`                           | A (weekly) time table to specify when to make recordings "start1,end1,start2,end2;start1..      | ""                             |
 | `AGENT_REGION_POLYGON`                      | A single polygon set for motion detection: "x1,y1;x2,y2;x3,y3;...                               | ""                             |
-| `AGENT_CAPTURE_IPCAMERA_RTSP`               | Full-HD RTSP endpoint to the camera you're targetting.                                          | ""                             |
-| `AGENT_CAPTURE_IPCAMERA_SUB_RTSP`           | Sub-stream RTSP endpoint used for livestreaming (WebRTC).                                       | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_RTSP`               | Full-HD RTSP or RTSPS endpoint for the target camera.                                           | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_SUB_RTSP`           | RTSP or RTSPS sub-stream endpoint used for livestreaming (WebRTC).                              | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE`     | Disable RTSPS camera certificate verification; use only when a trusted CA cannot be installed.  | "false"                        |
 | `AGENT_CAPTURE_IPCAMERA_BASE_WIDTH`         | Force a specific width resolution for live view processing.                                     | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_BASE_HEIGHT`        | Force a specific height resolution for live view processing.                                    | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_ONVIF`              | Mark as a compliant ONVIF device.                                                               | ""                             |

@@ -8,9 +8,11 @@ import "C"
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"image"
+	"os"
 	"reflect"
 	"strconv"
 	"sync"
@@ -37,6 +39,16 @@ import (
 )
 
 var tracer = otel.Tracer("github.com/kerberos-io/agent/machinery/src/capture")
+
+const rtspsInsecureEnv = "AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE"
+
+func rtspsTLSConfig() *tls.Config {
+	if os.Getenv(rtspsInsecureEnv) != "true" {
+		return nil
+	}
+
+	return &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- explicit opt-in for cameras with self-signed certificates
+}
 
 // Implements the RTSPClient interface.
 type Golibrtsp struct {
@@ -322,6 +334,7 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	g.Client = gortsplib.Client{
 		RequestBackChannels: false,
 		Protocol:            &protocol,
+		TLSConfig:           rtspsTLSConfig(),
 		// Route gortsplib's packet-loss / decode-error reporting through our
 		// structured logger with stream context (replaces its plain stdout
 		// logging). These hooks are what let us tell whether the camera is
@@ -599,6 +612,7 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 	g.Client = gortsplib.Client{
 		RequestBackChannels: true,
 		Protocol:            &protocol,
+		TLSConfig:           rtspsTLSConfig(),
 	}
 	// parse URL
 	u, err := base.ParseURL(g.Url)
