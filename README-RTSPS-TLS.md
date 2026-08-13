@@ -63,6 +63,61 @@ certificate and hostname verification with the process trust pool.
 sets `InsecureSkipVerify` for camera clients. It should be false in a verified
 deployment.
 
+## Communication and certificate flow
+
+The certificate is used during the TLS handshake, before the first RTSP command
+is exchanged. It is not attached to `DESCRIBE`, `SETUP`, or `PLAY`, and the CA
+trust bundle is never sent to the camera.
+
+```mermaid
+sequenceDiagram
+  participant Agent as Kerberos Agent
+  participant Trust as Go trust pool
+  participant Camera as Camera RTSPS :9554
+
+  Agent->>Trust: Load trusted CAs from SSL_CERT_FILE and CA directories
+  Agent->>Camera: Open TCP connection
+  Agent->>Camera: Send TLS ClientHello
+  Camera-->>Agent: Send TLS ServerHello and camera certificate
+  Agent->>Trust: Verify chain, validity, serverAuth, and URL host against SAN
+  Trust-->>Agent: Accept or reject the camera identity
+  Agent->>Camera: Complete TLS handshake
+  Note over Agent,Camera: All following traffic is encrypted by TLS
+  Agent->>Camera: DESCRIBE with RTSP authentication
+  Camera-->>Agent: Return SDP and available media tracks
+  Agent->>Camera: SETUP selected video and audio tracks over TCP
+  Agent->>Camera: PLAY
+  Camera-->>Agent: Send interleaved RTP and RTCP media over TLS
+```
+
+The files and keys have distinct roles:
+
+| Material | Location | Purpose | Sent over the connection |
+| --- | --- | --- | --- |
+| Camera leaf certificate | Camera | Identifies the camera and binds its public key to its SAN | Yes, by the camera during the TLS handshake |
+| Camera private key | Camera | Proves that the camera owns the presented certificate | No |
+| Intermediate and root CA PEM bundle | Agent | Lets Go build and trust the camera certificate chain | No |
+| RTSP username and password | Agent configuration or URL | Authenticates the Agent to the RTSP service after TLS succeeds | An authentication response is sent inside TLS; its form depends on the RTSP authentication method |
+
+For an `rtsps://` URL, the Agent parses the URL and gives gortsplib the host and
+TLS settings. gortsplib opens the TCP connection and starts TLS. Go compares the
+certificate presented by the camera with the local trust pool, checks its
+validity period and server usage, and matches the URL hostname or IP address to
+the certificate SAN. Only a successful handshake creates the encrypted channel
+needed for the RTSP exchange.
+
+The Agent then sends `DESCRIBE`, selects the advertised video and audio tracks,
+sends `SETUP`, and starts delivery with `PLAY`. For the tested camera, gortsplib
+uses interleaved TCP, so the RTSP control messages and RTP/RTCP media remain
+inside the same encrypted TLS connection. Main stream, sub stream, and enabled
+audio backchannel clients each establish and verify their own connection.
+
+If certificate verification fails, the TLS handshake does not complete and no
+usable RTSP session is established. Setting
+`AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=true` keeps traffic encrypted but skips
+certificate-chain and hostname verification, so an attacker could impersonate
+the camera. It is not equivalent to trusting the camera certificate.
+
 ## Decide the certificate identity first
 
 Choose the stable name used in every Agent URL before creating the certificate:
