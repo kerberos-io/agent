@@ -151,6 +151,13 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	}
 	defer client.Close()
 
+	sessionCtx, cancelSessionWatch := context.WithCancel(ctx)
+	defer cancelSessionWatch()
+	sessionClosed := make(chan error, 1)
+	go func() {
+		sessionClosed <- client.Session().Closed(sessionCtx)
+	}()
+
 	broadcast, err := client.CreateBroadcast(config.broadcast)
 	if err != nil {
 		return fmt.Errorf("create broadcast: %w", err)
@@ -180,6 +187,12 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	var lastDuplicateKeyframeWarning time.Time
 	idle := false
 	for {
+		select {
+		case err := <-sessionClosed:
+			return fmt.Errorf("relay session closed: %w", err)
+		default:
+		}
+
 		packet, err := cursor.ReadPacket()
 		if err != nil {
 			return fmt.Errorf("read packet: %w", err)
