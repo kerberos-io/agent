@@ -377,7 +377,7 @@ For a process running directly in the same environment:
 AGENT_CAPTURE_IPCAMERA_RTSP="rtsps://<user>:<password>@10.0.30.11:9554/?inst=1"
 AGENT_CAPTURE_IPCAMERA_SUB_RTSP="rtsps://<user>:<password>@10.0.30.11:9554/?inst=2"
 AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=false
-SSL_CERT_FILE=/home/agent/data/config/uug-camera-trust-bundle.pem
+AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE=/home/agent/data/config/uug-camera-trust-bundle.pem
 ```
 
 For a container, mount the public bundle read-only at the exact path visible
@@ -387,20 +387,22 @@ includes Debian's `ca-certificates` package:
 ```bash
 docker run \
   -v /secure/config/uug-camera-trust-bundle.pem:/home/agent/data/config/uug-camera-trust-bundle.pem:ro \
-  -e SSL_CERT_FILE=/home/agent/data/config/uug-camera-trust-bundle.pem \
+  -e AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE=/home/agent/data/config/uug-camera-trust-bundle.pem \
   -e AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=false \
   -e 'AGENT_CAPTURE_IPCAMERA_RTSP=rtsps://<user>:<password>@10.0.30.11:9554/?inst=1' \
   -e 'AGENT_CAPTURE_IPCAMERA_SUB_RTSP=rtsps://<user>:<password>@10.0.30.11:9554/?inst=2' \
   kerberos/agent:latest
 ```
 
-Restart the Agent after changing trust files. Go can cache the process system
-certificate pool after its first use, so editing a file does not guarantee that
-an already-running process reloads it.
+`AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE` starts with the operating system's roots
+and appends the camera bundle only to the gortsplib TLS configuration. Other
+clients, including MoQ, Hub, and Vault, retain the normal public CA chain.
+Restart the Agent after changing trust files.
 
-The default production mode retains the image's normal public roots in addition
-to the private camera CA. For a deliberately private-CA-only deployment, mount
-an empty directory and set `SSL_CERT_DIR` to its path:
+Do not set `SSL_CERT_FILE` or `SSL_CERT_DIR` in production solely for camera
+trust. They are process-wide and can prevent other clients from validating
+public services. For a deliberate process-wide isolation test, mount an empty
+directory and set `SSL_CERT_DIR` to its path:
 
 ```bash
 -v /secure/config/empty-ca-dir:/home/agent/data/config/empty-ca-dir:ro \
@@ -523,9 +525,10 @@ go run -tags moq . -action run -port 8080
 That fresh process must fail with `x509: certificate signed by unknown
 authority`.
 
-Use exactly one trust-distribution approach when possible:
+Use exactly one camera trust-distribution approach when possible:
 
-1. Mount a private trust bundle and set `SSL_CERT_FILE`; or
+1. Mount a private trust bundle and set
+  `AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE`; or
 2. Install the CA certificates into the operating-system trust store.
 
 Using both is valid, but makes isolation tests less obvious.
