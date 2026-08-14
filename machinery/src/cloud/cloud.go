@@ -229,6 +229,54 @@ func rawJSONOrEmptyArray(b []byte) json.RawMessage {
 	return json.RawMessage(b)
 }
 
+const heartbeatResponseBodyLogLimit = 4 * 1024
+
+func readHeartbeatResponseBody(response *http.Response) (string, bool, error) {
+	if response == nil || response.Body == nil {
+		return "", false, nil
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(response.Body, heartbeatResponseBodyLogLimit+1))
+	if err != nil {
+		return "", false, err
+	}
+
+	truncated := len(body) > heartbeatResponseBodyLogLimit
+	if truncated {
+		body = body[:heartbeatResponseBodyLogLimit]
+	}
+
+	return strings.TrimSpace(string(body)), truncated, nil
+}
+
+func formatHeartbeatFailureLog(response *http.Response, requestErr error, responseBody string, responseBodyTruncated bool, responseBodyErr error, elapsed time.Duration) string {
+	details := make([]string, 0, 6)
+	if response != nil {
+		details = append(details, "status_code="+strconv.Itoa(response.StatusCode))
+		if response.Status != "" {
+			details = append(details, "status="+strconv.Quote(response.Status))
+		}
+	} else {
+		details = append(details, "status_code=none")
+	}
+	details = append(details, "duration="+elapsed.Round(time.Millisecond).String())
+	if requestErr != nil {
+		details = append(details, "request_error="+strconv.Quote(requestErr.Error()))
+	}
+	if responseBody != "" {
+		details = append(details, "response_body="+strconv.Quote(responseBody))
+	}
+	if responseBodyTruncated {
+		details = append(details, "response_body_truncated=true")
+	}
+	if responseBodyErr != nil {
+		details = append(details, "response_body_error="+strconv.Quote(responseBodyErr.Error()))
+	}
+
+	return "cloud.HandleHeartBeat(): heartbeat request to Kerberos Hub failed: " + strings.Join(details, ", ")
+}
+
 func HandleHeartBeat(configuration *models.Configuration, communication *models.Communication, uptimeStart time.Time) {
 	log.Log.Debug("cloud.HandleHeartBeat(): started")
 
@@ -644,20 +692,26 @@ loop:
 
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)
-				req, _ := http.NewRequest("POST", hubURI, buffy)
-				req.Header.Set("Content-Type", "application/json")
-				resp, err := client.Do(req)
-				if resp != nil {
-					resp.Body.Close()
+				requestStarted := time.Now()
+				req, requestErr := http.NewRequest("POST", hubURI, buffy)
+				var resp *http.Response
+				if requestErr == nil {
+					req.Header.Set("Content-Type", "application/json")
+					resp, requestErr = client.Do(req)
 				}
-				if err == nil && resp.StatusCode == 200 {
+				if requestErr == nil && resp != nil && resp.StatusCode == http.StatusOK {
+					if resp.Body != nil {
+						_, _ = io.Copy(io.Discard, resp.Body)
+						resp.Body.Close()
+					}
 					communication.CloudTimestamp.Store(time.Now().Unix())
 					log.Log.Info("cloud.HandleHeartBeat(): (200) Heartbeat received by Kerberos Hub.")
 				} else {
+					responseBody, responseBodyTruncated, responseBodyErr := readHeartbeatResponseBody(resp)
 					if communication.CloudTimestamp != nil && communication.CloudTimestamp.Load() != nil {
 						communication.CloudTimestamp.Store(int64(0))
 					}
-					log.Log.Error("cloud.HandleHeartBeat(): (400) Something went wrong while sending to Kerberos Hub.")
+					log.Log.Error(formatHeartbeatFailureLog(resp, requestErr, responseBody, responseBodyTruncated, responseBodyErr, time.Since(requestStarted)))
 				}
 			} else {
 				log.Log.Error("cloud.HandleHeartBeat(): Disabled as we do not have a public key defined.")
