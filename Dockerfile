@@ -103,7 +103,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 	ca-certificates curl ffmpeg libatomic1 libcap2-bin libstdc++6 && \
 	rm -rf /var/lib/apt/lists/* && \
 	groupadd --system kerberosio && \
-	useradd --system --gid kerberosio --groups video --create-home agent
+	useradd --system --gid kerberosio --groups video --create-home agent && \
+	chmod 0755 /home/agent
 
 #################################
 # Copy files from previous images
