@@ -9,6 +9,7 @@ import "C"
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"image"
@@ -40,14 +41,34 @@ import (
 
 var tracer = otel.Tracer("github.com/kerberos-io/agent/machinery/src/capture")
 
-const rtspsInsecureEnv = "AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE"
+const (
+	rtspsCAFileEnv   = "AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE"
+	rtspsInsecureEnv = "AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE"
+)
 
-func rtspsTLSConfig() *tls.Config {
-	if os.Getenv(rtspsInsecureEnv) != "true" {
-		return nil
+func rtspsTLSConfig() (*tls.Config, error) {
+	if os.Getenv(rtspsInsecureEnv) == "true" {
+		return &tls.Config{InsecureSkipVerify: true}, nil // #nosec G402 -- explicit opt-in for cameras with self-signed certificates
 	}
 
-	return &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- explicit opt-in for cameras with self-signed certificates
+	caFile := os.Getenv(rtspsCAFileEnv)
+	if caFile == "" {
+		return nil, nil
+	}
+
+	rootCAs, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, fmt.Errorf("load system CA pool: %w", err)
+	}
+	caPEM, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, fmt.Errorf("read RTSPS CA file %q: %w", caFile, err)
+	}
+	if !rootCAs.AppendCertsFromPEM(caPEM) {
+		return nil, fmt.Errorf("RTSPS CA file %q contains no certificates", caFile)
+	}
+
+	return &tls.Config{RootCAs: rootCAs}, nil
 }
 
 // Implements the RTSPClient interface.
@@ -329,12 +350,17 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	_, span := tracer.Start(ctxOtel, "Connect")
 	defer span.End()
 
+	tlsConfig, err := rtspsTLSConfig()
+	if err != nil {
+		return fmt.Errorf("configure RTSPS TLS: %w", err)
+	}
+
 	protocol := gortsplib.ProtocolTCP
 	g.health = newStreamHealth()
 	g.Client = gortsplib.Client{
 		RequestBackChannels: false,
 		Protocol:            &protocol,
-		TLSConfig:           rtspsTLSConfig(),
+		TLSConfig:           tlsConfig,
 		// Route gortsplib's packet-loss / decode-error reporting through our
 		// structured logger with stream context (replaces its plain stdout
 		// logging). These hooks are what let us tell whether the camera is
@@ -607,12 +633,17 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 	_, span := tracer.Start(ctxRunAgent, "ConnectBackChannel")
 	defer span.End()
 
+	tlsConfig, err := rtspsTLSConfig()
+	if err != nil {
+		return fmt.Errorf("configure RTSPS TLS: %w", err)
+	}
+
 	// Transport TCP
 	protocol := gortsplib.ProtocolTCP
 	g.Client = gortsplib.Client{
 		RequestBackChannels: true,
 		Protocol:            &protocol,
-		TLSConfig:           rtspsTLSConfig(),
+		TLSConfig:           tlsConfig,
 	}
 	// parse URL
 	u, err := base.ParseURL(g.Url)

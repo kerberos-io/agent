@@ -17,7 +17,7 @@
                 "8080"
             ],
             "envFile": "${workspaceFolder}/machinery/.env.local",
-            "buildFlags": "--tags dynamic",
+            "buildFlags": "--tags dynamic,moq",
             "env": {
                 "GOWORK": "off"
             },
