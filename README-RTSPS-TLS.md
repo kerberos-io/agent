@@ -75,7 +75,7 @@ sequenceDiagram
   participant Trust as Go trust pool
   participant Camera as Camera RTSPS :9554
 
-  Agent->>Trust: Load trusted CAs from SSL_CERT_FILE and CA directories
+  Agent->>Trust: Load system roots and append AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE
   Agent->>Camera: Open TCP connection
   Agent->>Camera: Send TLS ClientHello
   Camera-->>Agent: Send TLS ServerHello and camera certificate
@@ -505,7 +505,8 @@ openssl s_client \
 On Unix, Go uses `SSL_CERT_FILE` instead of its default aggregate CA file, but it
 still scans default certificate directories such as `/etc/ssl/certs`. Setting
 `SSL_CERT_FILE` alone therefore does not remove CA certificates installed with
-`update-ca-certificates`.
+`update-ca-certificates`. `AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE` is appended
+after this system pool is loaded; it does not replace the system roots.
 
 Blank values do not select empty trust sources. Both `SSL_CERT_FILE=` and
 `SSL_CERT_DIR=` are treated as unset, so Go falls back to its default aggregate
@@ -517,6 +518,7 @@ directory path that contains no certificates:
 mkdir -p /tmp/empty-ca-dir
 SSL_CERT_FILE=/dev/null \
 SSL_CERT_DIR=/tmp/empty-ca-dir \
+AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE= \
 AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=false \
 GOWORK=off \
 go run -tags moq . -action run -port 8080
@@ -553,8 +555,9 @@ openssl req \
   -keyout /tmp/unrelated-test-root.key \
   -out /tmp/unrelated-test-root.crt
 
-SSL_CERT_FILE=/tmp/unrelated-test-root.crt \
+SSL_CERT_FILE=/dev/null \
 SSL_CERT_DIR=/tmp/empty-ca-dir \
+AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE=/tmp/unrelated-test-root.crt \
 AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=false \
 GOWORK=off \
 go run -tags moq . -action run -port 8080
