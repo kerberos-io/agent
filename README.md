@@ -200,7 +200,7 @@ AGENT_CAPTURE_IPCAMERA_SUB_RTSP='rtsps://username:password@camera.example:9554/?
 
 Certificate verification is enabled by default. The URL hostname or IP address must match the camera certificate SAN. On this Bosch firmware, RTSPS presents the certificate assigned to **HTTPS**; there is no separate SRTSP certificate usage. Leave **CBS client** assigned to the Bosch device certificate.
 
-For a private CA, mount a PEM trust bundle containing every CA certificate needed to build the camera certificate chain and set `SSL_CERT_FILE` to that file. This Bosch firmware presents only its leaf certificate, so include both the issuing intermediate and root certificates in the bundle. As a temporary fallback, `AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=true` disables certificate verification for camera streams only.
+For a private CA, mount a PEM trust bundle containing every CA certificate needed to build the camera certificate chain and set `AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE` to its path inside the Agent. The bundle is appended to the system roots for camera RTSPS connections only. This Bosch firmware presents only its leaf certificate, so include both the issuing intermediate and root certificates in the bundle. As a temporary fallback, `AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE=true` disables certificate verification for camera streams only.
 
 See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI, private-CA, deployment, validation, and troubleshooting procedure.
 
@@ -225,6 +225,7 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_REGION_POLYGON`                      | A single polygon set for motion detection: "x1,y1;x2,y2;x3,y3;...                               | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_RTSP`               | Full-HD RTSP or RTSPS endpoint for the target camera.                                           | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_SUB_RTSP`           | RTSP or RTSPS sub-stream endpoint used for livestreaming (WebRTC).                              | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE`      | PEM CA bundle appended to the system roots for RTSPS camera certificate verification.           | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE`     | Disable RTSPS camera certificate verification; use only when a trusted CA cannot be installed.  | "false"                        |
 | `AGENT_CAPTURE_IPCAMERA_BASE_WIDTH`         | Force a specific width resolution for live view processing.                                     | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_BASE_HEIGHT`        | Force a specific height resolution for live view processing.                                    | ""                             |
