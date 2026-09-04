@@ -226,6 +226,31 @@ func CreateWebRTC(name string, stunServers []string, turnServers []string, turnS
 	}
 }
 
+func nonEmptyICEURLs(urls []string) []string {
+	nonEmpty := make([]string, 0, len(urls))
+	for _, uri := range urls {
+		if uri = strings.TrimSpace(uri); uri != "" {
+			nonEmpty = append(nonEmpty, uri)
+		}
+	}
+	return nonEmpty
+}
+
+func buildICEServers(w WebRTC) []pionWebRTC.ICEServer {
+	iceServers := make([]pionWebRTC.ICEServer, 0, 2)
+	if stunURLs := nonEmptyICEURLs(w.StunServers); len(stunURLs) > 0 {
+		iceServers = append(iceServers, pionWebRTC.ICEServer{URLs: stunURLs})
+	}
+	if turnURLs := nonEmptyICEURLs(w.TurnServers); len(turnURLs) > 0 {
+		iceServers = append(iceServers, pionWebRTC.ICEServer{
+			URLs:       turnURLs,
+			Username:   w.TurnServersUsername,
+			Credential: w.TurnServersCredential,
+		})
+	}
+	return iceServers
+}
+
 func (w WebRTC) DecodeSessionDescription(data string) ([]byte, error) {
 	sd, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
@@ -423,21 +448,28 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 		peerConnection, err := api.NewPeerConnection(
 			pionWebRTC.Configuration{
-				ICEServers: []pionWebRTC.ICEServer{
-					{
-						URLs: w.StunServers,
-					},
-					{
-						URLs:       w.TurnServers,
-						Username:   w.TurnServersUsername,
-						Credential: w.TurnServersCredential,
-					},
-				},
+				ICEServers:         buildICEServers(*w),
 				ICETransportPolicy: policy,
 			},
 		)
 
-		if err == nil && peerConnection != nil {
+		if err != nil {
+			globalConnectionManager.CloseCandidateChannel(sessionKey)
+			log.Log.Error("webrtc.main.InitializeWebRTCConnection(): failed to create peer connection: " + err.Error() +
+				" (STUN configured: " + strconv.FormatBool(strings.TrimSpace(config.STUNURI) != "") +
+				", TURN configured: " + strconv.FormatBool(strings.TrimSpace(config.TURNURI) != "") +
+				", TURN username configured: " + strconv.FormatBool(config.TURNUsername != "") +
+				", TURN credential configured: " + strconv.FormatBool(config.TURNPassword != "") +
+				", ForceTurn: " + config.ForceTurn + ")")
+			return
+		}
+		if peerConnection == nil {
+			globalConnectionManager.CloseCandidateChannel(sessionKey)
+			log.Log.Error("webrtc.main.InitializeWebRTCConnection(): failed to create peer connection: pion returned a nil connection")
+			return
+		}
+
+		{
 
 			// Create context for this connection
 			ctx, cancel := context.WithCancel(context.Background())

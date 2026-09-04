@@ -72,6 +72,23 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 	if config.Offline == "true" {
 		log.Log.Info("routers.mqtt.main.ConfigureMQTT(): not starting as running in Offline mode.")
 	} else {
+		hubKey := ""
+		if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
+			hubKey = config.S3.Publickey
+		} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
+			hubKey = config.KStorage.CloudKey
+		}
+		if config.HubKey != "" {
+			hubKey = config.HubKey
+		}
+		if hubKey == "" {
+			log.Log.Warning("routers.mqtt.main.ConfigureMQTT(): not starting without a Hub key")
+			return nil
+		}
+		if config.Key == "" {
+			log.Log.Warning("routers.mqtt.main.ConfigureMQTT(): not starting without an Agent key")
+			return nil
+		}
 
 		opts := mqtt.NewClientOptions()
 
@@ -121,42 +138,27 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 			log.Log.Info("routers.mqtt.main.ConfigureMQTT(): MQTT session is online")
 		})
 
-		hubKey := ""
-		// This is the old way ;)
-		if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
-			hubKey = config.S3.Publickey
-		} else if config.Cloud == "kstorage" && config.KStorage != nil && config.KStorage.CloudKey != "" {
-			hubKey = config.KStorage.CloudKey
+		rand.Seed(time.Now().UnixNano())
+		random := rand.Intn(100)
+		mqttClientID := config.Key + strconv.Itoa(random) // this random int is to avoid conflicts.
+
+		// This is a worked-around.
+		// current S3 (Kerberos Hub SAAS) is using a secured MQTT, where the client id,
+		// should match the kerberos hub key.
+		if config.Cloud == "s3" {
+			mqttClientID = config.Key
 		}
-		// This is the new way ;)
-		if config.HubKey != "" {
-			hubKey = config.HubKey
-		}
 
-		if hubKey != "" {
+		opts.SetClientID(mqttClientID)
+		log.Log.Info("routers.mqtt.main.ConfigureMQTT(): Set ClientID " + mqttClientID)
+		rand.Seed(time.Now().UnixNano())
 
-			rand.Seed(time.Now().UnixNano())
-			random := rand.Intn(100)
-			mqttClientID := config.Key + strconv.Itoa(random) // this random int is to avoid conflicts.
+		opts.OnConnect = func(c mqtt.Client) {
+			// We managed to connect to the MQTT broker, hurray!
+			log.Log.Info("routers.mqtt.main.ConfigureMQTT(): " + mqttClientID + " connected to " + mqttURL)
 
-			// This is a worked-around.
-			// current S3 (Kerberos Hub SAAS) is using a secured MQTT, where the client id,
-			// should match the kerberos hub key.
-			if config.Cloud == "s3" {
-				mqttClientID = config.Key
-			}
-
-			opts.SetClientID(mqttClientID)
-			log.Log.Info("routers.mqtt.main.ConfigureMQTT(): Set ClientID " + mqttClientID)
-			rand.Seed(time.Now().UnixNano())
-
-			opts.OnConnect = func(c mqtt.Client) {
-				// We managed to connect to the MQTT broker, hurray!
-				log.Log.Info("routers.mqtt.main.ConfigureMQTT(): " + mqttClientID + " connected to " + mqttURL)
-
-				// Create a susbcription for listen and reply
-				MQTTListenerHandler(c, hubKey, configDirectory, configuration, communication)
-			}
+			// Create a susbcription for listen and reply
+			MQTTListenerHandler(c, hubKey, configDirectory, configuration, communication)
 		}
 		mqc := mqtt.NewClient(opts)
 		if token := mqc.Connect(); token.WaitTimeout(30 * time.Second) {
