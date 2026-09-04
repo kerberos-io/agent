@@ -7,6 +7,22 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
+func TestConfigureMQTTRequiresHubKey(t *testing.T) {
+	configuration := &models.Configuration{Config: models.Config{Key: "agent-key"}}
+
+	if client := ConfigureMQTT("", configuration, &models.Communication{}); client != nil {
+		t.Fatal("ConfigureMQTT() returned a client without a Hub key")
+	}
+}
+
+func TestConfigureMQTTRequiresAgentKey(t *testing.T) {
+	configuration := &models.Configuration{Config: models.Config{HubKey: "hub-key"}}
+
+	if client := ConfigureMQTT("", configuration, &models.Communication{}); client != nil {
+		t.Fatal("ConfigureMQTT() returned a client without an Agent key")
+	}
+}
+
 func TestEnqueueLatestAudioReplacesOldestFrameWhenFull(t *testing.T) {
 	audioChannel := make(chan models.AudioDataPartial, 2)
 	audioChannel <- models.AudioDataPartial{Timestamp: 1}

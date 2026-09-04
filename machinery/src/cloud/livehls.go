@@ -188,6 +188,9 @@ func HandleLiveStreamHLS(configuration *models.Configuration, communication *mod
 					publishHLSReady(configuration, mqttClient, hubKey, deviceId, sessionID)
 					lastReadyAnnounce = time.Now().Unix()
 				})
+				session.SetOnFailure(func(sessionID, reason string) {
+					publishHLSFailure(configuration, mqttClient, hubKey, deviceId, sessionID, reason)
+				})
 				log.Log.Info("cloud.HandleLiveStreamHLS(): prewarming live HLS session " + session.SessionID())
 			}
 
@@ -247,6 +250,9 @@ func HandleLiveStreamHLS(configuration *models.Configuration, communication *mod
 				publishHLSReady(configuration, mqttClient, hubKey, deviceId, sessionID)
 				lastReadyAnnounce = time.Now().Unix()
 			})
+			session.SetOnFailure(func(sessionID, reason string) {
+				publishHLSFailure(configuration, mqttClient, hubKey, deviceId, sessionID, reason)
+			})
 			log.Log.Info("cloud.HandleLiveStreamHLS(): started live HLS session " + session.SessionID())
 		}
 
@@ -281,6 +287,28 @@ func publishHLSReady(configuration *models.Configuration, mqttClient mqtt.Client
 		log.Log.Info("cloud.HandleLiveStreamHLS(): announced live HLS session " + sessionID)
 	} else {
 		log.Log.Error("cloud.HandleLiveStreamHLS(): failed to package receive-hls-ready message: " + err.Error())
+	}
+}
+
+func publishHLSFailure(configuration *models.Configuration, mqttClient mqtt.Client, hubKey, deviceId, sessionID, reason string) {
+	valueMap := map[string]interface{}{
+		"session": sessionID,
+		"device":  deviceId,
+		"reason":  reason,
+	}
+	message := models.Message{
+		Payload: models.Payload{
+			Action:   "receive-hls-error",
+			DeviceId: deviceId,
+			Value:    valueMap,
+		},
+	}
+	payload, err := models.PackageMQTTMessage(configuration, message)
+	if err == nil {
+		mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
+		log.Log.Warning("cloud.HandleLiveStreamHLS(): announced live HLS startup failure " + reason + " for " + sessionID)
+	} else {
+		log.Log.Error("cloud.HandleLiveStreamHLS(): failed to package receive-hls-error message: " + err.Error())
 	}
 }
 

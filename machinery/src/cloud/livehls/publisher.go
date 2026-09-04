@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -67,6 +68,7 @@ const (
 	// cannot be delivered within roughly its own duration is stale, so the upload
 	// is abandoned (dropped) rather than allowed to back up the pipeline.
 	defaultPublishTimeout = 4 * time.Second
+	maxErrorResponseBytes = 4 << 10
 )
 
 // PublisherConfig carries the hub endpoint and credentials needed to ship live
@@ -214,6 +216,11 @@ func (p *Publisher) post(ctx context.Context, params postParams) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorResponseBytes))
+		detail := strings.Join(strings.Fields(string(body)), " ")
+		if detail != "" {
+			return fmt.Errorf("livehls: upload %s rejected: %s: %s", params.name, resp.Status, detail)
+		}
 		return fmt.Errorf("livehls: upload %s rejected: %s", params.name, resp.Status)
 	}
 	log.Log.Debug("livehls.Publisher.post(): shipped " + params.name + " for session " + params.sessionID)

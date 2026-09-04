@@ -46,9 +46,11 @@ type Session struct {
 	// lastInitAt is when the init segment was last (re)uploaded. The init is
 	// re-sent periodically so its short TTL in the hub live window never lapses
 	// mid-session; see refreshInitIfStale.
-	lastInitAt time.Time
-	readyFired bool
-	onReady    func(sessionID string)
+	lastInitAt   time.Time
+	readyFired   bool
+	onReady      func(sessionID string)
+	failureFired bool
+	onFailure    func(sessionID, reason string)
 
 	// uploadsActive gates whether the init and completed segments are shipped to
 	// hub-api. It is true for the default on-demand path. The prewarm path starts
@@ -150,6 +152,7 @@ func NewSession(publisher *Publisher, opts SessionOptions) *Session {
 		defer cancel()
 		if err := s.publisher.PublishSegment(ctx, s.id, segment); err != nil {
 			log.Log.Warning("livehls.Session: " + err.Error())
+			s.fireFailureOnce("segment-upload-failed")
 			return nil
 		}
 		s.fireReadyOnce()
@@ -181,6 +184,7 @@ func NewSession(publisher *Publisher, opts SessionOptions) *Session {
 			defer cancel()
 			if err := s.publisher.PublishPart(ctx, s.id, part); err != nil {
 				log.Log.Warning("livehls.Session: " + err.Error())
+				s.fireFailureOnce("part-upload-failed")
 				return nil
 			}
 			s.fireReadyOnce()
@@ -213,6 +217,15 @@ func (s *Session) IsReady() bool {
 func (s *Session) SetOnReady(fn func(sessionID string)) {
 	s.mu.Lock()
 	s.onReady = fn
+	s.mu.Unlock()
+}
+
+// SetOnFailure registers a one-shot callback for startup upload failures. The
+// reason is a fixed code rather than an HTTP response body, so credentials or
+// server details cannot leak through MQTT diagnostics.
+func (s *Session) SetOnFailure(fn func(sessionID, reason string)) {
+	s.mu.Lock()
+	s.onFailure = fn
 	s.mu.Unlock()
 }
 
@@ -269,6 +282,7 @@ func (s *Session) SetUploadsActive(active bool) bool {
 		ctx, cancel := s.newContext()
 		if err := s.publisher.PublishSegment(ctx, s.id, buffered[i]); err != nil {
 			log.Log.Warning("livehls.Session: prewarm flush: " + err.Error())
+			s.fireFailureOnce("segment-upload-failed")
 			cancel()
 			continue
 		}
@@ -285,6 +299,7 @@ func (s *Session) SetUploadsActive(active bool) bool {
 		ctx, cancel := s.newContext()
 		if err := s.publisher.PublishPart(ctx, s.id, bufferedParts[i]); err != nil {
 			log.Log.Warning("livehls.Session: prewarm flush (part): " + err.Error())
+			s.fireFailureOnce("part-upload-failed")
 			cancel()
 			continue
 		}
@@ -382,6 +397,7 @@ func (s *Session) publishInitIfNeeded() bool {
 	defer cancel()
 	if err := s.publisher.PublishInit(ctx, s.id, initBytes); err != nil {
 		log.Log.Warning("livehls.Session: init upload failed, will retry: " + err.Error())
+		s.fireFailureOnce("init-upload-failed")
 		return false
 	}
 
@@ -443,6 +459,18 @@ func (s *Session) fireReadyOnce() {
 	fn := s.onReady
 	s.mu.Unlock()
 	fn(s.id)
+}
+
+func (s *Session) fireFailureOnce(reason string) {
+	s.mu.Lock()
+	if s.failureFired || s.readyFired || s.onFailure == nil {
+		s.mu.Unlock()
+		return
+	}
+	s.failureFired = true
+	fn := s.onFailure
+	s.mu.Unlock()
+	fn(s.id, reason)
 }
 
 // newSessionID returns a short, unique, URL-safe session identifier of the form

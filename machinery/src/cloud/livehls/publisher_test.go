@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -144,12 +145,19 @@ func TestPublisherPublishSegmentSendsSequenceAndDuration(t *testing.T) {
 }
 
 func TestPublisherReturnsErrorOnNon2xx(t *testing.T) {
-	srv, _, _ := newCapturingServer(t, http.StatusInternalServerError)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":true,"data":"No user found with this public and private key."}`))
+	}))
+	t.Cleanup(srv.Close)
 	p := testPublisher(srv.URL)
 
 	err := p.PublishSegment(context.Background(), "s", video.LiveSegment{SequenceNumber: 1, Data: []byte("x")})
 	if err == nil {
-		t.Fatal("expected an error on 500 response")
+		t.Fatal("expected an error on 400 response")
+	}
+	if !strings.Contains(err.Error(), "400 Bad Request") || !strings.Contains(err.Error(), "No user found with this public and private key") {
+		t.Fatalf("error = %q, want status and bounded Hub response", err)
 	}
 }
 
@@ -281,7 +289,13 @@ func TestSessionRetriesInitWhenFirstAttemptFails(t *testing.T) {
 	})
 
 	var ready int
+	var failures int
+	var failureReason string
 	sess.SetOnReady(func(string) { ready++ })
+	sess.SetOnFailure(func(_ string, reason string) {
+		failures++
+		failureReason = reason
+	})
 
 	for i := 0; i < 60; i++ {
 		isKey := i%25 == 0
@@ -303,6 +317,9 @@ func TestSessionRetriesInitWhenFirstAttemptFails(t *testing.T) {
 	}
 	if ready != 1 {
 		t.Errorf("OnReady fired %d times, want 1", ready)
+	}
+	if failures != 1 || failureReason != "init-upload-failed" {
+		t.Errorf("OnFailure = %d/%q, want 1/init-upload-failed", failures, failureReason)
 	}
 }
 
