@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -27,6 +28,33 @@ import (
 )
 
 var tracer = otel.Tracer("github.com/kerberos-io/agent/machinery/src/components")
+
+type runWorkers struct {
+	waitGroup sync.WaitGroup
+}
+
+func (w *runWorkers) Start(worker func()) {
+	w.waitGroup.Add(1)
+	go func() {
+		defer w.waitGroup.Done()
+		worker()
+	}()
+}
+
+func (w *runWorkers) Wait(timeout time.Duration) bool {
+	done := make(chan struct{})
+	go func() {
+		w.waitGroup.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return true
+	case <-time.After(timeout):
+		return false
+	}
+}
 
 func Bootstrap(ctx context.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
 
@@ -52,11 +80,11 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 	// This is used when the last packet was received (timestamp),
 	// this metric is used to determine if the camera is still online/connected.
 	var lastPacketTimer atomic.Value
-	packageCounter.Store(int64(0))
+	lastPacketTimer.Store(int64(0))
 	communication.LastPacketTimer = &lastPacketTimer
 
 	var lastPacketTimerSub atomic.Value
-	packageCounterSub.Store(int64(0))
+	lastPacketTimerSub.Store(int64(0))
 	communication.LastPacketTimerSub = &lastPacketTimerSub
 
 	// This is used to understand if we have a working Kerberos Hub connection
@@ -139,6 +167,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	config := configuration.Config
 
 	status := "not started"
+	workers := &runWorkers{}
 
 	// Currently only support H264 encoded cameras, this will change.
 	// Establishing the camera connection without backchannel if no substream
@@ -214,7 +243,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		// For the sub stream we will not enable backchannel.
 		subStreamEnabled = true
 		rtspSubClient := captureDevice.SetSubClient(subRtspUrl)
-		captureDevice.RTSPSubClient = rtspSubClient
 
 		err := rtspSubClient.Connect(ctx, ctxRunAgent)
 		if err != nil {
@@ -260,44 +288,52 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// We are creating a queue to store the RTSP frames in, these frames will be
 	// processed by the different consumers: motion detection, recording, etc.
 	queue = packets.NewQueue()
-	communication.Queue = queue
+	communication.Queue.Store(queue)
 
 	// Set the maximum GOP count, this is used to determine the pre-recording time.
 	log.Log.Info("components.Kerberos.RunAgent(): SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
 	queue.SetMaxGopCount(1) // We will adjust this later on, when we have the GOP size.
 	queue.WriteHeader(videoStreams)
-	go rtspClient.Start(ctx, "main", queue, configuration, communication)
+	workers.Start(func() {
+		rtspClient.Start(ctx, "main", queue, configuration, communication)
+	})
 
 	// Main stream is connected and ready to go.
-	communication.MainStreamConnected = true
+	communication.MainStreamConnected.Store(true)
 
 	// Try to create backchannel
-	communication.HasBackChannel = false
+	communication.HasBackChannel.Store(false)
 	rtspBackChannelClient := captureDevice.SetBackChannelClient(rtspUrl)
 	err = rtspBackChannelClient.ConnectBackChannel(ctx, ctxRunAgent)
 	if err == nil {
 		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP backchannel stream: " + rtspUrl)
 	}
 
-	rtspSubClient := captureDevice.RTSPSubClient
+	rtspSubClient := captureDevice.SubClient()
 	if subStreamEnabled && rtspSubClient != nil {
 		subQueue = packets.NewQueue()
-		communication.SubQueue = subQueue
+		communication.SubQueue.Store(subQueue)
 		subQueue.SetMaxGopCount(1) // GOP time frame is set to 1 for motion detection and livestreaming.
 		subQueue.WriteHeader(videoSubStreams)
-		go rtspSubClient.Start(ctx, "sub", subQueue, configuration, communication)
+		workers.Start(func() {
+			rtspSubClient.Start(ctx, "sub", subQueue, configuration, communication)
+		})
 
 		// Sub stream is connected and ready to go.
-		communication.SubStreamConnected = true
+		communication.SubStreamConnected.Store(true)
 	}
 
 	// Handle livestream SD (low resolution over MQTT)
 	if subStreamEnabled {
 		livestreamCursor := subQueue.Latest()
-		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspSubClient)
+		workers.Start(func() {
+			cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspSubClient)
+		})
 	} else {
 		livestreamCursor := queue.Latest()
-		go cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspClient)
+		workers.Start(func() {
+			cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspClient)
+		})
 	}
 
 	// Handle livestream HLS (adaptive segments over HTTP via hub-api -> vault).
@@ -306,60 +342,85 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// quality the viewer requests; "auto" prefers the sub stream when available.
 	// Like SD it is viewer-keepalive gated and produces no traffic while nobody is
 	// watching.
-	go cloud.HandleLiveStreamHLS(configuration, communication, mqttClient, subStreamEnabled)
+	workers.Start(func() {
+		cloud.HandleLiveStreamHLS(configuration, communication, mqttClient, subStreamEnabled)
+	})
 
 	// MoQ is available only in the dedicated CGO/glibc build. The standard
 	// static Alpine build resolves this hook to a no-op.
-	cloud.StartLiveStreamMoQ(configuration, communication, subStreamEnabled)
+	workers.Start(func() {
+		cloud.StartLiveStreamMoQ(configuration, communication, subStreamEnabled)
+	})
 
 	// Handle livestream HD (high resolution over WEBRTC). Both the main and sub
 	// stream are exposed as separate broadcasters so a viewer can request the
 	// high (main) or low (sub) resolution per peer connection; "auto" prefers the
 	// sub stream when available.
-	communication.HandleLiveHDHandshake = make(chan models.LiveHDHandshake, 100)
-	go cloud.HandleLiveStreamHD(configuration, communication, mqttClient, rtspClient, rtspSubClient, subStreamEnabled)
+	liveHDHandshakes := make(chan models.LiveHDHandshake, 100)
+	motionEvents := make(chan models.MotionDataPartial, 10)
+	onvifActions := make(chan models.OnvifAction, 10)
+	communication.SetRunChannels(liveHDHandshakes, motionEvents, onvifActions)
+	workers.Start(func() {
+		cloud.HandleLiveStreamHD(configuration, communication, mqttClient, rtspClient, rtspSubClient, subStreamEnabled, liveHDHandshakes)
+	})
 
 	// Handle recording, will write an mp4 to disk.
-	go capture.HandleRecordStream(queue, configDirectory, configuration, communication, rtspClient, mqttClient)
+	workers.Start(func() {
+		capture.HandleRecordStream(queue, configDirectory, configuration, communication, rtspClient, mqttClient, motionEvents)
+	})
 
 	// Handle processing of motion
-	communication.HandleMotion = make(chan models.MotionDataPartial, 10)
 	if subStreamEnabled {
 		motionCursor := subQueue.Latest()
-		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspSubClient)
+		workers.Start(func() {
+			computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspSubClient)
+		})
 	} else {
 		motionCursor := queue.Latest()
-		go computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspClient)
+		workers.Start(func() {
+			computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspClient)
+		})
 	}
 
 	// Handle realtime processing if enabled.
 	if subStreamEnabled {
 		realtimeProcessingCursor := subQueue.Latest()
-		go cloud.HandleRealtimeProcessing(realtimeProcessingCursor, configuration, communication, mqttClient, rtspClient)
+		workers.Start(func() {
+			cloud.HandleRealtimeProcessing(realtimeProcessingCursor, configuration, communication, mqttClient, rtspClient)
+		})
 	} else {
 		realtimeProcessingCursor := queue.Latest()
-		go cloud.HandleRealtimeProcessing(realtimeProcessingCursor, configuration, communication, mqttClient, rtspClient)
+		workers.Start(func() {
+			cloud.HandleRealtimeProcessing(realtimeProcessingCursor, configuration, communication, mqttClient, rtspClient)
+		})
 	}
 
 	// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)
-	go cloud.HandleUpload(configDirectory, configuration, communication)
+	workers.Start(func() {
+		cloud.HandleUpload(configDirectory, configuration, communication)
+	})
 
 	// Handle ONVIF actions
-	communication.HandleONVIF = make(chan models.OnvifAction, 10)
-	go onvif.HandleONVIFActions(configuration, communication)
+	workers.Start(func() {
+		onvif.HandleONVIFActions(configuration, communication, onvifActions)
+	})
 
 	// Handle ONVIF event stream — opt-in via Capture.ONVIFMotion="true".
 	// Stops when the agent's shared context is cancelled. The function
 	// is a no-op if ONVIFMotion is not enabled.
-	go onvif.HandleONVIFEventStream(*communication.Context, configuration, communication)
+	workers.Start(func() {
+		onvif.HandleONVIFEventStream(*communication.Context, configuration, communication)
+	})
 
 	if rtspBackChannelClient.HasBackChannel {
-		communication.HasBackChannel = true
-		go WriteAudioToBackchannel(communication, rtspBackChannelClient)
+		communication.HasBackChannel.Store(true)
+		workers.Start(func() {
+			WriteAudioToBackchannel(communication, rtspBackChannelClient)
+		})
 	}
 
 	// If we reach this point, we have a working RTSP connection.
-	communication.CameraConnected = true
+	communication.CameraConnected.Store(true)
 
 	// Otel end span
 	span.End()
@@ -371,9 +432,9 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	status = <-communication.HandleBootstrap
 
 	// If we reach this point, we are stopping the stream.
-	communication.CameraConnected = false
-	communication.MainStreamConnected = false
-	communication.SubStreamConnected = false
+	communication.CameraConnected.Store(false)
+	communication.MainStreamConnected.Store(false)
+	communication.SubStreamConnected.Store(false)
 
 	// Cancel the main context, this will stop all the other goroutines.
 	(*communication.CancelContext)()
@@ -405,29 +466,21 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	//	communication.HandleSubStream <- "stop"
 	//}
 
-	time.Sleep(time.Second * 3)
-
 	err = rtspClient.Close(ctxRunAgent)
 	if err != nil {
 		log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP stream: " + err.Error())
-		time.Sleep(time.Second * 3)
-		return status
 	}
 
 	queue.Close()
 	queue = nil
-	communication.Queue = nil
 
 	if subStreamEnabled {
 		err = rtspSubClient.Close(ctxRunAgent)
 		if err != nil {
 			log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP sub stream: " + err.Error())
-			time.Sleep(time.Second * 3)
-			return status
 		}
 		subQueue.Close()
 		subQueue = nil
-		communication.SubQueue = nil
 	}
 
 	err = rtspBackChannelClient.Close(ctxRunAgent)
@@ -435,20 +488,16 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP backchannel stream: " + err.Error())
 	}
 
-	time.Sleep(time.Second * 3)
+	communication.CloseRunChannels()
 
-	close(communication.HandleLiveHDHandshake)
-	communication.HandleLiveHDHandshake = nil
-
-	close(communication.HandleMotion)
-	communication.HandleMotion = nil
-
-	close(communication.HandleONVIF)
-	communication.HandleONVIF = nil
-
-	// Waiting for some seconds to make sure everything is properly closed.
-	log.Log.Info("components.Kerberos.RunAgent(): waiting 3 seconds to make sure everything is properly closed.")
-	time.Sleep(time.Second * 3)
+	if workers.Wait(runShutdownTimeout) {
+		log.Log.Info("components.Kerberos.RunAgent(): all run workers stopped")
+	} else {
+		communication.RecordRunWorkerShutdownTimeout()
+		log.Log.Error("components.Kerberos.RunAgent(): timed out waiting for run workers to stop")
+	}
+	communication.Queue.Store(nil)
+	communication.SubQueue.Store(nil)
 
 	return status
 }
@@ -485,87 +534,159 @@ func packetAgeString(timer *atomic.Value) string {
 }
 
 // ControlAgent will check if the camera is still connected, if not it will restart the agent.
-// In the other thread we are keeping track of the number of packets received, and particular the keyframe packets.
+// In the other thread we are keeping track of the number of complete video access units received.
 // Once we are not receiving any packets anymore, we will restart the agent.
 func ControlAgent(communication *models.Communication) {
 	log.Log.Debug("components.Kerberos.ControlAgent(): started")
 	packageCounter := communication.PackageCounter
 	packageSubCounter := communication.PackageCounterSub
 	go func() {
-		// A channel to check the camera activity
-		var previousPacket int64 = 0
-		var previousPacketSub int64 = 0
-		var occurence = 0
-		var occurenceSub = 0
+		watchdog := newStreamRestartWatchdog()
 		for {
-
-			// If camera is connected, we'll check if we are still receiving packets.
-			if communication.CameraConnected {
-
-				// First we'll check the main stream.
-				packetsR := packageCounter.Load().(int64)
-				if packetsR == previousPacket {
-					// If we are already reconfiguring,
-					// we dont need to check if the stream is blocking.
-					if !communication.IsConfiguring.IsSet() {
-						occurence = occurence + 1
-					}
-				} else {
-					occurence = 0
-				}
-
-				log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from mainstream: " + strconv.FormatInt(packetsR, 10))
-
-				// After 15 seconds without activity this is thrown..
-				if occurence == 3 {
-					log.Log.Info(fmt.Sprintf("components.Kerberos.ControlAgent(): Restarting machinery because of blocking mainstream. (stalledKeyframeCounter=%d, lastPacket=%s ago, isConfiguring=%t)",
-						packetsR, packetAgeString(communication.LastPacketTimer), communication.IsConfiguring.IsSet()))
-					select {
-					case communication.HandleBootstrap <- "restart":
-						log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream.")
-					case <-time.After(1 * time.Second):
-						log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream timed out")
-					}
-					occurence = 0
-				}
-
-				// Now we'll check the sub stream.
-				packetsSubR := packageSubCounter.Load().(int64)
-				if communication.SubStreamConnected {
-					if packetsSubR == previousPacketSub {
-						// If we are already reconfiguring,
-						// we dont need to check if the stream is blocking.
-						if !communication.IsConfiguring.IsSet() {
-							occurenceSub = occurenceSub + 1
-						}
-					} else {
-						occurenceSub = 0
-					}
-
-					log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from substream: " + strconv.FormatInt(packetsSubR, 10))
-
-					// After 15 seconds without activity this is thrown..
-					if occurenceSub == 3 {
-						log.Log.Info(fmt.Sprintf("components.Kerberos.ControlAgent(): substream stalled (stalledKeyframeCounter=%d, lastPacket=%s ago, isConfiguring=%t)",
-							packetsSubR, packetAgeString(communication.LastPacketTimerSub), communication.IsConfiguring.IsSet()))
-						select {
-						case communication.HandleBootstrap <- "restart":
-							log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream.")
-						case <-time.After(1 * time.Second):
-							log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery because of blocking substream timed out")
-						}
-						occurenceSub = 0
-					}
-				}
-
-				previousPacket = packageCounter.Load().(int64)
-				previousPacketSub = packageSubCounter.Load().(int64)
+			time.Sleep(streamWatchdogInterval)
+			if !communication.CameraConnected.Load() {
+				watchdog.ResetObservations()
+				continue
 			}
 
-			time.Sleep(5 * time.Second)
+			packetsR := packageCounter.Load().(int64)
+			packetsSubR := packageSubCounter.Load().(int64)
+			log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from mainstream: " + strconv.FormatInt(packetsR, 10))
+			subStreamConnected := communication.SubStreamConnected.Load()
+			if subStreamConnected {
+				log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from substream: " + strconv.FormatInt(packetsSubR, 10))
+			}
+
+			reason, restart := watchdog.Observe(time.Now(), packetsR, packetsSubR, subStreamConnected, communication.IsConfiguring.IsSet())
+			if !restart {
+				communication.SetWatchdogCooldown(watchdog.CooldownRemaining(time.Now()))
+				continue
+			}
+
+			log.Log.Info(fmt.Sprintf(
+				"components.Kerberos.ControlAgent(): Restarting machinery because of blocking %s. (mainPackets=%d, subPackets=%d, mainLastPacket=%s ago, subLastPacket=%s ago, nextBackoff=%s)",
+				reason, packetsR, packetsSubR, packetAgeString(communication.LastPacketTimer), packetAgeString(communication.LastPacketTimerSub), watchdog.Backoff(),
+			))
+			select {
+			case communication.HandleBootstrap <- "restart":
+				cooldown := watchdog.MarkRestart(time.Now())
+				communication.RecordWatchdogRestart(cooldown)
+			case <-time.After(time.Second):
+				log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery timed out")
+			}
 		}
 	}()
 	log.Log.Debug("components.Kerberos.ControlAgent(): finished")
+}
+
+const (
+	runShutdownTimeout         = 10 * time.Second
+	streamWatchdogInterval     = 5 * time.Second
+	streamWatchdogStallChecks  = 3
+	streamWatchdogBaseBackoff  = 15 * time.Second
+	streamWatchdogMaxBackoff   = 2 * time.Minute
+	streamWatchdogHealthyReset = time.Minute
+)
+
+type streamRestartWatchdog struct {
+	previousMain    int64
+	previousSub     int64
+	mainStalls      int
+	subStalls       int
+	backoff         time.Duration
+	nextRestart     time.Time
+	healthySince    time.Time
+	hasObservations bool
+}
+
+func newStreamRestartWatchdog() *streamRestartWatchdog {
+	return &streamRestartWatchdog{backoff: streamWatchdogBaseBackoff}
+}
+
+func (w *streamRestartWatchdog) ResetObservations() {
+	w.mainStalls = 0
+	w.subStalls = 0
+	w.healthySince = time.Time{}
+	w.hasObservations = false
+}
+
+func (w *streamRestartWatchdog) Observe(now time.Time, mainPackets, subPackets int64, subConnected, configuring bool) (string, bool) {
+	if !w.hasObservations {
+		w.previousMain = mainPackets
+		w.previousSub = subPackets
+		w.hasObservations = true
+		return "", false
+	}
+
+	mainHealthy := mainPackets != w.previousMain
+	subHealthy := !subConnected || subPackets != w.previousSub
+	w.previousMain = mainPackets
+	w.previousSub = subPackets
+
+	if mainHealthy && subHealthy {
+		w.mainStalls = 0
+		w.subStalls = 0
+		if w.healthySince.IsZero() {
+			w.healthySince = now
+		} else if now.Sub(w.healthySince) >= streamWatchdogHealthyReset {
+			w.backoff = streamWatchdogBaseBackoff
+			w.nextRestart = time.Time{}
+		}
+	} else {
+		w.healthySince = time.Time{}
+	}
+
+	if configuring || now.Before(w.nextRestart) {
+		return "", false
+	}
+	if mainHealthy {
+		w.mainStalls = 0
+	} else {
+		w.mainStalls++
+	}
+	if subHealthy {
+		w.subStalls = 0
+	} else {
+		w.subStalls++
+	}
+
+	mainStalled := w.mainStalls >= streamWatchdogStallChecks
+	subStalled := w.subStalls >= streamWatchdogStallChecks
+	if !mainStalled && !subStalled {
+		return "", false
+	}
+	if mainStalled && subStalled {
+		return "main and sub streams", true
+	}
+	if mainStalled {
+		return "main stream", true
+	}
+	return "sub stream", true
+}
+
+func (w *streamRestartWatchdog) MarkRestart(now time.Time) time.Duration {
+	cooldown := w.backoff
+	w.nextRestart = now.Add(w.backoff)
+	w.mainStalls = 0
+	w.subStalls = 0
+	if w.backoff < streamWatchdogMaxBackoff {
+		w.backoff *= 2
+		if w.backoff > streamWatchdogMaxBackoff {
+			w.backoff = streamWatchdogMaxBackoff
+		}
+	}
+	return cooldown
+}
+
+func (w *streamRestartWatchdog) Backoff() time.Duration {
+	return w.backoff
+}
+
+func (w *streamRestartWatchdog) CooldownRemaining(now time.Time) time.Duration {
+	if !now.Before(w.nextRestart) {
+		return 0
+	}
+	return w.nextRestart.Sub(now)
 }
 
 // GetDashboard godoc
@@ -578,7 +699,7 @@ func ControlAgent(communication *models.Communication) {
 func GetDashboard(c *gin.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 
 	// Check if camera is online.
-	cameraIsOnline := communication.CameraConnected
+	cameraIsOnline := communication.CameraConnected.Load()
 
 	// If an agent is properly setup with Kerberos Hub, we will send
 	// a ping to Kerberos Hub every 15seconds. On receiving a positive response
@@ -595,10 +716,7 @@ func GetDashboard(c *gin.Context, configDirectory string, configuration *models.
 	recordingDirectory := configDirectory + "/data/recordings"
 	numberOfRecordings := utils.NumberOfMP4sInDirectory(recordingDirectory)
 	activeWebRTCReaders := webrtc.GetActivePeerConnectionCount()
-	pendingWebRTCHandshakes := 0
-	if communication.HandleLiveHDHandshake != nil {
-		pendingWebRTCHandshakes = len(communication.HandleLiveHDHandshake)
-	}
+	pendingWebRTCHandshakes := communication.PendingLiveHDHandshakes()
 
 	// All days stored in this agent.
 	days := []string{}
@@ -623,6 +741,7 @@ func GetDashboard(c *gin.Context, configDirectory string, configuration *models.
 		"numberOfRecordings": numberOfRecordings,
 		"webrtcReaders":      activeWebRTCReaders,
 		"webrtcPending":      pendingWebRTCHandshakes,
+		"recovery":           communication.RecoveryTelemetry(),
 		"days":               days,
 		"latestEvents":       latestEvents,
 	})
@@ -741,7 +860,10 @@ func MakeRecording(c *gin.Context, communication *models.Communication) {
 		Timestamp:       time.Now().Unix(),
 		NumberOfChanges: 100000000, // hack set the number of changes to a high number to force recording
 	}
-	communication.HandleMotion <- dataToPass //Save data to the channel
+	if !communication.TrySendMotion(dataToPass) {
+		c.JSON(503, gin.H{"recording": false, "error": "camera is restarting or recording queue is full"})
+		return
+	}
 	c.JSON(200, gin.H{
 		"recording": true,
 	})

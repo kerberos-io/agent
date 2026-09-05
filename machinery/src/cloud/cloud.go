@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/dromara/carbon/v2"
 	"github.com/elastic/go-sysinfo"
@@ -527,12 +528,12 @@ loop:
 			macs, _ := json.Marshal(system.MACs)
 			ips, _ := json.Marshal(system.IPs)
 			cameraConnected := "true"
-			if !communication.CameraConnected {
+			if !communication.CameraConnected.Load() {
 				cameraConnected = "false"
 			}
 
 			hasBackChannel := "false"
-			if communication.HasBackChannel {
+			if communication.HasBackChannel.Load() {
 				hasBackChannel = "true"
 			}
 
@@ -1055,7 +1056,7 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 	log.Log.Debug("cloud.HandleLiveStreamSD(): finished")
 }
 
-func HandleLiveStreamHD(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient, rtspSubClient capture.RTSPClient, subStreamEnabled bool) {
+func HandleLiveStreamHD(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient, rtspSubClient capture.RTSPClient, subStreamEnabled bool, handshakes <-chan models.LiveHDHandshake) {
 
 	config := configuration.Config
 
@@ -1065,6 +1066,8 @@ func HandleLiveStreamHD(configuration *models.Configuration, communication *mode
 
 		// Check if we need to enable the live stream
 		if config.Capture.Liveview != "false" {
+			var writers sync.WaitGroup
+			defer writers.Wait()
 
 			// Create per-peer broadcasters instead of shared tracks.
 			// Each viewer gets its own track with independent, non-blocking writes
@@ -1082,17 +1085,47 @@ func HandleLiveStreamHD(configuration *models.Configuration, communication *mode
 				log.Log.Error("cloud.HandleLiveStreamHD(): failed to create both video and audio broadcasters for the main stream")
 				return
 			}
+			defer func() {
+				if mainVideoBroadcaster != nil {
+					mainVideoBroadcaster.Close()
+				}
+				if mainAudioBroadcaster != nil {
+					mainAudioBroadcaster.Close()
+				}
+			}()
 
-			go webrtc.WriteToTrack(communication.Queue.Latest(), configuration, communication, mqttClient, mainVideoBroadcaster, mainAudioBroadcaster, rtspClient)
+			mainQueue := communication.Queue.Load()
+			if mainQueue == nil {
+				log.Log.Error("cloud.HandleLiveStreamHD(): main packet queue is unavailable")
+				return
+			}
+			writers.Add(1)
+			go func() {
+				defer writers.Done()
+				webrtc.WriteToTrack(mainQueue.Latest(), configuration, communication, mqttClient, mainVideoBroadcaster, mainAudioBroadcaster, rtspClient)
+			}()
 
 			// Sub stream broadcasters, only when a distinct sub stream is available.
 			var subVideoBroadcaster *webrtc.TrackBroadcaster
 			var subAudioBroadcaster *webrtc.TrackBroadcaster
-			if subStreamEnabled && rtspSubClient != nil && communication.SubQueue != nil {
+			subQueue := communication.SubQueue.Load()
+			if subStreamEnabled && rtspSubClient != nil && subQueue != nil {
 				subStreams, _ := rtspSubClient.GetStreams()
 				subVideoBroadcaster = webrtc.NewVideoBroadcaster(subStreams)
 				subAudioBroadcaster = webrtc.NewAudioBroadcaster(subStreams)
-				go webrtc.WriteToTrack(communication.SubQueue.Latest(), configuration, communication, mqttClient, subVideoBroadcaster, subAudioBroadcaster, rtspSubClient)
+				defer func() {
+					if subVideoBroadcaster != nil {
+						subVideoBroadcaster.Close()
+					}
+					if subAudioBroadcaster != nil {
+						subAudioBroadcaster.Close()
+					}
+				}()
+				writers.Add(1)
+				go func() {
+					defer writers.Done()
+					webrtc.WriteToTrack(subQueue.Latest(), configuration, communication, mqttClient, subVideoBroadcaster, subAudioBroadcaster, rtspSubClient)
+				}()
 			}
 			subBroadcastersReady := subVideoBroadcaster != nil || subAudioBroadcaster != nil
 
@@ -1100,7 +1133,7 @@ func HandleLiveStreamHD(configuration *models.Configuration, communication *mode
 
 			} else {
 				log.Log.Info("cloud.HandleLiveStreamHD(): Waiting for peer connections.")
-				for handshake := range communication.HandleLiveHDHandshake {
+				for handshake := range handshakes {
 					// Route each viewer to the main or sub broadcasters based on the
 					// quality it requested; "auto" prefers the sub stream when one is
 					// available, matching the historical default.

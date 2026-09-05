@@ -1048,20 +1048,18 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				default:
 				}
 
-				if idrPresent {
-					// Increment packets, so we know the device
-					// is not blocking.
-					if streamType == "main" {
-						r := communication.PackageCounter.Load().(int64)
-						log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
-						communication.PackageCounter.Store((r + 1) % 1000)
-						communication.LastPacketTimer.Store(time.Now().Unix())
-					} else if streamType == "sub" {
-						r := communication.PackageCounterSub.Load().(int64)
-						log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
-						communication.PackageCounterSub.Store((r + 1) % 1000)
-						communication.LastPacketTimerSub.Store(time.Now().Unix())
-					}
+				// Count every complete video access unit. Keyframe-only counters make
+				// healthy cameras with GOPs longer than the watchdog window look stalled.
+				if streamType == "main" {
+					r := communication.PackageCounter.Load().(int64)
+					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					communication.PackageCounter.Store((r + 1) % 1000)
+					communication.LastPacketTimer.Store(time.Now().Unix())
+				} else if streamType == "sub" {
+					r := communication.PackageCounterSub.Load().(int64)
+					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					communication.PackageCounterSub.Store((r + 1) % 1000)
+					communication.LastPacketTimerSub.Store(time.Now().Unix())
 				}
 			}
 
@@ -1213,20 +1211,18 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				default:
 				}
 
-				if isRandomAccess {
-					// Increment packets, so we know the device
-					// is not blocking.
-					if streamType == "main" {
-						r := communication.PackageCounter.Load().(int64)
-						log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
-						communication.PackageCounter.Store((r + 1) % 1000)
-						communication.LastPacketTimer.Store(time.Now().Unix())
-					} else if streamType == "sub" {
-						r := communication.PackageCounterSub.Load().(int64)
-						log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
-						communication.PackageCounterSub.Store((r + 1) % 1000)
-						communication.LastPacketTimerSub.Store(time.Now().Unix())
-					}
+				// Count every complete video access unit; random-access frames remain
+				// responsible only for GOP tracking above.
+				if streamType == "main" {
+					r := communication.PackageCounter.Load().(int64)
+					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					communication.PackageCounter.Store((r + 1) % 1000)
+					communication.LastPacketTimer.Store(time.Now().Unix())
+				} else if streamType == "sub" {
+					r := communication.PackageCounterSub.Load().(int64)
+					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					communication.PackageCounterSub.Store((r + 1) % 1000)
+					communication.LastPacketTimerSub.Store(time.Now().Unix())
 				}
 			}
 

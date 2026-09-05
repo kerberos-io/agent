@@ -140,13 +140,14 @@ func dispatchEvent(ctx context.Context, ev stream.Event, configuration *models.C
 		Timestamp:       time.Now().Unix(),
 		NumberOfChanges: 0, // ONVIF does not quantify motion area.
 	}
-	select {
-	case <-ctx.Done():
-	case communication.HandleMotion <- dataToPass:
+	if ctx.Err() != nil {
+		return
+	}
+	if communication.TrySendMotion(dataToPass) {
 		// Logged on the send, not before it: this line records that a
 		// recording started, so a dropped event must not leave one.
 		log.Log.Debug("onvif.dispatchEvent(): recording trigger " + ev.Kind.String() + " topic=" + topic)
-	default:
+	} else {
 		log.Log.Debug("onvif.dispatchEvent(): HandleMotion full, dropping ONVIF motion event")
 	}
 }
