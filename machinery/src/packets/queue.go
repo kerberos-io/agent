@@ -2,6 +2,7 @@
 package packets
 
 import (
+	"context"
 	"io"
 	"sync"
 )
@@ -201,6 +202,18 @@ func (self *QueueCursor) Streams() (streams []Stream, err error) {
 
 // ReadPacket will not consume packets in Queue, it's just a cursor.
 func (self *QueueCursor) ReadPacket() (pkt Packet, err error) {
+	return self.ReadPacketContext(context.Background())
+}
+
+// ReadPacketContext waits for the next packet or returns when ctx is cancelled.
+func (self *QueueCursor) ReadPacketContext(ctx context.Context) (pkt Packet, err error) {
+	stop := context.AfterFunc(ctx, func() {
+		self.que.lock.Lock()
+		self.que.cond.Broadcast()
+		self.que.lock.Unlock()
+	})
+	defer stop()
+
 	self.que.cond.L.Lock()
 	buf := self.que.buf
 	if !self.gotpos {
@@ -220,6 +233,9 @@ func (self *QueueCursor) ReadPacket() (pkt Packet, err error) {
 		}
 		if self.que.closed {
 			err = io.EOF
+			break
+		}
+		if err = ctx.Err(); err != nil {
 			break
 		}
 		self.que.cond.Wait()

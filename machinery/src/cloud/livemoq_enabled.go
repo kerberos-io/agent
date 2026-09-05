@@ -22,6 +22,8 @@ const (
 	minMoQRetryDelay        = time.Second
 	maxMoQRetryDelay        = 30 * time.Second
 	maxMoQLivePacketAge     = 1500 * time.Millisecond
+	maxMoQWriteDuration     = 5 * time.Second
+	moQWriteWatchInterval   = 250 * time.Millisecond
 	slowMoQWriteThreshold   = 100 * time.Millisecond
 	moQWriteWarningInterval = 10 * time.Second
 	duplicateKeyframeWindow = 500 * time.Millisecond
@@ -151,11 +153,12 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	}
 	defer client.Close()
 
-	sessionCtx, cancelSessionWatch := context.WithCancel(ctx)
-	defer cancelSessionWatch()
+	publisherCtx, cancelPublisher := context.WithCancel(ctx)
+	defer cancelPublisher()
 	sessionClosed := make(chan error, 1)
 	go func() {
-		sessionClosed <- client.Session().Closed(sessionCtx)
+		sessionClosed <- client.Session().Closed(publisherCtx)
+		cancelPublisher()
 	}()
 
 	broadcast, err := client.CreateBroadcast(config.broadcast)
@@ -174,11 +177,19 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	// true so the track becomes discoverable on the relay even before the first
 	// subscriber ever arrives; from the moment a viewer has attached once, the
 	// subscriber watcher takes over and idles the tier again when everybody left.
-	watchCtx, cancelWatch := context.WithCancel(ctx)
-	defer cancelWatch()
 	publishing := &atomic.Bool{}
 	publishing.Store(true)
-	go watchLiveStreamMoQSubscribers(watchCtx, stream, publishing, config)
+	go watchLiveStreamMoQSubscribers(publisherCtx, stream, publishing, config)
+	writeWatchdog := &livemoq.WriteWatchdog{}
+	writeWatchDone := make(chan struct{})
+	go func() {
+		defer close(writeWatchDone)
+		watchLiveStreamMoQWrites(publisherCtx, client, writeWatchdog, config)
+	}()
+	defer func() {
+		cancelPublisher()
+		<-writeWatchDone
+	}()
 
 	cursor := config.queue.Latest()
 	gate := livemoq.FrameGate{}
@@ -193,8 +204,16 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 		default:
 		}
 
-		packet, err := cursor.ReadPacket()
+		packet, err := cursor.ReadPacketContext(publisherCtx)
 		if err != nil {
+			select {
+			case sessionErr := <-sessionClosed:
+				return fmt.Errorf("relay session closed: %w", sessionErr)
+			default:
+			}
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			return fmt.Errorf("read packet: %w", err)
 		}
 		if !publishing.Load() {
@@ -249,7 +268,10 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 			TimestampUs: livemoq.TimestampUs(packet.Time),
 		}
 		writeStartedAt := time.Now()
-		if err := stream.WriteFrame(frame); err != nil {
+		writeWatchdog.Begin(writeStartedAt)
+		err = stream.WriteFrame(frame)
+		writeWatchdog.End()
+		if err != nil {
 			return fmt.Errorf("write H.264 access unit: %w", err)
 		}
 		writeDuration := time.Since(writeStartedAt)
@@ -266,6 +288,32 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 				config.label(), writeDuration.Round(time.Millisecond), packetAge.Round(time.Millisecond), packet.IsKeyFrame,
 			))
 			lastSlowWriteWarning = time.Now()
+		}
+	}
+}
+
+func watchLiveStreamMoQWrites(ctx context.Context, client *moq.Client, watchdog *livemoq.WriteWatchdog, config liveMoQConfig) {
+	ticker := time.NewTicker(moQWriteWatchInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			if _, active := watchdog.Elapsed(time.Now()); active {
+				client.Close()
+			}
+			return
+		case now := <-ticker.C:
+			writeDuration, active := watchdog.Elapsed(now)
+			if !active || writeDuration < maxMoQWriteDuration {
+				continue
+			}
+			log.Log.Warning(fmt.Sprintf(
+				"cloud.watchLiveStreamMoQWrites(): %s WriteFrame blocked for %s; closing the relay client to force a reconnect",
+				config.label(), writeDuration.Round(time.Millisecond),
+			))
+			client.Close()
+			return
 		}
 	}
 }

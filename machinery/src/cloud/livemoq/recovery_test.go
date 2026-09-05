@@ -47,3 +47,22 @@ func TestFrameGateAllowsMissingCaptureTime(t *testing.T) {
 		t.Fatalf("Allow() = (%t, %d), want (true, %d)", allowed, event, FrameGateEventStarted)
 	}
 }
+
+func TestWriteWatchdogTracksActiveWrite(t *testing.T) {
+	now := time.Unix(10, 0)
+	watchdog := WriteWatchdog{}
+
+	if elapsed, active := watchdog.Elapsed(now); active || elapsed != 0 {
+		t.Fatalf("Elapsed() before Begin() = (%s, %t), want (0, false)", elapsed, active)
+	}
+
+	watchdog.Begin(now)
+	if elapsed, active := watchdog.Elapsed(now.Add(5 * time.Second)); !active || elapsed != 5*time.Second {
+		t.Fatalf("Elapsed() during write = (%s, %t), want (5s, true)", elapsed, active)
+	}
+
+	watchdog.End()
+	if elapsed, active := watchdog.Elapsed(now.Add(6 * time.Second)); active || elapsed != 0 {
+		t.Fatalf("Elapsed() after End() = (%s, %t), want (0, false)", elapsed, active)
+	}
+}
