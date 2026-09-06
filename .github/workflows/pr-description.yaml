@@ -9,4 +9,9 @@ jobs:
       pr_number: ${{ github.event.number }}
       pull_request_url: ""
       overwrite_description: true
-    secrets: inherit
+    secrets:
+      TOKEN: ${{ secrets.TOKEN }}
+      AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_VERSION: ${{ secrets.AZURE_OPENAI_VERSION }}
