@@ -11,8 +11,8 @@ import (
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox/files"
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox/users"
 	"github.com/gin-gonic/gin"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	log "github.com/sirupsen/logrus"
 )
 
 // UploadDropbox uploads the file to your Dropbox account using the access token and directory.
@@ -30,13 +30,13 @@ func UploadDropbox(configuration *models.Configuration, fileName string) (bool, 
 
 	if token == "" {
 		err := "UploadDropbox: Dropbox not properly configured"
-		log.Log.Info(err)
+		log.Info(err)
 		return false, true, errors.New(err)
 	}
 
 	// Upload to Dropbox
-	log.Log.Info("UploadDropbox: Uploading to Dropbox")
-	log.Log.Info("UploadDropbox: Upload started for " + fileName)
+	log.Info("UploadDropbox: Uploading to Dropbox")
+	log.Info("UploadDropbox: Upload started for " + fileName)
 	fullname := "data/recordings/" + fileName
 
 	dConfig := dropbox.Config{
@@ -48,7 +48,7 @@ func UploadDropbox(configuration *models.Configuration, fileName string) (bool, 
 	if file != nil {
 		defer func() {
 			if cerr := file.Close(); cerr != nil {
-				log.Log.Error("UploadDropbox: Error closing file: " + cerr.Error())
+				log.Error("UploadDropbox: Error closing file: " + cerr.Error())
 			}
 		}()
 	}
@@ -68,15 +68,15 @@ func UploadDropbox(configuration *models.Configuration, fileName string) (bool, 
 		}, file)
 
 		if err != nil {
-			log.Log.Error("UploadDropbox: Error uploading file: " + err.Error())
+			log.Error("UploadDropbox: Error uploading file: " + err.Error())
 			return false, false, err
 		}
 
-		log.Log.Info("UploadDropbox: File uploaded successfully, " + res.Name)
+		log.Info("UploadDropbox: File uploaded successfully, " + res.Name)
 		return true, true, nil
 	}
 
-	log.Log.Error("UploadDropbox: Error opening file: " + err.Error())
+	log.Error("UploadDropbox: Error opening file: " + err.Error())
 	return false, true, err
 }
 

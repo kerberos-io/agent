@@ -10,6 +10,7 @@ import (
 
 	"github.com/kerberos-io/agent/machinery/src/lifecycle"
 	"github.com/kerberos-io/agent/machinery/src/packets"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -78,7 +79,7 @@ func NewAgentRun(parent context.Context, communication *Communication, stopUploa
 		parent = context.Background()
 	}
 	ctx, cancel := context.WithCancelCause(parent)
-	return &AgentRun{
+	run := &AgentRun{
 		id:               nextAgentRunID.Add(1),
 		ctx:              ctx,
 		cancel:           cancel,
@@ -89,6 +90,13 @@ func NewAgentRun(parent context.Context, communication *Communication, stopUploa
 		motionEvents:     make(chan MotionDataPartial, 10),
 		onvifActions:     make(chan OnvifAction, 10),
 	}
+	log.WithFields(log.Fields{
+		"component":   "agent_run",
+		"event":       "run_created",
+		"run_id":      run.id,
+		"stop_upload": stopUpload,
+	}).Debug("Agent run created")
+	return run
 }
 
 func (r *AgentRun) ID() uint64 {
@@ -100,11 +108,53 @@ func (r *AgentRun) Context() context.Context {
 }
 
 func (r *AgentRun) Go(name string, policy lifecycle.TaskPolicy, task lifecycle.TaskFunc) error {
-	return r.supervisor.Go(name, policy, task)
+	if task == nil {
+		return r.supervisor.Go(name, policy, task)
+	}
+
+	fields := log.Fields{
+		"component":    "agent_run",
+		"event":        "task_lifecycle",
+		"long_running": policy.LongRunning,
+		"required":     policy.Required,
+		"run_id":       r.id,
+		"task":         name,
+	}
+	wrappedTask := func(ctx context.Context) error {
+		startedAt := time.Now()
+		log.WithFields(fields).Debug("Agent task started")
+		err := task(ctx)
+		entry := log.WithFields(fields).
+			WithField("duration_ms", time.Since(startedAt).Milliseconds())
+		if err != nil {
+			entry = entry.WithError(err)
+			if ctx.Err() == nil {
+				entry.Warn("Agent task stopped with an error")
+			} else {
+				entry.Debug("Agent task stopped during shutdown")
+			}
+		} else {
+			entry.Debug("Agent task stopped")
+		}
+		return err
+	}
+
+	if err := r.supervisor.Go(name, policy, wrappedTask); err != nil {
+		log.WithError(err).WithFields(fields).Error("Failed to register Agent task")
+		return err
+	}
+	log.WithFields(fields).Debug("Agent task registered")
+	return nil
 }
 
 func (r *AgentRun) Seal() {
 	r.supervisor.Seal()
+	log.WithFields(log.Fields{
+		"component":  "agent_run",
+		"event":      "run_sealed",
+		"run_id":     r.id,
+		"task_count": len(r.supervisor.Snapshot()),
+	}).Debug("Agent run sealed")
 }
 
 func (r *AgentRun) Failures() <-chan lifecycle.Failure {
@@ -138,6 +188,11 @@ func (r *AgentRun) Activate() error {
 		return err
 	}
 	r.activated = true
+	log.WithFields(log.Fields{
+		"component": "agent_run",
+		"event":     "run_activated",
+		"run_id":    r.id,
+	}).Info("Agent run activated")
 	return nil
 }
 
@@ -286,6 +341,13 @@ func (r *AgentRun) Shutdown(ctx context.Context, cause error) AgentRunShutdownRe
 	}
 
 	r.shutdownOnce.Do(func() {
+		startedAt := time.Now()
+		log.WithError(cause).WithFields(log.Fields{
+			"component": "agent_run",
+			"event":     "shutdown_started",
+			"run_id":    r.id,
+		}).Info("Agent run shutdown started")
+
 		r.stateMu.Lock()
 		r.stopping = true
 		activated := r.activated
@@ -328,6 +390,26 @@ func (r *AgentRun) Shutdown(ctx context.Context, cause error) AgentRunShutdownRe
 		if r.shutdownReport.Complete && r.communication != nil {
 			r.communication.detachRun(r)
 		}
+
+		runningTasks := make([]string, 0, len(r.shutdownReport.Running))
+		for _, task := range r.shutdownReport.Running {
+			runningTasks = append(runningTasks, task.Name)
+		}
+		entry := log.WithFields(log.Fields{
+			"component":            "agent_run",
+			"duration_ms":          time.Since(startedAt).Milliseconds(),
+			"resource_error_count": len(r.shutdownReport.ResourceErrors),
+			"run_id":               r.id,
+			"running_tasks":        runningTasks,
+			"task_count":           len(r.shutdownReport.Tasks),
+			"upload_stop_sent":     r.shutdownReport.UploadStopDelivered,
+			"stream_stop_sent":     r.shutdownReport.StreamStopDelivered,
+		})
+		if r.shutdownReport.Complete {
+			entry.WithField("event", "shutdown_completed").Info("Agent run shutdown completed")
+		} else {
+			entry.WithField("event", "shutdown_timed_out").Error("Agent run shutdown timed out")
+		}
 	})
 
 	report := r.shutdownReport
@@ -350,7 +432,20 @@ func (r *AgentRun) closeClient(ctx context.Context, name string, client AgentRun
 			Resource: name,
 			Err:      err,
 		})
+		log.WithError(err).WithFields(log.Fields{
+			"component": "agent_run",
+			"event":     "resource_close_failed",
+			"resource":  name,
+			"run_id":    r.id,
+		}).Warn("Failed to close Agent run resource")
+		return
 	}
+	log.WithFields(log.Fields{
+		"component": "agent_run",
+		"event":     "resource_closed",
+		"resource":  name,
+		"run_id":    r.id,
+	}).Debug("Agent run resource closed")
 }
 
 func (r *AgentRun) closeChannels() {

@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	log "github.com/sirupsen/logrus"
 )
 
 // We will count the number of retries we have done.
@@ -27,7 +27,7 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 		config.KStorage.Directory == "" ||
 		config.KStorage.URI == "" {
 		err := "UploadKerberosVault: Kerberos Vault not properly configured"
-		log.Log.Info(err)
+		log.Info(err)
 		return false, false, errors.New(err)
 	}
 
@@ -37,11 +37,11 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 	// instead of retrying indefinitely.
 	info, err := os.Stat("data/recordings/" + fileName)
 	if err != nil {
-		log.Log.Info("UploadKerberosVault: skipping " + fileName + ", file doesn't exist anymore")
+		log.Info("UploadKerberosVault: skipping " + fileName + ", file doesn't exist anymore")
 		return false, false, nil
 	}
 	if info.Size() == 0 {
-		log.Log.Warning("UploadKerberosVault: skipping " + fileName + ", recording is empty")
+		log.Warn("UploadKerberosVault: skipping " + fileName + ", recording is empty")
 		return false, false, nil
 	}
 
@@ -54,8 +54,11 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 	// - Number of changes
 	// - Token
 	// KerberosCloud, this means storage is disabled and proxy enabled.
-	log.Log.Info("UploadKerberosVault: Uploading to Kerberos Vault (" + config.KStorage.URI + ")")
-	log.Log.Info("UploadKerberosVault: Upload started for " + fileName)
+	log.WithFields(log.Fields{
+		"component": "kerberos_vault",
+		"event":     "upload_started",
+		"storage":   "primary",
+	}).Info("Vault upload started")
 
 	publicKey := config.KStorage.CloudKey
 	if config.HubKey != "" {
@@ -67,14 +70,27 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 		uploaded, responded, body, err := sendToVault(*config.KStorage, publicKey, config.Key, fileName, "UploadKerberosVault", "primary")
 		if uploaded {
 			kstorageRetryCount = 0
-			log.Log.Info("UploadKerberosVault: Upload Finished, " + body)
+			log.WithFields(log.Fields{
+				"component": "kerberos_vault",
+				"event":     "upload_completed",
+				"storage":   "primary",
+			}).Info("Vault upload completed")
 			return true, true, nil
 		}
 
 		if err != nil {
-			log.Log.Info("UploadKerberosVault: Upload Failed, " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"component": "kerberos_vault",
+				"event":     "upload_failed",
+				"storage":   "primary",
+			}).Error("Vault upload failed")
 		} else {
-			log.Log.Info("UploadKerberosVault: Upload Failed, " + body)
+			log.WithFields(log.Fields{
+				"component":      "kerberos_vault",
+				"event":          "upload_rejected",
+				"response_bytes": len(body),
+				"storage":        "primary",
+			}).Warn("Vault upload rejected")
 		}
 
 		// We only advance the retry policy when the vault gave a definitive
@@ -96,26 +112,43 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 		config.KStorageSecondary.SecretAccessKey == "" ||
 		config.KStorageSecondary.Directory == "" ||
 		config.KStorageSecondary.URI == "" {
-		log.Log.Info("UploadKerberosVault (Secondary): Secondary Kerberos Vault not properly configured.")
+		log.Info("UploadKerberosVault (Secondary): Secondary Kerberos Vault not properly configured.")
 	} else {
 
 		if kstorageRetryCount < config.KStorage.MaxRetries {
-			log.Log.Info("UploadKerberosVault (Secondary): Do not upload to secondary storage, we are still in retry policy.")
+			log.Info("UploadKerberosVault (Secondary): Do not upload to secondary storage, we are still in retry policy.")
 			return false, true, nil
 		}
 
-		log.Log.Info("UploadKerberosVault (Secondary): Uploading to Secondary Kerberos Vault (" + config.KStorageSecondary.URI + ")")
+		log.WithFields(log.Fields{
+			"component": "kerberos_vault",
+			"event":     "upload_started",
+			"storage":   "secondary",
+		}).Info("Vault upload started")
 
 		uploaded, _, body, err := sendToVault(*config.KStorageSecondary, publicKey, config.Key, fileName, "UploadKerberosVault (Secondary)", "secondary")
 		if uploaded {
-			log.Log.Info("UploadKerberosVault (Secondary): Upload Finished to secondary, " + body)
+			log.WithFields(log.Fields{
+				"component": "kerberos_vault",
+				"event":     "upload_completed",
+				"storage":   "secondary",
+			}).Info("Vault upload completed")
 			return true, true, nil
 		}
 
 		if err != nil {
-			log.Log.Info("UploadKerberosVault (Secondary): Upload Failed to secondary, " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"component": "kerberos_vault",
+				"event":     "upload_failed",
+				"storage":   "secondary",
+			}).Error("Vault upload failed")
 		} else {
-			log.Log.Info("UploadKerberosVault (Secondary): Upload Failed to secondary, " + body)
+			log.WithFields(log.Fields{
+				"component":      "kerberos_vault",
+				"event":          "upload_rejected",
+				"response_bytes": len(body),
+				"storage":        "secondary",
+			}).Warn("Vault upload rejected")
 		}
 	}
 
@@ -136,7 +169,7 @@ func sendToVault(vault models.KStorage, publicKey, deviceKey, fileName, label, s
 		if supported {
 			return uploaded, responded, body, err
 		}
-		log.Log.Info(label + ": resumable (tus) endpoint not available, falling back to legacy upload")
+		log.Info(label + ": resumable (tus) endpoint not available, falling back to legacy upload")
 	}
 	return uploadVaultLegacy(vault, publicKey, deviceKey, fileName, label)
 }
@@ -153,7 +186,7 @@ func uploadVaultLegacy(vault models.KStorage, publicKey, deviceKey, fileName, la
 	}
 	if err != nil {
 		msg := label + ": Upload Failed, file doesn't exists anymore"
-		log.Log.Info(msg)
+		log.Info(msg)
 		return false, false, "", errors.New(msg)
 	}
 
@@ -165,7 +198,7 @@ func uploadVaultLegacy(vault models.KStorage, publicKey, deviceKey, fileName, la
 	req, err := http.NewRequest("POST", uri+"/storage", file)
 	if err != nil {
 		errorMessage := label + ": error reading request, " + uri + "/storage: " + err.Error()
-		log.Log.Error(errorMessage)
+		log.Error(errorMessage)
 		return false, false, "", errors.New(errorMessage)
 	}
 	req.Header.Set("Content-Type", "video/mp4")

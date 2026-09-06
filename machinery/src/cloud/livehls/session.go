@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/video"
+	log "github.com/sirupsen/logrus"
 )
 
 // DefaultTargetSegmentMs is the nominal live segment length. ~2s keeps standard
@@ -144,14 +144,24 @@ func NewSession(publisher *Publisher, opts SessionOptions) *Session {
 			return nil
 		}
 		if !s.publishInitIfNeeded() {
-			log.Log.Warning("livehls.Session: dropping segment " +
-				fmt.Sprintf("%d", segment.SequenceNumber) + " because init has not been delivered yet")
+			log.WithFields(log.Fields{
+				"component":        "cloud/livehls",
+				"event":            "segment_dropped",
+				"reason":           "init_unavailable",
+				"segment_sequence": segment.SequenceNumber,
+				"session_id":       s.id,
+			}).Warn("Dropping live HLS segment")
 			return nil
 		}
 		ctx, cancel := s.newContext()
 		defer cancel()
 		if err := s.publisher.PublishSegment(ctx, s.id, segment); err != nil {
-			log.Log.Warning("livehls.Session: " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"component":        "cloud/livehls",
+				"event":            "segment_upload_failed",
+				"segment_sequence": segment.SequenceNumber,
+				"session_id":       s.id,
+			}).Warn("Failed to upload live HLS segment")
 			s.fireFailureOnce("segment-upload-failed")
 			return nil
 		}
@@ -175,15 +185,26 @@ func NewSession(publisher *Publisher, opts SessionOptions) *Session {
 				return nil
 			}
 			if !s.publishInitIfNeeded() {
-				log.Log.Warning("livehls.Session: dropping part " +
-					fmt.Sprintf("%d.%d", part.SegmentSeq, part.PartIndex) +
-					" because init has not been delivered yet")
+				log.WithFields(log.Fields{
+					"component":        "cloud/livehls",
+					"event":            "part_dropped",
+					"part_index":       part.PartIndex,
+					"reason":           "init_unavailable",
+					"segment_sequence": part.SegmentSeq,
+					"session_id":       s.id,
+				}).Warn("Dropping live HLS part")
 				return nil
 			}
 			ctx, cancel := s.newContext()
 			defer cancel()
 			if err := s.publisher.PublishPart(ctx, s.id, part); err != nil {
-				log.Log.Warning("livehls.Session: " + err.Error())
+				log.WithError(err).WithFields(log.Fields{
+					"component":        "cloud/livehls",
+					"event":            "part_upload_failed",
+					"part_index":       part.PartIndex,
+					"segment_sequence": part.SegmentSeq,
+					"session_id":       s.id,
+				}).Warn("Failed to upload live HLS part")
 				s.fireFailureOnce("part-upload-failed")
 				return nil
 			}
@@ -281,7 +302,12 @@ func (s *Session) SetUploadsActive(active bool) bool {
 		}
 		ctx, cancel := s.newContext()
 		if err := s.publisher.PublishSegment(ctx, s.id, buffered[i]); err != nil {
-			log.Log.Warning("livehls.Session: prewarm flush: " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"component":        "cloud/livehls",
+				"event":            "prewarm_segment_upload_failed",
+				"segment_sequence": buffered[i].SequenceNumber,
+				"session_id":       s.id,
+			}).Warn("Failed to upload buffered live HLS segment")
 			s.fireFailureOnce("segment-upload-failed")
 			cancel()
 			continue
@@ -298,7 +324,13 @@ func (s *Session) SetUploadsActive(active bool) bool {
 		}
 		ctx, cancel := s.newContext()
 		if err := s.publisher.PublishPart(ctx, s.id, bufferedParts[i]); err != nil {
-			log.Log.Warning("livehls.Session: prewarm flush (part): " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"component":        "cloud/livehls",
+				"event":            "prewarm_part_upload_failed",
+				"part_index":       bufferedParts[i].PartIndex,
+				"segment_sequence": bufferedParts[i].SegmentSeq,
+				"session_id":       s.id,
+			}).Warn("Failed to upload buffered live HLS part")
 			s.fireFailureOnce("part-upload-failed")
 			cancel()
 			continue
@@ -396,7 +428,11 @@ func (s *Session) publishInitIfNeeded() bool {
 	ctx, cancel := s.newContext()
 	defer cancel()
 	if err := s.publisher.PublishInit(ctx, s.id, initBytes); err != nil {
-		log.Log.Warning("livehls.Session: init upload failed, will retry: " + err.Error())
+		log.WithError(err).WithFields(log.Fields{
+			"component":  "cloud/livehls",
+			"event":      "init_upload_failed",
+			"session_id": s.id,
+		}).Warn("Failed to upload live HLS init segment; retrying")
 		s.fireFailureOnce("init-upload-failed")
 		return false
 	}
@@ -405,7 +441,11 @@ func (s *Session) publishInitIfNeeded() bool {
 	s.initPublished = true
 	s.lastInitAt = time.Now()
 	s.mu.Unlock()
-	log.Log.Info("livehls.Session: init segment delivered for session " + s.id)
+	log.WithFields(log.Fields{
+		"component":  "cloud/livehls",
+		"event":      "init_uploaded",
+		"session_id": s.id,
+	}).Info("Live HLS init segment uploaded")
 	return true
 }
 
@@ -438,14 +478,22 @@ func (s *Session) refreshInitIfStale() {
 	ctx, cancel := s.newContext()
 	defer cancel()
 	if err := s.publisher.PublishInit(ctx, s.id, initBytes); err != nil {
-		log.Log.Warning("livehls.Session: init refresh failed, will retry: " + err.Error())
+		log.WithError(err).WithFields(log.Fields{
+			"component":  "cloud/livehls",
+			"event":      "init_refresh_failed",
+			"session_id": s.id,
+		}).Warn("Failed to refresh live HLS init segment; retrying")
 		return
 	}
 
 	s.mu.Lock()
 	s.lastInitAt = time.Now()
 	s.mu.Unlock()
-	log.Log.Debug("livehls.Session: refreshed init segment TTL for session " + s.id)
+	log.WithFields(log.Fields{
+		"component":  "cloud/livehls",
+		"event":      "init_refreshed",
+		"session_id": s.id,
+	}).Debug("Live HLS init segment refreshed")
 }
 
 // fireReadyOnce invokes the OnReady callback the first time it is called.

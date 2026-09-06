@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -44,18 +45,34 @@ func New() *DB {
 		// We can also apply the complete URI
 		// e.g. "mongodb+srv://<username>:<password>@kerberos-hub.shhng.mongodb.net/?retryWrites=true&w=majority&appName=kerberos-hub"
 		if mongodbURI != "" {
+			log.WithFields(log.Fields{
+				"component":      "database",
+				"database":       DatabaseName,
+				"event":          "client_configuring",
+				"uri_configured": true,
+			}).Debug("Configuring MongoDB client")
 			serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 			opts := options.Client().ApplyURI(mongodbURI).SetServerAPIOptions(serverAPI)
 
 			// Create a new client and connect to the server
 			client, err := mongo.Connect(ctx, opts)
 			if err != nil {
-				fmt.Printf("Error setting up mongodb connection: %+v\n", err)
-				os.Exit(1)
+				log.WithError(err).WithFields(log.Fields{
+					"component": "database",
+					"database":  DatabaseName,
+					"event":     "client_configuration_failed",
+				}).Fatal("Failed to configure MongoDB client")
 			}
 			_instance.Client = client
 
 		} else {
+			log.WithFields(log.Fields{
+				"component":             "database",
+				"database":              DatabaseName,
+				"event":                 "client_configuring",
+				"replicaset_configured": replicaset != "",
+				"uri_configured":        false,
+			}).Debug("Configuring MongoDB client")
 
 			// New MongoDB driver
 			mongodbURI := fmt.Sprintf("mongodb://%s:%s@%s", username, password, host)
@@ -69,8 +86,11 @@ func New() *DB {
 				Password:      password,
 			}))
 			if err != nil {
-				fmt.Printf("Error setting up mongodb connection: %+v\n", err)
-				os.Exit(1)
+				log.WithError(err).WithFields(log.Fields{
+					"component": "database",
+					"database":  DatabaseName,
+					"event":     "client_configuration_failed",
+				}).Fatal("Failed to configure MongoDB client")
 			}
 			_instance.Client = client
 		}

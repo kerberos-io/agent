@@ -16,9 +16,9 @@ import (
 	"github.com/Eyevinn/mp4ff/avc"
 	mp4ff "github.com/Eyevinn/mp4ff/mp4"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
+	log "github.com/sirupsen/logrus"
 )
 
 var LastPTS uint64 = 0 // Last PTS for the current segment
@@ -216,13 +216,13 @@ func (mp4 *MP4) updateVideoParameterSetsFromAnnexB(data []byte) {
 				if needSPS {
 					mp4.SPSNALUs = [][]byte{nalu}
 					needSPS = false
-					log.Log.Warning("mp4.updateVideoParameterSetsFromAnnexB(): SPS recovered from in-band NALU")
+					log.Warn("mp4.updateVideoParameterSetsFromAnnexB(): SPS recovered from in-band NALU")
 				}
 			case 8: // PPS
 				if needPPS {
 					mp4.PPSNALUs = [][]byte{nalu}
 					needPPS = false
-					log.Log.Warning("mp4.updateVideoParameterSetsFromAnnexB(): PPS recovered from in-band NALU")
+					log.Warn("mp4.updateVideoParameterSetsFromAnnexB(): PPS recovered from in-band NALU")
 				}
 			}
 		case "H265", "HVC1":
@@ -232,19 +232,19 @@ func (mp4 *MP4) updateVideoParameterSetsFromAnnexB(data []byte) {
 				if needVPS {
 					mp4.VPSNALUs = [][]byte{nalu}
 					needVPS = false
-					log.Log.Warning("mp4.updateVideoParameterSetsFromAnnexB(): VPS recovered from in-band NALU")
+					log.Warn("mp4.updateVideoParameterSetsFromAnnexB(): VPS recovered from in-band NALU")
 				}
 			case 33: // SPS
 				if needSPS {
 					mp4.SPSNALUs = [][]byte{nalu}
 					needSPS = false
-					log.Log.Warning("mp4.updateVideoParameterSetsFromAnnexB(): SPS recovered from in-band NALU")
+					log.Warn("mp4.updateVideoParameterSetsFromAnnexB(): SPS recovered from in-band NALU")
 				}
 			case 34: // PPS
 				if needPPS {
 					mp4.PPSNALUs = [][]byte{nalu}
 					needPPS = false
-					log.Log.Warning("mp4.updateVideoParameterSetsFromAnnexB(): PPS recovered from in-band NALU")
+					log.Warn("mp4.updateVideoParameterSetsFromAnnexB(): PPS recovered from in-band NALU")
 				}
 			}
 		}
@@ -266,7 +266,12 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 	} else {
 		// No valid nextPTS (Close case) or PTS went backwards (jitter/discontinuity)
 		if nextPTS > 0 {
-			log.Log.Warning(fmt.Sprintf("mp4.flushPendingVideoSample(): video PTS went backwards or zero duration (nextPTS=%d, prevDTS=%d), using last known duration", nextPTS, mp4.VideoFullSample.DecodeTime))
+			log.WithFields(log.Fields{
+				"component":                 "video/mp4",
+				"event":                     "invalid_video_timestamp",
+				"next_presentation_time_ms": nextPTS,
+				"previous_decode_time_ms":   mp4.VideoFullSample.DecodeTime,
+			}).Warn("Video timestamp moved backwards or produced zero duration")
 		}
 		duration = mp4.LastVideoSampleDTS
 		if duration == 0 {
@@ -282,15 +287,23 @@ func (mp4 *MP4) flushPendingVideoSample(nextPTS uint64) bool {
 	isKF := mp4.PendingSampleIsKeyframe
 	err := mp4.MultiTrackFragment.AddFullSampleToTrack(*mp4.VideoFullSample, uint32(mp4.VideoTrack))
 	if err != nil {
-		log.Log.Error("mp4.flushPendingVideoSample(): error adding sample: " + err.Error())
+		log.Error("mp4.flushPendingVideoSample(): error adding sample: " + err.Error())
 	} else {
 		mp4.SampleCount++
 	}
 	if isKF {
 		mp4.TotalKeyframesWritten++
 		mp4.FragmentKeyframeCount++
-		log.Log.Debug(fmt.Sprintf("mp4.flushPendingVideoSample(): KEYFRAME WRITTEN to trun - totalWritten=%d, fragmentKF=%d, flags=0x%08x, dur=%d, DTS=%d",
-			mp4.TotalKeyframesWritten, mp4.FragmentKeyframeCount, mp4.VideoFullSample.Sample.Flags, duration, mp4.VideoFullSample.DecodeTime))
+		log.WithFields(log.Fields{
+			"component":               "video/mp4",
+			"decode_time_ms":          mp4.VideoFullSample.DecodeTime,
+			"duration_ms":             duration,
+			"event":                   "keyframe_written",
+			"fragment_keyframe_count": mp4.FragmentKeyframeCount,
+			"sample_flags":            mp4.VideoFullSample.Sample.Flags,
+			"total_keyframes_written": mp4.TotalKeyframesWritten,
+		}).Debug("MP4 keyframe written")
+
 	}
 
 	mp4.VideoFullSample = nil
@@ -378,7 +391,14 @@ func (mp4 *MP4) AddSampleToTrack(trackID uint32, isKeyframe bool, data []byte, p
 		truncatedTail := fullGopFrames > 0 && bufferedVideo*2 < fullGopFrames
 		if closeKeyframe && truncatedTail {
 			seam = true
-			log.Log.Warning(fmt.Sprintf("mp4.AddSampleToTrack(): dropping truncated GOP at premature keyframe (interval=%d ms, min interval=%d ms, buffered video frames=%d of ~%d) - likely upstream loop/restart discontinuity", gap, mp4.MinKeyframeGapMs, bufferedVideo, fullGopFrames))
+			log.WithFields(log.Fields{
+				"buffered_video_frames":   bufferedVideo,
+				"component":               "video/mp4",
+				"event":                   "truncated_gop_dropped",
+				"expected_gop_frames":     fullGopFrames,
+				"keyframe_interval_ms":    gap,
+				"minimum_keyframe_gap_ms": mp4.MinKeyframeGapMs,
+			}).Warn("Dropping truncated GOP at premature keyframe")
 		}
 		mp4.LastKeyframeGapMs = gap
 		if !seam && (mp4.MinKeyframeGapMs == 0 || gap < mp4.MinKeyframeGapMs) {
@@ -483,7 +503,7 @@ func (mp4 *MP4) commitBufferedGOP() {
 	mp4.gopBuffer = nil // detach so commitSampleToTrack never observes a half-cleared buffer
 	for _, s := range buffered {
 		if err := mp4.commitSampleToTrack(s.trackID, s.isKeyframe, s.data, s.pts, s.compositionOffset); err != nil {
-			log.Log.Error("mp4.commitBufferedGOP(): " + err.Error())
+			log.Error("mp4.commitBufferedGOP(): " + err.Error())
 		}
 	}
 }
@@ -499,8 +519,18 @@ func (mp4 *MP4) commitSampleToTrack(trackID uint32, isKeyframe bool, data []byte
 		if mp4.Start {
 			elapsedDbg = pts - mp4.FragmentStartRawPTS
 		}
-		log.Log.Debug(fmt.Sprintf("mp4.AddSampleToTrack(): KEYFRAME #%d received - PTS=%d, size=%d, elapsed=%dms, started=%t, segment=%d, fragKF=%d",
-			mp4.TotalKeyframesReceived, pts, len(data), elapsedDbg, mp4.Start, mp4.SegmentCount, mp4.FragmentKeyframeCount))
+		log.WithFields(log.Fields{
+			"component":                "video/mp4",
+			"elapsed_ms":               elapsedDbg,
+			"event":                    "keyframe_received",
+			"fragment_keyframe_count":  mp4.FragmentKeyframeCount,
+			"presentation_time_ms":     pts,
+			"recording_started":        mp4.Start,
+			"sample_bytes":             len(data),
+			"segment_count":            mp4.SegmentCount,
+			"total_keyframes_received": mp4.TotalKeyframesReceived,
+		}).Debug("MP4 keyframe received")
+
 	}
 
 	if isKeyframe {
@@ -524,8 +554,15 @@ func (mp4 *MP4) commitSampleToTrack(trackID uint32, isKeyframe bool, data []byte
 					mp4.flushPendingVideoSample(pts)
 				}
 
-				log.Log.Debug(fmt.Sprintf("mp4.AddSampleToTrack(): FLUSHING segment #%d - keyframes_in_fragment=%d, totalKF_received=%d, totalKF_written=%d",
-					mp4.SegmentCount, mp4.FragmentKeyframeCount, mp4.TotalKeyframesReceived, mp4.TotalKeyframesWritten))
+				log.WithFields(log.Fields{
+					"component":                "video/mp4",
+					"event":                    "segment_flush_started",
+					"fragment_keyframe_count":  mp4.FragmentKeyframeCount,
+					"segment_count":            mp4.SegmentCount,
+					"total_keyframes_received": mp4.TotalKeyframesReceived,
+					"total_keyframes_written":  mp4.TotalKeyframesWritten,
+				}).Debug("Flushing MP4 segment")
+
 				mp4.MoofBoxes = mp4.MoofBoxes + 1
 				mp4.MoofBoxSizes = append(mp4.MoofBoxSizes, int64(mp4.Segment.Size()))
 				// Track the segment's duration and base decode time for sidx.
@@ -536,7 +573,7 @@ func (mp4 *MP4) commitSampleToTrack(trackID uint32, isKeyframe bool, data []byte
 				mp4.SegmentBaseDecTimes = append(mp4.SegmentBaseDecTimes, mp4.FragmentStartDTS)
 				err := mp4.Segment.Encode(mp4.Writer)
 				if err != nil {
-					log.Log.Error("mp4.AddSampleToTrack(): error encoding segment: " + err.Error())
+					log.Error("mp4.AddSampleToTrack(): error encoding segment: " + err.Error())
 				}
 				mp4.Segments = append(mp4.Segments, mp4.Segment)
 			}
@@ -552,7 +589,7 @@ func (mp4 *MP4) commitSampleToTrack(trackID uint32, isKeyframe bool, data []byte
 			// Create a video fragment
 			multiTrackFragment, err := mp4ff.CreateMultiTrackFragment(uint32(mp4.SegmentCount), mp4.TrackIDs)
 			if err != nil {
-				log.Log.Error("mp4.AddSampleToTrack(): error creating multi track fragment: " + err.Error())
+				log.Error("mp4.AddSampleToTrack(): error creating multi track fragment: " + err.Error())
 			}
 			mp4.MultiTrackFragment = multiTrackFragment
 			seg.AddFragment(multiTrackFragment)
@@ -585,7 +622,14 @@ func (mp4 *MP4) commitSampleToTrack(trackID uint32, isKeyframe bool, data []byte
 			if err == nil {
 				// Flush previous pending sample before storing the new one
 				if mp4.VideoFullSample != nil {
-					log.Log.Debugf("Adding sample to track %d, PTS: %d, size: %d, Keyframe: %t", trackID, pts, len(lengthPrefixed), isKeyframe)
+					log.WithFields(log.Fields{
+						"bytes":     len(lengthPrefixed),
+						"component": "mp4",
+						"event":     "video_sample_added",
+						"keyframe":  isKeyframe,
+						"pts":       pts,
+						"track_id":  trackID,
+					}).Trace("Adding MP4 video sample")
 					mp4.flushPendingVideoSample(pts)
 				}
 
@@ -628,7 +672,11 @@ func (mp4 *MP4) commitSampleToTrack(trackID uint32, isKeyframe bool, data []byte
 					sampleToAdd.Sample.Size = uint32(len(aac[7:]))
 					err := mp4.MultiTrackFragment.AddFullSampleToTrack(sampleToAdd, trackID)
 					if err != nil {
-						log.Log.Error("mp4.AddSampleToTrack(): error adding sample to track " + fmt.Sprintf("%d: %v", trackID, err))
+						log.WithError(err).WithFields(log.Fields{
+							"component": "video/mp4",
+							"event":     "audio_sample_write_failed",
+							"track_id":  trackID,
+						}).Error("Failed to add audio sample to MP4 track")
 					}
 				})
 			}
@@ -657,11 +705,17 @@ func (mp4 *MP4) Close(config *models.Config) {
 	// a recording is never a loop seam, so it must always be written out.
 	mp4.commitBufferedGOP()
 
-	log.Log.Info(fmt.Sprintf("mp4.Close(): KEYFRAME SUMMARY - totalReceived=%d, totalWritten=%d, segments=%d, lastFragmentKF=%d",
-		mp4.TotalKeyframesReceived, mp4.TotalKeyframesWritten, mp4.SegmentCount, mp4.FragmentKeyframeCount))
+	log.WithFields(log.Fields{
+		"component":                "video/mp4",
+		"event":                    "recording_keyframe_summary",
+		"fragment_keyframe_count":  mp4.FragmentKeyframeCount,
+		"segment_count":            mp4.SegmentCount,
+		"total_keyframes_received": mp4.TotalKeyframesReceived,
+		"total_keyframes_written":  mp4.TotalKeyframesWritten,
+	}).Info("MP4 recording keyframe summary")
 
 	if mp4.VideoTotalDuration == 0 && mp4.AudioTotalDuration == 0 {
-		log.Log.Error("mp4.Close(): no video or audio samples added, removing empty MP4 file")
+		log.Error("mp4.Close(): no video or audio samples added, removing empty MP4 file")
 		mp4.Writer.Flush()
 		_ = mp4.FileWriter.Sync()
 		_ = mp4.FileWriter.Close()
@@ -690,7 +744,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 				sampleToAdd.Sample.Size = uint32(len(aac[7:]))
 				err := mp4.MultiTrackFragment.AddFullSampleToTrack(sampleToAdd, uint32(mp4.AudioTrack))
 				if err != nil {
-					log.Log.Error("mp4.Close(): error adding final audio sample: " + err.Error())
+					log.Error("mp4.Close(): error adding final audio sample: " + err.Error())
 				}
 			})
 			mp4.AudioFullSample = nil
@@ -712,14 +766,14 @@ func (mp4 *MP4) Close(config *models.Config) {
 
 		err := mp4.Segment.Encode(mp4.Writer)
 		if err != nil {
-			log.Log.Error("mp4.Close(): error encoding last segment: " + err.Error())
+			log.Error("mp4.Close(): error encoding last segment: " + err.Error())
 		}
 	}
 
 	mp4.Writer.Flush()
 	// Ensure all segment data is on disk before we overwrite the placeholder at offset 0.
 	if err := mp4.FileWriter.Sync(); err != nil {
-		log.Log.Error("mp4.Close(): error syncing file: " + err.Error())
+		log.Error("mp4.Close(): error syncing file: " + err.Error())
 	}
 
 	// Now we have all the moof and mdat boxes written to the file.
@@ -747,8 +801,14 @@ func (mp4 *MP4) Close(config *models.Config) {
 		actualVideoDuration += d
 	}
 	if actualVideoDuration != mp4.VideoTotalDuration {
-		log.Log.Warning(fmt.Sprintf("mp4.Close(): duration mismatch: accumulated VideoTotalDuration=%d, sum of segment durations=%d (diff=%d ms)",
-			mp4.VideoTotalDuration, actualVideoDuration, int64(mp4.VideoTotalDuration)-int64(actualVideoDuration)))
+		log.WithFields(log.Fields{
+			"accumulated_duration_ms": mp4.VideoTotalDuration,
+			"component":               "video/mp4",
+			"difference_ms":           int64(mp4.VideoTotalDuration) - int64(actualVideoDuration),
+			"event":                   "duration_mismatch",
+			"segment_duration_ms":     actualVideoDuration,
+		}).Warn("MP4 video duration does not match segment durations")
+
 	}
 
 	// Set the creation time and modification time for the moov box.
@@ -790,21 +850,40 @@ func (mp4 *MP4) Close(config *models.Config) {
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
 		spsNALUs, ppsNALUs := normalizeH264ParameterSets(mp4.SPSNALUs, mp4.PPSNALUs)
-		log.Log.Debug("mp4.Close(): AVC parameter sets: SPS=" + formatNaluDebug(spsNALUs) + ", PPS=" + formatNaluDebug(ppsNALUs))
+		log.WithFields(log.Fields{
+			"component": "video/mp4",
+			"event":     "avc_parameter_sets",
+			"pps":       formatNaluDebug(ppsNALUs),
+			"sps":       formatNaluDebug(spsNALUs),
+		}).Debug("AVC parameter sets normalized")
 		if len(spsNALUs) == 0 || len(ppsNALUs) == 0 {
 			// An avcC without both SPS and PPS is invalid: downstream FFmpeg-based
 			// pipelines decoding this file will report "non-existing PPS 0 referenced"
 			// and fail to extract any frame. Surface it loudly so the capture-side
 			// parameter-set handling can be diagnosed.
-			log.Log.Error(fmt.Sprintf("mp4.Close(): incomplete H264 parameter sets (SPS=%d, PPS=%d) - the avcC will be invalid and downstream decoders will report 'non-existing PPS 0 referenced'", len(spsNALUs), len(ppsNALUs)))
+			log.WithFields(log.Fields{
+				"component": "video/mp4",
+				"event":     "avc_parameter_sets_incomplete",
+				"pps_count": len(ppsNALUs),
+				"sps_count": len(spsNALUs),
+			}).Error("Incomplete H264 parameter sets will produce an invalid AVC descriptor")
 		}
 		err := init.Moov.Traks[0].SetAVCDescriptor("avc1", spsNALUs, ppsNALUs, includePS)
 		if err != nil {
-			log.Log.Error("mp4.Close(): error setting AVC descriptor: " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"component": "video/mp4",
+				"event":     "avc_descriptor_failed",
+			}).Error("Failed to set AVC descriptor")
 			if fallbackErr := addAVCDescriptorFallback(init.Moov.Traks[0], spsNALUs, ppsNALUs, uint16(mp4.width), uint16(mp4.height)); fallbackErr != nil {
-				log.Log.Error("mp4.Close(): error setting AVC descriptor fallback: " + fallbackErr.Error())
+				log.WithError(fallbackErr).WithFields(log.Fields{
+					"component": "video/mp4",
+					"event":     "avc_descriptor_fallback_failed",
+				}).Error("Failed to set fallback AVC descriptor")
 			} else {
-				log.Log.Warning("mp4.Close(): AVC descriptor fallback used due to SPS parse error")
+				log.WithFields(log.Fields{
+					"component": "video/mp4",
+					"event":     "avc_descriptor_fallback_used",
+				}).Warn("Using fallback AVC descriptor")
 			}
 		}
 		init.Moov.Traks[0].Tkhd.Duration = actualVideoDuration
@@ -823,15 +902,30 @@ func (mp4 *MP4) Close(config *models.Config) {
 		init.AddEmptyTrack(videoTimescale, "video", "und")
 		includePS := true
 		vpsNALUs, spsNALUs, ppsNALUs := normalizeH265ParameterSets(mp4.VPSNALUs, mp4.SPSNALUs, mp4.PPSNALUs)
-		log.Log.Debug("mp4.Close(): HEVC parameter sets: VPS=" + formatNaluDebug(vpsNALUs) + ", SPS=" + formatNaluDebug(spsNALUs) + ", PPS=" + formatNaluDebug(ppsNALUs))
+		log.WithFields(log.Fields{
+			"component": "video/mp4",
+			"event":     "hevc_parameter_sets",
+			"pps":       formatNaluDebug(ppsNALUs),
+			"sps":       formatNaluDebug(spsNALUs),
+			"vps":       formatNaluDebug(vpsNALUs),
+		}).Debug("HEVC parameter sets normalized")
 		if len(vpsNALUs) == 0 || len(spsNALUs) == 0 || len(ppsNALUs) == 0 {
 			// An hvcC missing VPS/SPS/PPS is invalid and downstream FFmpeg-based
 			// pipelines will fail to decode the recording. Surface it loudly.
-			log.Log.Error(fmt.Sprintf("mp4.Close(): incomplete H265 parameter sets (VPS=%d, SPS=%d, PPS=%d) - the hvcC will be invalid and downstream decoders will fail to process the recording", len(vpsNALUs), len(spsNALUs), len(ppsNALUs)))
+			log.WithFields(log.Fields{
+				"component": "video/mp4",
+				"event":     "hevc_parameter_sets_incomplete",
+				"pps_count": len(ppsNALUs),
+				"sps_count": len(spsNALUs),
+				"vps_count": len(vpsNALUs),
+			}).Error("Incomplete H265 parameter sets will produce an invalid HEVC descriptor")
 		}
 		err := init.Moov.Traks[0].SetHEVCDescriptor("hvc1", vpsNALUs, spsNALUs, ppsNALUs, [][]byte{}, includePS)
 		if err != nil {
-			log.Log.Error("mp4.Close(): error setting HEVC descriptor: " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"component": "video/mp4",
+				"event":     "hevc_descriptor_failed",
+			}).Error("Failed to set HEVC descriptor")
 		}
 		init.Moov.Traks[0].Tkhd.Duration = actualVideoDuration
 		init.Moov.Traks[0].Tkhd.Width = mp4ff.Fixed32(uint32(mp4.width) << 16)
@@ -876,7 +970,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 		// Set the subtitle descriptor
 		err := init.Moov.Traks[2].SetWvttDescriptor("")
 		if err != nil {
-			//log.Log.Error("mp4.Close(): error setting VTT descriptor: " + err.Error())
+			// log.Error("mp4.Close(): error setting VTT descriptor: " + err.Error())
 			//return
 		}
 		init.Moov.Traks[2].Mdia.Hdlr.Name = "agent " + utils.VERSION
@@ -924,14 +1018,14 @@ func (mp4 *MP4) Close(config *models.Config) {
 	block, _ := pem.Decode(pemBytes)
 
 	if block == nil {
-		//log.Log.Error("mp4.Close(): error decoding PEM block containing private key")
+		// log.Error("mp4.Close(): error decoding PEM block containing private key")
 		//return
 	} else {
 		// Parse private key
 		b := block.Bytes
 		key, err := x509.ParsePKCS8PrivateKey(b)
 		if err != nil {
-			//log.Log.Error("mp4.Close(): error parsing private key: " + err.Error())
+			// log.Error("mp4.Close(): error parsing private key: " + err.Error())
 			//return
 		} else {
 			// Conver key to *rsa.PrivateKey
@@ -944,7 +1038,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 				uuid.UnknownPayload = signature
 				init.Moov.AddChild(uuid)
 			} else {
-				//log.Log.Error("mp4.Close(): error signing fingerprint: " + err.Error())
+				// log.Error("mp4.Close(): error signing fingerprint: " + err.Error())
 			}
 		}
 	}
@@ -979,7 +1073,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 	// and re-encode with the corrected value.
 	var initBuf bytes.Buffer
 	if err := init.Encode(&initBuf); err != nil {
-		log.Log.Error("mp4.Close(): error encoding init segment: " + err.Error())
+		log.Error("mp4.Close(): error encoding init segment: " + err.Error())
 	}
 
 	initSize := int64(initBuf.Len())
@@ -991,7 +1085,7 @@ func (mp4 *MP4) Close(config *models.Config) {
 	if len(mp4.SegmentDurations) > 0 {
 		if mp4.FreeBoxSize < initSize {
 			// Avoid computing a negative offset and wrapping it to uint64.
-			log.Log.Error("mp4.Close(): FreeBoxSize is smaller than initSize; skipping sidx FirstOffset adjustment")
+			log.Error("mp4.Close(): FreeBoxSize is smaller than initSize; skipping sidx FirstOffset adjustment")
 		} else {
 			firstOffset := uint64(mp4.FreeBoxSize - initSize)
 			// Find the sidx we added and update its FirstOffset
@@ -1004,19 +1098,24 @@ func (mp4 *MP4) Close(config *models.Config) {
 			// Re-encode with the corrected FirstOffset (same size, no layout change)
 			initBuf.Reset()
 			if err := init.Encode(&initBuf); err != nil {
-				log.Log.Error("mp4.Close(): error re-encoding init segment: " + err.Error())
+				log.Error("mp4.Close(): error re-encoding init segment: " + err.Error())
 			}
 			initSize = int64(initBuf.Len())
 		}
 	}
 
 	if initSize > mp4.FreeBoxSize {
-		log.Log.Error(fmt.Sprintf("mp4.Close(): init segment (%d bytes) exceeds reserved space (%d bytes), file may be corrupt", initSize, mp4.FreeBoxSize))
+		log.WithFields(log.Fields{
+			"component":      "video/mp4",
+			"event":          "init_segment_oversized",
+			"init_bytes":     initSize,
+			"reserved_bytes": mp4.FreeBoxSize,
+		}).Error("MP4 init segment exceeds reserved space")
 	}
 
 	// Write the init segment at the beginning of the file, overwriting the free box placeholder.
 	if _, err := mp4.FileWriter.WriteAt(initBuf.Bytes(), 0); err != nil {
-		log.Log.Error("mp4.Close(): error writing init segment: " + err.Error())
+		log.Error("mp4.Close(): error writing init segment: " + err.Error())
 	}
 
 	// Fill any remaining reserved space with a new (smaller) free box so
@@ -1026,15 +1125,15 @@ func (mp4 *MP4) Close(config *models.Config) {
 		newFree := mp4ff.NewFreeBox(make([]byte, remainingSize-8))
 		var freeBuf bytes.Buffer
 		if err := newFree.Encode(&freeBuf); err != nil {
-			log.Log.Error("mp4.Close(): error encoding free box: " + err.Error())
+			log.Error("mp4.Close(): error encoding free box: " + err.Error())
 		}
 		if _, err := mp4.FileWriter.WriteAt(freeBuf.Bytes(), initSize); err != nil {
-			log.Log.Error("mp4.Close(): error writing free box: " + err.Error())
+			log.Error("mp4.Close(): error writing free box: " + err.Error())
 		}
 	}
 
 	if err := mp4.FileWriter.Sync(); err != nil {
-		log.Log.Error("mp4.Close(): error syncing file: " + err.Error())
+		log.Error("mp4.Close(): error syncing file: " + err.Error())
 	}
 	mp4.FileWriter.Close()
 }

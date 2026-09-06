@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -18,13 +17,13 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/lifecycle"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	routers "github.com/kerberos-io/agent/machinery/src/routers/mqtt"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
+	log "github.com/sirupsen/logrus"
 	"github.com/tevino/abool"
 )
 
@@ -32,7 +31,10 @@ var tracer = otel.Tracer("github.com/kerberos-io/agent/machinery/src/components"
 
 func Bootstrap(ctx context.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
 
-	log.Log.Debug("components.Kerberos.Bootstrap(): bootstrapping the kerberos agent.")
+	log.WithFields(log.Fields{
+		"component": "agent",
+		"event":     "bootstrap_started",
+	}).Debug("Bootstrapping Agent")
 
 	bootstrapContext := context.Background()
 	_, span := tracer.Start(bootstrapContext, "Bootstrap")
@@ -102,7 +104,10 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 	// goroutines which do image capture, motion detection, onvif, etc.
 	for {
 		if ctx.Err() != nil {
-			log.Log.Info("components.Kerberos.Bootstrap(): parent context canceled")
+			log.WithError(context.Cause(ctx)).WithFields(log.Fields{
+				"component": "agent",
+				"event":     "bootstrap_stopped",
+			}).Info("Agent bootstrap stopped")
 			return
 		}
 
@@ -110,16 +115,28 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 		status := RunAgent(ctx, configDirectory, configuration, communication, mqttClient, uptimeStart, cameraSettings, captureDevice)
 
 		if status == runStatusParentCanceled {
-			log.Log.Info("components.Kerberos.Bootstrap(): parent context canceled")
+			log.WithFields(log.Fields{
+				"component": "agent",
+				"event":     "bootstrap_stopped",
+				"status":    status,
+			}).Info("Agent bootstrap stopped")
 			return
 		}
 		if status == "stop" {
-			log.Log.Info("components.Kerberos.Bootstrap(): shutting down the agent in 3 seconds.")
+			log.WithFields(log.Fields{
+				"component":     "agent",
+				"delay_seconds": 3,
+				"event":         "process_shutdown_requested",
+			}).Info("Agent process shutdown requested")
 			time.Sleep(time.Second * 3)
 			os.Exit(0)
 		}
 		if status == runStatusShutdownTimeout || status == runStatusOwnershipConflict {
-			log.Log.Error("components.Kerberos.Bootstrap(): terminating after camera workers failed to stop")
+			log.WithFields(log.Fields{
+				"component": "agent",
+				"event":     "process_terminating",
+				"status":    status,
+			}).Error("Terminating Agent after camera workers failed to stop")
 			os.Exit(1)
 		}
 
@@ -147,11 +164,19 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 	ctxRunAgent, span := tracer.Start(parent, "RunAgent")
 	defer span.End()
 
-	log.Log.Info("components.Kerberos.RunAgent(): Creating camera and processing threads.")
 	config := configuration.Config
 
 	status = "not started"
 	run := models.NewAgentRun(parent, communication, config.Offline != "true")
+	runFields := log.Fields{
+		"component": "agent_run",
+		"run_id":    run.ID(),
+	}
+	log.WithFields(runFields).WithFields(log.Fields{
+		"event":             "run_starting",
+		"offline":           config.Offline,
+		"substream_enabled": config.Capture.IPCamera.SubRTSP != "",
+	}).Info("Starting camera run")
 	runStopped := false
 	shutdownCause := error(nil)
 	var rtspClient *capture.Golibrtsp
@@ -178,7 +203,10 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 	if rtspUrl != "" {
 		err := rtspClient.Connect(run.Context(), ctxRunAgent)
 		if err != nil {
-			log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP stream: " + err.Error())
+			log.WithError(err).WithFields(runFields).WithFields(log.Fields{
+				"event":  "rtsp_connect_failed",
+				"stream": "main",
+			}).Error("Failed to connect RTSP stream")
 			shutdownCause = err
 			if !waitForRunRetry(parent) {
 				status = runStatusParentCanceled
@@ -187,7 +215,10 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 			return status
 		}
 	} else {
-		log.Log.Error("components.Kerberos.RunAgent(): no rtsp url found in config, please provide one.")
+		log.WithFields(runFields).WithFields(log.Fields{
+			"event":  "rtsp_configuration_missing",
+			"stream": "main",
+		}).Error("Main RTSP URL is not configured")
 		shutdownCause = errors.New("no RTSP URL configured")
 		if !waitForRunRetry(parent) {
 			status = runStatusParentCanceled
@@ -196,12 +227,23 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 		return status
 	}
 
-	log.Log.Info("components.Kerberos.RunAgent(): opened RTSP stream: " + rtspUrl)
+	log.WithFields(runFields).WithFields(log.Fields{
+		"event":  "rtsp_connected",
+		"stream": "main",
+	}).Info("RTSP stream connected")
 
 	// Get the video streams from the RTSP server.
 	videoStreams, err := rtspClient.GetVideoStreams()
 	if err != nil || len(videoStreams) == 0 {
-		log.Log.Error("components.Kerberos.RunAgent(): no video stream found, might be the wrong codec (we only support H264 for the moment)")
+		entry := log.WithFields(runFields).WithFields(log.Fields{
+			"event":        "rtsp_video_missing",
+			"stream":       "main",
+			"stream_count": len(videoStreams),
+		})
+		if err != nil {
+			entry = entry.WithError(err)
+		}
+		entry.Error("RTSP stream has no supported video track")
 		shutdownCause = errors.New("main RTSP stream has no supported video track")
 		if err != nil {
 			shutdownCause = err
@@ -215,7 +257,14 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 
 	// Get the video stream from the RTSP server.
 	videoStream := videoStreams[0]
-	log.Log.Info(fmt.Sprintf("components.Kerberos.RunAgent(): detected main video stream: codec=%s resolution=%dx%d fps=%.2f", videoStream.Name, videoStream.Width, videoStream.Height, videoStream.FPS))
+	log.WithFields(runFields).WithFields(log.Fields{
+		"codec":  videoStream.Name,
+		"event":  "video_stream_detected",
+		"fps":    videoStream.FPS,
+		"height": videoStream.Height,
+		"stream": "main",
+		"width":  videoStream.Width,
+	}).Info("Video stream detected")
 
 	// Get some information from the video stream.
 	width := videoStream.Width
@@ -244,7 +293,10 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 	// and consumed by all other routines: motion, livestream, etc.
 	if config.Capture.PreRecording <= 0 {
 		config.Capture.PreRecording = 1
-		log.Log.Warning("components.Kerberos.RunAgent(): Prerecording value not found in config or invalid value! Found: " + strconv.FormatInt(config.Capture.PreRecording, 10))
+		log.WithFields(runFields).WithFields(log.Fields{
+			"event":                 "prerecording_adjusted",
+			"pre_recording_seconds": config.Capture.PreRecording,
+		}).Warn("Invalid prerecording duration; using one second")
 	}
 
 	// We might have a secondary rtsp url, so we might need to use that for livestreaming let us check first!
@@ -261,7 +313,10 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 
 		err := rtspSubClient.Connect(run.Context(), ctxRunAgent)
 		if err != nil {
-			log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP sub stream: " + err.Error())
+			log.WithError(err).WithFields(runFields).WithFields(log.Fields{
+				"event":  "rtsp_connect_failed",
+				"stream": "sub",
+			}).Error("Failed to connect RTSP stream")
 			shutdownCause = err
 			if !waitForRunRetry(parent) {
 				status = runStatusParentCanceled
@@ -269,12 +324,23 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 			}
 			return status
 		}
-		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP sub stream: " + subRtspUrl)
+		log.WithFields(runFields).WithFields(log.Fields{
+			"event":  "rtsp_connected",
+			"stream": "sub",
+		}).Info("RTSP stream connected")
 
 		// Get the video streams from the RTSP server.
 		videoSubStreams, err = rtspSubClient.GetVideoStreams()
 		if err != nil || len(videoSubStreams) == 0 {
-			log.Log.Error("components.Kerberos.RunAgent(): no video sub stream found, might be the wrong codec (we only support H264 for the moment)")
+			entry := log.WithFields(runFields).WithFields(log.Fields{
+				"event":        "rtsp_video_missing",
+				"stream":       "sub",
+				"stream_count": len(videoSubStreams),
+			})
+			if err != nil {
+				entry = entry.WithError(err)
+			}
+			entry.Error("RTSP stream has no supported video track")
 			shutdownCause = errors.New("sub RTSP stream has no supported video track")
 			if err != nil {
 				shutdownCause = err
@@ -288,7 +354,14 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 
 		// Get the video stream from the RTSP server.
 		videoSubStream := videoSubStreams[0]
-		log.Log.Info(fmt.Sprintf("components.Kerberos.RunAgent(): detected sub video stream: codec=%s resolution=%dx%d fps=%.2f", videoSubStream.Name, videoSubStream.Width, videoSubStream.Height, videoSubStream.FPS))
+		log.WithFields(runFields).WithFields(log.Fields{
+			"codec":  videoSubStream.Name,
+			"event":  "video_stream_detected",
+			"fps":    videoSubStream.FPS,
+			"height": videoSubStream.Height,
+			"stream": "sub",
+			"width":  videoSubStream.Width,
+		}).Info("Video stream detected")
 
 		width := videoSubStream.Width
 		height := videoSubStream.Height
@@ -316,11 +389,16 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 	run.SetMainQueue(queue)
 
 	// Set the maximum GOP count, this is used to determine the pre-recording time.
-	log.Log.Info("components.Kerberos.RunAgent(): SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
+	log.WithFields(runFields).WithFields(log.Fields{
+		"event":         "packet_queue_configured",
+		"max_gop_count": int(config.Capture.PreRecording) + 1,
+		"stream":        "main",
+	}).Debug("Packet queue configured")
 	queue.SetMaxGopCount(1) // We will adjust this later on, when we have the GOP size.
 	queue.WriteHeader(videoStreams)
 	if err := run.Activate(); err != nil {
-		log.Log.Error("components.Kerberos.RunAgent(): failed to activate camera run: " + err.Error())
+		log.WithError(err).WithFields(runFields).WithField("event", "run_activation_failed").
+			Error("Failed to activate camera run")
 		if parent.Err() != nil {
 			status = runStatusParentCanceled
 			shutdownCause = context.Cause(parent)
@@ -352,7 +430,15 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 	run.SetBackchannelClient(rtspBackChannelClient)
 	err = rtspBackChannelClient.ConnectBackChannel(run.Context(), ctxRunAgent)
 	if err == nil {
-		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP backchannel stream: " + rtspUrl)
+		log.WithFields(runFields).WithFields(log.Fields{
+			"event":  "rtsp_connected",
+			"stream": "backchannel",
+		}).Info("RTSP stream connected")
+	} else {
+		log.WithError(err).WithFields(runFields).WithFields(log.Fields{
+			"event":  "rtsp_backchannel_unavailable",
+			"stream": "backchannel",
+		}).Debug("Optional RTSP backchannel is unavailable")
 	}
 
 	if subStreamEnabled && rtspSubClient != nil {
@@ -492,7 +578,9 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 	}
 
 	if taskRegistrationErr != nil {
-		log.Log.Error("components.Kerberos.RunAgent(): failed to register camera task: " + taskRegistrationErr.Error())
+		log.WithError(taskRegistrationErr).WithFields(runFields).
+			WithField("event", "task_registration_failed").
+			Error("Failed to register camera task")
 		if parent.Err() != nil {
 			status = runStatusParentCanceled
 			shutdownCause = context.Cause(parent)
@@ -510,7 +598,16 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 		case status = <-communication.HandleBootstrap:
 			shutdownCause = fmt.Errorf("camera run requested %s", status)
 		case failure := <-run.Failures():
-			log.Log.Error("components.Kerberos.RunAgent(): supervised task failed: " + failure.Error())
+			entry := log.WithError(failure.Cause).WithFields(runFields).WithFields(log.Fields{
+				"event": "task_failed",
+				"panic": failure.Panic != "",
+				"task":  failure.Task,
+			})
+			entry.Error("Supervised Agent task failed")
+			if len(failure.Stack) > 0 {
+				entry.WithField("stack", string(failure.Stack)).
+					Debug("Supervised Agent task panic stack")
+			}
 			status = "restart"
 			shutdownCause = failure.Cause
 		case <-parent.Done():
@@ -527,14 +624,24 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 	shutdownReport := shutdownAgentRun(run, communication, shutdownCause)
 	runStopped = true
 	if shutdownReport.Complete {
-		log.Log.Info("components.Kerberos.RunAgent(): all run workers stopped")
+		log.WithFields(runFields).WithFields(log.Fields{
+			"event":      "workers_stopped",
+			"status":     status,
+			"task_count": len(shutdownReport.Tasks),
+		}).Info("All Agent run workers stopped")
 		for _, task := range shutdownReport.Tasks {
 			if task.Status == lifecycle.TaskPanicked {
-				log.Log.Error(fmt.Sprintf(
-					"components.Kerberos.RunAgent(): task %q panicked during shutdown: %s",
-					task.Name,
-					task.Panic,
-				))
+				entry := log.WithFields(runFields).WithFields(log.Fields{
+					"event": "task_panicked",
+					"panic": task.Panic,
+					"task":  task.Name,
+				})
+				entry.Error("Agent task panicked during shutdown")
+				if len(task.Stack) > 0 {
+					entry.WithField("stack", string(task.Stack)).
+						Debug("Agent task panic stack")
+				}
+
 				if status != "stop" {
 					status = "restart"
 				}
@@ -562,20 +669,33 @@ func shutdownAgentRun(run *models.AgentRun, communication *models.Communication,
 
 	report := run.Shutdown(waitContext, cause)
 	for _, resourceErr := range report.ResourceErrors {
-		log.Log.Error("components.Kerberos.RunAgent(): " + resourceErr.Error())
+		log.WithError(resourceErr.Err).WithFields(log.Fields{
+			"component": "agent_run",
+			"event":     "resource_close_failed",
+			"resource":  resourceErr.Resource,
+			"run_id":    run.ID(),
+		}).Error("Agent run resource failed to close")
 	}
 	if report.Complete {
 		return report
 	}
 
 	communication.RecordRunWorkerShutdownTimeout()
-	log.Log.Error("components.Kerberos.RunAgent(): timed out waiting for run workers to stop")
+	log.WithError(cause).WithFields(log.Fields{
+		"component":          "agent_run",
+		"event":              "worker_shutdown_timeout",
+		"run_id":             run.ID(),
+		"running_task_count": len(report.Running),
+		"timeout_ms":         runShutdownTimeout.Milliseconds(),
+	}).Error("Timed out waiting for Agent run workers")
 	for _, task := range report.Running {
-		log.Log.Error(fmt.Sprintf(
-			"components.Kerberos.RunAgent(): task %q still running after %s",
-			task.Name,
-			time.Since(task.StartedAt).Round(time.Millisecond),
-		))
+		log.WithFields(log.Fields{
+			"component":   "agent_run",
+			"duration_ms": time.Since(task.StartedAt).Milliseconds(),
+			"event":       "task_stuck",
+			"run_id":      run.ID(),
+			"task":        task.Name,
+		}).Error("Agent task is still running after shutdown timeout")
 	}
 	return report
 }
@@ -591,12 +711,9 @@ func waitForRunRetry(ctx context.Context) bool {
 	}
 }
 
-// packetAgeString returns a human readable age (e.g. "12s") since the last
-// packet timestamp stored in the given atomic.Value, or "unknown" when no
-// packet has been received yet. Used to add context to watchdog restart logs.
-func packetAgeString(timer *atomic.Value) string {
+func packetAgeSeconds(timer *atomic.Value) (int64, bool) {
 	if timer == nil {
-		return "unknown"
+		return 0, false
 	}
 
 	// atomic.Value panics on Load() if it was never initialized via Store().
@@ -612,21 +729,25 @@ func packetAgeString(timer *atomic.Value) string {
 
 	last, ok := v.(int64)
 	if !ok || last == 0 {
-		return "unknown"
+		return 0, false
 	}
 
 	age := time.Now().Unix() - last
 	if age < 0 {
 		age = 0
 	}
-	return strconv.FormatInt(age, 10) + "s"
+	return age, true
 }
 
 // ControlAgent will check if the camera is still connected, if not it will restart the agent.
 // In the other thread we are keeping track of the number of complete video access units received.
 // Once we are not receiving any packets anymore, we will restart the agent.
 func ControlAgent(communication *models.Communication) {
-	log.Log.Debug("components.Kerberos.ControlAgent(): started")
+	log.WithFields(log.Fields{
+		"component":   "watchdog",
+		"event":       "watchdog_started",
+		"interval_ms": streamWatchdogInterval.Milliseconds(),
+	}).Debug("Stream watchdog started")
 	packageCounter := communication.PackageCounter
 	packageSubCounter := communication.PackageCounterSub
 	go func() {
@@ -640,11 +761,14 @@ func ControlAgent(communication *models.Communication) {
 
 			packetsR := packageCounter.Load().(int64)
 			packetsSubR := packageSubCounter.Load().(int64)
-			log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from mainstream: " + strconv.FormatInt(packetsR, 10))
 			subStreamConnected := communication.SubStreamConnected.Load()
-			if subStreamConnected {
-				log.Log.Info("components.Kerberos.ControlAgent(): Number of packets read from substream: " + strconv.FormatInt(packetsSubR, 10))
-			}
+			log.WithFields(log.Fields{
+				"component":           "watchdog",
+				"event":               "packet_counters",
+				"main_packets":        packetsR,
+				"sub_packets":         packetsSubR,
+				"substream_connected": subStreamConnected,
+			}).Debug("Stream packet counters sampled")
 
 			reason, restart := watchdog.Observe(time.Now(), packetsR, packetsSubR, subStreamConnected, communication.IsConfiguring.IsSet())
 			if !restart {
@@ -652,20 +776,38 @@ func ControlAgent(communication *models.Communication) {
 				continue
 			}
 
-			log.Log.Info(fmt.Sprintf(
-				"components.Kerberos.ControlAgent(): Restarting machinery because of blocking %s. (mainPackets=%d, subPackets=%d, mainLastPacket=%s ago, subLastPacket=%s ago, nextBackoff=%s)",
-				reason, packetsR, packetsSubR, packetAgeString(communication.LastPacketTimer), packetAgeString(communication.LastPacketTimerSub), watchdog.Backoff(),
-			))
+			mainPacketAgeSeconds, mainPacketAgeKnown := packetAgeSeconds(communication.LastPacketTimer)
+			subPacketAgeSeconds, subPacketAgeKnown := packetAgeSeconds(communication.LastPacketTimerSub)
+			log.WithFields(log.Fields{
+				"component":                    "watchdog",
+				"event":                        "stream_restart_requested",
+				"main_last_packet_age_known":   mainPacketAgeKnown,
+				"main_last_packet_age_seconds": mainPacketAgeSeconds,
+				"main_packets":                 packetsR,
+				"next_backoff_ms":              watchdog.Backoff().Milliseconds(),
+				"reason":                       reason,
+				"sub_last_packet_age_known":    subPacketAgeKnown,
+				"sub_last_packet_age_seconds":  subPacketAgeSeconds,
+				"sub_packets":                  packetsSubR,
+			}).Warn("Stream watchdog requested an Agent restart")
+
 			select {
 			case communication.HandleBootstrap <- "restart":
 				cooldown := watchdog.MarkRestart(time.Now())
 				communication.RecordWatchdogRestart(cooldown)
 			case <-time.After(time.Second):
-				log.Log.Info("components.Kerberos.ControlAgent(): Restarting machinery timed out")
+				log.WithFields(log.Fields{
+					"component":  "watchdog",
+					"event":      "restart_signal_timeout",
+					"timeout_ms": time.Second.Milliseconds(),
+				}).Error("Timed out delivering watchdog restart signal")
 			}
 		}
 	}()
-	log.Log.Debug("components.Kerberos.ControlAgent(): finished")
+	log.WithFields(log.Fields{
+		"component": "watchdog",
+		"event":     "watchdog_worker_started",
+	}).Debug("Stream watchdog worker started")
 }
 
 const (
@@ -907,12 +1049,12 @@ func GetDays(c *gin.Context, configDirectory string, configuration *models.Confi
 // @Description Stop the agent.
 // @Success 200 {object} models.APIResponse
 func StopAgent(c *gin.Context, communication *models.Communication) {
-	log.Log.Info("components.Kerberos.StopAgent(): sending signal to stop agent, this will os.Exit(0).")
+	log.Info("components.Kerberos.StopAgent(): sending signal to stop agent, this will os.Exit(0).")
 	select {
 	case communication.HandleBootstrap <- "stop":
-		log.Log.Info("components.Kerberos.StopAgent(): Stopping machinery.")
+		log.Info("components.Kerberos.StopAgent(): Stopping machinery.")
 	case <-time.After(1 * time.Second):
-		log.Log.Info("components.Kerberos.StopAgent(): Stopping machinery timed out")
+		log.Info("components.Kerberos.StopAgent(): Stopping machinery timed out")
 	}
 	c.JSON(200, gin.H{
 		"stopped": true,
@@ -927,12 +1069,12 @@ func StopAgent(c *gin.Context, communication *models.Communication) {
 // @Description Restart the agent.
 // @Success 200 {object} models.APIResponse
 func RestartAgent(c *gin.Context, communication *models.Communication) {
-	log.Log.Info("components.Kerberos.RestartAgent(): sending signal to restart agent.")
+	log.Info("components.Kerberos.RestartAgent(): sending signal to restart agent.")
 	select {
 	case communication.HandleBootstrap <- "restart":
-		log.Log.Info("components.Kerberos.RestartAgent(): Restarting machinery.")
+		log.Info("components.Kerberos.RestartAgent(): Restarting machinery.")
 	case <-time.After(1 * time.Second):
-		log.Log.Info("components.Kerberos.RestartAgent(): Restarting machinery timed out")
+		log.Info("components.Kerberos.RestartAgent(): Restarting machinery timed out")
 	}
 	c.JSON(200, gin.H{
 		"restarted": true,
@@ -947,7 +1089,7 @@ func RestartAgent(c *gin.Context, communication *models.Communication) {
 // @Description Make a recording.
 // @Success 200 {object} models.APIResponse
 func MakeRecording(c *gin.Context, communication *models.Communication) {
-	log.Log.Info("components.Kerberos.MakeRecording(): sending signal to start recording.")
+	log.Info("components.Kerberos.MakeRecording(): sending signal to start recording.")
 	dataToPass := models.MotionDataPartial{
 		Timestamp:       time.Now().Unix(),
 		NumberOfChanges: 100000000, // hack set the number of changes to a high number to force recording
@@ -1024,7 +1166,7 @@ func GetConfig(c *gin.Context, captureDevice *capture.Capture, configuration *mo
 			communication.Image = base64Image
 		}
 	case <-time.After(2 * time.Second):
-		log.Log.Info("components.Kerberos.GetConfig(): snapshot timed out (stream stalled or camera offline), returning configuration with the last cached snapshot.")
+		log.Info("components.Kerberos.GetConfig(): snapshot timed out (stream stalled or camera offline), returning configuration with the last cached snapshot.")
 	}
 
 	c.JSON(200, gin.H{

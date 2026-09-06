@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	log "github.com/sirupsen/logrus"
 )
 
 // tusResumableVersion is the tus protocol version implemented by this client.
@@ -90,7 +90,14 @@ func logTusUploadProgress(label string, offset, size int64, loggedBucket *int64)
 	if percent > 100 {
 		percent = 100
 	}
-	log.Log.Infof("%s: resumable upload progress %d%% (%d/%d bytes)", label, percent, offset, size)
+	log.WithFields(log.Fields{
+		"bytes_sent":  offset,
+		"bytes_total": size,
+		"component":   "tus",
+		"event":       "upload_progress",
+		"progress":    percent,
+		"target":      label,
+	}).Info("Resumable upload progress")
 }
 
 // tusHeaderFunc sets the authentication and routing headers required on every
@@ -121,7 +128,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 	}
 	if ferr != nil {
 		msg := label + ": resumable upload failed, file doesn't exist anymore"
-		log.Log.Info(msg)
+		log.Info(msg)
 		// The file is gone, so the legacy path cannot help either. Report it as
 		// "supported" to avoid a pointless fallback attempt.
 		return false, false, true, "", errors.New(msg)
@@ -182,7 +189,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 					// The vault does not implement tus; let the caller fall back.
 					return false, false, false, "", cerr
 				}
-				log.Log.Info(label + ": resumable create failed, " + cerr.Error())
+				log.Info(label + ": resumable create failed, " + cerr.Error())
 				tusBackoff(attempt)
 				continue
 			}
@@ -200,7 +207,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 				uploadURL = ""
 				continue
 			}
-			log.Log.Info(label + ": resumable head failed, " + herr.Error())
+			log.Info(label + ": resumable head failed, " + herr.Error())
 			tusBackoff(attempt)
 			continue
 		}
@@ -253,9 +260,9 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 				if status >= 400 {
 					// Definitive rejection (e.g. provider push failed during finalize).
 					// Re-evaluate via HEAD on the next iteration to decide retry/restart.
-					log.Log.Info(label + ": resumable patch rejected, " + perr.Error())
+					log.Info(label + ": resumable patch rejected, " + perr.Error())
 				} else {
-					log.Log.Info(label + ": resumable patch failed, " + perr.Error())
+					log.Info(label + ": resumable patch failed, " + perr.Error())
 				}
 				tusBackoff(attempt)
 				patchFailed = true

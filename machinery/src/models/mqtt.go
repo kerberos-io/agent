@@ -12,7 +12,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
-	"github.com/kerberos-io/agent/machinery/src/log"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -95,7 +95,7 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 	// Create a Version 4 UUID.
 	u2, err := uuid.NewV4()
 	if err != nil {
-		log.Log.Error("failed to generate UUID: " + err.Error())
+		log.Error("failed to generate UUID: " + err.Error())
 	}
 
 	// We'll generate an unique id, and encrypt / decrypt it using the private key if available.
@@ -121,7 +121,10 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 		// Pload to base64
 		data, err := json.Marshal(pload)
 		if err != nil {
-			log.Log.Error("models.mqtt.PackageMQTTMessage(): failed to marshal payload: " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"component": "models/mqtt",
+				"event":     "payload_marshal_failed",
+			}).Error("Failed to marshal MQTT payload")
 		}
 
 		// Encrypt the value
@@ -129,9 +132,12 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 		rsaKey, err := rsaPrivateKeyCache.get(privateKey)
 		if err != nil {
 			if errors.Is(err, errMQTTPrivateKeyPEMDecode) {
-				log.Log.Error("models.mqtt.PackageMQTTMessage(): error decoding PEM block containing private key")
+				log.Error("models.mqtt.PackageMQTTMessage(): error decoding PEM block containing private key")
 			} else {
-				log.Log.Error("models.mqtt.PackageMQTTMessage(): error parsing private key: " + err.Error())
+				log.WithError(err).WithFields(log.Fields{
+					"component": "models/mqtt",
+					"event":     "private_key_parse_failed",
+				}).Error("Failed to parse MQTT private key")
 			}
 		} else {
 			// Create a 16bit key random

@@ -16,11 +16,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/conditions"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/video"
+	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -49,7 +49,7 @@ func publishRecordingState(mqttClient mqtt.Client, hubKey string, configuration 
 	if err == nil {
 		mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 	} else {
-		log.Log.Error("capture.main.publishRecordingState(): failed to package MQTT message: " + err.Error())
+		log.Error("capture.main.publishRecordingState(): failed to package MQTT message: " + err.Error())
 	}
 }
 
@@ -72,7 +72,7 @@ func recordingUploadMetadata(name, deviceKey string, timestamp int64, mp4Video *
 func queueRecordingForUpload(configDirectory string, metadata models.RecordingUploadMetadata) {
 	payload, err := json.Marshal(metadata)
 	if err != nil {
-		log.Log.Error("capture.main.queueRecordingForUpload(): " + err.Error())
+		log.Error("capture.main.queueRecordingForUpload(): " + err.Error())
 		return
 	}
 
@@ -95,7 +95,7 @@ func queueRecordingForUpload(configDirectory string, metadata models.RecordingUp
 		err = os.Rename(marker.Name(), filepath.Join(configDirectory, "data", "cloud", models.RecordingUploadMetadataFileName(metadata.FileName)))
 	}
 	if err != nil {
-		log.Log.Error("capture.main.queueRecordingForUpload(): " + err.Error())
+		log.Error("capture.main.queueRecordingForUpload(): " + err.Error())
 	}
 }
 
@@ -137,9 +137,9 @@ func manualRecordingExpired(communication *models.Communication, now int64) bool
 		return false
 	}
 	if heartbeatExpired {
-		log.Log.Info("capture.main.HandleRecordStream(motiondetection): auto-stopping manual recording, no viewer heartbeat within timeout.")
+		log.Info("capture.main.HandleRecordStream(motiondetection): auto-stopping manual recording, no viewer heartbeat within timeout.")
 	} else {
-		log.Log.Info("capture.main.HandleRecordStream(motiondetection): auto-stopping manual recording, maximum duration reached.")
+		log.Info("capture.main.HandleRecordStream(motiondetection): auto-stopping manual recording, maximum duration reached.")
 	}
 	communication.IsRecordingManual.UnSet()
 	communication.RecordingManualHeartbeat.Store(0)
@@ -151,7 +151,7 @@ func manualRecordingExpired(communication *models.Communication, now int64) bool
 func CleanupRecordingDirectory(configDirectory string, configuration *models.Configuration) {
 	autoClean := configuration.Config.AutoClean
 	if autoClean != "true" {
-		log.Log.Info("HandleRecordStream: Autoclean disabled, nothing to do here.")
+		log.Info("HandleRecordStream: Autoclean disabled, nothing to do here.")
 		return
 	}
 
@@ -164,7 +164,7 @@ func CleanupRecordingDirectory(configDirectory string, configuration *models.Con
 	// disk while keeping a free-space reserve.
 	needsCleanup, err := recordingsNeedCleanup(recordingsDirectory, configuration)
 	if err != nil {
-		log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+		log.Info("HandleRecordStream: something went wrong, " + err.Error())
 		return
 	}
 	if !needsCleanup {
@@ -185,12 +185,12 @@ func CleanupRecordingDirectory(configDirectory string, configuration *models.Con
 	// (otherwise a long outage would fill the disk and stop new recordings).
 	name, pending, err := pickRecordingToCleanup(recordingsDirectory, cloudDirectory)
 	if err != nil {
-		log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+		log.Info("HandleRecordStream: something went wrong, " + err.Error())
 		return
 	}
 
 	if err := os.Remove(recordingsDirectory + "/" + name); err != nil {
-		log.Log.Info("HandleRecordStream: something went wrong, " + err.Error())
+		log.Info("HandleRecordStream: something went wrong, " + err.Error())
 		return
 	}
 
@@ -200,14 +200,14 @@ func CleanupRecordingDirectory(configDirectory string, configuration *models.Con
 		// that was never uploaded to keep recording new footage. Also remove the
 		// now-dangling upload marker so the upload loop doesn't keep trying to
 		// upload a file that no longer exists.
-		log.Log.Warning("HandleRecordStream: removed oldest recording as part of cleanup, but it was STILL PENDING UPLOAD (disk full of un-uploaded recordings) - " + recordingsDirectory + "/" + name)
+		log.Warn("HandleRecordStream: removed oldest recording as part of cleanup, but it was STILL PENDING UPLOAD (disk full of un-uploaded recordings) - " + recordingsDirectory + "/" + name)
 		for _, markerName := range uploadMarkerNames(name) {
 			if err := os.Remove(filepath.Join(cloudDirectory, markerName)); err != nil && !os.IsNotExist(err) {
-				log.Log.Info("HandleRecordStream: could not remove dangling upload marker " + markerName + ", " + err.Error())
+				log.Info("HandleRecordStream: could not remove dangling upload marker " + markerName + ", " + err.Error())
 			}
 		}
 	} else {
-		log.Log.Info("HandleRecordStream: removed oldest file as part of cleanup - " + recordingsDirectory + "/" + name)
+		log.Info("HandleRecordStream: removed oldest file as part of cleanup - " + recordingsDirectory + "/" + name)
 	}
 }
 
@@ -345,9 +345,9 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 	communication.RecordingManualHeartbeatSeen.UnSet()
 
 	if config.Capture.Recording == "false" {
-		log.Log.Info("capture.main.HandleRecordStream(): disabled, we will not record anything.")
+		log.Info("capture.main.HandleRecordStream(): disabled, we will not record anything.")
 	} else {
-		log.Log.Debug("capture.main.HandleRecordStream(): started")
+		log.Debug("capture.main.HandleRecordStream(): started")
 
 		preRecording := config.Capture.PreRecording * 1000
 		postRecording := config.Capture.PostRecording * 1000           // number of seconds to record.
@@ -360,7 +360,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 		}
 
 		if maxRecordingPeriod < preRecording+postRecording {
-			log.Log.Error("capture.main.HandleRecordStream(): maxRecordingPeriod is less than preRecording + postRecording, this is not allowed. Setting maxRecordingPeriod to preRecording + postRecording.")
+			log.Error("capture.main.HandleRecordStream(): maxRecordingPeriod is less than preRecording + postRecording, this is not allowed. Setting maxRecordingPeriod to preRecording + postRecording.")
 			maxRecordingPeriod = preRecording + postRecording
 		}
 
@@ -394,7 +394,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var name string
 
 			// Do not do anything!
-			log.Log.Info("capture.main.HandleRecordStream(continuous): start recording")
+			log.Info("capture.main.HandleRecordStream(continuous): start recording")
 
 			start := false
 
@@ -440,10 +440,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 					if (videoCodec == "H264" && (len(mp4Video.SPSNALUs) == 0 || len(mp4Video.PPSNALUs) == 0)) ||
 						(videoCodec == "H265" && (len(mp4Video.VPSNALUs) == 0 || len(mp4Video.SPSNALUs) == 0 || len(mp4Video.PPSNALUs) == 0)) {
-						log.Log.Warning("capture.main.HandleRecordStream(continuous): closing MP4 without full parameter sets, moov may be incomplete")
+						log.Warn("capture.main.HandleRecordStream(continuous): closing MP4 without full parameter sets, moov may be incomplete")
 					}
 					mp4Video.Close(&config)
-					log.Log.Info("capture.main.HandleRecordStream(continuous): recording finished: file save: " + name)
+					log.Info("capture.main.HandleRecordStream(continuous): recording finished: file save: " + name)
 
 					// Cleanup muxer
 					start = false
@@ -467,7 +467,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						oldName := name
 						name = s + ".mp4"
 						fullName = configDirectory + "/data/recordings/" + name
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
+						log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
 
 						// Rename the file to the new name.
 						err := os.Rename(
@@ -475,10 +475,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							configDirectory+"/data/recordings/"+s+".mp4")
 
 						if err != nil {
-							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
+							log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
 						}
 					} else {
-						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
+						log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
 					}
 
 					// Check if we need to encrypt the recording.
@@ -492,13 +492,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 								// write back to file
 								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
 								if err != nil {
-									log.Log.Error("capture.main.HandleRecordStream(continuous): error writing file: " + err.Error())
+									log.Error("capture.main.HandleRecordStream(continuous): error writing file: " + err.Error())
 								}
 							} else {
-								log.Log.Error("capture.main.HandleRecordStream(continuous): error encrypting file: " + err.Error())
+								log.Error("capture.main.HandleRecordStream(continuous): error encrypting file: " + err.Error())
 							}
 						} else {
-							log.Log.Error("capture.main.HandleRecordStream(continuous): error reading file: " + err.Error())
+							log.Error("capture.main.HandleRecordStream(continuous): error reading file: " + err.Error())
 						}
 					}
 
@@ -520,7 +520,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// We'll validate those conditions and if not valid we'll not do anything.
 					valid, err := conditions.Validate(loc, configuration)
 					if !valid && err != nil {
-						log.Log.Debug("capture.main.HandleRecordStream(continuous): " + err.Error() + ".")
+						log.Debug("capture.main.HandleRecordStream(continuous): " + err.Error() + ".")
 						time.Sleep(5 * time.Second)
 						continue
 					}
@@ -552,7 +552,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					fullName = configDirectory + "/data/recordings/" + name
 
 					// Running...
-					log.Log.Info("capture.main.HandleRecordStream(continuous): recording started")
+					log.Info("capture.main.HandleRecordStream(continuous): recording started")
 
 					// Get width and height from the camera.
 					width := configuration.Config.Capture.IPCamera.Width
@@ -564,7 +564,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					vpsNALUS := configuration.Config.Capture.IPCamera.VPSNALUs
 
 					if len(spsNALUS) == 0 || len(ppsNALUS) == 0 {
-						log.Log.Warning("capture.main.HandleRecordStream(continuous): missing SPS/PPS at recording start")
+						log.Warn("capture.main.HandleRecordStream(continuous): missing SPS/PPS at recording start")
 					}
 					// Create a video file, and set the dimensions.
 					mp4Video = video.NewMP4(fullName, spsNALUS, ppsNALUS, vpsNALUS, configuration.Config.Capture.MaxLengthRecording)
@@ -579,7 +579,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					if audioCodec == "AAC" {
 						audioTrack = mp4Video.AddAudioTrack("AAC")
 					} else if audioCodec == "PCM_MULAW" {
-						log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
+						log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 					}
 
 					writeSampleToMP4(mp4Video, videoTrack, audioTrack, pkt)
@@ -600,7 +600,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			if cursorError != nil {
 				if recordingStatus == "started" {
 
-					log.Log.Info("capture.main.HandleRecordStream(continuous): Recording finished: file save: " + name)
+					log.Info("capture.main.HandleRecordStream(continuous): Recording finished: file save: " + name)
 
 					// Cleanup muxer
 					start = false
@@ -624,7 +624,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						oldName := name
 						name = s + ".mp4"
 						fullName = configDirectory + "/data/recordings/" + name
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
+						log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
 
 						// Rename the file to the new name.
 						err := os.Rename(
@@ -632,10 +632,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							configDirectory+"/data/recordings/"+s+".mp4")
 
 						if err != nil {
-							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
+							log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
 						}
 					} else {
-						log.Log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
+						log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
 					}
 
 					// Check if we need to encrypt the recording.
@@ -649,13 +649,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 								// write back to file
 								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
 								if err != nil {
-									log.Log.Error("capture.main.HandleRecordStream(motiondetection): error writing file: " + err.Error())
+									log.Error("capture.main.HandleRecordStream(motiondetection): error writing file: " + err.Error())
 								}
 							} else {
-								log.Log.Error("capture.main.HandleRecordStream(motiondetection): error encrypting file: " + err.Error())
+								log.Error("capture.main.HandleRecordStream(motiondetection): error encrypting file: " + err.Error())
 							}
 						} else {
-							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error reading file: " + err.Error())
+							log.Error("capture.main.HandleRecordStream(motiondetection): error reading file: " + err.Error())
 						}
 					}
 
@@ -672,7 +672,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			}
 		} else {
 
-			log.Log.Info("capture.main.HandleRecordStream(motiondetection): Start motion based recording ")
+			log.Info("capture.main.HandleRecordStream(motiondetection): Start motion based recording ")
 
 			var lastRecordingTime int64 = 0 // last recording timestamp in milliseconds
 			var displayTime int64 = 0       // display time in milliseconds
@@ -710,7 +710,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 				// If startRecording is 0, we will continue as it might be we are in a state of restarting the agent.
 				if startRecording == 0 {
-					log.Log.Info("capture.main.HandleRecordStream(motiondetection): startRecording is 0, we will continue as it might be we are in a state of restarting the agent.")
+					log.Info("capture.main.HandleRecordStream(motiondetection): startRecording is 0, we will continue as it might be we are in a state of restarting the agent.")
 					continue
 				}
 
@@ -748,7 +748,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				fullName := configDirectory + "/data/recordings/" + name
 
 				// Running...
-				log.Log.Info("capture.main.HandleRecordStream(motiondetection): recording started (" + name + ")" + " at " + strconv.FormatInt(displayTimeSeconds, 10) + " unix")
+				log.Info("capture.main.HandleRecordStream(motiondetection): recording started (" + name + ")" + " at " + strconv.FormatInt(displayTimeSeconds, 10) + " unix")
 
 				// Get width and height from the camera.
 				width := configuration.Config.Capture.IPCamera.Width
@@ -760,7 +760,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				vpsNALUS := configuration.Config.Capture.IPCamera.VPSNALUs
 
 				if len(spsNALUS) == 0 || len(ppsNALUS) == 0 {
-					log.Log.Warning("capture.main.HandleRecordStream(motiondetection): missing SPS/PPS at recording start")
+					log.Warn("capture.main.HandleRecordStream(motiondetection): missing SPS/PPS at recording start")
 				}
 				// Create the MP4 only once the first keyframe arrives.
 				var mp4Video *video.MP4
@@ -769,16 +769,16 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					nextPkt, cursorError = recordingCursor.ReadPacket()
 					if cursorError != nil {
-						log.Log.Error("capture.main.HandleRecordStream(motiondetection): " + cursorError.Error())
+						log.Error("capture.main.HandleRecordStream(motiondetection): " + cursorError.Error())
 					}
 
 					now = time.Now().UnixMilli()
 					select {
 					case motion := <-motionEvents:
 						motionTimestamp = now
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): motion detected while recording. Expanding recording.")
+						log.Info("capture.main.HandleRecordStream(motiondetection): motion detected while recording. Expanding recording.")
 						numberOfChanges := motion.NumberOfChanges
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
+						log.Info("capture.main.HandleRecordStream(motiondetection): Received message with recording data, detected changes to save: " + strconv.Itoa(numberOfChanges))
 					default:
 					}
 
@@ -794,16 +794,16 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 
 					if start && (motionTimestamp+postRecording-now < 0 || now-startRecording > maxRecordingPeriod-500) && nextPkt.IsKeyFrame {
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(motionTimestamp+postRecording-now, 10) + " < 0")
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-500 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-500, 10))
-						log.Log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(motionTimestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
+						log.Info("capture.main.HandleRecordStream(motiondetection): timestamp+postRecording-now < 0  - " + strconv.FormatInt(motionTimestamp+postRecording-now, 10) + " < 0")
+						log.Info("capture.main.HandleRecordStream(motiondetection): now-startRecording > maxRecordingPeriod-500 - " + strconv.FormatInt(now-startRecording, 10) + " > " + strconv.FormatInt(maxRecordingPeriod-500, 10))
+						log.Info("capture.main.HandleRecordStream(motiondetection): closing recording (timestamp: " + strconv.FormatInt(motionTimestamp, 10) + ", postRecording: " + strconv.FormatInt(postRecording, 10) + ", now: " + strconv.FormatInt(now, 10) + ", startRecording: " + strconv.FormatInt(startRecording, 10) + ", maxRecordingPeriod: " + strconv.FormatInt(maxRecordingPeriod, 10))
 						break
 					}
 					if pkt.IsKeyFrame && !start && pkt.CurrentTime >= startRecording {
 						// We start the recording if we have a keyframe and the last duration is 0 or less than the current packet time.
 						// It could be start we start from the beginning of the recording.
-						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): write frames")
-						log.Log.Debug("capture.main.HandleRecordStream(motiondetection): recording started on keyframe")
+						log.Debug("capture.main.HandleRecordStream(motiondetection): write frames")
+						log.Debug("capture.main.HandleRecordStream(motiondetection): recording started on keyframe")
 
 						// Align duration timers with the first keyframe.
 						startRecording = pkt.CurrentTime
@@ -821,7 +821,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						if audioCodec == "AAC" {
 							audioTrack = mp4Video.AddAudioTrack("AAC")
 						} else if audioCodec == "PCM_MULAW" {
-							log.Log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
+							log.Debug("capture.main.HandleRecordStream(continuous): no AAC audio codec detected, skipping audio track.")
 						}
 						start = true
 
@@ -840,7 +840,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				lastRecordingTime = pkt.CurrentTime
 
 				if mp4Video == nil {
-					log.Log.Warning("capture.main.HandleRecordStream(motiondetection): recording closed without keyframe; no MP4 created")
+					log.Warn("capture.main.HandleRecordStream(motiondetection): recording closed without keyframe; no MP4 created")
 					continue
 				}
 
@@ -856,10 +856,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				}
 				if (videoCodec == "H264" && (len(mp4Video.SPSNALUs) == 0 || len(mp4Video.PPSNALUs) == 0)) ||
 					(videoCodec == "H265" && (len(mp4Video.VPSNALUs) == 0 || len(mp4Video.SPSNALUs) == 0 || len(mp4Video.PPSNALUs) == 0)) {
-					log.Log.Warning("capture.main.HandleRecordStream(motiondetection): closing MP4 without full parameter sets, moov may be incomplete")
+					log.Warn("capture.main.HandleRecordStream(motiondetection): closing MP4 without full parameter sets, moov may be incomplete")
 				}
 				mp4Video.Close(&config)
-				log.Log.Info("capture.main.HandleRecordStream(motiondetection): file save: " + name)
+				log.Info("capture.main.HandleRecordStream(motiondetection): file save: " + name)
 
 				// Notify the hub / live-view UI that this camera stopped recording.
 				publishRecordingState(mqttClient, hubKey, configuration, false)
@@ -891,7 +891,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					oldName := name
 					name = s + ".mp4"
 					fullName = configDirectory + "/data/recordings/" + name
-					log.Log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
+					log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
 
 					// Rename the file to the new name.
 					err := os.Rename(
@@ -899,10 +899,10 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						configDirectory+"/data/recordings/"+s+".mp4")
 
 					if err != nil {
-						log.Log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
+						log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
 					}
 				} else {
-					log.Log.Info("capture.main.HandleRecordStream(motiondetection): no video data recorded, not renaming file.")
+					log.Info("capture.main.HandleRecordStream(motiondetection): no video data recorded, not renaming file.")
 				}
 
 				// Check if we need to encrypt the recording.
@@ -916,13 +916,13 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							// write back to file
 							err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
 							if err != nil {
-								log.Log.Error("capture.main.HandleRecordStream(motiondetection): error writing file: " + err.Error())
+								log.Error("capture.main.HandleRecordStream(motiondetection): error writing file: " + err.Error())
 							}
 						} else {
-							log.Log.Error("capture.main.HandleRecordStream(motiondetection): error encrypting file: " + err.Error())
+							log.Error("capture.main.HandleRecordStream(motiondetection): error encrypting file: " + err.Error())
 						}
 					} else {
-						log.Log.Error("capture.main.HandleRecordStream(motiondetection): error reading file: " + err.Error())
+						log.Error("capture.main.HandleRecordStream(motiondetection): error reading file: " + err.Error())
 					}
 				}
 
@@ -933,7 +933,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			}
 		}
 
-		log.Log.Debug("capture.main.HandleRecordStream(): finished")
+		log.Debug("capture.main.HandleRecordStream(): finished")
 	}
 }
 
@@ -1136,20 +1136,16 @@ func writeSampleToMP4(mp4Video *video.MP4, videoTrack, audioTrack uint32, pkt pa
 			dts = pts - uint64(compositionOffset)
 		}
 		if err := mp4Video.AddSampleToTrack(videoTrack, pkt.IsKeyFrame, pkt.Data, dts, compositionOffset); err != nil {
-			log.Log.Error("capture.main.writeSampleToMP4(): " + err.Error())
+			log.Error("capture.main.writeSampleToMP4(): " + err.Error())
 		}
 	} else if pkt.IsAudio {
 		if pkt.Codec == "AAC" {
 			if err := mp4Video.AddSampleToTrack(audioTrack, pkt.IsKeyFrame, pkt.Data, pts, 0); err != nil {
-				log.Log.Error("capture.main.writeSampleToMP4(): " + err.Error())
+				log.Error("capture.main.writeSampleToMP4(): " + err.Error())
 			}
 		} else if pkt.Codec == "PCM_MULAW" {
 			// TODO: transcode to AAC, some work to do..
-			log.Log.Debug("capture.main.writeSampleToMP4(): no AAC audio codec detected, skipping audio track.")
+			log.Debug("capture.main.writeSampleToMP4(): no AAC audio codec detected, skipping audio track.")
 		}
 	}
 }
-
-/*func convertPTS2(v int64) uint64 {
-	return uint64(v) / 100
-}*/

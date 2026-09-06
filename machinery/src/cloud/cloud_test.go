@@ -3,6 +3,7 @@ package cloud
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -16,7 +17,7 @@ import (
 	goonvifptz "github.com/kerberos-io/onvif/ptz"
 )
 
-func TestHeartbeatFailureLogIncludesHubResponse(t *testing.T) {
+func TestHeartbeatFailureLogOmitsHubResponseBody(t *testing.T) {
 	response := &http.Response{
 		StatusCode: http.StatusBadRequest,
 		Status:     "400 Bad Request",
@@ -27,16 +28,24 @@ func TestHeartbeatFailureLogIncludesHubResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("readHeartbeatResponseBody() error = %v", err)
 	}
-	message := formatHeartbeatFailureLog(response, nil, responseBody, truncated, nil, 125*time.Millisecond)
+	fields := heartbeatFailureLogFields(response, responseBody, truncated, 125*time.Millisecond)
 
-	for _, expected := range []string{
-		"status_code=400",
-		`status="400 Bad Request"`,
-		"duration=125ms",
-		`response_body="{\"error\":\"invalid heartbeat\"}"`,
+	for key, want := range map[string]interface{}{
+		"duration_ms":             int64(125),
+		"response_body_bytes":     len(responseBody),
+		"response_body_truncated": false,
+		"status_code":             http.StatusBadRequest,
 	} {
-		if !strings.Contains(message, expected) {
-			t.Errorf("formatHeartbeatFailureLog() = %q, want it to contain %q", message, expected)
+		if got := fields[key]; got != want {
+			t.Errorf("%s = %v, want %v", key, got, want)
+		}
+	}
+	for key, value := range fields {
+		if strings.Contains(key, "response_body") && key != "response_body_bytes" && key != "response_body_truncated" {
+			t.Fatalf("unexpected response body field %q=%v", key, value)
+		}
+		if strings.Contains(fmt.Sprint(value), "invalid heartbeat") {
+			t.Fatalf("heartbeat log fields exposed response body in %q=%v", key, value)
 		}
 	}
 }

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/onvif/event/stream"
+	log "github.com/sirupsen/logrus"
 )
 
 // The library handles in-stream reconnect; these guards cover the
@@ -29,14 +29,14 @@ const (
 // blip, credential reload) the goroutine retries with exponential
 // backoff. Exits when ctx is cancelled.
 func HandleONVIFEventStream(ctx context.Context, configuration *models.Configuration, communication *models.Communication) {
-	log.Log.Debug("onvif.HandleONVIFEventStream(): started")
-	defer log.Log.Debug("onvif.HandleONVIFEventStream(): finished")
+	log.Debug("onvif.HandleONVIFEventStream(): started")
+	defer log.Debug("onvif.HandleONVIFEventStream(): finished")
 
 	if !isONVIFMotionEnabled(configuration.Config.Capture.ONVIFMotion) {
 		return
 	}
 	if configuration.Config.Capture.IPCamera.ONVIFXAddr == "" {
-		log.Log.Warning("onvif.HandleONVIFEventStream(): ONVIFMotion enabled but ONVIFXAddr is empty; nothing to do")
+		log.Warn("onvif.HandleONVIFEventStream(): ONVIFMotion enabled but ONVIFXAddr is empty; nothing to do")
 		return
 	}
 
@@ -66,23 +66,26 @@ func runStreamOnce(ctx context.Context, configuration *models.Configuration, com
 
 	device, _, err := ConnectToOnvifDevice(&camera)
 	if err != nil {
-		log.Log.Error("onvif.HandleONVIFEventStream(): connect: " + err.Error())
+		log.Error("onvif.HandleONVIFEventStream(): connect: " + err.Error())
 		return true
 	}
 
 	deviceID := resolveDeviceID(configuration.Name, camera.ONVIFXAddr)
 	s, err := stream.NewStream(ctx, device, stream.Options{DeviceID: deviceID})
 	if err != nil {
-		log.Log.Error("onvif.HandleONVIFEventStream(): open stream: " + err.Error())
+		log.Error("onvif.HandleONVIFEventStream(): open stream: " + err.Error())
 		return true
 	}
 	defer func() {
 		if err := s.Close(); err != nil {
-			log.Log.Debug("onvif.HandleONVIFEventStream(): close: " + err.Error())
+			log.Debug("onvif.HandleONVIFEventStream(): close: " + err.Error())
 		}
 	}()
 
-	log.Log.Info("onvif.HandleONVIFEventStream(): consuming events for " + deviceID)
+	log.WithFields(log.Fields{
+		"component": "onvif",
+		"event":     "event_stream_started",
+	}).Info("Consuming ONVIF events")
 
 	// recovering = the first successful event after an error streak
 	// logs a recovery line so on-call operators see the clear-of-
@@ -97,7 +100,10 @@ func runStreamOnce(ctx context.Context, configuration *models.Configuration, com
 				return false
 			}
 			if recovering {
-				log.Log.Info("onvif.HandleONVIFEventStream(): event stream recovered for " + deviceID)
+				log.WithFields(log.Fields{
+					"component": "onvif",
+					"event":     "event_stream_recovered",
+				}).Info("ONVIF event stream recovered")
 				recovering = false
 			}
 			dispatchEvent(ctx, ev, configuration, communication)
@@ -119,14 +125,14 @@ func runStreamOnce(ctx context.Context, configuration *models.Configuration, com
 func dispatchEvent(ctx context.Context, ev stream.Event, configuration *models.Configuration, communication *models.Communication) {
 	topic := sanitiseTopic(ev.Topic)
 	if ev.Kind != stream.KindMotion {
-		log.Log.Debug("onvif.dispatchEvent(): non-motion event " + ev.Kind.String() + " topic=" + topic)
+		log.Debug("onvif.dispatchEvent(): non-motion event " + ev.Kind.String() + " topic=" + topic)
 		return
 	}
 	if ev.State != stream.StateActive {
 		return
 	}
 	if !isTransition(ev.Operation) {
-		log.Log.Debug("onvif.dispatchEvent(): " + ev.Operation.String() + " is not a transition, not a trigger: topic=" + topic)
+		log.Debug("onvif.dispatchEvent(): " + ev.Operation.String() + " is not a transition, not a trigger: topic=" + topic)
 		return
 	}
 	if configuration.Config.Capture.Recording == "false" {
@@ -146,9 +152,9 @@ func dispatchEvent(ctx context.Context, ev stream.Event, configuration *models.C
 	if communication.TrySendMotion(dataToPass) {
 		// Logged on the send, not before it: this line records that a
 		// recording started, so a dropped event must not leave one.
-		log.Log.Debug("onvif.dispatchEvent(): recording trigger " + ev.Kind.String() + " topic=" + topic)
+		log.Debug("onvif.dispatchEvent(): recording trigger " + ev.Kind.String() + " topic=" + topic)
 	} else {
-		log.Log.Debug("onvif.dispatchEvent(): HandleMotion full, dropping ONVIF motion event")
+		log.Debug("onvif.dispatchEvent(): HandleMotion full, dropping ONVIF motion event")
 	}
 }
 
@@ -186,13 +192,13 @@ func logStreamError(e error) {
 	var renew stream.ErrRenewFailed
 	switch {
 	case errors.As(e, &recreate):
-		log.Log.Error("onvif.HandleONVIFEventStream(): subscription recreate failed (camera may be offline): " + recreate.Err.Error())
+		log.Error("onvif.HandleONVIFEventStream(): subscription recreate failed (camera may be offline): " + recreate.Err.Error())
 	case errors.As(e, &renew):
-		log.Log.Debug("onvif.HandleONVIFEventStream(): renew failed (will recover via pull/recreate): " + renew.Err.Error())
+		log.Debug("onvif.HandleONVIFEventStream(): renew failed (will recover via pull/recreate): " + renew.Err.Error())
 	case errors.As(e, &pull):
-		log.Log.Debug("onvif.HandleONVIFEventStream(): pull failed (will retry): " + pull.Err.Error())
+		log.Debug("onvif.HandleONVIFEventStream(): pull failed (will retry): " + pull.Err.Error())
 	default:
-		log.Log.Info("onvif.HandleONVIFEventStream(): stream error: " + e.Error())
+		log.Info("onvif.HandleONVIFEventStream(): stream error: " + e.Error())
 	}
 }
 

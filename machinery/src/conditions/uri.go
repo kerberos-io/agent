@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	log "github.com/sirupsen/logrus"
 )
 
 const conditionHTTPTimeout = 10 * time.Second
@@ -51,13 +50,19 @@ func IsValidUriResponse(configuration *models.Configuration) (enabled bool) {
 		}
 		jsonBody, err := json.Marshal(payload)
 		if err != nil {
-			log.Log.Error("conditions.uri.IsValidUriResponse(): failed to encode request: " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"component": "conditions/uri",
+				"event":     "request_encoding_failed",
+			}).Error("Failed to encode condition request")
 			return false
 		}
 
 		req, err := http.NewRequest(http.MethodPost, conditionURI, bytes.NewReader(jsonBody))
 		if err != nil {
-			log.Log.Error("conditions.uri.IsValidUriResponse(): failed to create request: " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"component": "conditions/uri",
+				"event":     "request_creation_failed",
+			}).Error("Failed to create condition request")
 			return false
 		}
 		req.Header.Set("Content-Type", "application/json")
@@ -67,12 +72,23 @@ func IsValidUriResponse(configuration *models.Configuration) (enabled bool) {
 			resp.Body.Close()
 		}
 		if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
-			log.Log.Info("conditions.uri.IsValidUriResponse(): response 200, enabling recording.")
+			log.WithFields(log.Fields{
+				"component":   "conditions/uri",
+				"event":       "recording_enabled",
+				"status_code": resp.StatusCode,
+			}).Info("Condition request enabled recording")
 		} else {
 			if err != nil {
-				log.Log.Error("conditions.uri.IsValidUriResponse(): request failed: " + err.Error())
+				log.WithError(err).WithFields(log.Fields{
+					"component": "conditions/uri",
+					"event":     "request_failed",
+				}).Error("Condition request failed")
 			} else {
-				log.Log.Info(fmt.Sprintf("conditions.uri.IsValidUriResponse(): response %d, disabling recording.", resp.StatusCode))
+				log.WithFields(log.Fields{
+					"component":   "conditions/uri",
+					"event":       "recording_disabled",
+					"status_code": resp.StatusCode,
+				}).Info("Condition request disabled recording")
 			}
 			enabled = false
 		}

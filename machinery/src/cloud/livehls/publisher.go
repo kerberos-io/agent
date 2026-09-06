@@ -30,8 +30,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/video"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -217,13 +217,14 @@ func (p *Publisher) post(ctx context.Context, params postParams) error {
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorResponseBytes))
-		detail := strings.Join(strings.Fields(string(body)), " ")
-		if detail != "" {
-			return fmt.Errorf("livehls: upload %s rejected: %s: %s", params.name, resp.Status, detail)
-		}
-		return fmt.Errorf("livehls: upload %s rejected: %s", params.name, resp.Status)
+		return fmt.Errorf("livehls: upload %s rejected with status %d (%d response bytes)", params.name, resp.StatusCode, len(body))
 	}
-	log.Log.Debug("livehls.Publisher.post(): shipped " + params.name + " for session " + params.sessionID)
+	log.WithFields(log.Fields{
+		"component":  "cloud/livehls",
+		"event":      "object_uploaded",
+		"object":     params.name,
+		"session_id": params.sessionID,
+	}).Trace("Live HLS object uploaded")
 	return nil
 }
 

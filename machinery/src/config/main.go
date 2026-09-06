@@ -13,8 +13,8 @@ import (
 
 	"github.com/InVisionApp/conjungo"
 	"github.com/kerberos-io/agent/machinery/src/database"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -38,7 +38,7 @@ func readFactoryConfig(collection *mongo.Collection, filter bson.M, destination 
 			return err
 		}
 
-		log.Log.Warning("Factory configuration read timed out or lost its database connection; retrying.")
+		log.Warn("Factory configuration read timed out or lost its database connection; retrying.")
 		time.Sleep(factoryConfigRetryDelay)
 	}
 }
@@ -50,14 +50,14 @@ func ReadUserConfig(configDirectory string) (userConfig models.User) {
 	for {
 		jsonFile, err := os.Open(configDirectory + "/data/config/user.json")
 		if err != nil {
-			log.Log.Error("Config file is not found " + configDirectory + "/data/config/user.json, trying again in 5s: " + err.Error())
+			log.Error("Config file is not found " + configDirectory + "/data/config/user.json, trying again in 5s: " + err.Error())
 			time.Sleep(5 * time.Second)
 		} else {
-			log.Log.Info("Successfully Opened user.json")
+			log.Info("Successfully Opened user.json")
 			byteValue, _ := ioutil.ReadAll(jsonFile)
 			err = json.Unmarshal(byteValue, &userConfig)
 			if err != nil {
-				log.Log.Error("JSON file not valid: " + err.Error())
+				log.Error("JSON file not valid: " + err.Error())
 			} else {
 				jsonFile.Close()
 				break
@@ -92,11 +92,11 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 			"type": "global",
 		}, &globalConfig)
 		if err != nil {
-			log.Log.Error("Could not find global configuration, using default configuration.")
+			log.Error("Could not find global configuration, using default configuration.")
 			panic("Could not find global configuration, using default configuration.")
 		}
 		if globalConfig.Type != "global" {
-			log.Log.Error("Could not find global configuration, might missed the mongodb connection.")
+			log.Error("Could not find global configuration, might missed the mongodb connection.")
 			panic("Could not find global configuration, might missed the mongodb connection.")
 		}
 
@@ -109,10 +109,10 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 			"name": deploymentName,
 		}, &customConfig)
 		if err != nil {
-			log.Log.Error("Could not find configuration for " + deploymentName + ", using global configuration.")
+			log.Error("Could not find configuration for " + deploymentName + ", using global configuration.")
 			customConfig = models.Config{}
 		} else if customConfig.Type != "config" {
-			log.Log.Error("Custom configuration has an invalid type, using global configuration.")
+			log.Error("Custom configuration has an invalid type, using global configuration.")
 			customConfig = models.Config{}
 		}
 		configuration.CustomConfig = customConfig
@@ -180,21 +180,29 @@ func OpenConfig(configDirectory string, configuration *models.Configuration) {
 
 		// Open device config
 		for {
-			jsonFile, err := os.Open(configDirectory + "/data/config/config.json")
+			configPath := configDirectory + "/data/config/config.json"
+			jsonFile, err := os.Open(configPath)
 			if err != nil {
-				log.Log.Error("Config file is not found " + configDirectory + "/data/config/config.json" + ", trying again in 5s.")
+				log.WithError(err).WithFields(log.Fields{
+					"component":      "config",
+					"event":          "configuration_open_failed",
+					"retry_delay_ms": 5000,
+				}).Warn("Configuration file unavailable; retrying")
 				time.Sleep(5 * time.Second)
 			} else {
-				log.Log.Info("Successfully Opened config.json from " + configuration.Name)
+				log.WithFields(log.Fields{
+					"component": "config",
+					"event":     "configuration_opened",
+				}).Info("Configuration file opened")
 				byteValue, _ := ioutil.ReadAll(jsonFile)
 				err = json.Unmarshal(byteValue, &configuration.Config)
 				jsonFile.Close()
 				if err != nil {
-					log.Log.Error("JSON file not valid: " + err.Error())
+					log.Error("JSON file not valid: " + err.Error())
 				} else {
 					err = json.Unmarshal(byteValue, &configuration.CustomConfig)
 					if err != nil {
-						log.Log.Error("JSON file not valid: " + err.Error())
+						log.Error("JSON file not valid: " + err.Error())
 					} else {
 						break
 					}
@@ -704,9 +712,9 @@ func SaveConfig(configDirectory string, config models.Config, configuration *mod
 		if communication.CameraConnected.Load() {
 			select {
 			case communication.HandleBootstrap <- "restart":
-				log.Log.Info("config.main.SaveConfig(): update config, restart agent.")
+				log.Info("config.main.SaveConfig(): update config, restart agent.")
 			case <-time.After(1 * time.Second):
-				log.Log.Info("config.main.SaveConfig(): update config, restart agent.")
+				log.Info("config.main.SaveConfig(): update config, restart agent.")
 			}
 		}
 

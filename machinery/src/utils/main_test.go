@@ -2,10 +2,13 @@ package utils
 
 import (
 	"bytes"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"os"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,6 +34,76 @@ func TestImageToBytesReturnsCompleteJPEG(t *testing.T) {
 	}
 	if got := decoded.Bounds().Size(); got.X != 16 || got.Y != 12 {
 		t.Fatalf("decoded JPEG size = %dx%d, want 16x12", got.X, got.Y)
+	}
+}
+
+func TestAgentEnvironmentVariableNamesOmitsValues(t *testing.T) {
+	got := agentEnvironmentVariableNames([]string{
+		"AGENT_HUB_PRIVATE_KEY=do-not-log",
+		"PATH=/usr/bin",
+		"NOT_AGENT_SECRET=also-do-not-log",
+		"AGENT_CAPTURE_LIVEVIEW=true",
+	})
+	want := []string{"AGENT_CAPTURE_LIVEVIEW", "AGENT_HUB_PRIVATE_KEY"}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("agentEnvironmentVariableNames() = %v, want %v", got, want)
+	}
+}
+
+func TestConfigurationLogFieldsOmitCredentialsAndEndpoints(t *testing.T) {
+	config := models.Config{
+		Name:          "Front Door",
+		FriendlyName:  "Entrance",
+		Cloud:         "kstorage",
+		HubKey:        "hub-key-secret",
+		HubPrivateKey: "hub-private-secret",
+		MQTTURI:       "mqtt://internal.example",
+		MQTTUsername:  "mqtt-user",
+		MQTTPassword:  "mqtt-password-secret",
+		Capture: models.Capture{
+			Liveview:           "true",
+			MaxLengthRecording: 20,
+			IPCamera: models.IPCamera{
+				RTSP:          "rtsp://camera-user:camera-password@10.0.30.11/live",
+				ONVIFUsername: "onvif-user",
+				ONVIFPassword: "onvif-password-secret",
+			},
+		},
+	}
+
+	fields := []map[string]interface{}{
+		configurationLogFields(config),
+		configurationDebugLogFields(config),
+	}
+	summary := fmt.Sprint(fields)
+	for _, secret := range []string{
+		config.HubKey,
+		config.HubPrivateKey,
+		config.MQTTURI,
+		config.MQTTUsername,
+		config.MQTTPassword,
+		config.Capture.IPCamera.RTSP,
+		config.Capture.IPCamera.ONVIFUsername,
+		config.Capture.IPCamera.ONVIFPassword,
+	} {
+		if strings.Contains(summary, secret) {
+			t.Fatalf("configuration log fields exposed sensitive value %q in %q", secret, summary)
+		}
+	}
+	infoFields := configurationLogFields(config)
+	if got := infoFields["agent_name"]; got != "Front Door" {
+		t.Fatalf("agent_name = %v, want Front Door", got)
+	}
+	if got := infoFields["cloud_provider"]; got != "kstorage" {
+		t.Fatalf("cloud_provider = %v, want kstorage", got)
+	}
+	debugFields := configurationDebugLogFields(config)
+	if got := debugFields["max_recording_seconds"]; got != int64(20) {
+		t.Fatalf("max_recording_seconds = %v, want 20", got)
+	}
+	if got := debugFields["main_stream_configured"]; got != true {
+		t.Fatalf("main_stream_configured = %v, want true", got)
 	}
 }
 

@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/pem"
+	"errors"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -15,6 +17,20 @@ func TestGolibrtspCloseBeforeClientStart(t *testing.T) {
 
 	if err := client.Close(context.Background()); err != nil {
 		t.Fatalf("Close() error = %v", err)
+	}
+}
+
+func TestSanitizeRTSPErrorRemovesCredentialsAndQuery(t *testing.T) {
+	rawURL := "rtsp://camera-user:camera-password@10.0.20.15/live?access_token=secret"
+	got := sanitizeRTSPError(errors.New("describe "+rawURL+": bad status code"), rawURL)
+
+	for _, secret := range []string{"camera-user", "camera-password", "access_token", "secret"} {
+		if strings.Contains(got.Error(), secret) {
+			t.Fatalf("sanitizeRTSPError() exposed %q in %q", secret, got)
+		}
+	}
+	if !strings.Contains(got.Error(), "rtsp://10.0.20.15/live") {
+		t.Fatalf("sanitizeRTSPError() removed useful host/path context: %q", got)
 	}
 }
 

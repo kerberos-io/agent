@@ -7,9 +7,9 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 
 	"github.com/kerberos-io/agent/machinery/src/cloud/livehls"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
+	log "github.com/sirupsen/logrus"
 )
 
 // hlsViewerTimeoutSeconds is how long the agent keeps shipping live HLS segments
@@ -54,20 +54,20 @@ func HandleLiveStreamHLS(
 	subQueue *packets.Queue,
 ) {
 
-	log.Log.Debug("cloud.HandleLiveStreamHLS(): started")
+	log.Debug("cloud.HandleLiveStreamHLS(): started")
 
 	config := configuration.Config
 
 	if config.Offline == "true" {
-		log.Log.Debug("cloud.HandleLiveStreamHLS(): stopping as Offline is enabled.")
+		log.Debug("cloud.HandleLiveStreamHLS(): stopping as Offline is enabled.")
 		return
 	}
 	if config.Capture.Liveview == "false" {
-		log.Log.Debug("cloud.HandleLiveStreamHLS(): stopping as Liveview is disabled.")
+		log.Debug("cloud.HandleLiveStreamHLS(): stopping as Liveview is disabled.")
 		return
 	}
 	if config.HubURI == "" || config.HubKey == "" {
-		log.Log.Debug("cloud.HandleLiveStreamHLS(): stopping as the Hub is not configured (HubURI/HubKey).")
+		log.Debug("cloud.HandleLiveStreamHLS(): stopping as the Hub is not configured (HubURI/HubKey).")
 		return
 	}
 
@@ -96,7 +96,7 @@ func HandleLiveStreamHLS(
 	requestedQuality := models.StreamQualityAuto
 	useSub := models.SelectSubStreamForQuality(config, requestedQuality, subStreamEnabled)
 	source := buildHLSSource(config, mainQueue, subQueue, useSub)
-	log.Log.Info("cloud.HandleLiveStreamHLS(): serving live HLS from the " + source.label + " stream")
+	log.Info("cloud.HandleLiveStreamHLS(): serving live HLS from the " + source.label + " stream")
 
 	// prewarm keeps a single long-lived session muxing into an in-memory ring
 	// buffer while idle and flushes it the instant a viewer arrives, eliminating
@@ -104,9 +104,9 @@ func HandleLiveStreamHLS(
 	// to fall back to the lazy on-demand path.
 	prewarm := os.Getenv("AGENT_LIVE_HLS_PREWARM") != "false"
 	if prewarm {
-		log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS prewarm ENABLED (set AGENT_LIVE_HLS_PREWARM=false to disable)")
+		log.Info("cloud.HandleLiveStreamHLS(): live HLS prewarm ENABLED (set AGENT_LIVE_HLS_PREWARM=false to disable)")
 	} else {
-		log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS prewarm DISABLED (AGENT_LIVE_HLS_PREWARM=false)")
+		log.Info("cloud.HandleLiveStreamHLS(): live HLS prewarm DISABLED (AGENT_LIVE_HLS_PREWARM=false)")
 	}
 
 	// lowLatency enables LL-HLS: each segment is sliced into CMAF parts shipped the
@@ -116,9 +116,9 @@ func HandleLiveStreamHLS(
 	partTargetMs := uint64(0)
 	if os.Getenv("AGENT_LIVE_HLS_LOW_LATENCY") != "false" {
 		partTargetMs = livehls.DefaultPartTargetMs
-		log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS low-latency (LL-HLS) ENABLED (set AGENT_LIVE_HLS_LOW_LATENCY=false to disable)")
+		log.Info("cloud.HandleLiveStreamHLS(): live HLS low-latency (LL-HLS) ENABLED (set AGENT_LIVE_HLS_LOW_LATENCY=false to disable)")
 	} else {
-		log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS low-latency (LL-HLS) DISABLED (AGENT_LIVE_HLS_LOW_LATENCY=false)")
+		log.Info("cloud.HandleLiveStreamHLS(): live HLS low-latency (LL-HLS) DISABLED (AGENT_LIVE_HLS_LOW_LATENCY=false)")
 	}
 
 	var session *livehls.Session
@@ -168,7 +168,7 @@ func HandleLiveStreamHLS(
 			}
 			source = buildHLSSource(config, mainQueue, subQueue, useSub)
 			lastReadyAnnounce = 0
-			log.Log.Info("cloud.HandleLiveStreamHLS(): switched live HLS to the " + source.label + " stream (quality=" + requestedQuality + ")")
+			log.Info("cloud.HandleLiveStreamHLS(): switched live HLS to the " + source.label + " stream (quality=" + requestedQuality + ")")
 			continue
 		}
 
@@ -194,14 +194,22 @@ func HandleLiveStreamHLS(
 					StartBuffering: true,
 				})
 				session.SetOnReady(func(sessionID string) {
-					log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS session ready, announcing " + sessionID)
+					log.WithFields(log.Fields{
+						"component":  "cloud/livehls",
+						"event":      "session_ready",
+						"session_id": sessionID,
+					}).Info("Live HLS session ready")
 					publishHLSReady(configuration, mqttClient, hubKey, deviceId, sessionID)
 					lastReadyAnnounce = time.Now().Unix()
 				})
 				session.SetOnFailure(func(sessionID, reason string) {
 					publishHLSFailure(configuration, mqttClient, hubKey, deviceId, sessionID, reason)
 				})
-				log.Log.Info("cloud.HandleLiveStreamHLS(): prewarming live HLS session " + session.SessionID())
+				log.WithFields(log.Fields{
+					"component":  "cloud/livehls",
+					"event":      "session_prewarming",
+					"session_id": session.SessionID(),
+				}).Info("Prewarming live HLS session")
 			}
 
 			if viewerActive {
@@ -220,7 +228,7 @@ func HandleLiveStreamHLS(
 
 			if len(pkt.Data) > 0 && pkt.IsVideo {
 				if err := session.WritePacket(pkt); err != nil {
-					log.Log.Error("cloud.HandleLiveStreamHLS(): " + err.Error())
+					log.Error("cloud.HandleLiveStreamHLS(): " + err.Error())
 				}
 			}
 			continue
@@ -230,7 +238,12 @@ func HandleLiveStreamHLS(
 			// No viewer: stop and discard the session so we stop shipping segments.
 			if session != nil {
 				_ = session.Close()
-				log.Log.Info("cloud.HandleLiveStreamHLS(): no active viewers, stopped live HLS session " + session.SessionID())
+				log.WithFields(log.Fields{
+					"component":  "cloud/livehls",
+					"event":      "session_stopped",
+					"reason":     "no_active_viewers",
+					"session_id": session.SessionID(),
+				}).Info("Live HLS session stopped")
 				session = nil
 			}
 			continue
@@ -256,25 +269,33 @@ func HandleLiveStreamHLS(
 				PartTargetMs: partTargetMs,
 			})
 			session.SetOnReady(func(sessionID string) {
-				log.Log.Info("cloud.HandleLiveStreamHLS(): live HLS session ready, announcing " + sessionID)
+				log.WithFields(log.Fields{
+					"component":  "cloud/livehls",
+					"event":      "session_ready",
+					"session_id": sessionID,
+				}).Info("Live HLS session ready")
 				publishHLSReady(configuration, mqttClient, hubKey, deviceId, sessionID)
 				lastReadyAnnounce = time.Now().Unix()
 			})
 			session.SetOnFailure(func(sessionID, reason string) {
 				publishHLSFailure(configuration, mqttClient, hubKey, deviceId, sessionID, reason)
 			})
-			log.Log.Info("cloud.HandleLiveStreamHLS(): started live HLS session " + session.SessionID())
+			log.WithFields(log.Fields{
+				"component":  "cloud/livehls",
+				"event":      "session_started",
+				"session_id": session.SessionID(),
+			}).Info("Live HLS session started")
 		}
 
 		if err := session.WritePacket(pkt); err != nil {
-			log.Log.Error("cloud.HandleLiveStreamHLS(): " + err.Error())
+			log.Error("cloud.HandleLiveStreamHLS(): " + err.Error())
 		}
 	}
 
 	if session != nil {
 		_ = session.Close()
 	}
-	log.Log.Debug("cloud.HandleLiveStreamHLS(): finished")
+	log.Debug("cloud.HandleLiveStreamHLS(): finished")
 }
 
 // publishHLSReady announces, over MQTT, that a live HLS session is available so
@@ -294,9 +315,17 @@ func publishHLSReady(configuration *models.Configuration, mqttClient mqtt.Client
 	payload, err := models.PackageMQTTMessage(configuration, message)
 	if err == nil {
 		mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
-		log.Log.Info("cloud.HandleLiveStreamHLS(): announced live HLS session " + sessionID)
+		log.WithFields(log.Fields{
+			"component":  "cloud/livehls",
+			"event":      "session_announced",
+			"session_id": sessionID,
+		}).Info("Live HLS session announced")
 	} else {
-		log.Log.Error("cloud.HandleLiveStreamHLS(): failed to package receive-hls-ready message: " + err.Error())
+		log.WithError(err).WithFields(log.Fields{
+			"component":  "cloud/livehls",
+			"event":      "session_announcement_failed",
+			"session_id": sessionID,
+		}).Error("Failed to package live HLS session announcement")
 	}
 }
 
@@ -316,9 +345,18 @@ func publishHLSFailure(configuration *models.Configuration, mqttClient mqtt.Clie
 	payload, err := models.PackageMQTTMessage(configuration, message)
 	if err == nil {
 		mqttClient.Publish("kerberos/hub/"+hubKey, 0, false, payload)
-		log.Log.Warning("cloud.HandleLiveStreamHLS(): announced live HLS startup failure " + reason + " for " + sessionID)
+		log.WithFields(log.Fields{
+			"component":  "cloud/livehls",
+			"event":      "session_failure_announced",
+			"reason":     reason,
+			"session_id": sessionID,
+		}).Warn("Live HLS session failure announced")
 	} else {
-		log.Log.Error("cloud.HandleLiveStreamHLS(): failed to package receive-hls-error message: " + err.Error())
+		log.WithError(err).WithFields(log.Fields{
+			"component":  "cloud/livehls",
+			"event":      "session_failure_announcement_failed",
+			"session_id": sessionID,
+		}).Error("Failed to package live HLS session failure")
 	}
 }
 

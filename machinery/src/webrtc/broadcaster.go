@@ -4,9 +4,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
 	pionWebRTC "github.com/pion/webrtc/v4"
 	pionMedia "github.com/pion/webrtc/v4/pkg/media"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -74,12 +74,20 @@ func (b *TrackBroadcaster) AddPeer(sessionKey string) (*pionWebRTC.TrackLocalSta
 				if err == io.ErrClosedPipe {
 					return
 				}
-				log.Log.Error("webrtc.broadcaster.peerWriter(): error writing sample for " + sessionKey + ": " + err.Error())
+				log.WithError(err).WithFields(log.Fields{
+					"component":  "webrtc",
+					"event":      "sample_write_failed",
+					"session_id": sessionKey,
+				}).Error("Failed to write WebRTC sample")
 			}
 		}
 	}()
 
-	log.Log.Info("webrtc.broadcaster.AddPeer(): added peer track for " + sessionKey)
+	log.WithFields(log.Fields{
+		"component":  "webrtc",
+		"event":      "peer_added",
+		"session_id": sessionKey,
+	}).Info("WebRTC peer added")
 	return track, nil
 }
 
@@ -95,7 +103,11 @@ func (b *TrackBroadcaster) RemovePeer(sessionKey string) {
 	if exists {
 		close(pt.samples)
 		<-pt.done // wait for writer goroutine to finish
-		log.Log.Info("webrtc.broadcaster.RemovePeer(): removed peer track for " + sessionKey)
+		log.WithFields(log.Fields{
+			"component":  "webrtc",
+			"event":      "peer_removed",
+			"session_id": sessionKey,
+		}).Info("WebRTC peer removed")
 	}
 }
 
@@ -110,7 +122,11 @@ func (b *TrackBroadcaster) WriteSample(sample pionMedia.Sample) {
 		select {
 		case pt.samples <- sample:
 		default:
-			log.Log.Warning("webrtc.broadcaster.WriteSample(): dropping sample for slow peer " + sessionKey)
+			log.WithFields(log.Fields{
+				"component":  "webrtc",
+				"event":      "slow_peer_sample_dropped",
+				"session_id": sessionKey,
+			}).Warn("Dropping WebRTC sample for slow peer")
 		}
 	}
 }
