@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"math"
 	"net/url"
 	"os"
 	"reflect"
@@ -779,6 +780,23 @@ func ptsToDuration(pts int64, clockRate int) time.Duration {
 		time.Duration(pts%rate)*time.Second/time.Duration(rate)
 }
 
+func preRecordingGOPCount(preRecording int64, gopDuration float64) (int, bool) {
+	if preRecording <= 0 ||
+		gopDuration < 1 ||
+		math.IsNaN(gopDuration) ||
+		math.IsInf(gopDuration, 0) ||
+		gopDuration >= float64(math.MaxInt64) {
+		return 0, false
+	}
+
+	count := preRecording / int64(gopDuration)
+	maxInt := int64(^uint(0) >> 1)
+	if count >= maxInt {
+		return 0, false
+	}
+	return int(count) + 1, true
+}
+
 // Start the RTSP client, and start reading packets.
 func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets.Queue, configuration *models.Configuration, communication *models.Communication) (err error) {
 	log.Debug("capture.golibrtsp.Start(): started")
@@ -1061,8 +1079,8 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					}).Debug("RTSP keyframe interval observed")
 
 					preRecording := configuration.Config.Capture.PreRecording
-					if preRecording > 0 && int(gopDuration) > 0 {
-						queue.SetMaxGopCount(int(preRecording)/int(gopDuration) + 1)
+					if maxGOPCount, ok := preRecordingGOPCount(preRecording, gopDuration); ok {
+						queue.SetMaxGopCount(maxGOPCount)
 					}
 				}
 
@@ -1279,8 +1297,8 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 					}).Debug("RTSP keyframe interval observed")
 
 					preRecording := configuration.Config.Capture.PreRecording
-					if preRecording > 0 && int(gopDuration) > 0 {
-						queue.SetMaxGopCount(int(preRecording)/int(gopDuration) + 1)
+					if maxGOPCount, ok := preRecordingGOPCount(preRecording, gopDuration); ok {
+						queue.SetMaxGopCount(maxGOPCount)
 					}
 				}
 

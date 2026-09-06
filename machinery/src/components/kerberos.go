@@ -397,12 +397,13 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 	run.SetMainQueue(queue)
 
 	// Set the maximum GOP count, this is used to determine the pre-recording time.
+	const initialMaxGOPCount = 1
+	queue.SetMaxGopCount(initialMaxGOPCount) // Adjusted after the GOP duration is observed.
 	log.WithFields(runFields).WithFields(log.Fields{
 		"event":         "packet_queue_configured",
-		"max_gop_count": int(config.Capture.PreRecording) + 1,
+		"max_gop_count": initialMaxGOPCount,
 		"stream":        "main",
 	}).Debug("Packet queue configured")
-	queue.SetMaxGopCount(1) // We will adjust this later on, when we have the GOP size.
 	queue.WriteHeader(videoStreams)
 	if err := run.Activate(); err != nil {
 		log.WithError(err).WithFields(runFields).WithField("event", "run_activation_failed").
