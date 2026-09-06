@@ -168,6 +168,9 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	status := "not started"
 	workers := &runWorkers{}
+	var rtspSubClient *capture.Golibrtsp
+	mainClientNeedsClose := false
+	subClientNeedsClose := false
 
 	// Currently only support H264 encoded cameras, this will change.
 	// Establishing the camera connection without backchannel if no substream
@@ -182,12 +185,25 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 			time.Sleep(time.Second * 3)
 			return status
 		}
+		mainClientNeedsClose = true
 	} else {
 		log.Log.Error("components.Kerberos.RunAgent(): no rtsp url found in config, please provide one.")
 		rtspClient = nil
 		time.Sleep(time.Second * 3)
 		return status
 	}
+	defer func() {
+		if subClientNeedsClose && rtspSubClient != nil {
+			if closeErr := rtspSubClient.Close(ctxRunAgent); closeErr != nil {
+				log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP sub stream after partial startup: " + closeErr.Error())
+			}
+		}
+		if mainClientNeedsClose && rtspClient != nil {
+			if closeErr := rtspClient.Close(ctxRunAgent); closeErr != nil {
+				log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP stream after partial startup: " + closeErr.Error())
+			}
+		}
+	}()
 
 	log.Log.Info("components.Kerberos.RunAgent(): opened RTSP stream: " + rtspUrl)
 
@@ -195,7 +211,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	videoStreams, err := rtspClient.GetVideoStreams()
 	if err != nil || len(videoStreams) == 0 {
 		log.Log.Error("components.Kerberos.RunAgent(): no video stream found, might be the wrong codec (we only support H264 for the moment)")
-		rtspClient.Close(ctxRunAgent)
 		time.Sleep(time.Second * 3)
 		return status
 	}
@@ -242,7 +257,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	if subRtspUrl != "" && subRtspUrl != rtspUrl {
 		// For the sub stream we will not enable backchannel.
 		subStreamEnabled = true
-		rtspSubClient := captureDevice.SetSubClient(subRtspUrl)
+		rtspSubClient = captureDevice.SetSubClient(subRtspUrl)
+		subClientNeedsClose = true
 
 		err := rtspSubClient.Connect(ctx, ctxRunAgent)
 		if err != nil {
@@ -256,7 +272,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		videoSubStreams, err = rtspSubClient.GetVideoStreams()
 		if err != nil || len(videoSubStreams) == 0 {
 			log.Log.Error("components.Kerberos.RunAgent(): no video sub stream found, might be the wrong codec (we only support H264 for the moment)")
-			rtspSubClient.Close(ctxRunAgent)
 			time.Sleep(time.Second * 3)
 			return status
 		}
@@ -309,7 +324,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP backchannel stream: " + rtspUrl)
 	}
 
-	rtspSubClient := captureDevice.SubClient()
 	if subStreamEnabled && rtspSubClient != nil {
 		subQueue = packets.NewQueue()
 		communication.SubQueue.Store(subQueue)
@@ -439,12 +453,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Cancel the main context, this will stop all the other goroutines.
 	(*communication.CancelContext)()
 
-	// We will re open the configuration, might have changed :O!
-	configService.OpenConfig(configDirectory, configuration)
-
-	// We will override the configuration with the environment variables
-	configService.OverrideWithEnvironmentVariables(configuration)
-
 	// Here we are cleaning up everything!
 	if configuration.Config.Offline != "true" {
 		select {
@@ -466,6 +474,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	//	communication.HandleSubStream <- "stop"
 	//}
 
+	mainClientNeedsClose = false
 	err = rtspClient.Close(ctxRunAgent)
 	if err != nil {
 		log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP stream: " + err.Error())
@@ -475,6 +484,7 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	queue = nil
 
 	if subStreamEnabled {
+		subClientNeedsClose = false
 		err = rtspSubClient.Close(ctxRunAgent)
 		if err != nil {
 			log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP sub stream: " + err.Error())
@@ -498,6 +508,11 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	}
 	communication.Queue.Store(nil)
 	communication.SubQueue.Store(nil)
+
+	// Factory reads retry transient database failures, so release runtime
+	// resources before reopening configuration.
+	configService.OpenConfig(configDirectory, configuration)
+	configService.OverrideWithEnvironmentVariables(configuration)
 
 	return status
 }

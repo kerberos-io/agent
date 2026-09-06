@@ -5,7 +5,7 @@ import { SelectionMode } from 'vott-ct/lib/js/CanvasTools/Interface/ISelectorSet
 import { RegionDataType } from 'vott-ct/lib/js/CanvasTools/Core/RegionData';
 import './ImageCanvas.css';
 
-class ImageCanvas extends React.Component {
+export class ImageCanvas extends React.Component {
   componentDidMount() {
     this.isUnmounted = false;
     this.width = 0;
@@ -62,6 +62,8 @@ class ImageCanvas extends React.Component {
       if (this.isUnmounted || !this.editor) {
         return;
       }
+
+      this.currentImage = img;
       if (this.width !== img.width || this.height !== img.height) {
         this.width = img.width;
         this.height = img.height;
@@ -72,18 +74,33 @@ class ImageCanvas extends React.Component {
     });
   }
 
-  componentDidUpdate() {
+  componentDidUpdate(prevProps) {
+    const imageChanged = prevProps.image !== this.props.image;
+    const editorDataChanged = this.hasEditorDataChanged(prevProps);
+
+    if (!imageChanged && !editorDataChanged) {
+      return;
+    }
+
+    if (!imageChanged && editorDataChanged && this.currentImage) {
+      this.loadData(this.currentImage);
+      return;
+    }
+
     const { image } = this.props;
     this.loadImage(image, (img) => {
       if (this.isUnmounted || !this.editor) {
         return;
       }
+
+      this.currentImage = img;
       if (this.width !== img.width || this.height !== img.height) {
         this.width = img.width;
         this.height = img.height;
         this.loadData(img);
+      } else if (editorDataChanged) {
+        this.loadData(img);
       } else {
-        // alert('ok');
         this.editor.addContentSource(img);
       }
     });
@@ -97,6 +114,8 @@ class ImageCanvas extends React.Component {
       this.pendingImage.src = '';
       this.pendingImage = null;
     }
+
+    this.currentImage = null;
 
     if (this.editor) {
       this.editor.onSelectionEnd = null;
@@ -203,6 +222,24 @@ class ImageCanvas extends React.Component {
     });
   };
 
+  hasEditorDataChanged = (prevProps) => {
+    const {
+      polygons,
+      device,
+      onAddRegion,
+      onUpdateRegion,
+      onDeleteRegion,
+    } = this.props;
+
+    return (
+      prevProps.polygons !== polygons ||
+      prevProps.device !== device ||
+      prevProps.onAddRegion !== onAddRegion ||
+      prevProps.onUpdateRegion !== onUpdateRegion ||
+      prevProps.onDeleteRegion !== onDeleteRegion
+    );
+  };
+
   // eslint-disable-next-line class-methods-use-this
   loadImage = (path, onready) => {
     if (this.pendingImage) {
@@ -293,11 +330,15 @@ class ImageCanvas extends React.Component {
 
 ImageCanvas.propTypes = {
   image: PropTypes.string.isRequired,
-  polygons: PropTypes.string.isRequired,
-  device: PropTypes.string.isRequired,
+  polygons: PropTypes.array.isRequired,
+  device: PropTypes.string,
   onAddRegion: PropTypes.func.isRequired,
   onUpdateRegion: PropTypes.func.isRequired,
   onDeleteRegion: PropTypes.func.isRequired,
+};
+
+ImageCanvas.defaultProps = {
+  device: '',
 };
 
 export default ImageCanvas;

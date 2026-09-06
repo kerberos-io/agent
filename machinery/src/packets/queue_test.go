@@ -88,3 +88,22 @@ func TestQueueCursorReadPacketDoesNotAllocate(t *testing.T) {
 		t.Fatalf("ReadPacket() allocations = %.2f, want 0", allocations)
 	}
 }
+
+func TestQueueCursorReadPacketContextDoesNotAllocateWhenPacketIsAvailable(t *testing.T) {
+	queue := NewQueue()
+	for i := 0; i < 200; i++ {
+		if err := queue.WritePacket(Packet{Data: []byte{1}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cursor := queue.Oldest()
+
+	allocations := testing.AllocsPerRun(100, func() {
+		if _, err := cursor.ReadPacketContext(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if allocations != 0 {
+		t.Fatalf("ReadPacketContext() allocations = %.2f, want 0", allocations)
+	}
+}

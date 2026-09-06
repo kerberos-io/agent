@@ -2,12 +2,21 @@ package capture
 
 import (
 	"bytes"
+	"context"
 	"encoding/pem"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestGolibrtspCloseBeforeClientStart(t *testing.T) {
+	client := &Golibrtsp{}
+
+	if err := client.Close(context.Background()); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+}
 
 func TestRTSPSTLSConfig(t *testing.T) {
 	t.Run("verifies certificates by default", func(t *testing.T) {

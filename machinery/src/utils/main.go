@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -416,9 +415,8 @@ func Decrypt(directoryOrFile string, symmetricKey []byte) {
 
 func ImageToBytes(img *image.Image) ([]byte, error) {
 	buffer := new(bytes.Buffer)
-	w := bufio.NewWriter(buffer)
-	err := jpeg.Encode(w, *img, &jpeg.Options{Quality: 35})
-	log.Log.Debug("ImageToBytes() - buffer size: " + strconv.Itoa(buffer.Len()))
+	err := jpeg.Encode(buffer, *img, &jpeg.Options{Quality: 35})
+	log.Log.Debugf("ImageToBytes() - buffer size: %d", buffer.Len())
 	return buffer.Bytes(), err
 }
 

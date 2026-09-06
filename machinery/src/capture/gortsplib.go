@@ -77,6 +77,7 @@ type Golibrtsp struct {
 	Url string
 
 	Client            gortsplib.Client
+	clientStarted     bool
 	VideoDecoderMutex *sync.Mutex
 
 	VideoH264Index        int8
@@ -386,7 +387,9 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	err = g.Client.Start()
 	if err != nil {
 		log.Log.Debug("capture.golibrtsp.Connect(Start): " + err.Error())
+		return
 	}
+	g.clientStarted = true
 
 	// find published medias
 	desc, _, err := g.Client.Describe(u)
@@ -658,7 +661,9 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 	err = g.Client.Start()
 	if err != nil {
 		log.Log.Error("capture.golibrtsp.ConnectBackChannel(): " + err.Error())
+		return
 	}
+	g.clientStarted = true
 
 	// find published medias
 	desc, _, err := g.Client.Describe(u)
@@ -1052,12 +1057,12 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				// healthy cameras with GOPs longer than the watchdog window look stalled.
 				if streamType == "main" {
 					r := communication.PackageCounter.Load().(int64)
-					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					log.Log.Debugf("capture.golibrtsp.Start(): packet size %d", len(pkt.Data))
 					communication.PackageCounter.Store((r + 1) % 1000)
 					communication.LastPacketTimer.Store(time.Now().Unix())
 				} else if streamType == "sub" {
 					r := communication.PackageCounterSub.Load().(int64)
-					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					log.Log.Debugf("capture.golibrtsp.Start(): packet size %d", len(pkt.Data))
 					communication.PackageCounterSub.Store((r + 1) % 1000)
 					communication.LastPacketTimerSub.Store(time.Now().Unix())
 				}
@@ -1215,12 +1220,12 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				// responsible only for GOP tracking above.
 				if streamType == "main" {
 					r := communication.PackageCounter.Load().(int64)
-					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					log.Log.Debugf("capture.golibrtsp.Start(): packet size %d", len(pkt.Data))
 					communication.PackageCounter.Store((r + 1) % 1000)
 					communication.LastPacketTimer.Store(time.Now().Unix())
 				} else if streamType == "sub" {
 					r := communication.PackageCounterSub.Load().(int64)
-					log.Log.Debug("capture.golibrtsp.Start(): packet size " + strconv.Itoa(len(pkt.Data)))
+					log.Log.Debugf("capture.golibrtsp.Start(): packet size %d", len(pkt.Data))
 					communication.PackageCounterSub.Store((r + 1) % 1000)
 					communication.LastPacketTimerSub.Store(time.Now().Unix())
 				}
@@ -1355,7 +1360,11 @@ func (g *Golibrtsp) Close(ctxOtel context.Context) error {
 	_, span := tracer.Start(ctxOtel, "Close")
 	defer span.End()
 
-	// Close the demuxer.
+	if !g.clientStarted {
+		return nil
+	}
+
+	g.clientStarted = false
 	g.Client.Close()
 
 	// We will have created the decoders globally, so we don't need to close them here.

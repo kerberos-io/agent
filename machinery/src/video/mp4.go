@@ -585,7 +585,7 @@ func (mp4 *MP4) commitSampleToTrack(trackID uint32, isKeyframe bool, data []byte
 			if err == nil {
 				// Flush previous pending sample before storing the new one
 				if mp4.VideoFullSample != nil {
-					log.Log.Debug("Adding sample to track " + fmt.Sprintf("%d, PTS: %d, size: %d, Keyframe: %t", trackID, pts, len(lengthPrefixed), isKeyframe))
+					log.Log.Debugf("Adding sample to track %d, PTS: %d, size: %d, Keyframe: %t", trackID, pts, len(lengthPrefixed), isKeyframe)
 					mp4.flushPendingVideoSample(pts)
 				}
 

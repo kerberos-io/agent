@@ -1,12 +1,38 @@
 package utils
 
 import (
+	"bytes"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
+
+func TestImageToBytesReturnsCompleteJPEG(t *testing.T) {
+	source := image.NewRGBA(image.Rect(0, 0, 16, 12))
+	source.Set(8, 6, color.RGBA{R: 255, A: 255})
+	var input image.Image = source
+
+	encoded, err := ImageToBytes(&input)
+	if err != nil {
+		t.Fatalf("ImageToBytes() error = %v", err)
+	}
+	if len(encoded) == 0 {
+		t.Fatal("ImageToBytes() returned an empty JPEG")
+	}
+
+	decoded, err := jpeg.Decode(bytes.NewReader(encoded))
+	if err != nil {
+		t.Fatalf("decoding ImageToBytes() output: %v", err)
+	}
+	if got := decoded.Bounds().Size(); got.X != 16 || got.Y != 12 {
+		t.Fatalf("decoded JPEG size = %dx%d, want 16x12", got.X, got.Y)
+	}
+}
 
 type stubFileInfo struct {
 	name string
