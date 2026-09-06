@@ -260,6 +260,7 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_HUB_PRIVATE_KEY`                     | The secret access key linked to your account in Kerberos Hub.                                   | ""                             |
 | `AGENT_HUB_REGION`                          | The Kerberos Hub region, to which you want to upload.                                           | ""                             |
 | `AGENT_HUB_SITE`                            | The site ID of a site you've created in your Kerberos Hub account.                              | ""                             |
+| `AGENT_TUS_CHUNK_SIZE_BYTES`                | Bytes sent in each resumable-upload PATCH. Set to `0` or a negative value to send all remaining bytes in one PATCH. | "8388608" (8 MiB)              |
 | `AGENT_KERBEROSVAULT_URI`                   | The Kerberos Vault API url.                                                                     | "https://vault.domain.com/api" |
 | `AGENT_KERBEROSVAULT_ACCESS_KEY`            | The access key of a Kerberos Vault account.                                                     | ""                             |
 | `AGENT_KERBEROSVAULT_SECRET_KEY`            | The secret key of a Kerberos Vault account.                                                     | ""                             |
@@ -279,6 +280,27 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_ENCRYPTION_SYMMETRIC_KEY`            | The symmetric key (AES) to encrypt and decrypt requests sent over MQTT.                         | ""                             |
 | `AGENT_SIGNING`                             | Enable 'true' or disable 'false' for signing recordings.                                        | "true"                         |
 | `AGENT_SIGNING_PRIVATE_KEY`                 | The private key (RSA) to sign the recordings fingerprint to validate origin.                    | "" - uses default one if empty |
+
+### Resumable upload chunk size
+
+Hub and Vault resumable uploads use `AGENT_TUS_CHUNK_SIZE_BYTES` as the maximum
+body size of each tus `PATCH` request. The value is a number of bytes, not a
+number of chunks. If the variable is unset or invalid, the Agent uses 8 MiB:
+
+```dotenv
+# 8 MiB (default)
+AGENT_TUS_CHUNK_SIZE_BYTES=8388608
+
+# 4 MiB: more frequent checkpoints on unstable connections
+AGENT_TUS_CHUNK_SIZE_BYTES=4194304
+
+# Disable chunking and send all remaining bytes in one PATCH
+AGENT_TUS_CHUNK_SIZE_BYTES=0
+```
+
+Smaller chunks provide more frequent resumable checkpoints but create more HTTP
+requests. Larger chunks reduce request overhead but require more data to be
+retransmitted when a request fails.
 
 
 ## Encryption
