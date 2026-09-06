@@ -46,7 +46,7 @@ RUN RESOLVED_VERSION="${VERSION:-0.0.0}" && \
 	printf '%s' "${RESOLVED_VERSION}" > version && \
 	BUILD_TAGS=timetzdata,netgo,osusergo && \
 	case "${TARGETARCH:-$(go env GOARCH)}" in amd64|arm64) BUILD_TAGS="moq,${BUILD_TAGS}" ;; esac && \
-	go build -tags "${BUILD_TAGS}" --ldflags "-s -w -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${RESOLVED_VERSION}" main.go && \
+	go build -o main -tags "${BUILD_TAGS}" --ldflags "-s -w -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${RESOLVED_VERSION}" . && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv version /agent && \
