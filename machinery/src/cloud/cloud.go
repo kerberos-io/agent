@@ -1215,7 +1215,17 @@ func HandleLiveStreamSD(livestreamCursor *packets.QueueCursor, configuration *mo
 	log.Log.Debug("cloud.HandleLiveStreamSD(): finished")
 }
 
-func HandleLiveStreamHD(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient, rtspSubClient capture.RTSPClient, subStreamEnabled bool, handshakes <-chan models.LiveHDHandshake) {
+func HandleLiveStreamHD(
+	configuration *models.Configuration,
+	communication *models.Communication,
+	mqttClient mqtt.Client,
+	rtspClient capture.RTSPClient,
+	rtspSubClient capture.RTSPClient,
+	subStreamEnabled bool,
+	handshakes <-chan models.LiveHDHandshake,
+	mainQueue *packets.Queue,
+	subQueue *packets.Queue,
+) {
 
 	config := configuration.Config
 
@@ -1253,7 +1263,6 @@ func HandleLiveStreamHD(configuration *models.Configuration, communication *mode
 				}
 			}()
 
-			mainQueue := communication.Queue.Load()
 			if mainQueue == nil {
 				log.Log.Error("cloud.HandleLiveStreamHD(): main packet queue is unavailable")
 				return
@@ -1267,7 +1276,6 @@ func HandleLiveStreamHD(configuration *models.Configuration, communication *mode
 			// Sub stream broadcasters, only when a distinct sub stream is available.
 			var subVideoBroadcaster *webrtc.TrackBroadcaster
 			var subAudioBroadcaster *webrtc.TrackBroadcaster
-			subQueue := communication.SubQueue.Load()
 			if subStreamEnabled && rtspSubClient != nil && subQueue != nil {
 				subStreams, _ := rtspSubClient.GetStreams()
 				subVideoBroadcaster = webrtc.NewVideoBroadcaster(subStreams)

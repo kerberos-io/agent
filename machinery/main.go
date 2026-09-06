@@ -205,18 +205,14 @@ func main() {
 			// Create a cancelable context, which will be used to cancel and restart.
 			// This is used to restart the agent when the configuration is updated.
 			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			// We create a capture object, this will contain all the streaming clients.
 			// And allow us to extract media from within difference places in the agent.
-			capture := capture.Capture{
-				RTSPClient:    nil,
-				RTSPSubClient: nil,
-			}
+			capture := capture.Capture{}
 
 			// Bootstrapping the agent
 			communication := models.Communication{
-				Context:         &ctx,
-				CancelContext:   &cancel,
 				HandleBootstrap: make(chan string, 1),
 			}
 

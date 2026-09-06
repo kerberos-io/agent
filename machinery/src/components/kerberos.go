@@ -2,6 +2,7 @@ package components
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -100,16 +101,24 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 	// Run the agent and fire up all the other
 	// goroutines which do image capture, motion detection, onvif, etc.
 	for {
+		if ctx.Err() != nil {
+			log.Log.Info("components.Kerberos.Bootstrap(): parent context canceled")
+			return
+		}
 
 		// This will blocking until receiving a signal to be restarted, reconfigured, stopped, etc.
-		status := RunAgent(configDirectory, configuration, communication, mqttClient, uptimeStart, cameraSettings, captureDevice)
+		status := RunAgent(ctx, configDirectory, configuration, communication, mqttClient, uptimeStart, cameraSettings, captureDevice)
 
+		if status == runStatusParentCanceled {
+			log.Log.Info("components.Kerberos.Bootstrap(): parent context canceled")
+			return
+		}
 		if status == "stop" {
 			log.Log.Info("components.Kerberos.Bootstrap(): shutting down the agent in 3 seconds.")
 			time.Sleep(time.Second * 3)
 			os.Exit(0)
 		}
-		if status == runStatusShutdownTimeout {
+		if status == runStatusShutdownTimeout || status == runStatusOwnershipConflict {
 			log.Log.Error("components.Kerberos.Bootstrap(): terminating after camera workers failed to stop")
 			os.Exit(1)
 		}
@@ -127,59 +136,65 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 			mqttClient = routers.ConfigureMQTT(configDirectory, configuration, communication)
 		}
 
-		// We will create a new cancelable context, which will be used to cancel and restart.
-		// This is used to restart the agent when the configuration is updated.
-		ctx, cancel := context.WithCancel(context.Background())
-		communication.Context = &ctx
-		communication.CancelContext = &cancel
 	}
 }
 
-func RunAgent(configDirectory string, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, uptimeStart time.Time, cameraSettings *models.Camera, captureDevice *capture.Capture) string {
+func RunAgent(parent context.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, uptimeStart time.Time, cameraSettings *models.Camera, captureDevice *capture.Capture) (status string) {
+	if parent == nil {
+		parent = context.Background()
+	}
 
-	ctx := context.Background()
-	ctxRunAgent, span := tracer.Start(ctx, "RunAgent")
+	ctxRunAgent, span := tracer.Start(parent, "RunAgent")
+	defer span.End()
 
 	log.Log.Info("components.Kerberos.RunAgent(): Creating camera and processing threads.")
 	config := configuration.Config
 
-	status := "not started"
+	status = "not started"
+	run := models.NewAgentRun(parent, communication, config.Offline != "true")
+	runStopped := false
+	shutdownCause := error(nil)
+	var rtspClient *capture.Golibrtsp
 	var rtspSubClient *capture.Golibrtsp
-	mainClientNeedsClose := false
-	subClientNeedsClose := false
+	var rtspBackChannelClient *capture.Golibrtsp
+	run.SetClientRelease(func() {
+		captureDevice.ClearClients(rtspClient, rtspSubClient, rtspBackChannelClient)
+	})
+	defer func() {
+		if runStopped {
+			return
+		}
+		report := shutdownAgentRun(run, communication, shutdownCause)
+		if !report.Complete {
+			status = runStatusShutdownTimeout
+		}
+	}()
 
 	// Currently only support H264 encoded cameras, this will change.
 	// Establishing the camera connection without backchannel if no substream
 	rtspUrl := config.Capture.IPCamera.RTSP
-	rtspClient := captureDevice.SetMainClient(rtspUrl)
+	rtspClient = captureDevice.SetMainClient(rtspUrl)
+	run.SetMainClient(rtspClient)
 	if rtspUrl != "" {
-		err := rtspClient.Connect(ctx, ctxRunAgent)
+		err := rtspClient.Connect(run.Context(), ctxRunAgent)
 		if err != nil {
 			log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP stream: " + err.Error())
-			rtspClient.Close(ctxRunAgent)
-			rtspClient = nil
-			time.Sleep(time.Second * 3)
+			shutdownCause = err
+			if !waitForRunRetry(parent) {
+				status = runStatusParentCanceled
+				shutdownCause = context.Cause(parent)
+			}
 			return status
 		}
-		mainClientNeedsClose = true
 	} else {
 		log.Log.Error("components.Kerberos.RunAgent(): no rtsp url found in config, please provide one.")
-		rtspClient = nil
-		time.Sleep(time.Second * 3)
+		shutdownCause = errors.New("no RTSP URL configured")
+		if !waitForRunRetry(parent) {
+			status = runStatusParentCanceled
+			shutdownCause = context.Cause(parent)
+		}
 		return status
 	}
-	defer func() {
-		if subClientNeedsClose && rtspSubClient != nil {
-			if closeErr := rtspSubClient.Close(ctxRunAgent); closeErr != nil {
-				log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP sub stream after partial startup: " + closeErr.Error())
-			}
-		}
-		if mainClientNeedsClose && rtspClient != nil {
-			if closeErr := rtspClient.Close(ctxRunAgent); closeErr != nil {
-				log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP stream after partial startup: " + closeErr.Error())
-			}
-		}
-	}()
 
 	log.Log.Info("components.Kerberos.RunAgent(): opened RTSP stream: " + rtspUrl)
 
@@ -187,7 +202,14 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	videoStreams, err := rtspClient.GetVideoStreams()
 	if err != nil || len(videoStreams) == 0 {
 		log.Log.Error("components.Kerberos.RunAgent(): no video stream found, might be the wrong codec (we only support H264 for the moment)")
-		time.Sleep(time.Second * 3)
+		shutdownCause = errors.New("main RTSP stream has no supported video track")
+		if err != nil {
+			shutdownCause = err
+		}
+		if !waitForRunRetry(parent) {
+			status = runStatusParentCanceled
+			shutdownCause = context.Cause(parent)
+		}
 		return status
 	}
 
@@ -234,12 +256,17 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		// For the sub stream we will not enable backchannel.
 		subStreamEnabled = true
 		rtspSubClient = captureDevice.SetSubClient(subRtspUrl)
-		subClientNeedsClose = true
 
-		err := rtspSubClient.Connect(ctx, ctxRunAgent)
+		run.SetSubClient(rtspSubClient)
+
+		err := rtspSubClient.Connect(run.Context(), ctxRunAgent)
 		if err != nil {
 			log.Log.Error("components.Kerberos.RunAgent(): error connecting to RTSP sub stream: " + err.Error())
-			time.Sleep(time.Second * 3)
+			shutdownCause = err
+			if !waitForRunRetry(parent) {
+				status = runStatusParentCanceled
+				shutdownCause = context.Cause(parent)
+			}
 			return status
 		}
 		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP sub stream: " + subRtspUrl)
@@ -248,7 +275,14 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		videoSubStreams, err = rtspSubClient.GetVideoStreams()
 		if err != nil || len(videoSubStreams) == 0 {
 			log.Log.Error("components.Kerberos.RunAgent(): no video sub stream found, might be the wrong codec (we only support H264 for the moment)")
-			time.Sleep(time.Second * 3)
+			shutdownCause = errors.New("sub RTSP stream has no supported video track")
+			if err != nil {
+				shutdownCause = err
+			}
+			if !waitForRunRetry(parent) {
+				status = runStatusParentCanceled
+				shutdownCause = context.Cause(parent)
+			}
 			return status
 		}
 
@@ -279,19 +313,30 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// We are creating a queue to store the RTSP frames in, these frames will be
 	// processed by the different consumers: motion detection, recording, etc.
 	queue = packets.NewQueue()
-	communication.Queue.Store(queue)
+	run.SetMainQueue(queue)
 
 	// Set the maximum GOP count, this is used to determine the pre-recording time.
 	log.Log.Info("components.Kerberos.RunAgent(): SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
 	queue.SetMaxGopCount(1) // We will adjust this later on, when we have the GOP size.
 	queue.WriteHeader(videoStreams)
-	runSupervisor := lifecycle.NewSupervisor(*communication.Context)
+	if err := run.Activate(); err != nil {
+		log.Log.Error("components.Kerberos.RunAgent(): failed to activate camera run: " + err.Error())
+		if parent.Err() != nil {
+			status = runStatusParentCanceled
+			shutdownCause = context.Cause(parent)
+		} else {
+			status = runStatusOwnershipConflict
+			shutdownCause = err
+		}
+		return status
+	}
+
 	var taskRegistrationErr error
 	registerTask := func(name string, policy lifecycle.TaskPolicy, task lifecycle.TaskFunc) {
 		if taskRegistrationErr != nil {
 			return
 		}
-		taskRegistrationErr = runSupervisor.Go(name, policy, task)
+		taskRegistrationErr = run.Go(name, policy, task)
 	}
 
 	registerTask("rtsp-main-start", lifecycle.TaskPolicy{Required: true}, func(taskContext context.Context) error {
@@ -303,15 +348,16 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	// Try to create backchannel
 	communication.HasBackChannel.Store(false)
-	rtspBackChannelClient := captureDevice.SetBackChannelClient(rtspUrl)
-	err = rtspBackChannelClient.ConnectBackChannel(ctx, ctxRunAgent)
+	rtspBackChannelClient = captureDevice.SetBackChannelClient(rtspUrl)
+	run.SetBackchannelClient(rtspBackChannelClient)
+	err = rtspBackChannelClient.ConnectBackChannel(run.Context(), ctxRunAgent)
 	if err == nil {
 		log.Log.Info("components.Kerberos.RunAgent(): opened RTSP backchannel stream: " + rtspUrl)
 	}
 
 	if subStreamEnabled && rtspSubClient != nil {
 		subQueue = packets.NewQueue()
-		communication.SubQueue.Store(subQueue)
+		run.SetSubQueue(subQueue)
 		subQueue.SetMaxGopCount(1) // GOP time frame is set to 1 for motion detection and livestreaming.
 		subQueue.WriteHeader(videoSubStreams)
 		registerTask("rtsp-sub-start", lifecycle.TaskPolicy{Required: true}, func(taskContext context.Context) error {
@@ -344,14 +390,14 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Like SD it is viewer-keepalive gated and produces no traffic while nobody is
 	// watching.
 	registerTask("live-hls", lifecycle.TaskPolicy{}, func(context.Context) error {
-		cloud.HandleLiveStreamHLS(configuration, communication, mqttClient, subStreamEnabled)
+		cloud.HandleLiveStreamHLS(configuration, communication, mqttClient, subStreamEnabled, queue, subQueue)
 		return nil
 	})
 
 	// MoQ is available only in the dedicated CGO/glibc build. The standard
 	// static Alpine build resolves this hook to a no-op.
-	registerTask("live-moq", lifecycle.TaskPolicy{}, func(context.Context) error {
-		cloud.StartLiveStreamMoQ(configuration, communication, subStreamEnabled)
+	registerTask("live-moq", lifecycle.TaskPolicy{}, func(taskContext context.Context) error {
+		cloud.StartLiveStreamMoQ(taskContext, configuration, communication, subStreamEnabled, queue, subQueue)
 		return nil
 	})
 
@@ -359,12 +405,21 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// stream are exposed as separate broadcasters so a viewer can request the
 	// high (main) or low (sub) resolution per peer connection; "auto" prefers the
 	// sub stream when available.
-	liveHDHandshakes := make(chan models.LiveHDHandshake, 100)
-	motionEvents := make(chan models.MotionDataPartial, 10)
-	onvifActions := make(chan models.OnvifAction, 10)
-	communication.SetRunChannels(liveHDHandshakes, motionEvents, onvifActions)
+	liveHDHandshakes := run.LiveHDHandshakes()
+	motionEvents := run.MotionEvents()
+	onvifActions := run.ONVIFActions()
 	registerTask("live-hd", lifecycle.TaskPolicy{}, func(context.Context) error {
-		cloud.HandleLiveStreamHD(configuration, communication, mqttClient, rtspClient, rtspSubClient, subStreamEnabled, liveHDHandshakes)
+		cloud.HandleLiveStreamHD(
+			configuration,
+			communication,
+			mqttClient,
+			rtspClient,
+			rtspSubClient,
+			subStreamEnabled,
+			liveHDHandshakes,
+			queue,
+			subQueue,
+		)
 		return nil
 	})
 
@@ -430,31 +485,37 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	if rtspBackChannelClient.HasBackChannel {
 		communication.HasBackChannel.Store(true)
-		registerTask("backchannel", lifecycle.TaskPolicy{}, func(context.Context) error {
-			WriteAudioToBackchannel(communication, rtspBackChannelClient)
+		registerTask("backchannel", lifecycle.TaskPolicy{}, func(taskContext context.Context) error {
+			WriteAudioToBackchannel(taskContext, communication, rtspBackChannelClient)
 			return nil
 		})
 	}
 
-	// Otel end span
-	span.End()
-
 	if taskRegistrationErr != nil {
 		log.Log.Error("components.Kerberos.RunAgent(): failed to register camera task: " + taskRegistrationErr.Error())
-		status = "restart"
-		runSupervisor.BeginShutdown(taskRegistrationErr)
+		if parent.Err() != nil {
+			status = runStatusParentCanceled
+			shutdownCause = context.Cause(parent)
+		} else {
+			status = "restart"
+			shutdownCause = taskRegistrationErr
+		}
 	} else {
-		runSupervisor.Seal()
+		run.Seal()
 
 		// If we reach this point, we have a working RTSP connection.
 		communication.CameraConnected.Store(true)
 
 		select {
 		case status = <-communication.HandleBootstrap:
-			runSupervisor.BeginShutdown(fmt.Errorf("camera run requested %s", status))
-		case failure := <-runSupervisor.Failures():
+			shutdownCause = fmt.Errorf("camera run requested %s", status)
+		case failure := <-run.Failures():
 			log.Log.Error("components.Kerberos.RunAgent(): supervised task failed: " + failure.Error())
 			status = "restart"
+			shutdownCause = failure.Cause
+		case <-parent.Done():
+			status = runStatusParentCanceled
+			shutdownCause = context.Cause(parent)
 		}
 	}
 
@@ -463,59 +524,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	communication.MainStreamConnected.Store(false)
 	communication.SubStreamConnected.Store(false)
 
-	// Cancel the main context, this will stop all the other goroutines.
-	(*communication.CancelContext)()
-
-	// Here we are cleaning up everything!
-	if configuration.Config.Offline != "true" {
-		select {
-		case communication.HandleUpload <- "stop":
-			log.Log.Info("components.Kerberos.RunAgent(): stopping upload")
-		case <-time.After(1 * time.Second):
-			log.Log.Info("components.Kerberos.RunAgent(): stopping upload timed out")
-		}
-	}
-
-	select {
-	case communication.HandleStream <- "stop":
-		log.Log.Info("components.Kerberos.RunAgent(): stopping stream")
-	case <-time.After(1 * time.Second):
-		log.Log.Info("components.Kerberos.RunAgent(): stopping stream timed out")
-	}
-	// We use the steam channel to stop both main and sub stream.
-	//if subStreamEnabled {
-	//	communication.HandleSubStream <- "stop"
-	//}
-
-	mainClientNeedsClose = false
-	err = rtspClient.Close(ctxRunAgent)
-	if err != nil {
-		log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP stream: " + err.Error())
-	}
-
-	queue.Close()
-	queue = nil
-
-	if subStreamEnabled {
-		subClientNeedsClose = false
-		err = rtspSubClient.Close(ctxRunAgent)
-		if err != nil {
-			log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP sub stream: " + err.Error())
-		}
-		subQueue.Close()
-		subQueue = nil
-	}
-
-	err = rtspBackChannelClient.Close(ctxRunAgent)
-	if err != nil {
-		log.Log.Error("components.Kerberos.RunAgent(): error closing RTSP backchannel stream: " + err.Error())
-	}
-
-	communication.CloseRunChannels()
-
-	waitContext, cancelWait := context.WithTimeout(context.Background(), runShutdownTimeout)
-	shutdownReport := runSupervisor.Wait(waitContext)
-	cancelWait()
+	shutdownReport := shutdownAgentRun(run, communication, shutdownCause)
+	runStopped = true
 	if shutdownReport.Complete {
 		log.Log.Info("components.Kerberos.RunAgent(): all run workers stopped")
 		for _, task := range shutdownReport.Tasks {
@@ -531,21 +541,10 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 			}
 		}
 	} else {
-		communication.RecordRunWorkerShutdownTimeout()
-		log.Log.Error("components.Kerberos.RunAgent(): timed out waiting for run workers to stop")
-		for _, task := range shutdownReport.Running {
-			log.Log.Error(fmt.Sprintf(
-				"components.Kerberos.RunAgent(): task %q still running after %s",
-				task.Name,
-				time.Since(task.StartedAt).Round(time.Millisecond),
-			))
-		}
 		status = runStatusShutdownTimeout
 	}
-	communication.Queue.Store(nil)
-	communication.SubQueue.Store(nil)
 
-	if status == runStatusShutdownTimeout {
+	if status == runStatusShutdownTimeout || status == runStatusOwnershipConflict || status == runStatusParentCanceled {
 		return status
 	}
 
@@ -555,6 +554,41 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	configService.OverrideWithEnvironmentVariables(configuration)
 
 	return status
+}
+
+func shutdownAgentRun(run *models.AgentRun, communication *models.Communication, cause error) models.AgentRunShutdownReport {
+	waitContext, cancelWait := context.WithTimeout(context.Background(), runShutdownTimeout)
+	defer cancelWait()
+
+	report := run.Shutdown(waitContext, cause)
+	for _, resourceErr := range report.ResourceErrors {
+		log.Log.Error("components.Kerberos.RunAgent(): " + resourceErr.Error())
+	}
+	if report.Complete {
+		return report
+	}
+
+	communication.RecordRunWorkerShutdownTimeout()
+	log.Log.Error("components.Kerberos.RunAgent(): timed out waiting for run workers to stop")
+	for _, task := range report.Running {
+		log.Log.Error(fmt.Sprintf(
+			"components.Kerberos.RunAgent(): task %q still running after %s",
+			task.Name,
+			time.Since(task.StartedAt).Round(time.Millisecond),
+		))
+	}
+	return report
+}
+
+func waitForRunRetry(ctx context.Context) bool {
+	timer := time.NewTimer(3 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 // packetAgeString returns a human readable age (e.g. "12s") since the last
@@ -635,6 +669,8 @@ func ControlAgent(communication *models.Communication) {
 }
 
 const (
+	runStatusOwnershipConflict = "run ownership conflict"
+	runStatusParentCanceled    = "parent canceled"
 	runStatusShutdownTimeout   = "shutdown timed out"
 	runShutdownTimeout         = 10 * time.Second
 	streamWatchdogInterval     = 5 * time.Second

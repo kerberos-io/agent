@@ -1,9 +1,23 @@
 package components
 
 import (
+	"context"
 	"testing"
 	"time"
 )
+
+func TestWaitForRunRetryStopsOnCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	started := time.Now()
+	if waitForRunRetry(ctx) {
+		t.Fatal("waitForRunRetry() completed the retry delay after cancellation")
+	}
+	if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
+		t.Fatalf("waitForRunRetry() took %s after cancellation", elapsed)
+	}
+}
 
 func TestStreamRestartWatchdogCoalescesStallsAndBacksOff(t *testing.T) {
 	now := time.Unix(1_000, 0)

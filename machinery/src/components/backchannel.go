@@ -88,12 +88,7 @@ func GetBackChannelAudioCodec(streams []av.CodecData, communication *models.Comm
 	return nil
 }
 
-func WriteAudioToBackchannel(communication *models.Communication, rtspClient capture.RTSPClient) {
-	ctx := context.Background()
-	if communication.Context != nil {
-		ctx = *communication.Context
-	}
-
+func WriteAudioToBackchannel(ctx context.Context, communication *models.Communication, rtspClient capture.RTSPClient) {
 	writeAudioToBackchannel(ctx, ctx, communication.HandleAudio, rtspClient)
 }
 

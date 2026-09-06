@@ -45,7 +45,14 @@ const hlsReadyReannounceSeconds = 2
 // trades a little idle CPU for a near-instant "requesting stream", so viewers no
 // longer wait a full GOP for the first segment to be cut. Set
 // AGENT_LIVE_HLS_PREWARM=false to fall back to the lazy on-demand path above.
-func HandleLiveStreamHLS(configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, subStreamEnabled bool) {
+func HandleLiveStreamHLS(
+	configuration *models.Configuration,
+	communication *models.Communication,
+	mqttClient mqtt.Client,
+	subStreamEnabled bool,
+	mainQueue *packets.Queue,
+	subQueue *packets.Queue,
+) {
 
 	log.Log.Debug("cloud.HandleLiveStreamHLS(): started")
 
@@ -88,7 +95,7 @@ func HandleLiveStreamHLS(configuration *models.Configuration, communication *mod
 	// mp4ff's strict parser rejects).
 	requestedQuality := models.StreamQualityAuto
 	useSub := models.SelectSubStreamForQuality(config, requestedQuality, subStreamEnabled)
-	source := buildHLSSource(config, communication, useSub)
+	source := buildHLSSource(config, mainQueue, subQueue, useSub)
 	log.Log.Info("cloud.HandleLiveStreamHLS(): serving live HLS from the " + source.label + " stream")
 
 	// prewarm keeps a single long-lived session muxing into an in-memory ring
@@ -159,7 +166,7 @@ func HandleLiveStreamHLS(configuration *models.Configuration, communication *mod
 				_ = session.Close()
 				session = nil
 			}
-			source = buildHLSSource(config, communication, useSub)
+			source = buildHLSSource(config, mainQueue, subQueue, useSub)
 			lastReadyAnnounce = 0
 			log.Log.Info("cloud.HandleLiveStreamHLS(): switched live HLS to the " + source.label + " stream (quality=" + requestedQuality + ")")
 			continue
@@ -333,9 +340,8 @@ type hlsStreamSource struct {
 // is available; otherwise the main (high-resolution) stream is used. A fresh
 // Latest() cursor is created so muxing resumes from the live edge of the chosen
 // stream after a switch.
-func buildHLSSource(config models.Config, communication *models.Communication, useSub bool) hlsStreamSource {
+func buildHLSSource(config models.Config, mainQueue, subQueue *packets.Queue, useSub bool) hlsStreamSource {
 	cam := config.Capture.IPCamera
-	subQueue := communication.SubQueue.Load()
 	if useSub && subQueue != nil {
 		return hlsStreamSource{
 			cursor: subQueue.Latest(),
@@ -347,7 +353,6 @@ func buildHLSSource(config models.Config, communication *models.Communication, u
 			label:  "sub",
 		}
 	}
-	mainQueue := communication.Queue.Load()
 	return hlsStreamSource{
 		cursor: mainQueue.Latest(),
 		sps:    cam.SPSNALUs,

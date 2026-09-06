@@ -3,6 +3,7 @@ package onvif
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -26,17 +27,31 @@ func makeConfig(recording, onvifMotion, name string) *models.Configuration {
 	}
 }
 
-func makeCommunication(buffer int) *models.Communication {
-	return &models.Communication{
-		HandleMotion: make(chan models.MotionDataPartial, buffer),
+func makeCommunication(t *testing.T) *models.Communication {
+	t.Helper()
+	communication := &models.Communication{}
+	run := models.NewAgentRun(context.Background(), communication, false)
+	require.NoError(t, run.Activate())
+	t.Cleanup(func() {
+		run.Shutdown(context.Background(), errors.New("test complete"))
+	})
+	return communication
+}
+
+func motionEvents(t *testing.T, communication *models.Communication) <-chan models.MotionDataPartial {
+	t.Helper()
+	run := communication.CurrentRun()
+	if run == nil {
+		t.Fatal("expected active agent run")
 	}
+	return run.MotionEvents()
 }
 
 // --- dispatchEvent ---------------------------------------------------
 
 func TestDispatchEvent_MotionActive_SendsToHandleMotion(t *testing.T) {
 	cfg := makeConfig("true", "true", "cam-1")
-	comm := makeCommunication(1)
+	comm := makeCommunication(t)
 	ev := stream.Event{Kind: stream.KindMotion, State: stream.StateActive}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -44,7 +59,7 @@ func TestDispatchEvent_MotionActive_SendsToHandleMotion(t *testing.T) {
 	dispatchEvent(ctx, ev, cfg, comm)
 
 	select {
-	case m := <-comm.HandleMotion:
+	case m := <-motionEvents(t, comm):
 		assert.NotZero(t, m.Timestamp)
 	case <-time.After(time.Second):
 		t.Fatal("expected motion data on HandleMotion")
@@ -53,7 +68,7 @@ func TestDispatchEvent_MotionActive_SendsToHandleMotion(t *testing.T) {
 
 func TestDispatchEvent_MotionInactive_DoesNotSend(t *testing.T) {
 	cfg := makeConfig("true", "true", "cam-1")
-	comm := makeCommunication(1)
+	comm := makeCommunication(t)
 	ev := stream.Event{Kind: stream.KindMotion, State: stream.StateInactive}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -61,7 +76,7 @@ func TestDispatchEvent_MotionInactive_DoesNotSend(t *testing.T) {
 	dispatchEvent(ctx, ev, cfg, comm)
 
 	select {
-	case <-comm.HandleMotion:
+	case <-motionEvents(t, comm):
 		t.Fatal("inactive motion must not reach HandleMotion (motion-stop is a follow-up)")
 	case <-time.After(100 * time.Millisecond):
 	}
@@ -69,7 +84,7 @@ func TestDispatchEvent_MotionInactive_DoesNotSend(t *testing.T) {
 
 func TestDispatchEvent_NonMotionKindIgnored(t *testing.T) {
 	cfg := makeConfig("true", "true", "cam-1")
-	comm := makeCommunication(1)
+	comm := makeCommunication(t)
 	ev := stream.Event{Kind: stream.KindDigitalInput, State: stream.StateActive}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -77,7 +92,7 @@ func TestDispatchEvent_NonMotionKindIgnored(t *testing.T) {
 	dispatchEvent(ctx, ev, cfg, comm)
 
 	select {
-	case <-comm.HandleMotion:
+	case <-motionEvents(t, comm):
 		t.Fatal("non-motion kinds must not reach HandleMotion")
 	case <-time.After(100 * time.Millisecond):
 	}
@@ -108,7 +123,7 @@ func TestDispatchEvent_LogsTheTriggeringTopic(t *testing.T) {
 	buf := captureDebugLog(t)
 
 	cfg := makeConfig("true", "true", "cam-1")
-	comm := makeCommunication(1)
+	comm := makeCommunication(t)
 	ev := stream.Event{
 		Kind:  stream.KindMotion,
 		State: stream.StateActive,
@@ -147,7 +162,7 @@ func TestDispatchEvent_PropertyOperation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := makeConfig("true", "true", "cam-1")
-			comm := makeCommunication(1)
+			comm := makeCommunication(t)
 			ev := stream.Event{
 				Kind:      stream.KindMotion,
 				State:     stream.StateActive,
@@ -160,7 +175,7 @@ func TestDispatchEvent_PropertyOperation(t *testing.T) {
 			dispatchEvent(ctx, ev, cfg, comm)
 
 			select {
-			case <-comm.HandleMotion:
+			case <-motionEvents(t, comm):
 				if !tt.wantSend {
 					t.Fatalf("%v must not trigger a recording", tt.op)
 				}
@@ -175,7 +190,7 @@ func TestDispatchEvent_PropertyOperation(t *testing.T) {
 
 func TestDispatchEvent_RecordingDisabled_DoesNotSend(t *testing.T) {
 	cfg := makeConfig("false", "true", "cam-1")
-	comm := makeCommunication(1)
+	comm := makeCommunication(t)
 	ev := stream.Event{Kind: stream.KindMotion, State: stream.StateActive}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -183,7 +198,7 @@ func TestDispatchEvent_RecordingDisabled_DoesNotSend(t *testing.T) {
 	dispatchEvent(ctx, ev, cfg, comm)
 
 	select {
-	case <-comm.HandleMotion:
+	case <-motionEvents(t, comm):
 		t.Fatal("Recording=false must gate the send (matches computervision behaviour)")
 	case <-time.After(100 * time.Millisecond):
 	}
@@ -191,9 +206,10 @@ func TestDispatchEvent_RecordingDisabled_DoesNotSend(t *testing.T) {
 
 func TestDispatchEvent_HandleMotionFull_DropsRatherThanBlocks(t *testing.T) {
 	cfg := makeConfig("true", "true", "cam-1")
-	// Pre-fill the buffer so the next send would block.
-	comm := &models.Communication{HandleMotion: make(chan models.MotionDataPartial, 1)}
-	comm.HandleMotion <- models.MotionDataPartial{}
+	// Fill the buffer so the next send would be dropped.
+	comm := makeCommunication(t)
+	for comm.TrySendMotion(models.MotionDataPartial{}) {
+	}
 	ev := stream.Event{Kind: stream.KindMotion, State: stream.StateActive}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -219,8 +235,9 @@ func TestDispatchEvent_CtxCancelledAndHandleMotionClosed_DoesNotPanic(t *testing
 	// send would panic. The ctx pre-check must short-circuit before the
 	// send is attempted.
 	cfg := makeConfig("true", "true", "cam-1")
-	comm := &models.Communication{HandleMotion: make(chan models.MotionDataPartial, 1)}
-	close(comm.HandleMotion)
+	comm := makeCommunication(t)
+	run := comm.CurrentRun()
+	run.Shutdown(context.Background(), errors.New("test shutdown"))
 	ev := stream.Event{Kind: stream.KindMotion, State: stream.StateActive}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -299,7 +316,7 @@ func TestDispatchEvent_OnlyRealTransitionsTrigger(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.op.String(), func(t *testing.T) {
 			cfg := makeConfig("true", "true", "cam-1")
-			comm := makeCommunication(1)
+			comm := makeCommunication(t)
 			ev := stream.Event{Kind: stream.KindMotion, State: stream.StateActive, Operation: tt.op}
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -307,10 +324,10 @@ func TestDispatchEvent_OnlyRealTransitionsTrigger(t *testing.T) {
 			dispatchEvent(ctx, ev, cfg, comm)
 
 			if tt.wantSend {
-				require.Len(t, comm.HandleMotion, 1, "%v must trigger a recording", tt.op)
+				require.Len(t, motionEvents(t, comm), 1, "%v must trigger a recording", tt.op)
 				return
 			}
-			require.Empty(t, comm.HandleMotion, "%v must not trigger a recording", tt.op)
+			require.Empty(t, motionEvents(t, comm), "%v must not trigger a recording", tt.op)
 		})
 	}
 }
@@ -361,8 +378,9 @@ func TestDispatchEvent_LogsTriggerOnlyWhenSent(t *testing.T) {
 	buf := captureDebugLog(t)
 
 	cfg := makeConfig("true", "true", "cam-1")
-	comm := &models.Communication{HandleMotion: make(chan models.MotionDataPartial, 1)}
-	comm.HandleMotion <- models.MotionDataPartial{} // full
+	comm := makeCommunication(t)
+	for comm.TrySendMotion(models.MotionDataPartial{}) {
+	}
 	ev := stream.Event{Kind: stream.KindMotion, State: stream.StateActive, Topic: "tns1:VideoSource/MotionAlarm"}
 
 	ctx, cancel := context.WithCancel(context.Background())

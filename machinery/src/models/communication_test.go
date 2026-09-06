@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -8,11 +10,10 @@ import (
 
 func TestCommunicationRunChannelDispatchAfterClose(t *testing.T) {
 	communication := &Communication{}
-	communication.SetRunChannels(
-		make(chan LiveHDHandshake, 1),
-		make(chan MotionDataPartial, 1),
-		make(chan OnvifAction, 1),
-	)
+	run := NewAgentRun(context.Background(), communication, false)
+	if err := run.Activate(); err != nil {
+		t.Fatal(err)
+	}
 
 	if !communication.TrySendLiveHDHandshake(LiveHDHandshake{}) {
 		t.Fatal("TrySendLiveHDHandshake() rejected an available channel")
@@ -24,7 +25,10 @@ func TestCommunicationRunChannelDispatchAfterClose(t *testing.T) {
 		t.Fatal("TrySendONVIF() rejected an available channel")
 	}
 
-	communication.CloseRunChannels()
+	report := run.Shutdown(context.Background(), errors.New("test complete"))
+	if !report.Complete {
+		t.Fatalf("shutdown report = %+v, want complete", report)
+	}
 	if communication.TrySendLiveHDHandshake(LiveHDHandshake{}) {
 		t.Fatal("TrySendLiveHDHandshake() accepted a closed run")
 	}
@@ -38,11 +42,10 @@ func TestCommunicationRunChannelDispatchAfterClose(t *testing.T) {
 
 func TestCommunicationDispatchCanRaceRunChannelClose(t *testing.T) {
 	communication := &Communication{}
-	communication.SetRunChannels(
-		make(chan LiveHDHandshake, 64),
-		make(chan MotionDataPartial, 64),
-		make(chan OnvifAction, 64),
-	)
+	run := NewAgentRun(context.Background(), communication, false)
+	if err := run.Activate(); err != nil {
+		t.Fatal(err)
+	}
 
 	start := make(chan struct{})
 	var senders sync.WaitGroup
@@ -60,17 +63,20 @@ func TestCommunicationDispatchCanRaceRunChannelClose(t *testing.T) {
 	}
 
 	close(start)
-	communication.CloseRunChannels()
+	run.Shutdown(context.Background(), errors.New("test complete"))
 	senders.Wait()
 }
 
 func TestCommunicationRunChannelLifecycleSoak(t *testing.T) {
 	communication := &Communication{}
 	for cycle := 0; cycle < 100; cycle++ {
-		handshakes := make(chan LiveHDHandshake, 8)
-		motion := make(chan MotionDataPartial, 8)
-		onvif := make(chan OnvifAction, 8)
-		communication.SetRunChannels(handshakes, motion, onvif)
+		run := NewAgentRun(context.Background(), communication, false)
+		if err := run.Activate(); err != nil {
+			t.Fatalf("cycle %d Activate() error = %v", cycle, err)
+		}
+		handshakes := run.LiveHDHandshakes()
+		motion := run.MotionEvents()
+		onvif := run.ONVIFActions()
 
 		var consumers sync.WaitGroup
 		consumers.Add(3)
@@ -103,7 +109,7 @@ func TestCommunicationRunChannelLifecycleSoak(t *testing.T) {
 			}()
 		}
 
-		communication.CloseRunChannels()
+		run.Shutdown(context.Background(), errors.New("test complete"))
 		producers.Wait()
 
 		done := make(chan struct{})

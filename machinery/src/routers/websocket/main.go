@@ -231,10 +231,10 @@ func ForwardSDStream(ctx context.Context, clientID string, connection *Connectio
 	// We'll pick the right client and decoder.
 	rtspClient := captureDevice.SubClient()
 	if rtspClient != nil {
-		queue = communication.SubQueue.Load()
+		queue = communication.SubQueue()
 	} else {
 		rtspClient = captureDevice.MainClient()
-		queue = communication.Queue.Load()
+		queue = communication.MainQueue()
 	}
 	if queue != nil {
 		cursor = queue.Latest()

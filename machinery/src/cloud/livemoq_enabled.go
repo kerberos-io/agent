@@ -98,7 +98,14 @@ func boundedMoQDuration(name string, fallback, minimum, maximum time.Duration) t
 // its sub stream, so switching quality in the frontend is a resubscribe to the
 // other path. Each tier only uploads while it actually has subscribers, so the
 // second broadcast is close to free when nobody watches it.
-func StartLiveStreamMoQ(configuration *models.Configuration, communication *models.Communication, subStreamEnabled bool) {
+func StartLiveStreamMoQ(
+	ctx context.Context,
+	configuration *models.Configuration,
+	communication *models.Communication,
+	subStreamEnabled bool,
+	mainQueue *packets.Queue,
+	subQueue *packets.Queue,
+) {
 	if os.Getenv("AGENT_LIVE_MOQ_ENABLED") != "true" {
 		return
 	}
@@ -132,16 +139,10 @@ func StartLiveStreamMoQ(configuration *models.Configuration, communication *mode
 	maxPacketAge := boundedMoQDuration("AGENT_LIVE_MOQ_MAX_PACKET_AGE", defaultMoQLivePacketAge, minMoQLivePacketAge, maxMoQLivePacketAge)
 	writeTimeout := boundedMoQDuration("AGENT_LIVE_MOQ_WRITE_TIMEOUT", defaultMoQWriteTimeout, minMoQWriteTimeout, maxMoQWriteTimeout)
 
-	ctx := context.Background()
-	if communication.Context != nil {
-		ctx = *communication.Context
-	}
-
 	var publishers sync.WaitGroup
 	for _, quality := range qualities {
-		queue := communication.Queue.Load()
+		queue := mainQueue
 		sourceLabel := "main"
-		subQueue := communication.SubQueue.Load()
 		if models.SelectSubStreamForQuality(config, quality, subStreamEnabled) && subQueue != nil {
 			queue = subQueue
 			sourceLabel = "sub"

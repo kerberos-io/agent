@@ -1029,10 +1029,10 @@ func Base64Image(captureDevice *Capture, communication *models.Communication, co
 	// We'll pick the right client and decoder.
 	rtspClient := captureDevice.SubClient()
 	if rtspClient != nil {
-		queue = communication.SubQueue.Load()
+		queue = communication.SubQueue()
 	} else {
 		rtspClient = captureDevice.MainClient()
-		queue = communication.Queue.Load()
+		queue = communication.MainQueue()
 	}
 	if queue != nil {
 		cursor = queue.Latest()
@@ -1076,10 +1076,10 @@ func JpegImage(captureDevice *Capture, communication *models.Communication) imag
 	// We'll pick the right client and decoder.
 	rtspClient := captureDevice.SubClient()
 	if rtspClient != nil {
-		queue = communication.SubQueue.Load()
+		queue = communication.SubQueue()
 	} else {
 		rtspClient = captureDevice.MainClient()
-		queue = communication.Queue.Load()
+		queue = communication.MainQueue()
 	}
 	if queue != nil {
 		cursor = queue.Latest()
