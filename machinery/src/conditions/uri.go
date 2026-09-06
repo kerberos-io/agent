@@ -3,13 +3,26 @@ package conditions
 import (
 	"bytes"
 	"crypto/tls"
-	"fmt"
+	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	log "github.com/sirupsen/logrus"
+)
+
+const conditionHTTPTimeout = 10 * time.Second
+
+var (
+	conditionHTTPClient         = &http.Client{Timeout: conditionHTTPTimeout}
+	conditionInsecureHTTPClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // #nosec G402 -- explicit operator opt-in
+		},
+		Timeout: conditionHTTPTimeout,
+	}
 )
 
 func IsValidUriResponse(configuration *models.Configuration) (enabled bool) {
@@ -17,41 +30,66 @@ func IsValidUriResponse(configuration *models.Configuration) (enabled bool) {
 	conditionURI := config.ConditionURI
 	enabled = true
 	if conditionURI != "" {
-
-		// We will send a POST request to the conditionURI, and expect a 200 response.
-		// In the payload we will send some information, so the other end can decide
-		// if it should enable or disable recording.
-
-		var client *http.Client
+		client := conditionHTTPClient
 		if os.Getenv("AGENT_TLS_INSECURE") == "true" {
-			tr := &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			}
-			client = &http.Client{Transport: tr}
-		} else {
-			client = &http.Client{}
+			client = conditionInsecureHTTPClient
 		}
 
-		var object = fmt.Sprintf(`{
-			"camera_id" : "%s",
-			"camera_name" : "%s",
-			"site_id" : "%s",
-			"hub_key" : "%s",
-			"timestamp" : "%s",
-		}`, config.Key, config.FriendlyName, config.HubSite, config.HubKey, time.Now().Format("2006-01-02 15:04:05"))
+		payload := struct {
+			CameraID   string `json:"camera_id"`
+			CameraName string `json:"camera_name"`
+			SiteID     string `json:"site_id"`
+			HubKey     string `json:"hub_key"`
+			Timestamp  string `json:"timestamp"`
+		}{
+			CameraID:   config.Key,
+			CameraName: config.FriendlyName,
+			SiteID:     config.HubSite,
+			HubKey:     config.HubKey,
+			Timestamp:  time.Now().Format("2006-01-02 15:04:05"),
+		}
+		jsonBody, err := json.Marshal(payload)
+		if err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"component": "conditions/uri",
+				"event":     "request_encoding_failed",
+			}).Error("Failed to encode condition request")
+			return false
+		}
 
-		var jsonStr = []byte(object)
-		buffy := bytes.NewBuffer(jsonStr)
-		req, _ := http.NewRequest("POST", conditionURI, buffy)
+		req, err := http.NewRequest(http.MethodPost, conditionURI, bytes.NewReader(jsonBody))
+		if err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"component": "conditions/uri",
+				"event":     "request_creation_failed",
+			}).Error("Failed to create condition request")
+			return false
+		}
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := client.Do(req)
 		if resp != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 		}
-		if err == nil && resp.StatusCode == 200 {
-			log.Log.Info("conditions.uri.IsValidUriResponse(): response 200, enabling recording.")
+		if err == nil && resp != nil && resp.StatusCode == http.StatusOK {
+			log.WithFields(log.Fields{
+				"component":   "conditions/uri",
+				"event":       "recording_enabled",
+				"status_code": resp.StatusCode,
+			}).Info("Condition request enabled recording")
 		} else {
-			log.Log.Info("conditions.uri.IsValidUriResponse(): response not 200, disabling recording.")
+			if err != nil {
+				log.WithError(err).WithFields(log.Fields{
+					"component": "conditions/uri",
+					"event":     "request_failed",
+				}).Error("Condition request failed")
+			} else {
+				log.WithFields(log.Fields{
+					"component":   "conditions/uri",
+					"event":       "recording_disabled",
+					"status_code": resp.StatusCode,
+				}).Info("Condition request disabled recording")
+			}
 			enabled = false
 		}
 	}

@@ -11,9 +11,9 @@ import (
 
 type Capture struct {
 	clientsMu             sync.RWMutex
-	RTSPClient            *Golibrtsp
-	RTSPSubClient         *Golibrtsp
-	RTSPBackChannelClient *Golibrtsp
+	rtspClient            *Golibrtsp
+	rtspSubClient         *Golibrtsp
+	rtspBackChannelClient *Golibrtsp
 }
 
 func (c *Capture) SetMainClient(rtspUrl string) *Golibrtsp {
@@ -21,7 +21,7 @@ func (c *Capture) SetMainClient(rtspUrl string) *Golibrtsp {
 		Url: rtspUrl,
 	}
 	c.clientsMu.Lock()
-	c.RTSPClient = client
+	c.rtspClient = client
 	c.clientsMu.Unlock()
 	return client
 }
@@ -31,7 +31,7 @@ func (c *Capture) SetSubClient(rtspUrl string) *Golibrtsp {
 		Url: rtspUrl,
 	}
 	c.clientsMu.Lock()
-	c.RTSPSubClient = client
+	c.rtspSubClient = client
 	c.clientsMu.Unlock()
 	return client
 }
@@ -41,7 +41,7 @@ func (c *Capture) SetBackChannelClient(rtspUrl string) *Golibrtsp {
 		Url: rtspUrl,
 	}
 	c.clientsMu.Lock()
-	c.RTSPBackChannelClient = client
+	c.rtspBackChannelClient = client
 	c.clientsMu.Unlock()
 	return client
 }
@@ -49,13 +49,27 @@ func (c *Capture) SetBackChannelClient(rtspUrl string) *Golibrtsp {
 func (c *Capture) MainClient() *Golibrtsp {
 	c.clientsMu.RLock()
 	defer c.clientsMu.RUnlock()
-	return c.RTSPClient
+	return c.rtspClient
 }
 
 func (c *Capture) SubClient() *Golibrtsp {
 	c.clientsMu.RLock()
 	defer c.clientsMu.RUnlock()
-	return c.RTSPSubClient
+	return c.rtspSubClient
+}
+
+func (c *Capture) ClearClients(main, sub, backchannel *Golibrtsp) {
+	c.clientsMu.Lock()
+	defer c.clientsMu.Unlock()
+	if c.rtspClient == main {
+		c.rtspClient = nil
+	}
+	if c.rtspSubClient == sub {
+		c.rtspSubClient = nil
+	}
+	if c.rtspBackChannelClient == backchannel {
+		c.rtspBackChannelClient = nil
+	}
 }
 
 // RTSPClient is a interface that abstracts the RTSP client implementation.

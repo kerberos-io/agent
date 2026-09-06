@@ -22,6 +22,7 @@ import { connect } from 'react-redux';
 import { interval } from 'rxjs';
 import { send } from '@giantmachines/redux-websocket';
 import ImageCanvas from '../../components/ImageCanvas/ImageCanvas';
+import websocketClientId from '../../websocket';
 import './Settings.scss';
 import timezones from './timezones';
 import {
@@ -39,7 +40,7 @@ import {
 } from '../../actions/agent';
 
 // eslint-disable-next-line react/prefer-stateless-function
-class Settings extends React.Component {
+export class Settings extends React.Component {
   KERBEROS_VAULT = 'kstorage'; // @TODO needs to change
 
   KERBEROS_HUB = 's3'; // @TODO needs to change
@@ -153,22 +154,27 @@ class Settings extends React.Component {
         config,
       }));
       this.calculateTimetable(config.timetable);
+      this.syncLiveviewSubscription();
     });
-    this.initialiseLiveview();
+    this.syncLiveviewSubscription();
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    this.syncLiveviewSubscription(prevProps, prevState);
+
+    if (
+      !prevProps.connected &&
+      this.props.connected &&
+      this.sdLiveviewActive &&
+      this.shouldRequestLiveview()
+    ) {
+      this.requestSDLiveviewFrame();
+    }
   }
 
   componentWillUnmount() {
     document.removeEventListener('keydown', this.escFunction, false);
-    if (this.requestStreamSubscription) {
-      this.requestStreamSubscription.unsubscribe();
-      this.requestStreamSubscription = null;
-    }
-
-    const { dispatchSend } = this.props;
-    const message = {
-      message_type: 'stop-sd',
-    };
-    dispatchSend(message);
+    this.stopLiveview();
   }
 
   onAddRegion(device, id, polygon) {
@@ -247,21 +253,147 @@ class Settings extends React.Component {
     ]);
   }
 
-  initialiseLiveview() {
-    const message = {
-      message_type: 'stream-sd',
+  getVisibleSections(props = this.props, state = this.state) {
+    const { selectedTab, search } = state;
+    const sections = {
+      showOverviewSection: false,
+      showRecordingSection: false,
+      showCameraSection: false,
+      showStreamingSection: false,
+      showConditionsHubSection: false,
+      showPersistenceSection: false,
     };
+
+    switch (selectedTab) {
+      case 'all':
+        sections.showOverviewSection = true;
+        sections.showCameraSection = true;
+        sections.showRecordingSection = true;
+        sections.showStreamingSection = true;
+        sections.showConditionsHubSection = true;
+        sections.showPersistenceSection = true;
+        break;
+      case 'overview':
+        sections.showOverviewSection = true;
+        break;
+      case 'camera':
+        sections.showCameraSection = true;
+        break;
+      case 'recording':
+        sections.showRecordingSection = true;
+        break;
+      case 'streaming':
+        sections.showStreamingSection = true;
+        break;
+      case 'conditions':
+        sections.showConditionsHubSection = true;
+        break;
+      case 'persistence':
+        sections.showPersistenceSection = true;
+        break;
+      default:
+    }
+
+    if (search !== '' && search !== null && this.tags) {
+      Object.keys(this.tags).forEach((section) => {
+        const match = this.tags[section].some((tag) =>
+          tag.toLowerCase().includes(search.toLowerCase())
+        );
+
+        switch (section) {
+          case 'overview':
+            sections.showOverviewSection = match;
+            break;
+          case 'camera':
+            sections.showCameraSection = match;
+            break;
+          case 'recording':
+            sections.showRecordingSection = match;
+            break;
+          case 'streaming':
+            sections.showStreamingSection = match;
+            break;
+          case 'conditions':
+            sections.showConditionsHubSection = match;
+            break;
+          case 'persistence':
+            sections.showPersistenceSection = match;
+            break;
+          default:
+        }
+      });
+    }
+
+    return sections;
+  }
+
+  shouldRequestLiveview(props = this.props, state = this.state) {
+    const { config: configResponse } = props;
+    const config = configResponse && configResponse.config;
+    if (!config || !config.region) {
+      return false;
+    }
+
+    const { showConditionsHubSection } = this.getVisibleSections(props, state);
+    return showConditionsHubSection;
+  }
+
+  syncLiveviewSubscription(prevProps = this.props, prevState = this.state) {
+    const shouldRequestNow = this.shouldRequestLiveview();
+    const shouldRequestPreviously = this.shouldRequestLiveview(
+      prevProps,
+      prevState
+    );
+
+    if (!shouldRequestPreviously && shouldRequestNow) {
+      this.initialiseLiveview();
+    } else if (shouldRequestPreviously && !shouldRequestNow) {
+      this.stopLiveview();
+    }
+  }
+
+  requestSDLiveviewFrame() {
     const { connected, dispatchSend } = this.props;
     if (connected) {
-      dispatchSend(message);
+      dispatchSend({
+        client_id: websocketClientId,
+        message_type: 'stream-sd',
+      });
     }
+  }
+
+  initialiseLiveview() {
+    if (this.sdLiveviewActive) {
+      return;
+    }
+
+    this.sdLiveviewActive = true;
+    this.requestSDLiveviewFrame();
 
     const requestStreamInterval = interval(2000);
     this.requestStreamSubscription = requestStreamInterval.subscribe(() => {
-      const { connected: isConnected } = this.props;
-      if (isConnected) {
-        dispatchSend(message);
+      if (this.sdLiveviewActive) {
+        this.requestSDLiveviewFrame();
       }
+    });
+  }
+
+  stopLiveview() {
+    if (!this.sdLiveviewActive) {
+      return;
+    }
+
+    this.sdLiveviewActive = false;
+
+    if (this.requestStreamSubscription) {
+      this.requestStreamSubscription.unsubscribe();
+      this.requestStreamSubscription = null;
+    }
+
+    const { dispatchSend } = this.props;
+    dispatchSend({
+      client_id: websocketClientId,
+      message_type: 'stop-sd',
     });
   }
 
@@ -629,81 +761,14 @@ class Settings extends React.Component {
     const { config } = c;
 
     const snapshotBase64 = 'data:image/png;base64,';
-    // Determine which section(s) to be shown, depending on the searching criteria.
-    let showOverviewSection = false;
-    let showRecordingSection = false;
-    let showCameraSection = false;
-    let showStreamingSection = false;
-    let showConditionsHubSection = false;
-    let showPersistenceSection = false;
-
-    switch (selectedTab) {
-      case 'all':
-        showOverviewSection = true;
-        showCameraSection = true;
-        showRecordingSection = true;
-        showStreamingSection = true;
-        showConditionsHubSection = true;
-        showPersistenceSection = true;
-        break;
-      case 'overview':
-        showOverviewSection = true;
-        break;
-      case 'camera':
-        showCameraSection = true;
-        break;
-      case 'recording':
-        showRecordingSection = true;
-        break;
-      case 'streaming':
-        showStreamingSection = true;
-        break;
-      case 'conditions':
-        showConditionsHubSection = true;
-        break;
-      case 'persistence':
-        showPersistenceSection = true;
-        break;
-      default:
-    }
-
-    if (search !== '' && search !== null) {
-      if (this.tags) {
-        const sections = Object.keys(this.tags);
-        sections.forEach((section) => {
-          // Find a match for the current section
-          const sectionTags = this.tags[section];
-          let match = false;
-          sectionTags.forEach((tag) => {
-            if (tag.toLowerCase().includes(search.toLowerCase())) {
-              match = true;
-            }
-          });
-
-          switch (section) {
-            case 'overview':
-              showOverviewSection = match;
-              break;
-            case 'camera':
-              showCameraSection = match;
-              break;
-            case 'recording':
-              showRecordingSection = match;
-              break;
-            case 'streaming':
-              showStreamingSection = match;
-              break;
-            case 'conditions':
-              showConditionsHubSection = match;
-              break;
-            case 'persistence':
-              showPersistenceSection = match;
-              break;
-            default:
-          }
-        });
-      }
-    }
+    const {
+      showOverviewSection,
+      showRecordingSection,
+      showCameraSection,
+      showStreamingSection,
+      showConditionsHubSection,
+      showPersistenceSection,
+    } = this.getVisibleSections();
 
     return config ? (
       <div id="settings">

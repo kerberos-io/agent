@@ -5,14 +5,15 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/components"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
+	log "github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -27,6 +28,22 @@ import (
 )
 
 var VERSION = utils.VERSION
+
+func resolveServerPort(flagValue, environmentValue string) (string, error) {
+	value := strings.TrimSpace(environmentValue)
+	if value == "" {
+		value = strings.TrimSpace(flagValue)
+	}
+	if value == "" {
+		value = "80"
+	}
+
+	port, err := strconv.Atoi(value)
+	if err != nil || port < 1 || port > 65535 {
+		return "", fmt.Errorf("port must be an integer between 1 and 65535, got %q", value)
+	}
+	return strconv.Itoa(port), nil
+}
 
 func startTracing(agentKey string, otelEndpoint string) (*trace.TracerProvider, error) {
 	serviceName := "agent-" + agentKey
@@ -99,20 +116,44 @@ func main() {
 	}
 	// Specify the timezone of the log: "UTC" or "Local".
 	timezone, _ := time.LoadLocation("CET")
-	log.Log.Init(logLevel, logOutput, configDirectory, timezone)
+	configureLogging(logLevel, logOutput, timezone)
+	if action == "run" {
+		resolvedPort, err := resolveServerPort(port, os.Getenv("AGENT_PORT"))
+		if err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"component": "http",
+				"event":     "server_port_invalid",
+			}).Fatal("Invalid HTTP server port")
+			return
+		}
+		port = resolvedPort
+	}
+	log.WithFields(log.Fields{
+		"action":           action,
+		"component":        "agent",
+		"config_directory": configDirectory,
+		"event":            "command_parsed",
+		"port":             port,
+		"version":          VERSION,
+	}).Debug("Agent command parsed")
 
 	switch action {
 
 	case "version":
 		{
-			log.Log.Info("main.Main(): You are currrently running Kerberos Agent " + VERSION)
+			log.WithFields(log.Fields{
+				"component": "agent",
+				"event":     "version",
+				"version":   VERSION,
+			}).Info("Kerberos Agent version")
 		}
 	case "discover":
 		{
 			// Convert duration to int
 			timeout, err := time.ParseDuration(timeout + "ms")
 			if err != nil {
-				log.Log.Fatal("main.Main(): could not parse timeout: " + err.Error())
+				log.WithError(err).WithField("component", "onvif").
+					Fatal("invalid ONVIF discovery timeout")
 				return
 			}
 			var subnets []string
@@ -125,15 +166,19 @@ func main() {
 		}
 	case "decrypt":
 		{
-			log.Log.Info("main.Main(): Decrypting: " + flag.Arg(0) + " with key: " + flag.Arg(1))
+			log.WithFields(log.Fields{
+				"component": "encryption",
+				"event":     "decrypt_started",
+				"path":      flag.Arg(0),
+			}).Info("Decrypting recording")
 			symmetricKey := []byte(flag.Arg(1))
 
 			if len(symmetricKey) == 0 {
-				log.Log.Fatal("main.Main(): symmetric key should not be empty")
+				log.Fatal("main.Main(): symmetric key should not be empty")
 				return
 			}
 			if len(symmetricKey) != 32 {
-				log.Log.Fatal("main.Main(): symmetric key should be 32 bytes")
+				log.Fatal("main.Main(): symmetric key should be 32 bytes")
 				return
 			}
 
@@ -163,19 +208,28 @@ func main() {
 
 			// Start OpenTelemetry tracing
 			if otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"); otelEndpoint == "" {
-				log.Log.Info("main.Main(): No OpenTelemetry endpoint provided, skipping tracing")
+				log.WithFields(log.Fields{
+					"component": "tracing",
+					"event":     "tracing_disabled",
+				}).Debug("OpenTelemetry tracing disabled")
 			} else {
-				log.Log.Info("main.Main(): Starting OpenTelemetry tracing with endpoint: " + otelEndpoint)
+				log.WithFields(log.Fields{
+					"component": "tracing",
+					"event":     "tracing_starting",
+				}).Info("Starting OpenTelemetry tracing")
 				agentKey := configuration.Config.Key
 				traceProvider, err := startTracing(agentKey, otelEndpoint)
 				if err != nil {
-					log.Log.Error("traceprovider: " + err.Error())
+					log.WithError(err).WithField("component", "tracing").
+						Error("Failed to start OpenTelemetry tracing")
+				} else {
+					defer func() {
+						if err := traceProvider.Shutdown(context.Background()); err != nil {
+							log.WithError(err).WithField("component", "tracing").
+								Error("Failed to shut down OpenTelemetry tracing")
+						}
+					}()
 				}
-				defer func() {
-					if err := traceProvider.Shutdown(context.Background()); err != nil {
-						log.Log.Error("traceprovider: " + err.Error())
-					}
-				}()
 			}
 
 			// Printing final configuration
@@ -186,8 +240,13 @@ func main() {
 			utils.CheckDataDirectoryPermissions(configDirectory)
 
 			// Set timezone
-			timezone, _ := time.LoadLocation(configuration.Config.Timezone)
-			log.Log.Init(logLevel, logOutput, configDirectory, timezone)
+			timezone, err := time.LoadLocation(configuration.Config.Timezone)
+			if err != nil {
+				log.WithError(err).WithField("timezone", configuration.Config.Timezone).
+					Warn("invalid Agent timezone; using the host timezone for logs")
+				timezone = time.Local
+			}
+			configureLogging(logLevel, logOutput, timezone)
 
 			// Check if we have a device Key or not, if not
 			// we will generate one.
@@ -196,30 +255,37 @@ func main() {
 				configuration.Config.Key = key
 				err := configService.StoreConfig(configDirectory, configuration.Config)
 				if err == nil {
-					log.Log.Info("main.Main(): updated unique key for agent to: " + key)
+					log.WithFields(log.Fields{
+						"component": "configuration",
+						"event":     "agent_key_generated",
+					}).Info("Generated and stored a unique Agent key")
 				} else {
-					log.Log.Info("main.Main(): something went wrong while trying to store key: " + key)
+					log.WithError(err).WithFields(log.Fields{
+						"component": "configuration",
+						"event":     "agent_key_store_failed",
+					}).Error("Failed to store the generated Agent key")
 				}
 			}
 
 			// Create a cancelable context, which will be used to cancel and restart.
 			// This is used to restart the agent when the configuration is updated.
 			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			// We create a capture object, this will contain all the streaming clients.
 			// And allow us to extract media from within difference places in the agent.
-			capture := capture.Capture{
-				RTSPClient:    nil,
-				RTSPSubClient: nil,
-			}
+			capture := capture.Capture{}
 
 			// Bootstrapping the agent
 			communication := models.Communication{
-				Context:         &ctx,
-				CancelContext:   &cancel,
 				HandleBootstrap: make(chan string, 1),
 			}
 
+			log.WithFields(log.Fields{
+				"component": "agent",
+				"event":     "runtime_starting",
+				"port":      configuration.Port,
+			}).Info("Starting Agent runtime")
 			go components.Bootstrap(ctx, configDirectory, &configuration, &communication, &capture)
 
 			// Start the REST API.
@@ -227,7 +293,7 @@ func main() {
 		}
 	default:
 		{
-			log.Log.Error("main.Main(): Sorry I don't understand :(")
+			log.Error("main.Main(): Sorry I don't understand :(")
 		}
 	}
 }

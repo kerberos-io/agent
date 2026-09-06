@@ -3,12 +3,13 @@ package cloud
 import (
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	log "github.com/sirupsen/logrus"
 )
 
 func UploadKerberosHub(configuration *models.Configuration, fileName string) (bool, bool, error) {
@@ -19,7 +20,7 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 		config.HubPrivateKey == "" ||
 		config.S3.Region == "" {
 		err := "UploadKerberosHub: Kerberos Hub not properly configured."
-		log.Log.Info(err)
+		log.Info(err)
 		return false, false, errors.New(err)
 	}
 
@@ -32,8 +33,10 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 	// - Number of changes
 	// - Token
 
-	log.Log.Info("UploadKerberosHub: Uploading to Kerberos Hub (" + config.HubURI + ")")
-	log.Log.Info("UploadKerberosHub: Upload started for " + fileName)
+	log.WithFields(log.Fields{
+		"component": "kerberos_hub",
+		"event":     "upload_started",
+	}).Info("Uploading recording to Kerberos Hub")
 
 	// Prefer the resumable (tus) upload when enabled (the default). Kerberos Hub
 	// authenticates the agent with its Hub public/private key and proxies the
@@ -44,17 +47,35 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 		uploaded, _, supported, body, rerr := uploadHubResumable(&config, fileName, "UploadKerberosHub", "hub")
 		if supported {
 			if uploaded {
-				log.Log.Info("UploadKerberosHub: Upload Finished (resumable), " + body)
+				log.WithFields(log.Fields{
+					"component":      "kerberos_hub",
+					"event":          "upload_completed",
+					"response_bytes": len(body),
+					"transport":      "tus",
+				}).Info("Hub upload completed")
 				return true, true, nil
 			}
 			if rerr != nil {
-				log.Log.Info("UploadKerberosHub: resumable upload failed, " + rerr.Error())
+				log.WithError(rerr).WithFields(log.Fields{
+					"component": "kerberos_hub",
+					"event":     "upload_failed",
+					"transport": "tus",
+				}).Error("Hub upload failed")
 			} else {
-				log.Log.Info("UploadKerberosHub: resumable upload incomplete, " + body)
+				log.WithFields(log.Fields{
+					"component":      "kerberos_hub",
+					"event":          "upload_incomplete",
+					"response_bytes": len(body),
+					"transport":      "tus",
+				}).Warn("Hub upload incomplete")
 			}
 			return false, true, rerr
 		}
-		log.Log.Info("UploadKerberosHub: resumable (tus) endpoint not available, falling back to legacy upload")
+		log.WithFields(log.Fields{
+			"component": "kerberos_hub",
+			"event":     "upload_transport_fallback",
+			"transport": "http",
+		}).Info("Resumable Hub upload unavailable; using legacy upload")
 	}
 
 	fullname := "data/recordings/" + fileName
@@ -66,7 +87,7 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 	}
 	if err != nil {
 		err := "UploadKerberosHub: Upload Failed, file doesn't exists anymore."
-		log.Log.Info(err)
+		log.Info(err)
 		return false, false, errors.New(err)
 	}
 
@@ -74,9 +95,11 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 	// There might be different reasons like (muted, read-only..)
 	req, err := http.NewRequest("HEAD", config.HubURI+"/storage/upload", nil)
 	if err != nil {
-		errorMessage := "UploadKerberosHub: error reading HEAD request, " + config.HubURI + "/storage: " + err.Error()
-		log.Log.Error(errorMessage)
-		return false, true, errors.New(errorMessage)
+		log.WithError(err).WithFields(log.Fields{
+			"component": "kerberos_hub",
+			"event":     "authorization_request_creation_failed",
+		}).Error("Failed to create Hub upload authorization request")
+		return false, true, fmt.Errorf("create Hub upload authorization request: %w", err)
 	}
 
 	req.Header.Set("X-Kerberos-Storage-FileName", fileName)
@@ -102,25 +125,31 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 		defer resp.Body.Close()
 	}
 
-	if err == nil {
-		if resp != nil {
-			if err == nil {
-				if resp.StatusCode == 200 {
-					log.Log.Info("UploadKerberosHub: Upload allowed using the credentials provided (" + config.HubKey + ", " + config.HubPrivateKey + ")")
-				} else {
-					log.Log.Info("UploadKerberosHub: Upload NOT allowed using the credentials provided (" + config.HubKey + ", " + config.HubPrivateKey + ")")
-					return false, true, nil
-				}
-			}
+	if err == nil && resp != nil {
+		if resp.StatusCode == 200 {
+			log.WithFields(log.Fields{
+				"component":   "kerberos_hub",
+				"event":       "upload_authorized",
+				"status_code": resp.StatusCode,
+			}).Debug("Hub upload authorized")
+		} else {
+			log.WithFields(log.Fields{
+				"component":   "kerberos_hub",
+				"event":       "upload_rejected",
+				"status_code": resp.StatusCode,
+			}).Warn("Hub upload rejected")
+			return false, true, nil
 		}
 	}
 
 	// Now we know we are allowed to upload to the hub, we can start uploading.
 	req, err = http.NewRequest("POST", config.HubURI+"/storage/upload", file)
 	if err != nil {
-		errorMessage := "UploadKerberosHub: error reading POST request, " + config.KStorage.URI + "/storage/upload: " + err.Error()
-		log.Log.Error(errorMessage)
-		return false, true, errors.New(errorMessage)
+		log.WithError(err).WithFields(log.Fields{
+			"component": "kerberos_hub",
+			"event":     "upload_request_creation_failed",
+		}).Error("Failed to create Hub upload request")
+		return false, true, fmt.Errorf("create Hub upload request: %w", err)
 	}
 	req.Header.Set("Content-Type", "video/mp4")
 	req.Header.Set("X-Kerberos-Storage-FileName", fileName)
@@ -140,19 +169,36 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 			body, err := ioutil.ReadAll(resp.Body)
 			if err == nil {
 				if resp.StatusCode == 200 {
-					log.Log.Info("UploadKerberosHub: Upload Finished, " + resp.Status + ".")
+					log.WithFields(log.Fields{
+						"component":   "kerberos_hub",
+						"event":       "upload_completed",
+						"status_code": resp.StatusCode,
+						"transport":   "http",
+					}).Info("Hub upload completed")
 					return true, true, nil
 				} else {
-					log.Log.Info("UploadKerberosHub: Upload Failed, " + resp.Status + ", " + string(body))
+					log.WithFields(log.Fields{
+						"component":      "kerberos_hub",
+						"event":          "upload_rejected",
+						"response_bytes": len(body),
+						"status_code":    resp.StatusCode,
+						"transport":      "http",
+					}).Warn("Hub upload rejected")
 					return false, true, nil
 				}
 			}
 		}
 	}
 
-	errorMessage := "UploadKerberosHub: Upload Failed, " + err.Error()
-	log.Log.Info(errorMessage)
-	return false, true, errors.New(errorMessage)
+	if err == nil {
+		err = errors.New("Hub upload failed without a response")
+	}
+	log.WithError(err).WithFields(log.Fields{
+		"component": "kerberos_hub",
+		"event":     "upload_failed",
+		"transport": "http",
+	}).Error("Hub upload failed")
+	return false, true, fmt.Errorf("Hub upload failed: %w", err)
 }
 
 // stripHubCredentialsOnCrossHostRedirect removes the custom Kerberos Hub

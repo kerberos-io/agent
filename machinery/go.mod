@@ -28,7 +28,6 @@ require (
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/moq-dev/moq-go v0.5.7
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
-	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	github.com/pion/interceptor v0.1.47
 	github.com/pion/rtp v1.10.5
 	github.com/pion/webrtc/v4 v4.2.18
@@ -45,7 +44,6 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.36.0
 	go.opentelemetry.io/otel/sdk v1.36.0
 	go.opentelemetry.io/otel/trace v1.36.0
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (

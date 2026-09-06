@@ -26,29 +26,27 @@ RUN apt-get update && apt-get install -y --fix-missing --no-install-recommends \
 	rm -rf /var/lib/apt/lists/*
 
 ##############################################################################
-# Copy all the relevant source code in the Docker image, so we can build this.
+# Copy dependency metadata first so module downloads can be cached separately.
 
 RUN mkdir -p /go/src/github.com/kerberos-io/agent
-COPY machinery /go/src/github.com/kerberos-io/agent/machinery
-RUN rm -rf /go/src/github.com/kerberos-io/agent/machinery/.env
+WORKDIR /go/src/github.com/kerberos-io/agent/machinery
+COPY machinery/go.mod machinery/go.sum ./
+RUN go mod download
 
-##################################################################
-# Get the latest commit hash, so we know which version we're running
-COPY .git /go/src/github.com/kerberos-io/agent/.git
-RUN cd /go/src/github.com/kerberos-io/agent/.git && git log --format="%H" -n 1 | head -c7 > /go/src/github.com/kerberos-io/agent/machinery/version
-RUN cat /go/src/github.com/kerberos-io/agent/machinery/version
+##############################################################################
+# Copy the rest of the source after dependencies are primed.
+
+COPY machinery ./
+RUN rm -rf .env
 
 ##################
 # Build Machinery
 
-RUN cd /go/src/github.com/kerberos-io/agent/machinery && \
-	go mod download && \
-	if [ -z "${VERSION}" ] || [ "${VERSION}" = "0.0.0" ]; then \
-		VERSION=$(cd /go/src/github.com/kerberos-io/agent && git describe --tags --always 2>/dev/null || echo "0.0.0"); \
-	fi && \
+RUN RESOLVED_VERSION="${VERSION:-0.0.0}" && \
+	printf '%s' "${RESOLVED_VERSION}" > version && \
 	BUILD_TAGS=timetzdata,netgo,osusergo && \
 	case "${TARGETARCH:-$(go env GOARCH)}" in amd64|arm64) BUILD_TAGS="moq,${BUILD_TAGS}" ;; esac && \
-	go build -tags "${BUILD_TAGS}" --ldflags "-s -w -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${VERSION}" main.go && \
+	go build -o main -tags "${BUILD_TAGS}" --ldflags "-s -w -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${RESOLVED_VERSION}" . && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv version /agent && \
@@ -80,9 +78,11 @@ RUN apk update && apk upgrade --available && sync
 # Build Web (React app)
 
 RUN mkdir -p /go/src/github.com/kerberos-io/agent/machinery/www
-COPY ui /go/src/github.com/kerberos-io/agent/ui
-RUN cd /go/src/github.com/kerberos-io/agent/ui && yarn config set network-timeout 300000 && \
-	yarn --frozen-lockfile && yarn build
+WORKDIR /go/src/github.com/kerberos-io/agent/ui
+COPY ui/package.json ui/yarn.lock ./
+RUN yarn config set network-timeout 300000 && yarn --frozen-lockfile
+COPY ui ./
+RUN yarn build
 
 ####################################
 # Let's create a /dist folder containing just the files necessary for runtime.
@@ -146,10 +146,10 @@ EXPOSE 80
 ######################################
 # Check if agent is still running
 
-HEALTHCHECK CMD curl --fail http://localhost:80 || exit 1   
+HEALTHCHECK CMD curl --fail "http://localhost:${AGENT_PORT:-80}/health" || exit 1
 
 ###################################################
 # Leeeeettttt'ssss goooooo!!!
 # Run the shizzle from the right working directory.
 WORKDIR /home/agent
-CMD ["./main", "-action", "run", "-port", "80"]
+CMD ["./main", "-action", "run"]

@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/minio/minio-go/v6"
+	log "github.com/sirupsen/logrus"
 )
 
 func UploadS3(configuration *models.Configuration, fileName string) (bool, bool, error) {
@@ -29,7 +29,7 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 
 	if config.S3 == nil {
 		errorMessage := "UploadS3: Uploading Failed, as no settings found"
-		log.Log.Error(errorMessage)
+		log.Error(errorMessage)
 		return false, false, errors.New(errorMessage)
 	}
 
@@ -49,14 +49,14 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 	// Check if we have some credentials otherwise we abort the request.
 	if aws_access_key_id == "" || aws_secret_access_key == "" {
 		errorMessage := "UploadS3: Uploading Failed, as no credentials found"
-		log.Log.Error(errorMessage)
+		log.Error(errorMessage)
 		return false, false, errors.New(errorMessage)
 	}
 
 	s3Client, err := minio.NewWithRegion("s3.amazonaws.com", aws_access_key_id, aws_secret_access_key, true, aws_region)
 	if err != nil {
 		errorMessage := "UploadS3: " + err.Error()
-		log.Log.Error(errorMessage)
+		log.Error(errorMessage)
 		return false, true, errors.New(errorMessage)
 	}
 
@@ -74,7 +74,7 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 	fileParts := strings.Split(fileName, "_")
 	if len(fileParts) == 1 {
 		errorMessage := "UploadS3: " + fileName + " is not a valid name."
-		log.Log.Error(errorMessage)
+		log.Error(errorMessage)
 		return false, true, errors.New(errorMessage)
 	}
 
@@ -85,7 +85,7 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 	//numberOfChanges := fileParts[4]
 	token, _ := strconv.Atoi(fileParts[5])
 
-	log.Log.Info("UploadS3: Upload started for " + fileName)
+	log.Info("UploadS3: Upload started for " + fileName)
 	fullname := "data/recordings/" + fileName
 
 	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
@@ -95,14 +95,14 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 
 	if err != nil {
 		errorMessage := "UploadS3: " + err.Error()
-		log.Log.Error(errorMessage)
+		log.Error(errorMessage)
 		return false, true, errors.New(errorMessage)
 	}
 
 	fileInfo, err := file.Stat()
 	if err != nil {
 		errorMessage := "UploadS3: " + err.Error()
-		log.Log.Error(errorMessage)
+		log.Error(errorMessage)
 		return false, true, errors.New(errorMessage)
 	}
 
@@ -128,10 +128,10 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 
 	if err != nil {
 		errorMessage := "UploadS3: Uploading Failed, " + err.Error()
-		log.Log.Error(errorMessage)
+		log.Error(errorMessage)
 		return false, true, errors.New(errorMessage)
 	} else {
-		log.Log.Info("UploadS3: Upload Finished, file has been uploaded to bucket: " + strconv.FormatInt(n, 10))
+		log.Info("UploadS3: Upload Finished, file has been uploaded to bucket: " + strconv.FormatInt(n, 10))
 		return true, true, nil
 	}
 }

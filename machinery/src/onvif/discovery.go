@@ -13,8 +13,8 @@ import (
 	"time"
 
 	onvifc "github.com/cedricve/go-onvif"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	log "github.com/sirupsen/logrus"
 )
 
 // scanPort describes a TCP port we probe while scanning the local network,
@@ -105,7 +105,7 @@ func DiscoverDevices(timeout time.Duration, subnets ...string) []models.Discover
 	// 1) ONVIF WS-Discovery. This is quick and reliable for ONVIF cameras.
 	onvifDevices, err := onvifc.StartDiscovery(timeout)
 	if err != nil {
-		log.Log.Error("onvif.DiscoverDevices(): WS-Discovery failed: " + err.Error())
+		log.Error("onvif.DiscoverDevices(): WS-Discovery failed: " + err.Error())
 	} else {
 		for _, onvifDevice := range onvifDevices {
 			ip := hostFromXAddr(onvifDevice.XAddr)
@@ -129,7 +129,7 @@ func DiscoverDevices(timeout time.Duration, subnets ...string) []models.Discover
 	} else {
 		targets = localScanTargets()
 	}
-	log.Log.Info("onvif.DiscoverDevices(): scanning " + strconv.Itoa(len(targets)) + " hosts on the local network(s)")
+	log.Info("onvif.DiscoverDevices(): scanning " + strconv.Itoa(len(targets)) + " hosts on the local network(s)")
 
 	// Bound the amount of concurrent dials so we do not exhaust file
 	// descriptors on constrained devices (e.g. Raspberry Pi).
@@ -319,17 +319,17 @@ func targetsFromSubnets(subnets []string) []string {
 					targets = append(targets, subnet)
 				}
 			} else {
-				log.Log.Error("onvif.targetsFromSubnets(): invalid address '" + subnet + "'")
+				log.Error("onvif.targetsFromSubnets(): invalid address '" + subnet + "'")
 			}
 			continue
 		}
 		_, ipNet, err := net.ParseCIDR(subnet)
 		if err != nil || ipNet.IP.To4() == nil {
-			log.Log.Error("onvif.targetsFromSubnets(): invalid CIDR '" + subnet + "'")
+			log.Error("onvif.targetsFromSubnets(): invalid CIDR '" + subnet + "'")
 			continue
 		}
 		if ones, bits := ipNet.Mask.Size(); bits != 32 || ones < 22 {
-			log.Log.Error("onvif.targetsFromSubnets(): range '" + subnet + "' is too large to scan (use /22 or smaller)")
+			log.Error("onvif.targetsFromSubnets(): range '" + subnet + "' is too large to scan (use /22 or smaller)")
 			continue
 		}
 		for _, host := range hostsInNetwork(ipNet) {
@@ -352,7 +352,7 @@ func localScanTargets() []string {
 
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		log.Log.Error("onvif.localScanTargets(): " + err.Error())
+		log.Error("onvif.localScanTargets(): " + err.Error())
 		return targets
 	}
 

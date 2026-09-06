@@ -30,7 +30,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -131,7 +131,10 @@ func (p *Publisher) PublishSnapshot(ctx context.Context, jpeg []byte) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("livesnapshot: upload snapshot rejected: %s", resp.Status)
 	}
-	log.Log.Debug("livesnapshot.Publisher.PublishSnapshot(): shipped preview frame for device " + p.cfg.DeviceKey)
+	log.WithFields(log.Fields{
+		"component": "livesnapshot",
+		"event":     "snapshot_published",
+	}).Debug("Live snapshot published")
 	return nil
 }
 

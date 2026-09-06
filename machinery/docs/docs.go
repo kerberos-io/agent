@@ -24,6 +24,38 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/camera/discover": {
+            "get": {
+                "description": "Runs an advanced Fing/WiFiman-style scan (ONVIF WS-Discovery + TCP port scan + MAC/vendor lookup) and returns the devices found on the local network.",
+                "tags": [
+                    "onvif"
+                ],
+                "summary": "Discover cameras and other devices on the local network.",
+                "operationId": "camera-discover",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Discovery timeout in milliseconds (default 2000)",
+                        "name": "timeout",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Optional subnet(s) to scan, e.g. '192.168.1.0/24' (comma-separated). Defaults to the local interfaces.",
+                        "name": "subnet",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/camera/onvif/capabilities": {
             "post": {
                 "description": "Will return the ONVIF capabilities for the specific camera.",
@@ -623,6 +655,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/persistence/secondary/verify": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "Will verify the secondary persistence.",
+                "tags": [
+                    "persistence"
+                ],
+                "summary": "Will verify the secondary persistence.",
+                "operationId": "verify-secondary-persistence",
+                "parameters": [
+                    {
+                        "description": "Config",
+                        "name": "config",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.Config"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.APIResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/persistence/verify": {
             "post": {
                 "security": [
@@ -656,9 +722,151 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/health": {
+            "get": {
+                "description": "Confirms that the Agent HTTP process can serve requests and reports current camera stream and Hub heartbeat diagnostics. Operational dependency failures do not change the liveness HTTP status.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Check Agent health",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/http.HealthResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "http.Health": {
+            "type": "object",
+            "properties": {
+                "cameraConnected": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "hub": {
+                    "$ref": "#/definitions/http.HubHealth"
+                },
+                "mainStream": {
+                    "$ref": "#/definitions/http.StreamHealth"
+                },
+                "subStream": {
+                    "$ref": "#/definitions/http.StreamHealth"
+                }
+            }
+        },
+        "http.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "applicationStatusCode": {
+                    "type": "string"
+                },
+                "data": {
+                    "$ref": "#/definitions/http.HealthResponseData"
+                },
+                "entityStatusCode": {
+                    "type": "string"
+                },
+                "httpStatusCode": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/http.ResponseMetadata"
+                }
+            }
+        },
+        "http.HealthResponseData": {
+            "type": "object",
+            "properties": {
+                "health": {
+                    "$ref": "#/definitions/http.Health"
+                }
+            }
+        },
+        "http.HubHealth": {
+            "type": "object",
+            "properties": {
+                "configured": {
+                    "type": "boolean"
+                },
+                "connected": {
+                    "type": "boolean"
+                },
+                "lastHeartbeatAttemptAt": {
+                    "type": "integer"
+                },
+                "lastSuccessfulHeartbeatAt": {
+                    "type": "integer"
+                }
+            }
+        },
+        "http.ResponseMetadata": {
+            "type": "object",
+            "properties": {
+                "applicationName": {
+                    "type": "string"
+                },
+                "applicationVersion": {
+                    "type": "string"
+                },
+                "path": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "integer"
+                },
+                "traceId": {
+                    "type": "string"
+                }
+            }
+        },
+        "http.StreamHealth": {
+            "type": "object",
+            "properties": {
+                "configured": {
+                    "type": "boolean"
+                },
+                "connected": {
+                    "type": "boolean"
+                },
+                "fps": {
+                    "type": "number"
+                },
+                "lastPacketAt": {
+                    "type": "integer"
+                },
+                "packagesProcessed": {
+                    "type": "integer"
+                },
+                "resolution": {
+                    "$ref": "#/definitions/http.StreamResolution"
+                }
+            }
+        },
+        "http.StreamResolution": {
+            "type": "object",
+            "properties": {
+                "height": {
+                    "type": "integer"
+                },
+                "width": {
+                    "type": "integer"
+                }
+            }
+        },
         "models.APIResponse": {
             "type": "object",
             "properties": {
@@ -730,10 +938,17 @@ const docTemplate = `{
                 "fragmentedduration": {
                     "type": "integer"
                 },
+                "gopsize": {
+                    "description": "GOP size in seconds, used for pre-recording",
+                    "type": "integer"
+                },
                 "ipcamera": {
                     "$ref": "#/definitions/models.IPCamera"
                 },
                 "liveview": {
+                    "type": "string"
+                },
+                "liveview_chunking": {
                     "type": "string"
                 },
                 "maxlengthrecording": {
@@ -743,6 +958,10 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "onvif_motion": {
+                    "description": "ONVIFMotion routes the camera's ONVIF motion events into the\nagent's motion-triggered recording pipeline. When \"true\" the\nagent opens an event/stream against the configured ONVIF\nendpoint and forwards Motion+Active events to HandleMotion.\nRequires Capture.IPCamera.ONVIFXAddr / ONVIFUsername /\nONVIFPassword to be set. Default empty (disabled) keeps the\nexisting pixel-diff motion detection as the only source.",
                     "type": "string"
                 },
                 "pixelChangeThreshold": {
@@ -823,7 +1042,13 @@ const docTemplate = `{
                 "kstorage": {
                     "$ref": "#/definitions/models.KStorage"
                 },
+                "kstorage_secondary": {
+                    "$ref": "#/definitions/models.KStorage"
+                },
                 "max_directory_size": {
+                    "type": "integer"
+                },
+                "min_free_space": {
                     "type": "integer"
                 },
                 "mqtt_password": {
@@ -855,6 +1080,9 @@ const docTemplate = `{
                 },
                 "s3": {
                     "$ref": "#/definitions/models.S3"
+                },
+                "signing": {
+                    "$ref": "#/definitions/models.Signing"
                 },
                 "stunuri": {
                     "type": "string"
@@ -947,6 +1175,15 @@ const docTemplate = `{
         "models.IPCamera": {
             "type": "object",
             "properties": {
+                "base_height": {
+                    "type": "integer"
+                },
+                "base_width": {
+                    "type": "integer"
+                },
+                "channels": {
+                    "type": "integer"
+                },
                 "fps": {
                     "type": "string"
                 },
@@ -965,8 +1202,31 @@ const docTemplate = `{
                 "onvif_xaddr": {
                     "type": "string"
                 },
+                "pps_nalus": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    }
+                },
                 "rtsp": {
                     "type": "string"
+                },
+                "sample_rate": {
+                    "type": "integer"
+                },
+                "sps_nalus": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    }
                 },
                 "sub_fps": {
                     "type": "string"
@@ -974,11 +1234,52 @@ const docTemplate = `{
                 "sub_height": {
                     "type": "integer"
                 },
+                "sub_pps_nalus": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    }
+                },
                 "sub_rtsp": {
                     "type": "string"
                 },
+                "sub_sps_nalus": {
+                    "description": "Sub stream parameter sets, captured separately from the main stream so the\nlive HLS muxer can build a correct init segment when a viewer switches the\nlive view to the sub (low-resolution) stream.",
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    }
+                },
+                "sub_vps_nalus": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    }
+                },
                 "sub_width": {
                     "type": "integer"
+                },
+                "vps_nalus": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer",
+                            "format": "int32"
+                        }
+                    }
                 },
                 "width": {
                     "type": "integer"
@@ -998,11 +1299,17 @@ const docTemplate = `{
                 "directory": {
                     "type": "string"
                 },
+                "max_retries": {
+                    "type": "integer"
+                },
                 "provider": {
                     "type": "string"
                 },
                 "secret_access_key": {
                     "type": "string"
+                },
+                "timeout": {
+                    "type": "integer"
                 },
                 "uri": {
                     "type": "string"
@@ -1137,6 +1444,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.Signing": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "string"
+                },
+                "private_key": {
                     "type": "string"
                 }
             }

@@ -4,7 +4,9 @@ package cloud
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -12,10 +14,10 @@ import (
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/cloud/livemoq"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/moq-dev/moq-go/moq"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -45,10 +47,21 @@ type liveMoQConfig struct {
 	writeTimeout  time.Duration
 }
 
-// label identifies the tier in log lines, since one Agent runs a publisher per
-// quality tier.
-func (c liveMoQConfig) label() string {
-	return c.quality + " (" + c.sourceLabel + " stream)"
+func (c liveMoQConfig) logEntry(event string) *log.Entry {
+	return log.WithFields(log.Fields{
+		"component": "moq",
+		"event":     event,
+		"quality":   c.quality,
+		"stream":    c.sourceLabel,
+	})
+}
+
+func moQRelayHost(relayURL string) string {
+	parsed, err := url.Parse(relayURL)
+	if err != nil {
+		return ""
+	}
+	return parsed.Host
 }
 
 func (c liveMoQConfig) packetAgeLimit() time.Duration {
@@ -73,15 +86,35 @@ func boundedMoQDuration(name string, fallback, minimum, maximum time.Duration) t
 
 	value, err := time.ParseDuration(raw)
 	if err != nil {
-		log.Log.Warning(fmt.Sprintf("cloud.StartLiveStreamMoQ(): invalid %s=%q; using %s", name, raw, fallback))
+		log.WithError(err).WithFields(log.Fields{
+			"component":        "moq",
+			"configured_value": raw,
+			"effective_value":  fallback.String(),
+			"event":            "duration_invalid",
+			"variable":         name,
+		}).Warn("Invalid MoQ duration; using default")
 		return fallback
 	}
 	if value < minimum {
-		log.Log.Warning(fmt.Sprintf("cloud.StartLiveStreamMoQ(): %s=%s is below %s; clamping", name, value, minimum))
+		log.WithFields(log.Fields{
+			"component":        "moq",
+			"configured_value": value.String(),
+			"effective_value":  minimum.String(),
+			"event":            "duration_clamped",
+			"minimum":          minimum.String(),
+			"variable":         name,
+		}).Warn("MoQ duration is below the supported minimum")
 		return minimum
 	}
 	if value > maximum {
-		log.Log.Warning(fmt.Sprintf("cloud.StartLiveStreamMoQ(): %s=%s is above %s; clamping", name, value, maximum))
+		log.WithFields(log.Fields{
+			"component":        "moq",
+			"configured_value": value.String(),
+			"effective_value":  maximum.String(),
+			"event":            "duration_clamped",
+			"maximum":          maximum.String(),
+			"variable":         name,
+		}).Warn("MoQ duration exceeds the supported maximum")
 		return maximum
 	}
 	return value
@@ -96,20 +129,37 @@ func boundedMoQDuration(name string, fallback, minimum, maximum time.Duration) t
 // publishing each tier as its OWN broadcast (see livemoq.BroadcastPath): the
 // high tier from the camera's highest-resolution stream and the low tier from
 // its sub stream, so switching quality in the frontend is a resubscribe to the
-// other path. Each tier only uploads while it actually has subscribers, so the
-// second broadcast is close to free when nobody watches it.
-func StartLiveStreamMoQ(configuration *models.Configuration, communication *models.Communication, subStreamEnabled bool) {
+// other path. Each tier uploads every frame while watched and keyframes only
+// while idle, keeping the relay cache current without continuously sending the
+// full unused stream.
+func StartLiveStreamMoQ(
+	ctx context.Context,
+	configuration *models.Configuration,
+	communication *models.Communication,
+	subStreamEnabled bool,
+	mainQueue *packets.Queue,
+	subQueue *packets.Queue,
+) {
 	if os.Getenv("AGENT_LIVE_MOQ_ENABLED") != "true" {
 		return
 	}
 
 	config := configuration.Config
 	if config.Offline == "true" || config.Capture.Liveview == "false" {
-		log.Log.Info("cloud.StartLiveStreamMoQ(): disabled by Agent live-view configuration")
+		log.WithFields(log.Fields{
+			"component": "moq",
+			"event":     "publisher_disabled",
+			"liveview":  config.Capture.Liveview,
+			"offline":   config.Offline,
+		}).Debug("MoQ publisher disabled by Agent configuration")
 		return
 	}
 	if config.Key == "" {
-		log.Log.Warning("cloud.StartLiveStreamMoQ(): AGENT_KEY is required")
+		log.WithFields(log.Fields{
+			"component": "moq",
+			"event":     "publisher_configuration_invalid",
+			"variable":  "AGENT_KEY",
+		}).Warn("MoQ publisher requires an Agent key")
 		return
 	}
 
@@ -132,22 +182,20 @@ func StartLiveStreamMoQ(configuration *models.Configuration, communication *mode
 	maxPacketAge := boundedMoQDuration("AGENT_LIVE_MOQ_MAX_PACKET_AGE", defaultMoQLivePacketAge, minMoQLivePacketAge, maxMoQLivePacketAge)
 	writeTimeout := boundedMoQDuration("AGENT_LIVE_MOQ_WRITE_TIMEOUT", defaultMoQWriteTimeout, minMoQWriteTimeout, maxMoQWriteTimeout)
 
-	ctx := context.Background()
-	if communication.Context != nil {
-		ctx = *communication.Context
-	}
-
 	var publishers sync.WaitGroup
 	for _, quality := range qualities {
-		queue := communication.Queue.Load()
+		queue := mainQueue
 		sourceLabel := "main"
-		subQueue := communication.SubQueue.Load()
 		if models.SelectSubStreamForQuality(config, quality, subStreamEnabled) && subQueue != nil {
 			queue = subQueue
 			sourceLabel = "sub"
 		}
 		if queue == nil {
-			log.Log.Warning("cloud.StartLiveStreamMoQ(): packet queue for the " + quality + " tier is unavailable")
+			log.WithFields(log.Fields{
+				"component": "moq",
+				"event":     "packet_queue_unavailable",
+				"quality":   quality,
+			}).Warn("MoQ packet queue is unavailable")
 			continue
 		}
 		publisherConfig := liveMoQConfig{
@@ -170,10 +218,12 @@ func StartLiveStreamMoQ(configuration *models.Configuration, communication *mode
 }
 
 func runLiveStreamMoQ(ctx context.Context, config liveMoQConfig) {
-	log.Log.Info(fmt.Sprintf(
-		"cloud.runLiveStreamMoQ(): publishing %s stream (quality=%s) to %s/%s",
-		config.sourceLabel, config.quality, strings.TrimRight(config.relayURL, "/"), config.broadcast,
-	))
+	config.logEntry("publisher_started").Info("MoQ publisher started")
+	config.logEntry("publisher_configuration").WithFields(log.Fields{
+		"max_packet_age_ms": config.packetAgeLimit().Milliseconds(),
+		"relay_host":        moQRelayHost(config.relayURL),
+		"write_timeout_ms":  config.writeTimeoutLimit().Milliseconds(),
+	}).Debug("MoQ publisher configuration")
 
 	retryDelay := minMoQRetryDelay
 	for ctx.Err() == nil {
@@ -185,7 +235,10 @@ func runLiveStreamMoQ(ctx context.Context, config liveMoQConfig) {
 		if config.communication != nil {
 			config.communication.RecordMoQReconnect(config.quality)
 		}
-		log.Log.Warning("cloud.runLiveStreamMoQ(): publisher stopped: " + err.Error())
+		config.logEntry("publisher_reconnecting").WithError(err).WithFields(log.Fields{
+			"connected_duration_ms": time.Since(connectedAt).Milliseconds(),
+			"retry_delay_ms":        retryDelay.Milliseconds(),
+		}).Warn("MoQ publisher stopped; reconnecting")
 		if time.Since(connectedAt) >= time.Minute {
 			retryDelay = minMoQRetryDelay
 		}
@@ -212,6 +265,8 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 		return fmt.Errorf("connect to relay: %w", err)
 	}
 	defer client.Close()
+	config.logEntry("relay_connected").WithField("relay_host", moQRelayHost(config.relayURL)).
+		Info("MoQ relay connected")
 
 	publisherCtx, cancelPublisher := context.WithCancel(ctx)
 	defer cancelPublisher()
@@ -227,24 +282,34 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	if err != nil {
 		return fmt.Errorf("create broadcast: %w", err)
 	}
-	defer broadcast.Finish()
+	var finishBroadcastOnce sync.Once
+	var finishBroadcastErr error
+	finishBroadcast := func() error {
+		finishBroadcastOnce.Do(func() {
+			finishBroadcastErr = broadcast.Finish()
+		})
+		return finishBroadcastErr
+	}
+	defer finishBroadcast()
 
 	stream, err := broadcast.PublishMedia("avc3", nil)
 	if err != nil {
 		return fmt.Errorf("create H.264 media stream: %w", err)
 	}
 	var finishStreamOnce sync.Once
-	finishStream := func() {
+	var finishStreamErr error
+	finishStream := func() error {
 		finishStreamOnce.Do(func() {
-			_ = stream.Finish()
+			finishStreamErr = stream.Finish()
 		})
+		return finishStreamErr
 	}
 	defer finishStream()
 
-	// Only upload while this tier is actually being watched. `publishing` starts
-	// true so the track becomes discoverable on the relay even before the first
-	// subscriber ever arrives; from the moment a viewer has attached once, the
-	// subscriber watcher takes over and idles the tier again when everybody left.
+	// Publish the complete stream while watched and only keyframes while idle.
+	// `publishing` starts true so the track becomes discoverable on the relay
+	// before the first subscriber; after that, the subscriber watcher selects the
+	// full-rate or keyframe-refresh mode.
 	publishing := &atomic.Bool{}
 	publishing.Store(true)
 	subscriberWatchDone := make(chan struct{})
@@ -255,8 +320,7 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	writeWatchdog := &livemoq.WriteWatchdog{}
 	writeWatchDone := make(chan struct{})
 	closePublisher := func() error {
-		finishStream()
-		return client.Close()
+		return closeLiveMoQPublisher(finishStream, finishBroadcast, client.Close)
 	}
 	go func() {
 		defer close(writeWatchDone)
@@ -271,10 +335,10 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 
 	cursor := config.queue.Latest()
 	gate := livemoq.FrameGate{}
+	audienceGate := livemoq.AudienceGate{}
 	deduplicator := livemoq.KeyframeDeduplicator{}
 	var lastSlowWriteWarning time.Time
 	var lastDuplicateKeyframeWarning time.Time
-	idle := false
 	for {
 		select {
 		case err := <-sessionClosed:
@@ -294,28 +358,32 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 			}
 			return fmt.Errorf("read packet: %w", err)
 		}
-		if !publishing.Load() {
-			// Keep draining the cursor so we stay at the live edge, but publish
-			// nothing. The gate is closed so the next viewer resumes on a keyframe.
-			if !idle {
-				gate.Reset()
-				deduplicator.Reset()
-				idle = true
-			}
+		if !packet.IsVideo || len(packet.Data) == 0 || !strings.EqualFold(packet.Codec, "H264") {
 			continue
 		}
-		idle = false
-		if !packet.IsVideo || len(packet.Data) == 0 || !strings.EqualFold(packet.Codec, "H264") {
+		allowedForAudience, enteredIdle := audienceGate.Allow(publishing.Load(), packet.IsKeyFrame)
+		if enteredIdle {
+			gate.Reset()
+			deduplicator.Reset()
+		}
+		if !allowedForAudience {
 			continue
 		}
 		allowed, event := gate.Allow(packet.IsKeyFrame, packet.CurrentTime, time.Now(), config.packetAgeLimit())
 		switch event {
 		case livemoq.FrameGateEventStarted:
-			log.Log.Info("cloud.publishLiveStreamMoQ(): first H.264 keyframe received; " + config.label() + " broadcast is live")
+			config.logEntry("broadcast_live").WithFields(log.Fields{
+				"codec":        packet.Codec,
+				"timestamp_ms": packet.Time,
+			}).Info("MoQ broadcast is live")
 		case livemoq.FrameGateEventLagging:
-			log.Log.Warning("cloud.publishLiveStreamMoQ(): " + config.label() + " stream is lagging; dropping packets until a recent keyframe")
+			config.logEntry("stream_lagging").WithFields(log.Fields{
+				"max_packet_age_ms": config.packetAgeLimit().Milliseconds(),
+				"timestamp_ms":      packet.Time,
+			}).Warn("MoQ stream is lagging; dropping packets until a recent keyframe")
 		case livemoq.FrameGateEventRecovered:
-			log.Log.Info("cloud.publishLiveStreamMoQ(): caught up with the " + config.label() + " live stream at a recent keyframe")
+			config.logEntry("stream_recovered").WithField("timestamp_ms", packet.Time).
+				Info("MoQ stream recovered at a recent keyframe")
 		}
 		if !allowed {
 			continue
@@ -325,18 +393,18 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 			return fmt.Errorf("normalize H.264 access unit: %w", err)
 		}
 		if normalizationStats.DuplicateIDRNALUs > 0 && time.Since(lastDuplicateKeyframeWarning) >= moQWriteWarningInterval {
-			log.Log.Warning(fmt.Sprintf(
-				"cloud.publishLiveStreamMoQ(): %s removed %d duplicate IDR NALU(s) from H.264 keyframe (timestamp_ms=%d)",
-				config.label(), normalizationStats.DuplicateIDRNALUs, packet.Time,
-			))
+			config.logEntry("duplicate_idr_removed").WithFields(log.Fields{
+				"duplicate_idr_count": normalizationStats.DuplicateIDRNALUs,
+				"timestamp_ms":        packet.Time,
+			}).Warn("Removed duplicate IDR NAL units from MoQ keyframe")
+
 			lastDuplicateKeyframeWarning = time.Now()
 		}
 		if packet.IsKeyFrame && deduplicator.IsDuplicate(packet.Time, packet.CurrentTime, payload, time.Now(), duplicateKeyframeWindow) {
 			if time.Since(lastDuplicateKeyframeWarning) >= moQWriteWarningInterval {
-				log.Log.Warning(fmt.Sprintf(
-					"cloud.publishLiveStreamMoQ(): %s dropping duplicate H.264 keyframe (timestamp_ms=%d)",
-					config.label(), packet.Time,
-				))
+				config.logEntry("duplicate_keyframe_dropped").WithField("timestamp_ms", packet.Time).
+					Warn("Dropped duplicate MoQ keyframe")
+
 				lastDuplicateKeyframeWarning = time.Now()
 			}
 			continue
@@ -364,37 +432,53 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 					packetAge = 0
 				}
 			}
-			log.Log.Warning(fmt.Sprintf(
-				"cloud.publishLiveStreamMoQ(): %s WriteFrame blocked for %s (packet_age=%s keyframe=%t)",
-				config.label(), writeDuration.Round(time.Millisecond), packetAge.Round(time.Millisecond), packet.IsKeyFrame,
-			))
+			config.logEntry("slow_frame_write").WithFields(log.Fields{
+				"duration_ms":   writeDuration.Milliseconds(),
+				"keyframe":      packet.IsKeyFrame,
+				"packet_age_ms": packetAge.Milliseconds(),
+			}).Warn("MoQ frame write was slow")
+
 			lastSlowWriteWarning = time.Now()
 		}
 	}
 }
 
-func watchLiveStreamMoQWrites(ctx context.Context, closeClient func() error, watchdog *livemoq.WriteWatchdog, config liveMoQConfig) {
+func closeLiveMoQPublisher(finishStream, finishBroadcast, closeClient func() error) error {
+	streamErr := finishStream()
+	broadcastErr := finishBroadcast()
+	clientErr := closeClient()
+	return errors.Join(streamErr, broadcastErr, clientErr)
+}
+
+func watchLiveStreamMoQWrites(ctx context.Context, closePublisher func() error, watchdog *livemoq.WriteWatchdog, config liveMoQConfig) {
 	ticker := time.NewTicker(moQWriteWatchInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			closeClient()
+			if err := closePublisher(); err != nil {
+				config.logEntry("publisher_close_failed").WithError(err).
+					Debug("MoQ publisher reported an error while closing")
+			}
 			return
 		case now := <-ticker.C:
 			writeDuration, active := watchdog.Elapsed(now)
 			if !active || writeDuration < config.writeTimeoutLimit() {
 				continue
 			}
-			log.Log.Warning(fmt.Sprintf(
-				"cloud.watchLiveStreamMoQWrites(): %s WriteFrame blocked for %s; closing the relay client to force a reconnect",
-				config.label(), writeDuration.Round(time.Millisecond),
-			))
+			config.logEntry("frame_write_timeout").WithFields(log.Fields{
+				"duration_ms": writeDuration.Milliseconds(),
+				"timeout_ms":  config.writeTimeoutLimit().Milliseconds(),
+			}).Warn("MoQ frame write timed out; reconnecting relay client")
+
 			if config.communication != nil {
 				config.communication.RecordMoQWriteTimeout()
 			}
-			closeClient()
+			if err := closePublisher(); err != nil {
+				config.logEntry("publisher_close_failed").WithError(err).
+					Warn("MoQ publisher reported an error while closing after a write timeout")
+			}
 			return
 		}
 	}
@@ -415,7 +499,7 @@ func watchLiveStreamMoQSubscribers(ctx context.Context, stream *moq.MediaProduce
 			return
 		}
 		if publishing.CompareAndSwap(false, true) {
-			log.Log.Info("cloud.watchLiveStreamMoQSubscribers(): viewer subscribed, resuming the " + config.label() + " broadcast")
+			config.logEntry("subscriber_joined").Info("MoQ subscriber joined; resuming broadcast")
 		}
 
 		if err := stream.Unused(ctx); err != nil {
@@ -423,6 +507,6 @@ func watchLiveStreamMoQSubscribers(ctx context.Context, stream *moq.MediaProduce
 			return
 		}
 		publishing.Store(false)
-		log.Log.Info("cloud.watchLiveStreamMoQSubscribers(): no viewers left, idling the " + config.label() + " broadcast")
+		config.logEntry("subscribers_idle").Info("MoQ broadcast idle; refreshing keyframes only")
 	}
 }

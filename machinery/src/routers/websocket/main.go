@@ -11,11 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/kerberos-io/agent/machinery/src/capture"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
+	log "github.com/sirupsen/logrus"
 )
 
 type Message struct {
@@ -43,7 +43,7 @@ func writeWebRTCError(connection *Connection, clientID string, sessionID string,
 			"message":    errorMessage,
 		},
 	}); err != nil {
-		log.Log.Error("routers.websocket.main.writeWebRTCError(): " + err.Error())
+		log.Error("routers.websocket.main.writeWebRTCError(): " + err.Error())
 	}
 }
 
@@ -80,7 +80,7 @@ func WebsocketHandler(c *gin.Context, configuration *models.Configuration, commu
 		var message Message
 		err = conn.ReadJSON(&message)
 		if err != nil {
-			log.Log.Error("routers.websocket.main.WebsocketHandler(): " + err.Error())
+			log.Error("routers.websocket.main.WebsocketHandler(): " + err.Error())
 			return
 		}
 		clientID := message.ClientID
@@ -89,7 +89,7 @@ func WebsocketHandler(c *gin.Context, configuration *models.Configuration, commu
 			connection.Socket = conn
 			sockets[clientID] = connection
 			sockets[clientID].Cancels = make(map[string]context.CancelFunc)
-			log.Log.Info("routers.websocket.main.WebsocketHandler(): " + clientID + ": connected.")
+			log.Info("routers.websocket.main.WebsocketHandler(): " + clientID + ": connected.")
 		}
 
 		// Continuously read messages
@@ -111,14 +111,14 @@ func WebsocketHandler(c *gin.Context, configuration *models.Configuration, commu
 				if exists {
 					sockets[clientID].Cancels["stream-sd"]()
 				} else {
-					log.Log.Error("routers.websocket.main.WebsocketHandler(): streaming sd does not exists for " + clientID)
+					log.Error("routers.websocket.main.WebsocketHandler(): streaming sd does not exists for " + clientID)
 				}
 
 			case "stream-sd":
 				if communication.CameraConnected.Load() {
 					_, exists := sockets[clientID].Cancels["stream-sd"]
 					if exists {
-						log.Log.Debug("routers.websocket.main.WebsocketHandler(): already streaming sd for " + clientID)
+						log.Debug("routers.websocket.main.WebsocketHandler(): already streaming sd for " + clientID)
 					} else {
 						startStream := Message{
 							ClientID:    clientID,
@@ -218,7 +218,7 @@ func WebsocketHandler(c *gin.Context, configuration *models.Configuration, commu
 		_, exists := sockets[clientID]
 		if exists {
 			delete(sockets, clientID)
-			log.Log.Info("routers.websocket.main.WebsocketHandler(): " + clientID + ": terminated and disconnected websocket connection.")
+			log.Info("routers.websocket.main.WebsocketHandler(): " + clientID + ": terminated and disconnected websocket connection.")
 		}
 	}
 }
@@ -231,10 +231,10 @@ func ForwardSDStream(ctx context.Context, clientID string, connection *Connectio
 	// We'll pick the right client and decoder.
 	rtspClient := captureDevice.SubClient()
 	if rtspClient != nil {
-		queue = communication.SubQueue.Load()
+		queue = communication.SubQueue()
 	} else {
 		rtspClient = captureDevice.MainClient()
-		queue = communication.Queue.Load()
+		queue = communication.MainQueue()
 	}
 	if queue != nil {
 		cursor = queue.Latest()
@@ -261,7 +261,7 @@ logreader:
 					continue
 				}
 			} else {
-				log.Log.Error("routers.websocket.main.ForwardSDStream():" + err.Error())
+				log.Error("routers.websocket.main.ForwardSDStream():" + err.Error())
 				break logreader
 			}
 		}
@@ -275,7 +275,7 @@ logreader:
 		}
 		err := connection.WriteJson(startStrean)
 		if err != nil {
-			log.Log.Error("routers.websocket.main.ForwardSDStream():" + err.Error())
+			log.Error("routers.websocket.main.ForwardSDStream():" + err.Error())
 			break logreader
 		}
 		select {
@@ -290,9 +290,9 @@ logreader:
 	if exists {
 		delete(connection.Cancels, "stream-sd")
 	} else {
-		log.Log.Error("routers.websocket.main.ForwardSDStream(): streaming sd does not exists for " + clientID)
+		log.Error("routers.websocket.main.ForwardSDStream(): streaming sd does not exists for " + clientID)
 	}
 
 	// Send stop streaming message
-	log.Log.Info("routers.websocket.main.ForwardSDStream(): stop sending streaming over websocket")
+	log.Info("routers.websocket.main.ForwardSDStream(): stop sending streaming over websocket")
 }

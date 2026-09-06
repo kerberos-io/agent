@@ -10,24 +10,27 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    container:
-      image: kerberos/base:eb6b088
-
-    strategy:
-      matrix:
-        #No longer supported Go versions.
-        #go-version: ['1.17', '1.18', '1.19', '1.20', '1.21']
-        go-version: ["1.24"]
 
     steps:
-      - name: Set up Go ${{ matrix.go-version }}
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
       - name: Check out code into the Go module directory
         uses: actions/checkout@v4
-      - name: Set up git ownershi
-        run: git config --system --add safe.directory /__w/agent/agent
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+          check-latest: true
+          cache: true
+          cache-dependency-path: machinery/go.sum
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            libavcodec-dev \
+            libavutil-dev \
+            libswresample-dev \
+            libswscale-dev \
+            pkg-config
       - name: Get dependencies
         run: cd machinery && go mod download
       - name: Build

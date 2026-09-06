@@ -1,7 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { withTranslation } from 'react-i18next';
-import uuid from 'uuidv4';
 import {
   connect as connectWS,
   disconnect as disconnectWS,
@@ -27,65 +26,104 @@ import { logout } from './actions';
 import config from './config';
 import { getDashboardInformation } from './actions/agent';
 import LanguageSelect from './components/LanguageSelect/LanguageSelect';
+import websocketClientId from './websocket';
 import logo from './header-minimal-logo-36x36.svg';
 import '@kerberos-io/ui/lib/index.css';
 import './App.scss';
 
 // eslint-disable-next-line react/prefer-stateless-function
-class App extends React.Component {
+export class App extends React.Component {
   componentDidMount() {
-    const { dispatchGetDashboardInformation, dispatchConnect } = this.props;
-    dispatchGetDashboardInformation();
+    const { dispatchConnect } = this.props;
+    this.dashboardRequestInFlight = false;
+    this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
     dispatchConnect();
+    this.refreshDashboardInformation(true);
 
-    const connectInterval = interval(1000);
-    this.connectionSubscription = connectInterval.subscribe(() => {
-      const { connected } = this.props;
-      if (connected) {
-        // Already connected
-      } else {
-        dispatchConnect();
-      }
-    });
+    document.addEventListener(
+      'visibilitychange',
+      this.handleVisibilityChange,
+      false
+    );
 
     const interval$ = interval(5000);
     this.subscription = interval$.subscribe(() => {
-      dispatchGetDashboardInformation();
+      this.refreshDashboardInformation();
     });
   }
 
   componentDidUpdate(prevProps) {
     // We are connected again, lets fire the initial events.
-    const { connected, dispatchSend, dispatchConnect } = this.props;
+    const { connected, dispatchSend } = this.props;
     const { connected: connectedPrev } = prevProps;
     if (connectedPrev === false && connected === true) {
       const message = {
-        client_id: uuid(),
+        client_id: websocketClientId,
         message_type: 'hello',
       };
       dispatchSend(message);
     }
-
-    // We disconnected, let's try to connect again
-    if (connectedPrev === true && connected === false) {
-      dispatchConnect();
-    }
   }
 
   componentWillUnmount() {
-    this.subscription.unsubscribe();
-    this.connectionSubscription.unsubscribe();
+    this.dashboardRequestInFlight = false;
+    document.removeEventListener(
+      'visibilitychange',
+      this.handleVisibilityChange,
+      false
+    );
+
+    if (this.subscription) {
+      this.subscription.unsubscribe();
+      this.subscription = null;
+    }
+
     const message = {
-      client_id: uuid(),
+      client_id: websocketClientId,
       message_type: 'goodbye',
     };
-    const { dispatchSend, dispatchDisconnect } = this.props;
-    dispatchSend(message);
+    const { connected, dispatchSend, dispatchDisconnect } = this.props;
+    if (connected) {
+      dispatchSend(message);
+    }
     dispatchDisconnect();
+  }
+
+  handleVisibilityChange() {
+    if (!this.isDocumentHidden()) {
+      this.refreshDashboardInformation();
+    }
   }
 
   getCurrentTimestamp() {
     return Math.round(Date.now() / 1000);
+  }
+
+  isDocumentHidden() {
+    return typeof document !== 'undefined' && document.hidden;
+  }
+
+  refreshDashboardInformation(force = false) {
+    if (this.dashboardRequestInFlight) {
+      return;
+    }
+
+    if (!force && this.isDocumentHidden()) {
+      return;
+    }
+
+    this.dashboardRequestInFlight = true;
+    const { dispatchGetDashboardInformation } = this.props;
+    dispatchGetDashboardInformation(
+      () => {
+        this.dashboardRequestInFlight = false;
+      },
+      (error) => {
+        this.dashboardRequestInFlight = false;
+        // eslint-disable-next-line no-console
+        console.warn('Unable to refresh dashboard information.', error);
+      }
+    );
   }
 
   render() {
@@ -226,8 +264,8 @@ const mapDispatchToProps = (dispatch) => ({
   },
   dispatchDisconnect: () => dispatch(disconnectWS()),
   dispatchSend: (message) => dispatch(send(message)),
-  dispatchGetDashboardInformation: (dashboard, success, error) =>
-    dispatch(getDashboardInformation(dashboard, success, error)),
+  dispatchGetDashboardInformation: (onSuccess, onError) =>
+    dispatch(getDashboardInformation(onSuccess, onError)),
 });
 
 App.propTypes = {

@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
+	log "github.com/sirupsen/logrus"
 )
 
 // Login godoc
@@ -598,27 +598,27 @@ func DoTriggerRelayOutput(c *gin.Context) {
 			err := onvif.TriggerRelayOutput(device, output)
 			if err == nil {
 				msg := "relay output triggered: " + output
-				log.Log.Info("routers.http.methods.DoTriggerRelayOutput(): " + msg)
+				log.Info("routers.http.methods.DoTriggerRelayOutput(): " + msg)
 				c.JSON(200, gin.H{
 					"data": msg,
 				})
 			} else {
 				msg := "something went wrong: " + err.Error()
-				log.Log.Error("routers.http.methods.DoTriggerRelayOutput(): " + msg)
+				log.Error("routers.http.methods.DoTriggerRelayOutput(): " + msg)
 				c.JSON(400, gin.H{
 					"data": msg,
 				})
 			}
 		} else {
 			msg := "something went wrong: " + err.Error()
-			log.Log.Error("routers.http.methods.DoTriggerRelayOutput(): " + msg)
+			log.Error("routers.http.methods.DoTriggerRelayOutput(): " + msg)
 			c.JSON(400, gin.H{
 				"data": msg,
 			})
 		}
 	} else {
 		msg := "something went wrong: " + err.Error()
-		log.Log.Error("routers.http.methods.DoTriggerRelayOutput(): " + msg)
+		log.Error("routers.http.methods.DoTriggerRelayOutput(): " + msg)
 		c.JSON(400, gin.H{
 			"data": msg,
 		})

@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -12,15 +11,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/encryption"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	log "github.com/sirupsen/logrus"
 
 	"github.com/nfnt/resize"
 )
@@ -140,11 +138,11 @@ func CheckDataDirectoryPermissions(configDirectory string) error {
 	}
 
 	if err != nil {
-		log.Log.Error("Checking data directory permissions: " + err.Error())
+		log.Error("Checking data directory permissions: " + err.Error())
 		return err
 	}
 
-	log.Log.Info("Checking data directory permissions: OK")
+	log.Info("Checking data directory permissions: OK")
 	return nil
 }
 
@@ -301,16 +299,16 @@ func CreateFragmentedMP4(fullName string, fragmentedDuration int64) {
 	// This timescale is crucial, as it should be the same as the one defined in JOY4.
 	cmd := exec.Command("mp4fragment", "--timescale", "10000000", "--fragment-duration", strconv.FormatInt(duration, 10), fullName, fullName+"f.mp4")
 	cmd.Dir = path
-	log.Log.Info(cmd.String())
+	log.Info(cmd.String())
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
-		log.Log.Error(fmt.Sprint(err) + ": " + stderr.String())
+		log.Error(fmt.Sprint(err) + ": " + stderr.String())
 	} else {
-		log.Log.Info("Created Fragmented: " + out.String())
+		log.Info("Created Fragmented: " + out.String())
 	}
 
 	// We will swap the files.
@@ -319,42 +317,93 @@ func CreateFragmentedMP4(fullName string, fragmentedDuration int64) {
 }
 
 func PrintEnvironmentVariables() {
-	// Print environment variables that include "AGENT_" as a prefix.
-	environmentVariables := ""
-	for _, e := range os.Environ() {
-		if strings.Contains(e, "AGENT_") {
-			pair := strings.Split(e, "=")
-			environmentVariables = environmentVariables + pair[0] + "=" + pair[1] + " "
+	names := agentEnvironmentVariableNames(os.Environ())
+	log.WithFields(log.Fields{
+		"component":      "configuration",
+		"event":          "environment_loaded",
+		"variable_count": len(names),
+	}).Info("Agent environment loaded")
+	log.WithFields(log.Fields{
+		"component": "configuration",
+		"event":     "environment_details",
+		"variables": names,
+	}).Debug("Agent environment details")
+}
+
+func agentEnvironmentVariableNames(environment []string) []string {
+	names := make([]string, 0)
+	for _, entry := range environment {
+		name, _, found := strings.Cut(entry, "=")
+		if found && strings.HasPrefix(name, "AGENT_") {
+			names = append(names, name)
 		}
 	}
-	log.Log.Info("Printing out environmentVariables (AGENT_...): " + environmentVariables)
+	sort.Strings(names)
+	return names
 }
 
 func PrintConfiguration(configuration *models.Configuration) {
-	// We will print out the struct.
 	if configuration == nil {
-		log.Log.Info("Configuration is nil")
+		log.WithFields(log.Fields{
+			"component": "configuration",
+			"event":     "configuration_missing",
+		}).Warn("Agent configuration is nil")
 		return
 	}
-	config := configuration.Config
-	// Iterate over the struct and printout the values.
-	v := reflect.ValueOf(config)
-	typeOfS := v.Type()
-	configurationVariables := ""
-	for i := 0; i < v.NumField(); i++ {
-		key := typeOfS.Field(i).Name
-		value := v.Field(i).Interface()
-		// Convert to string.
-		configurationVariables = configurationVariables + key + ": " + fmt.Sprintf("%v", value) + " "
+
+	log.WithFields(configurationLogFields(configuration.Config)).
+		Info("Agent configuration loaded")
+	log.WithFields(configurationDebugLogFields(configuration.Config)).
+		Debug("Agent configuration details")
+}
+
+func configurationLogFields(config models.Config) log.Fields {
+	return log.Fields{
+		"agent_name":     config.Name,
+		"camera_type":    config.Capture.Name,
+		"cloud_provider": config.Cloud,
+		"component":      "configuration",
+		"event":          "configuration_loaded",
+		"friendly_name":  config.FriendlyName,
+		"liveview":       config.Capture.Liveview,
+		"offline":        config.Offline,
+		"recording":      config.Capture.Recording,
+		"timezone":       config.Timezone,
 	}
-	log.Log.Info("Printing our configuration (config.json): " + configurationVariables)
+}
+
+func configurationDebugLogFields(config models.Config) log.Fields {
+	return log.Fields{
+		"auto_clean":             config.AutoClean,
+		"component":              "configuration",
+		"continuous":             config.Capture.Continuous,
+		"event":                  "configuration_details",
+		"gop_size":               config.Capture.GopSize,
+		"main_fps":               config.Capture.IPCamera.FPS,
+		"main_height":            config.Capture.IPCamera.Height,
+		"main_stream_configured": config.Capture.IPCamera.RTSP != "",
+		"main_width":             config.Capture.IPCamera.Width,
+		"max_recording_seconds":  config.Capture.MaxLengthRecording,
+		"motion":                 config.Capture.Motion,
+		"onvif_configured":       config.Capture.IPCamera.ONVIFXAddr != "",
+		"onvif_motion":           config.Capture.ONVIFMotion,
+		"post_recording_seconds": config.Capture.PostRecording,
+		"pre_recording_seconds":  config.Capture.PreRecording,
+		"remove_after_upload":    config.RemoveAfterUpload,
+		"snapshots":              config.Capture.Snapshots,
+		"sub_fps":                config.Capture.IPCamera.SubFPS,
+		"sub_height":             config.Capture.IPCamera.SubHeight,
+		"sub_stream_configured":  config.Capture.IPCamera.SubRTSP != "",
+		"sub_width":              config.Capture.IPCamera.SubWidth,
+		"transcoding_webrtc":     config.Capture.TranscodingWebRTC,
+	}
 }
 
 func Decrypt(directoryOrFile string, symmetricKey []byte) {
 	// Check if file or directory
 	fileInfo, err := os.Stat(directoryOrFile)
 	if err != nil {
-		log.Log.Fatal(err.Error())
+		log.Fatal(err.Error())
 		return
 	}
 
@@ -363,12 +412,12 @@ func Decrypt(directoryOrFile string, symmetricKey []byte) {
 		// Create decrypted directory
 		err = os.MkdirAll(directoryOrFile+"/decrypted", 0755)
 		if err != nil {
-			log.Log.Fatal(err.Error())
+			log.Fatal(err.Error())
 			return
 		}
 		dir, err := os.ReadDir(directoryOrFile)
 		if err != nil {
-			log.Log.Fatal(err.Error())
+			log.Fatal(err.Error())
 			return
 		}
 		for _, file := range dir {
@@ -390,13 +439,13 @@ func Decrypt(directoryOrFile string, symmetricKey []byte) {
 		// Read file
 		content, err := os.ReadFile(file)
 		if err != nil {
-			log.Log.Fatal(err.Error())
+			log.Fatal(err.Error())
 			return
 		}
 		// Decrypt using AES key
 		decrypted, err := encryption.AesDecrypt(content, string(symmetricKey))
 		if err != nil {
-			log.Log.Fatal("Something went wrong while decrypting: " + err.Error())
+			log.Fatal("Something went wrong while decrypting: " + err.Error())
 			return
 		}
 
@@ -408,7 +457,7 @@ func Decrypt(directoryOrFile string, symmetricKey []byte) {
 
 		err = os.WriteFile(pathToFile+"/decrypted/"+fileName, []byte(decrypted), 0644)
 		if err != nil {
-			log.Log.Fatal(err.Error())
+			log.Fatal(err.Error())
 			return
 		}
 	}
@@ -416,9 +465,12 @@ func Decrypt(directoryOrFile string, symmetricKey []byte) {
 
 func ImageToBytes(img *image.Image) ([]byte, error) {
 	buffer := new(bytes.Buffer)
-	w := bufio.NewWriter(buffer)
-	err := jpeg.Encode(w, *img, &jpeg.Options{Quality: 35})
-	log.Log.Debug("ImageToBytes() - buffer size: " + strconv.Itoa(buffer.Len()))
+	err := jpeg.Encode(buffer, *img, &jpeg.Options{Quality: 35})
+	log.WithFields(log.Fields{
+		"bytes":     buffer.Len(),
+		"component": "image",
+		"event":     "jpeg_encoded",
+	}).Debug("Image encoded as JPEG")
 	return buffer.Bytes(), err
 }
 

@@ -6,20 +6,96 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
-	"io"
-	"strings"
+	"errors"
+	"sync"
 	"time"
 
 	"github.com/gofrs/uuid"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
-	"github.com/kerberos-io/agent/machinery/src/log"
+	log "github.com/sirupsen/logrus"
 )
+
+var (
+	errMQTTPrivateKeyPEMDecode = errors.New("error decoding PEM block containing private key")
+	errMQTTPrivateKeyNotRSA    = errors.New("private key is not RSA")
+
+	rsaPrivateKeyCache   = newRSAPrivateKeyCache()
+	parsePKCS8PrivateKey = x509.ParsePKCS8PrivateKey
+)
+
+type rsaPrivateKeyCacheState struct {
+	mu      sync.Mutex
+	cond    *sync.Cond
+	pem     string
+	key     *rsa.PrivateKey
+	err     error
+	parsing bool
+	ready   bool
+}
+
+func newRSAPrivateKeyCache() *rsaPrivateKeyCacheState {
+	cache := &rsaPrivateKeyCacheState{}
+	cache.cond = sync.NewCond(&cache.mu)
+	return cache
+}
+
+func (cache *rsaPrivateKeyCacheState) get(privateKey string) (*rsa.PrivateKey, error) {
+	cache.mu.Lock()
+	for {
+		if cache.ready && cache.pem == privateKey && !cache.parsing {
+			key, err := cache.key, cache.err
+			cache.mu.Unlock()
+			return key, err
+		}
+		if cache.parsing {
+			cache.cond.Wait()
+			continue
+		}
+
+		cache.pem = privateKey
+		cache.key = nil
+		cache.err = nil
+		cache.parsing = true
+		cache.ready = false
+		cache.mu.Unlock()
+
+		key, err := parseRSAPrivateKey(privateKey)
+
+		cache.mu.Lock()
+		cache.key = key
+		cache.err = err
+		cache.parsing = false
+		cache.ready = true
+		cache.cond.Broadcast()
+		cache.mu.Unlock()
+		return key, err
+	}
+}
+
+func parseRSAPrivateKey(privateKey string) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode([]byte(privateKey))
+	if block == nil {
+		return nil, errMQTTPrivateKeyPEMDecode
+	}
+
+	key, err := parsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	rsaKey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errMQTTPrivateKeyNotRSA
+	}
+
+	return rsaKey, nil
+}
 
 func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, error) {
 	// Create a Version 4 UUID.
 	u2, err := uuid.NewV4()
 	if err != nil {
-		log.Log.Error("failed to generate UUID: " + err.Error())
+		log.Error("failed to generate UUID: " + err.Error())
 	}
 
 	// We'll generate an unique id, and encrypt / decrypt it using the private key if available.
@@ -45,27 +121,25 @@ func PackageMQTTMessage(configuration *Configuration, msg Message) ([]byte, erro
 		// Pload to base64
 		data, err := json.Marshal(pload)
 		if err != nil {
-			log.Log.Error("models.mqtt.PackageMQTTMessage(): failed to marshal payload: " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"component": "models/mqtt",
+				"event":     "payload_marshal_failed",
+			}).Error("Failed to marshal MQTT payload")
 		}
 
 		// Encrypt the value
 		privateKey := configuration.Config.Encryption.PrivateKey
-		r := strings.NewReader(privateKey)
-		pemBytes, _ := io.ReadAll(r)
-		block, _ := pem.Decode(pemBytes)
-		if block == nil {
-			log.Log.Error("models.mqtt.PackageMQTTMessage(): error decoding PEM block containing private key")
-		} else {
-			// Parse private key
-			b := block.Bytes
-			key, err := x509.ParsePKCS8PrivateKey(b)
-			if err != nil {
-				log.Log.Error("models.mqtt.PackageMQTTMessage(): error parsing private key: " + err.Error())
+		rsaKey, err := rsaPrivateKeyCache.get(privateKey)
+		if err != nil {
+			if errors.Is(err, errMQTTPrivateKeyPEMDecode) {
+				log.Error("models.mqtt.PackageMQTTMessage(): error decoding PEM block containing private key")
+			} else {
+				log.WithError(err).WithFields(log.Fields{
+					"component": "models/mqtt",
+					"event":     "private_key_parse_failed",
+				}).Error("Failed to parse MQTT private key")
 			}
-
-			// Conver key to *rsa.PrivateKey
-			rsaKey, _ := key.(*rsa.PrivateKey)
-
+		} else {
 			// Create a 16bit key random
 			if config.Encryption != nil && config.Encryption.SymmetricKey != "" {
 				k := config.Encryption.SymmetricKey

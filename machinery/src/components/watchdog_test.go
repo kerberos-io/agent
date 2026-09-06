@@ -1,29 +1,21 @@
 package components
 
 import (
-	"sync/atomic"
+	"context"
 	"testing"
 	"time"
 )
 
-func TestRunWorkersWaitsForCompletion(t *testing.T) {
-	workers := &runWorkers{}
-	release := make(chan struct{})
-	var completed atomic.Bool
-	workers.Start(func() {
-		<-release
-		completed.Store(true)
-	})
+func TestWaitForRunRetryStopsOnCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
 
-	if workers.Wait(time.Millisecond) {
-		t.Fatal("Wait() completed while worker was blocked")
+	started := time.Now()
+	if waitForRunRetry(ctx) {
+		t.Fatal("waitForRunRetry() completed the retry delay after cancellation")
 	}
-	close(release)
-	if !workers.Wait(time.Second) {
-		t.Fatal("Wait() timed out after worker was released")
-	}
-	if !completed.Load() {
-		t.Fatal("worker completion was not observed")
+	if elapsed := time.Since(started); elapsed > 100*time.Millisecond {
+		t.Fatalf("waitForRunRetry() took %s after cancellation", elapsed)
 	}
 }
 

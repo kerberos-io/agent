@@ -6,12 +6,12 @@ import (
 	"encoding/xml"
 	"errors"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/onvif"
 	"github.com/kerberos-io/onvif/device"
@@ -21,6 +21,7 @@ import (
 	"github.com/kerberos-io/onvif/ptz"
 	xsd "github.com/kerberos-io/onvif/xsd"
 	xsdonvif "github.com/kerberos-io/onvif/xsd/onvif"
+	log "github.com/sirupsen/logrus"
 )
 
 // Discover performs an advanced Fing/WiFiman-style scan of the local network
@@ -29,12 +30,12 @@ import (
 // `-action discover` CLI command. Optional subnets (CIDR, e.g.
 // "192.168.1.0/24") override the auto-detected local subnets.
 func Discover(timeout time.Duration, subnets ...string) {
-	log.Log.Info("onvif.Discover(): starting advanced network discovery")
-	log.Log.Info("onvif.Discover(): this may take up to " + timeout.String() + " for the ONVIF probe plus the port scan")
+	log.Info("onvif.Discover(): starting advanced network discovery")
+	log.Info("onvif.Discover(): this may take up to " + timeout.String() + " for the ONVIF probe plus the port scan")
 
 	devices := DiscoverDevices(timeout, subnets...)
 	if len(devices) == 0 {
-		log.Log.Info("onvif.Discover(): no devices discovered on the local network")
+		log.Info("onvif.Discover(): no devices discovered on the local network")
 		return
 	}
 
@@ -44,7 +45,7 @@ func Discover(timeout time.Duration, subnets ...string) {
 			cameraCount++
 		}
 	}
-	log.Log.Info("onvif.Discover(): found " + strconv.Itoa(len(devices)) + " device(s), " + strconv.Itoa(cameraCount) + " likely camera(s)")
+	log.Info("onvif.Discover(): found " + strconv.Itoa(len(devices)) + " device(s), " + strconv.Itoa(cameraCount) + " likely camera(s)")
 
 	for _, device := range devices {
 		label := "device"
@@ -84,7 +85,7 @@ func Discover(timeout time.Duration, subnets ...string) {
 		if device.RTSPURL != "" {
 			summary += " rtsp=" + device.RTSPURL
 		}
-		log.Log.Info(summary)
+		log.Info(summary)
 
 		// Detail the guessed RTSP stream URLs from the brand -> RTSP mapping.
 		for _, stream := range device.RTSPStreams {
@@ -97,13 +98,13 @@ func Discover(timeout time.Duration, subnets ...string) {
 				line += " (auth required)"
 			}
 			line += ": " + stream.URL
-			log.Log.Info(line)
+			log.Info(line)
 		}
 	}
 }
 
 func HandleONVIFActions(configuration *models.Configuration, communication *models.Communication, actions <-chan models.OnvifAction) {
-	log.Log.Debug("onvif.HandleONVIFActions(): started")
+	log.Debug("onvif.HandleONVIFActions(): started")
 
 	for onvifAction := range actions {
 
@@ -138,7 +139,7 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 						functions, _, _ := GetPTZFunctionsFromDevice(configurations)
 
 						// Log functions
-						log.Log.Debug("onvif.HandleONVIFActions(): functions: " + strings.Join(functions, ", "))
+						log.Debug("onvif.HandleONVIFActions(): functions: " + strings.Join(functions, ", "))
 
 						// Check if we need to use absolute or continuous move
 						/*canAbsoluteMove := false
@@ -159,20 +160,20 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 						// on the ContinuousPanTiltMove function which is more compatible with more cameras.
 						err = AbsolutePanTiltMoveFake(device, configurations, token, x, y, z)
 						if err != nil {
-							log.Log.Debug("onvif.HandleONVIFActions() - AbsolutePanTitleMoveFake: " + err.Error())
+							log.Debug("onvif.HandleONVIFActions() - AbsolutePanTitleMoveFake: " + err.Error())
 						} else {
-							log.Log.Info("onvif.HandleONVIFActions() - AbsolutePanTitleMoveFake: successfully moved camera.")
+							log.Info("onvif.HandleONVIFActions() - AbsolutePanTitleMoveFake: successfully moved camera.")
 						}
 
 						/*if canAbsoluteMove {
 							err = AbsolutePanTiltMove(device, configurations, token, x, y, z)
 							if err != nil {
-								log.Log.Error("HandleONVIFActions (AbsolutePanTitleMove): " + err.Error())
+								log.Error("HandleONVIFActions (AbsolutePanTitleMove): " + err.Error())
 							}
 						} else if canContinuousMove {
 							err = AbsolutePanTiltMoveFake(device, configurations, token, x, y, z)
 							if err != nil {
-								log.Log.Error("HandleONVIFActions (AbsolutePanTitleMoveFake): " + err.Error())
+								log.Error("HandleONVIFActions (AbsolutePanTitleMoveFake): " + err.Error())
 							}
 						}*/
 
@@ -182,9 +183,9 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 						preset := ptzAction.Preset
 						err := GoToPresetFromDevice(device, preset)
 						if err != nil {
-							log.Log.Debug("onvif.HandleONVIFActions() - GotoPreset: " + err.Error())
+							log.Debug("onvif.HandleONVIFActions() - GotoPreset: " + err.Error())
 						} else {
-							log.Log.Info("onvif.HandleONVIFActions() - GotoPreset: successfully moved camera")
+							log.Info("onvif.HandleONVIFActions() - GotoPreset: successfully moved camera")
 						}
 
 					} else if onvifAction.Action == "ptz" {
@@ -196,9 +197,9 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 								// We will move the camera to zero position.
 								err := AbsolutePanTiltMove(device, configurations, token, 0, 0, 0)
 								if err != nil {
-									log.Log.Debug("onvif.HandleONVIFActions() - AbsolutePanTitleMove: " + err.Error())
+									log.Debug("onvif.HandleONVIFActions() - AbsolutePanTitleMove: " + err.Error())
 								} else {
-									log.Log.Info("onvif.HandleONVIFActions() - AbsolutePanTitleMove: successfully centered camera")
+									log.Info("onvif.HandleONVIFActions() - AbsolutePanTitleMove: successfully centered camera")
 								}
 
 							} else {
@@ -225,9 +226,9 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 
 								err := ContinuousPanTilt(device, configurations, token, x, y)
 								if err != nil {
-									log.Log.Debug("onvif.HandleONVIFActions() - ContinuousPanTilt: " + err.Error())
+									log.Debug("onvif.HandleONVIFActions() - ContinuousPanTilt: " + err.Error())
 								} else {
-									log.Log.Info("onvif.HandleONVIFActions() - ContinuousPanTilt: successfully pan tilted camera")
+									log.Info("onvif.HandleONVIFActions() - ContinuousPanTilt: successfully pan tilted camera")
 								}
 							}
 						}
@@ -237,9 +238,9 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 							zoom := ptzAction.Zoom
 							err := ContinuousZoom(device, configurations, token, zoom)
 							if err != nil {
-								log.Log.Debug("onvif.HandleONVIFActions() - ContinuousZoom: " + err.Error())
+								log.Debug("onvif.HandleONVIFActions() - ContinuousZoom: " + err.Error())
 							} else {
-								log.Log.Info("onvif.HandleONVIFActions() - ContinuousZoom: successfully zoomed camera")
+								log.Info("onvif.HandleONVIFActions() - ContinuousZoom: successfully zoomed camera")
 							}
 						}
 					}
@@ -247,11 +248,11 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 			}
 		}
 	}
-	log.Log.Debug("onvif.HandleONVIFActions(): finished")
+	log.Debug("onvif.HandleONVIFActions(): finished")
 }
 
 func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, device.GetCapabilitiesResponse, error) {
-	log.Log.Debug("onvif.ConnectToOnvifDevice(): started")
+	log.Debug("onvif.ConnectToOnvifDevice(): started")
 	dev, err := onvif.NewDevice(onvif.DeviceParams{
 		Xaddr:    cameraConfiguration.ONVIFXAddr,
 		Username: cameraConfiguration.ONVIFUsername,
@@ -269,7 +270,7 @@ func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, 
 			AuthMode: "digest",
 		})
 		if err != nil {
-			log.Log.Debug("onvif.ConnectToOnvifDevice(): " + err.Error())
+			log.Debug("onvif.ConnectToOnvifDevice(): " + err.Error())
 		}
 	}
 
@@ -277,7 +278,7 @@ func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, 
 		getCapabilities := device.GetCapabilities{Category: []xsdonvif.CapabilityCategory{"All"}}
 		resp, err := dev.CallMethod(getCapabilities)
 		if err != nil {
-			log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
+			log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
 		}
 
 		var b []byte
@@ -285,24 +286,24 @@ func ConnectToOnvifDevice(cameraConfiguration *models.IPCamera) (*onvif.Device, 
 			b, err = io.ReadAll(resp.Body)
 			resp.Body.Close() // Ensure the response body is closed
 			if err != nil {
-				log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
+				log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
 			}
 		}
 		stringBody := string(b)
 		decodedXML, et, err := getXMLNode(stringBody, "GetCapabilitiesResponse")
 		if err != nil {
-			log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
+			log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
 		} else {
 			if err := decodedXML.DecodeElement(&capabilities, et); err != nil {
-				log.Log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
+				log.Error("onvif.ConnectToOnvifDevice(): " + err.Error())
 			} else {
-				log.Log.Debug("onvif.ConnectToOnvifDevice(): capabilities.")
+				log.Debug("onvif.ConnectToOnvifDevice(): capabilities.")
 			}
 		}
 
-		log.Log.Info("onvif.ConnectToOnvifDevice(): successfully connected to device")
+		log.Info("onvif.ConnectToOnvifDevice(): successfully connected to device")
 	}
-	log.Log.Debug("onvif.ConnectToOnvifDevice(): finished")
+	log.Debug("onvif.ConnectToOnvifDevice(): finished")
 	return dev, capabilities, err
 }
 
@@ -319,13 +320,13 @@ func GetTokenFromProfile(device *onvif.Device, profileId int) (xsdonvif.Referenc
 			resp.Body.Close() // Ensure the response body is closed
 			decodedXML, et, err := getXMLNode(stringBody, "GetProfilesResponse")
 			if err != nil {
-				log.Log.Debug("onvif.GetTokenFromProfile(): " + err.Error())
+				log.Debug("onvif.GetTokenFromProfile(): " + err.Error())
 				return profileToken, err
 			} else {
 				// Decode the profiles from the server
 				var mProfilesResp media.GetProfilesResponse
 				if err := decodedXML.DecodeElement(&mProfilesResp, et); err != nil {
-					log.Log.Debug("onvif.GetTokenFromProfile(): " + err.Error())
+					log.Debug("onvif.GetTokenFromProfile(): " + err.Error())
 				}
 
 				// We'll try to get the token from a preferred profile
@@ -356,11 +357,11 @@ func GetPTZConfigurationsFromDevice(device *onvif.Device) (ptz.GetConfigurations
 		stringBody := string(b)
 		decodedXML, et, err := getXMLNode(stringBody, "GetConfigurationsResponse")
 		if err != nil {
-			log.Log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
+			log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
 			return configurations, err
 		} else {
 			if err := decodedXML.DecodeElement(&configurations, et); err != nil {
-				log.Log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
+				log.Debug("onvif.GetPTZConfigurationsFromDevice(): " + err.Error())
 				return configurations, err
 			}
 		}
@@ -386,22 +387,22 @@ func GetPositionFromDevice(configuration models.Configuration) (xsdonvif.PTZVect
 					x := strconv.FormatFloat(position.PanTilt.X, 'f', 6, 64)
 					y := strconv.FormatFloat(position.PanTilt.Y, 'f', 6, 64)
 					z := strconv.FormatFloat(position.Zoom.X, 'f', 6, 64)
-					log.Log.Info("onvif.GetPositionFromDevice(): successfully got position (" + x + ", " + y + ", " + z + ")")
+					log.Info("onvif.GetPositionFromDevice(): successfully got position (" + x + ", " + y + ", " + z + ")")
 					return position, err
 				} else {
-					log.Log.Debug("onvif.GetPositionFromDevice(): position is nil")
+					log.Debug("onvif.GetPositionFromDevice(): position is nil")
 					return position, errors.New("position is nil")
 				}
 			} else {
-				log.Log.Debug("onvif.GetPositionFromDevice(): " + err.Error())
+				log.Debug("onvif.GetPositionFromDevice(): " + err.Error())
 				return position, err
 			}
 		} else {
-			log.Log.Debug("onvif.GetPositionFromDevice(): " + err.Error())
+			log.Debug("onvif.GetPositionFromDevice(): " + err.Error())
 			return position, err
 		}
 	} else {
-		log.Log.Debug("onvif.GetPositionFromDevice(): " + err.Error())
+		log.Debug("onvif.GetPositionFromDevice(): " + err.Error())
 		return position, err
 	}
 }
@@ -426,17 +427,47 @@ func GetPosition(device *onvif.Device, token xsdonvif.ReferenceToken) (xsdonvif.
 		stringBody := string(b)
 		decodedXML, et, err := getXMLNode(stringBody, "GetStatusResponse")
 		if err != nil {
-			log.Log.Error("GetPositionFromDevice: " + err.Error())
+			log.Error("GetPositionFromDevice: " + err.Error())
 			return position, err
 		} else {
 			if err := decodedXML.DecodeElement(&status, et); err != nil {
-				log.Log.Error("GetPositionFromDevice: " + err.Error())
+				log.Error("GetPositionFromDevice: " + err.Error())
 				return position, err
 			}
 		}
 	}
 	position = status.PTZStatus.Position
 	return position, err
+}
+
+func handleONVIFResponse(operation string, response *http.Response, requestErr error) error {
+	fields := log.Fields{
+		"component": "onvif",
+		"operation": operation,
+	}
+	var responseErr error
+	if response != nil {
+		fields["status_code"] = response.StatusCode
+		fields["response_bytes"], responseErr = io.Copy(io.Discard, response.Body)
+		response.Body.Close()
+	}
+
+	err := errors.Join(requestErr, responseErr)
+	if response == nil && err == nil {
+		err = errors.New("ONVIF operation returned no response")
+	}
+	if err == nil && (response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices) {
+		err = errors.New("ONVIF operation was rejected")
+	}
+	if err != nil {
+		fields["event"] = "operation_failed"
+		log.WithError(err).WithFields(fields).Error("ONVIF operation failed")
+		return err
+	}
+
+	fields["event"] = "operation_completed"
+	log.WithFields(fields).Debug("ONVIF operation completed")
+	return nil
 }
 
 func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, tilt float64, zoom float64) error {
@@ -459,18 +490,7 @@ func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfiguratio
 			Zoom:    &absoluteZoomVector,
 		},
 	})
-
-	var b []byte
-	if resp != nil {
-		b, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
-	}
-	if err != nil {
-		log.Log.Error("AbsoluteMove: " + err.Error())
-	}
-	log.Log.Info("AbsoluteMove: " + string(b))
-
-	return err
+	return handleONVIFResponse("absolute_move", resp, err)
 }
 
 // This function will simulate the AbsolutePanTiltMove function.
@@ -479,7 +499,7 @@ func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfiguratio
 func AbsolutePanTiltMoveFake(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, tilt float64, zoom float64) error {
 	position, err := GetPosition(device, token)
 	if position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01 && position.PanTilt.Y >= tilt-0.01 && position.PanTilt.Y <= tilt+0.01 && position.Zoom.X >= zoom-0.01 && position.Zoom.X <= zoom+0.01 {
-		log.Log.Debug("AbsolutePanTiltMoveFake: already at position")
+		log.Debug("AbsolutePanTiltMoveFake: already at position")
 	} else {
 
 		// The speed of panning, the higher the faster we'll pan the camera
@@ -518,7 +538,7 @@ func ZoomOutCompletely(device *onvif.Device, configuration ptz.GetConfigurations
 		},
 	})
 	if err != nil {
-		log.Log.Error("ZoomOutCompletely: " + err.Error())
+		log.Error("ZoomOutCompletely: " + err.Error())
 	}
 
 	for {
@@ -534,7 +554,7 @@ func ZoomOutCompletely(device *onvif.Device, configuration ptz.GetConfigurations
 		Zoom:         true,
 	})
 	if err != nil {
-		log.Log.Error("ZoomOutCompletely: " + err.Error())
+		log.Error("ZoomOutCompletely: " + err.Error())
 	}
 	return err
 }
@@ -564,16 +584,7 @@ func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsR
 				PanTilt: panTiltVector,
 			},
 		})
-
-		var b []byte
-		if resp != nil {
-			b, err = io.ReadAll(resp.Body)
-			resp.Body.Close()
-		}
-		if err != nil {
-			log.Log.Error("ContinuousPanTiltMove (Pan): " + err.Error())
-		}
-		log.Log.Debug("ContinuousPanTiltMove (Pan): " + string(b))
+		err = handleONVIFResponse("continuous_pan", resp, err)
 
 		// While moving we'll check if we reached the desired position.
 		// or if we overshot the desired position.
@@ -598,7 +609,7 @@ func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsR
 		})
 
 		if err != nil {
-			log.Log.Error("ContinuousPanTiltMove (Pan): " + err.Error())
+			log.Error("ContinuousPanTiltMove (Pan): " + err.Error())
 		}
 	}
 	return err
@@ -632,17 +643,7 @@ func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 			ProfileToken: &token,
 			Velocity:     velocity,
 		})
-
-		var b []byte
-		if resp != nil {
-			b, err = io.ReadAll(resp.Body)
-			resp.Body.Close()
-		}
-
-		if err != nil {
-			log.Log.Error("ContinuousPanTiltMove (Tilt): " + err.Error())
-		}
-		log.Log.Debug("ContinuousPanTiltMove (Tilt) " + string(b))
+		err = handleONVIFResponse("continuous_tilt", resp, err)
 
 		// While moving we'll check if we reached the desired position.
 		// or if we overshot the desired position.
@@ -667,7 +668,7 @@ func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 		})
 
 		if err != nil {
-			log.Log.Error("ContinuousPanTiltMove (Tilt): " + err.Error())
+			log.Error("ContinuousPanTiltMove (Tilt): " + err.Error())
 		}
 	}
 	return err
@@ -697,17 +698,7 @@ func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 				Zoom: zoomVector,
 			},
 		})
-
-		var b []byte
-		if resp != nil {
-			b, err = io.ReadAll(resp.Body)
-			resp.Body.Close()
-		}
-		if err != nil {
-			log.Log.Error("ContinuousPanTiltMove (Zoom): " + err.Error())
-		}
-
-		log.Log.Debug("ContinuousPanTiltMove (Zoom) " + string(b))
+		err = handleONVIFResponse("continuous_zoom_to_position", resp, err)
 
 		// While moving we'll check if we reached the desired position.
 		// or if we overshot the desired position.
@@ -732,7 +723,7 @@ func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurations
 		})
 
 		if err != nil {
-			log.Log.Error("ContinuousPanTiltMove (Zoom): " + err.Error())
+			log.Error("ContinuousPanTiltMove (Zoom): " + err.Error())
 		}
 	}
 	return err
@@ -752,17 +743,7 @@ func ContinuousPanTilt(device *onvif.Device, configuration ptz.GetConfigurations
 			PanTilt: panTiltVector,
 		},
 	})
-
-	var b []byte
-	if resp != nil {
-		b, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
-	}
-	if err != nil {
-		log.Log.Error("ContinuousPanTiltMove: " + err.Error())
-	}
-
-	log.Log.Debug("ContinuousPanTiltMove: " + string(b))
+	moveErr := handleONVIFResponse("continuous_pan_tilt", resp, err)
 
 	time.Sleep(200 * time.Millisecond)
 
@@ -770,18 +751,8 @@ func ContinuousPanTilt(device *onvif.Device, configuration ptz.GetConfigurations
 		ProfileToken: token,
 		PanTilt:      true,
 	})
-
-	b = []byte{}
-	if resp != nil {
-		b, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
-	}
-
-	if err != nil {
-		log.Log.Error("ContinuousPanTiltMove: " + err.Error())
-	}
-
-	return err
+	stopErr := handleONVIFResponse("continuous_pan_tilt_stop", resp, err)
+	return errors.Join(moveErr, stopErr)
 }
 
 func ContinuousZoom(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, zoom float64) error {
@@ -799,36 +770,26 @@ func ContinuousZoom(device *onvif.Device, configuration ptz.GetConfigurationsRes
 		ProfileToken: &token,
 		Velocity:     &velocity,
 	})
-
-	var b []byte
-	if resp != nil {
-		b, err = io.ReadAll(resp.Body)
-		resp.Body.Close()
-	}
-	if err != nil {
-		log.Log.Error("onvif.main.ContinuousZoom(): " + err.Error())
-	}
-
-	log.Log.Debug("onvif.main.ContinuousZoom(): " + string(b))
+	moveErr := handleONVIFResponse("continuous_zoom", resp, err)
 	time.Sleep(500 * time.Millisecond)
 
-	_, err = device.CallMethod(ptz.Stop{
+	resp, err = device.CallMethod(ptz.Stop{
 		ProfileToken: token,
 		Zoom:         true,
 	})
-
-	if err != nil {
-		log.Log.Error("onvif.main.ContinuousZoom(): " + err.Error())
-	}
-
-	return err
+	stopErr := handleONVIFResponse("continuous_zoom_stop", resp, err)
+	return errors.Join(moveErr, stopErr)
 }
 
 func GetCapabilitiesFromDevice(dev *onvif.Device) []string {
 	var capabilities []string
 	services := dev.GetServices()
 	for key, _ := range services {
-		log.Log.Debug("onvif.main.GetCapabilitiesFromDevice(): has key: " + key)
+		log.WithFields(log.Fields{
+			"capability": key,
+			"component":  "onvif",
+			"event":      "capability_detected",
+		}).Debug("ONVIF capability detected")
 		if key != "" {
 			keyParts := strings.Split(key, "/")
 			if len(keyParts) > 0 {
@@ -859,11 +820,11 @@ func GetPresetsFromDevice(device *onvif.Device) ([]models.OnvifActionPreset, err
 			stringBody := string(b)
 			decodedXML, et, err := getXMLNode(stringBody, "GetPresetsResponse")
 			if err != nil {
-				log.Log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
+				log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
 				return presets, err
 			} else {
 				if err := decodedXML.DecodeElement(&presetsResponse, et); err != nil {
-					log.Log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
+					log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
 					return presets, err
 				}
 
@@ -876,15 +837,15 @@ func GetPresetsFromDevice(device *onvif.Device) ([]models.OnvifActionPreset, err
 					presetsList += string(preset.Name) + " (" + string(preset.Token) + "), "
 					presets = append(presets, p)
 				}
-				log.Log.Debug("onvif.main.GetPresetsFromDevice(): " + presetsList)
+				log.Debug("onvif.main.GetPresetsFromDevice(): " + presetsList)
 
 				return presets, err
 			}
 		} else {
-			log.Log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
+			log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
 		}
 	} else {
-		log.Log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
+		log.Error("onvif.main.GetPresetsFromDevice(): " + err.Error())
 	}
 
 	return presets, err
@@ -910,20 +871,20 @@ func GoToPresetFromDevice(device *onvif.Device, presetName string) error {
 			stringBody := string(b)
 			decodedXML, et, err := getXMLNode(stringBody, "GotoPresetResponses")
 			if err != nil {
-				log.Log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
+				log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
 				return err
 			} else {
 				if err := decodedXML.DecodeElement(&goToPresetResponse, et); err != nil {
-					log.Log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
+					log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
 					return err
 				}
 				return err
 			}
 		} else {
-			log.Log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
+			log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
 		}
 	} else {
-		log.Log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
+		log.Error("onvif.main.GoToPresetFromDevice(): " + err.Error())
 	}
 
 	return err
@@ -1068,10 +1029,10 @@ func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
 			stringBody := string(b2)
 			decodedXML, et, err := getXMLNode(stringBody, "CreatePullPointSubscriptionResponse")
 			if err != nil {
-				log.Log.Debug("onvif.main.CreatePullPointSubscription(): " + err.Error())
+				log.Debug("onvif.main.CreatePullPointSubscription(): " + err.Error())
 			} else {
 				if err := decodedXML.DecodeElement(&createPullPointSubscriptionResponse, et); err != nil {
-					log.Log.Error("onvif.main.CreatePullPointSubscription(): " + err.Error())
+					log.Error("onvif.main.CreatePullPointSubscription(): " + err.Error())
 				} else {
 					pullPointAdress = string(createPullPointSubscriptionResponse.SubscriptionReference.Address)
 				}
@@ -1087,25 +1048,40 @@ func UnsubscribePullPoint(dev *onvif.Device, pullPointAddress string) error {
 	unsubscribe := event.Unsubscribe{}
 	requestBody, err := xml.Marshal(unsubscribe)
 	if err != nil {
-		log.Log.Error("onvif.main.UnsubscribePullPoint(): " + err.Error())
+		log.WithError(err).WithFields(log.Fields{
+			"component": "onvif",
+			"event":     "unsubscribe_request_encoding_failed",
+		}).Error("Failed to encode ONVIF unsubscribe request")
+		return err
 	}
 
 	res, err := dev.SendSoap(pullPointAddress, string(requestBody))
 	if err != nil {
-		log.Log.Error("onvif.main.UnsubscribePullPoint(): " + err.Error())
+		log.WithError(err).WithFields(log.Fields{
+			"component": "onvif",
+			"event":     "unsubscribe_request_failed",
+		}).Error("Failed to send ONVIF unsubscribe request")
+		return err
 	}
-	if res != nil {
-		b, err := io.ReadAll(res.Body)
-		res.Body.Close() // Ensure the response body is closed
-		if err == nil {
-			stringBody := string(b)
-			log.Log.Debug("onvif.main.UnsubscribePullPoint(): " + stringBody)
-		}
-		if err != nil {
-			log.Log.Error("onvif.main.UnsubscribePullPoint(): " + err.Error())
-		}
+	if res == nil {
+		return errors.New("ONVIF unsubscribe returned no response")
 	}
-	return err
+	defer res.Body.Close()
+	responseBytes, err := io.Copy(io.Discard, res.Body)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"component": "onvif",
+			"event":     "unsubscribe_response_read_failed",
+		}).Error("Failed to read ONVIF unsubscribe response")
+		return err
+	}
+	log.WithFields(log.Fields{
+		"component":      "onvif",
+		"event":          "unsubscribe_completed",
+		"response_bytes": responseBytes,
+		"status_code":    res.StatusCode,
+	}).Debug("ONVIF unsubscribe completed")
+	return nil
 }
 
 // Look for Source of input and output
@@ -1126,7 +1102,13 @@ func GetInputOutputs() ([]ONVIFEvents, error) {
 		eventsArray = append(eventsArray, *value)
 	}
 	for _, value := range eventsArray {
-		log.Log.Debug("onvif.main.GetInputOutputs(): " + value.Key + " - " + value.Value + " (" + strconv.FormatInt(value.Timestamp, 10) + ")")
+		log.WithFields(log.Fields{
+			"component":      "onvif",
+			"event":          "input_output_state",
+			"input_output":   value.Key,
+			"state":          value.Value,
+			"timestamp_unix": value.Timestamp,
+		}).Debug("ONVIF input/output state")
 	}
 	return eventsArray, nil
 }
@@ -1143,7 +1125,7 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 		// We were able to create a subscription to the device. Now pull some messages from the subscription.
 		subscriptionURI := pullPointAddress
 		if subscriptionURI == "" {
-			log.Log.Error("onvif.main.GetEventMessages(): subscriptionURI is empty")
+			log.Error("onvif.main.GetEventMessages(): subscriptionURI is empty")
 		} else {
 			// Pull message
 			pullMessage := event.PullMessages{
@@ -1152,12 +1134,12 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 			}
 			requestBody, err := xml.Marshal(pullMessage)
 			if err != nil {
-				log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
+				log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
 				return eventsArray, err
 			}
 			res, err := dev.SendSoap(string(subscriptionURI), string(requestBody))
 			if err != nil {
-				log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
+				log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
 				return eventsArray, err
 			}
 
@@ -1169,11 +1151,11 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 					stringBody := string(bs)
 					decodedXML, et, err := getXMLNode(stringBody, "PullMessagesResponse")
 					if err != nil {
-						log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
+						log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
 						return eventsArray, err
 					} else {
 						if err := decodedXML.DecodeElement(&pullMessagesResponse, et); err != nil {
-							log.Log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
+							log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
 							return eventsArray, err
 						}
 					}
@@ -1181,9 +1163,9 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 			}
 
 			for _, message := range pullMessagesResponse.NotificationMessage {
-				log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Topic.TopicKinds))
+				log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Topic.TopicKinds))
 				//if len(message.Message.Message.Data.SimpleItem) > 0 {
-				//	log.Log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Message.Message.Data.SimpleItem[0].Name) + " " + string(message.Message.Message.Data.SimpleItem[0].Value))
+				// log.Debug("onvif.main.GetEventMessages(pullMessages): " + string(message.Message.Message.Data.SimpleItem[0].Name) + " " + string(message.Message.Message.Data.SimpleItem[0].Value))
 				//}
 				if message.Topic.TopicKinds == "tns1:Device/Trigger/Relay" ||
 					message.Topic.TopicKinds == "tns1:Device/tns1:Trigger/tns1:Relay" { // This is for avigilon cameras
@@ -1193,7 +1175,13 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 							key := string(message.Message.Message.Source.SimpleItem[0].Value)
 							value := string(message.Message.Message.Data.SimpleItem[0].Value)
 							propertyOperation := string(message.Message.Message.PropertyOperation)
-							log.Log.Debug("onvif.main.GetEventMessages(pullMessages) output: " + key + " " + value + " (" + propertyOperation + ")")
+							log.WithFields(log.Fields{
+								"component":          "onvif",
+								"event":              "event_property_output",
+								"property":           key,
+								"property_operation": propertyOperation,
+								"value":              value,
+							}).Debug("ONVIF event property output")
 
 							// Depending on the onvif library they might use different values for active and inactive.
 							if value == "active" || value == "1" {
@@ -1227,7 +1215,13 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 							key := string(message.Message.Message.Source.SimpleItem[0].Value)
 							value := string(message.Message.Message.Data.SimpleItem[0].Value)
 							propertyOperation := string(message.Message.Message.PropertyOperation)
-							log.Log.Debug("onvif.main.GetEventMessages(pullMessages) input: " + key + " " + value + " (" + propertyOperation + ")")
+							log.WithFields(log.Fields{
+								"component":          "onvif",
+								"event":              "event_property_input",
+								"property":           key,
+								"property_operation": propertyOperation,
+								"value":              value,
+							}).Debug("ONVIF event property input")
 
 							// Depending on the onvif library they might use different values for active and inactive.
 							if value == "active" || value == "1" {
@@ -1281,11 +1275,11 @@ func GetDigitalInputs(dev *onvif.Device) (device.GetDigitalInputsResponse, error
 			stringBody := string(b)
 			decodedXML, et, err := getXMLNode(stringBody, "GetDigitalInputsResponse")
 			if err != nil {
-				log.Log.Error("onvif.main.GetDigitalInputs(): " + err.Error())
+				log.Error("onvif.main.GetDigitalInputs(): " + err.Error())
 				return digitalinputs, err
 			} else {
 				if err := decodedXML.DecodeElement(&digitalinputs, et); err != nil {
-					log.Log.Debug("onvif.main.GetDigitalInputs(): " + err.Error())
+					log.Debug("onvif.main.GetDigitalInputs(): " + err.Error())
 					return digitalinputs, err
 				}
 			}
@@ -1312,11 +1306,11 @@ func GetRelayOutputs(dev *onvif.Device) (device.GetRelayOutputsResponse, error) 
 		stringBody := string(b)
 		decodedXML, et, err := getXMLNode(stringBody, "GetRelayOutputsResponse")
 		if err != nil {
-			log.Log.Error("onvif.main.GetRelayOutputs(): " + err.Error())
+			log.Error("onvif.main.GetRelayOutputs(): " + err.Error())
 			return relayoutputs, err
 		} else {
 			if err := decodedXML.DecodeElement(&relayoutputs, et); err != nil {
-				log.Log.Debug("onvif.main.GetRelayOutputs(): " + err.Error())
+				log.Debug("onvif.main.GetRelayOutputs(): " + err.Error())
 				return relayoutputs, err
 			}
 		}
@@ -1325,42 +1319,79 @@ func GetRelayOutputs(dev *onvif.Device) (device.GetRelayOutputsResponse, error) 
 	return relayoutputs, err
 }
 
-func TriggerRelayOutput(dev *onvif.Device, output string) (err error) {
-	err = nil
-
+func TriggerRelayOutput(dev *onvif.Device, output string) error {
 	// Get all outputs
-	relayoutputs, err := GetRelayOutputs(dev)
-
-	// For the moment we expect a single output
-	// However in theory there might be multiple outputs. We might need to change
-	// this in the future "kerberos-io/onvif" library.
-	if err == nil {
-		token := relayoutputs.RelayOutputs[0].Token
-		if output == string(token+"-output") {
-			outputState := device.SetRelayOutputState{
-				RelayOutputToken: token,
-				LogicalState:     "active",
-			}
-
-			resp, errResp := dev.CallMethod(outputState)
-			var b []byte
-			if errResp != nil {
-				b, err = io.ReadAll(resp.Body)
-				resp.Body.Close() // Ensure the response body is closed
-			}
-			stringBody := string(b)
-			if err == nil && resp.StatusCode == 200 {
-				log.Log.Info("onvif.main.TriggerRelayOutput(): triggered relay output (" + string(token) + ")")
-			} else {
-				log.Log.Error("onvif.main.TriggerRelayOutput(): " + stringBody)
-			}
-		} else {
-			log.Log.Error("onvif.main.TriggerRelayOutput(): could not find relay output (" + output + ")")
-		}
-	} else {
-		log.Log.Error("onvif.main.TriggerRelayOutput(): something went wrong while getting the relay outputs " + err.Error())
+	relayOutputs, err := GetRelayOutputs(dev)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"component": "onvif",
+			"event":     "relay_outputs_query_failed",
+		}).Error("Failed to query ONVIF relay outputs")
+		return err
 	}
-	return
+	if len(relayOutputs.RelayOutputs) == 0 {
+		err := errors.New("ONVIF device has no relay outputs")
+		log.WithError(err).WithFields(log.Fields{
+			"component": "onvif",
+			"event":     "relay_output_unavailable",
+		}).Error("ONVIF relay output unavailable")
+		return err
+	}
+
+	// For the moment we expect a single output. Supporting multiple outputs
+	// requires matching the requested output against every returned token.
+	token := relayOutputs.RelayOutputs[0].Token
+	if output != string(token+"-output") {
+		err := errors.New("requested ONVIF relay output was not found")
+		log.WithError(err).WithFields(log.Fields{
+			"component": "onvif",
+			"event":     "relay_output_unavailable",
+		}).Error("ONVIF relay output unavailable")
+		return err
+	}
+
+	resp, err := dev.CallMethod(device.SetRelayOutputState{
+		RelayOutputToken: token,
+		LogicalState:     "active",
+	})
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"component": "onvif",
+			"event":     "relay_output_request_failed",
+		}).Error("Failed to trigger ONVIF relay output")
+		return err
+	}
+	if resp == nil {
+		err := errors.New("ONVIF relay request returned no response")
+		log.WithError(err).WithFields(log.Fields{
+			"component": "onvif",
+			"event":     "relay_output_request_failed",
+		}).Error("Failed to trigger ONVIF relay output")
+		return err
+	}
+	defer resp.Body.Close()
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"component": "onvif",
+			"event":     "relay_output_response_read_failed",
+		}).Warn("Failed to read ONVIF relay response")
+		return err
+	}
+	if resp.StatusCode != 200 {
+		err := errors.New("ONVIF relay request was rejected")
+		log.WithError(err).WithFields(log.Fields{
+			"component":   "onvif",
+			"event":       "relay_output_rejected",
+			"status_code": resp.StatusCode,
+		}).Error("ONVIF relay request rejected")
+		return err
+	}
+
+	log.WithFields(log.Fields{
+		"component": "onvif",
+		"event":     "relay_output_triggered",
+	}).Info("ONVIF relay output triggered")
+	return nil
 }
 
 func getXMLNode(xmlBody string, nodeName string) (*xml.Decoder, *xml.StartElement, error) {

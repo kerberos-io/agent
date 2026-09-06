@@ -1,9 +1,11 @@
 package http
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strconv"
+	"time"
 
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-contrib/pprof"
@@ -11,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	//Swagger documentantion
-	"log"
+	log "github.com/sirupsen/logrus"
 
 	_ "github.com/kerberos-io/agent/machinery/docs"
 	"github.com/kerberos-io/agent/machinery/src/capture"
@@ -45,7 +47,17 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	gin.SetMode(gin.ReleaseMode)
 
 	// Initialize REST API
-	r := gin.Default()
+	r := gin.New()
+	r.Use(requestLogger(), gin.CustomRecovery(func(c *gin.Context, recovered interface{}) {
+		log.WithFields(log.Fields{
+			"component": "http",
+			"event":     "request_panic",
+			"method":    c.Request.Method,
+			"path":      c.Request.URL.Path,
+			"panic":     fmt.Sprint(recovered),
+		}).Error("HTTP request panicked")
+		c.AbortWithStatus(500)
+	}))
 
 	// Profiler
 	pprof.Register(r)
@@ -60,7 +72,10 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	middleWare := JWTMiddleWare()
 	authMiddleware, err := jwt.New(&middleWare)
 	if err != nil {
-		log.Fatal("JWT Error:" + err.Error())
+		log.WithError(err).WithFields(log.Fields{
+			"component": "http",
+			"event":     "jwt_initialization_failed",
+		}).Fatal("Failed to initialize JWT middleware")
 	}
 
 	// Add all routes
@@ -73,7 +88,10 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 		// Move demo environment variables to environment variables
 		err := os.Rename(demoEnvironmentVariables, environmentVariables)
 		if err != nil {
-			log.Fatal(err)
+			log.WithError(err).WithFields(log.Fields{
+				"component": "http",
+				"event":     "demo_environment_move_failed",
+			}).Fatal("Failed to activate demo UI environment")
 		}
 	}
 
@@ -88,9 +106,54 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	})
 
 	// Run the api on port
+	log.WithFields(log.Fields{
+		"component": "http",
+		"event":     "server_starting",
+		"port":      configuration.Port,
+	}).Info("HTTP server starting")
 	err = r.Run(":" + configuration.Port)
 	if err != nil {
-		log.Fatal(err)
+		log.WithError(err).WithFields(log.Fields{
+			"component": "http",
+			"event":     "server_failed",
+			"port":      configuration.Port,
+		}).Fatal("HTTP server stopped")
+	}
+}
+
+func requestLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		startedAt := time.Now()
+		c.Next()
+
+		fields := log.Fields{
+			"component":      "http",
+			"duration_ms":    time.Since(startedAt).Milliseconds(),
+			"event":          "request_completed",
+			"method":         c.Request.Method,
+			"path":           c.Request.URL.Path,
+			"response_bytes": c.Writer.Size(),
+			"status":         c.Writer.Status(),
+		}
+		if log.IsLevelEnabled(log.DebugLevel) {
+			fields["client_ip"] = c.ClientIP()
+			fields["user_agent"] = c.Request.UserAgent()
+		}
+		entry := log.WithFields(fields)
+		if len(c.Errors) > 0 {
+			entry = entry.WithField("request_errors", c.Errors.String())
+		}
+
+		switch status := c.Writer.Status(); {
+		case status >= 500:
+			entry.Error("HTTP request completed")
+		case status >= 400:
+			entry.Warn("HTTP request completed")
+		case c.Request.URL.Path == "/health":
+			entry.Debug("HTTP request completed")
+		default:
+			entry.Info("HTTP request completed")
+		}
 	}
 }
 

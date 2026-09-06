@@ -1,5 +1,84 @@
 basePath: /
 definitions:
+  http.Health:
+    properties:
+      cameraConnected:
+        type: boolean
+      description:
+        type: string
+      hub:
+        $ref: '#/definitions/http.HubHealth'
+      mainStream:
+        $ref: '#/definitions/http.StreamHealth'
+      subStream:
+        $ref: '#/definitions/http.StreamHealth'
+    type: object
+  http.HealthResponse:
+    properties:
+      applicationStatusCode:
+        type: string
+      data:
+        $ref: '#/definitions/http.HealthResponseData'
+      entityStatusCode:
+        type: string
+      httpStatusCode:
+        type: integer
+      message:
+        type: string
+      metadata:
+        $ref: '#/definitions/http.ResponseMetadata'
+    type: object
+  http.HealthResponseData:
+    properties:
+      health:
+        $ref: '#/definitions/http.Health'
+    type: object
+  http.HubHealth:
+    properties:
+      configured:
+        type: boolean
+      connected:
+        type: boolean
+      lastHeartbeatAttemptAt:
+        type: integer
+      lastSuccessfulHeartbeatAt:
+        type: integer
+    type: object
+  http.ResponseMetadata:
+    properties:
+      applicationName:
+        type: string
+      applicationVersion:
+        type: string
+      path:
+        type: string
+      timestamp:
+        type: integer
+      traceId:
+        type: string
+    type: object
+  http.StreamHealth:
+    properties:
+      configured:
+        type: boolean
+      connected:
+        type: boolean
+      fps:
+        type: number
+      lastPacketAt:
+        type: integer
+      packagesProcessed:
+        type: integer
+      resolution:
+        $ref: '#/definitions/http.StreamResolution'
+    type: object
+  http.StreamResolution:
+    properties:
+      height:
+        type: integer
+      width:
+        type: integer
+    type: object
   models.APIResponse:
     properties:
       can_pan_tilt:
@@ -47,15 +126,30 @@ definitions:
         type: string
       fragmentedduration:
         type: integer
+      gopsize:
+        description: GOP size in seconds, used for pre-recording
+        type: integer
       ipcamera:
         $ref: '#/definitions/models.IPCamera'
       liveview:
+        type: string
+      liveview_chunking:
         type: string
       maxlengthrecording:
         type: integer
       motion:
         type: string
       name:
+        type: string
+      onvif_motion:
+        description: |-
+          ONVIFMotion routes the camera's ONVIF motion events into the
+          agent's motion-triggered recording pipeline. When "true" the
+          agent opens an event/stream against the configured ONVIF
+          endpoint and forwards Motion+Active events to HandleMotion.
+          Requires Capture.IPCamera.ONVIFXAddr / ONVIFUsername /
+          ONVIFPassword to be set. Default empty (disabled) keeps the
+          existing pixel-diff motion detection as the only source.
         type: string
       pixelChangeThreshold:
         type: integer
@@ -109,7 +203,11 @@ definitions:
         type: string
       kstorage:
         $ref: '#/definitions/models.KStorage'
+      kstorage_secondary:
+        $ref: '#/definitions/models.KStorage'
       max_directory_size:
+        type: integer
+      min_free_space:
         type: integer
       mqtt_password:
         type: string
@@ -131,6 +229,8 @@ definitions:
         type: string
       s3:
         $ref: '#/definitions/models.S3'
+      signing:
+        $ref: '#/definitions/models.Signing'
       stunuri:
         type: string
       time:
@@ -190,6 +290,12 @@ definitions:
     type: object
   models.IPCamera:
     properties:
+      base_height:
+        type: integer
+      base_width:
+        type: integer
+      channels:
+        type: integer
       fps:
         type: string
       height:
@@ -202,16 +308,64 @@ definitions:
         type: string
       onvif_xaddr:
         type: string
+      pps_nalus:
+        items:
+          items:
+            format: int32
+            type: integer
+          type: array
+        type: array
       rtsp:
         type: string
+      sample_rate:
+        type: integer
+      sps_nalus:
+        items:
+          items:
+            format: int32
+            type: integer
+          type: array
+        type: array
       sub_fps:
         type: string
       sub_height:
         type: integer
+      sub_pps_nalus:
+        items:
+          items:
+            format: int32
+            type: integer
+          type: array
+        type: array
       sub_rtsp:
         type: string
+      sub_sps_nalus:
+        description: |-
+          Sub stream parameter sets, captured separately from the main stream so the
+          live HLS muxer can build a correct init segment when a viewer switches the
+          live view to the sub (low-resolution) stream.
+        items:
+          items:
+            format: int32
+            type: integer
+          type: array
+        type: array
+      sub_vps_nalus:
+        items:
+          items:
+            format: int32
+            type: integer
+          type: array
+        type: array
       sub_width:
         type: integer
+      vps_nalus:
+        items:
+          items:
+            format: int32
+            type: integer
+          type: array
+        type: array
       width:
         type: integer
     type: object
@@ -224,10 +378,14 @@ definitions:
         type: string
       directory:
         type: string
+      max_retries:
+        type: integer
       provider:
         type: string
       secret_access_key:
         type: string
+      timeout:
+        type: integer
       uri:
         type: string
     type: object
@@ -316,6 +474,13 @@ definitions:
       username:
         type: string
     type: object
+  models.Signing:
+    properties:
+      enabled:
+        type: string
+      private_key:
+        type: string
+    type: object
   models.Timetable:
     properties:
       end1:
@@ -345,6 +510,30 @@ info:
   title: Swagger Kerberos Agent API
   version: "1.0"
 paths:
+  /api/camera/discover:
+    get:
+      description: Runs an advanced Fing/WiFiman-style scan (ONVIF WS-Discovery +
+        TCP port scan + MAC/vendor lookup) and returns the devices found on the local
+        network.
+      operationId: camera-discover
+      parameters:
+      - description: Discovery timeout in milliseconds (default 2000)
+        in: query
+        name: timeout
+        type: integer
+      - description: Optional subnet(s) to scan, e.g. '192.168.1.0/24' (comma-separated).
+          Defaults to the local interfaces.
+        in: query
+        name: subnet
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      summary: Discover cameras and other devices on the local network.
+      tags:
+      - onvif
   /api/camera/onvif/capabilities:
     post:
       description: Will return the ONVIF capabilities for the specific camera.
@@ -735,6 +924,27 @@ paths:
       summary: Get Authorization token.
       tags:
       - authentication
+  /api/persistence/secondary/verify:
+    post:
+      description: Will verify the secondary persistence.
+      operationId: verify-secondary-persistence
+      parameters:
+      - description: Config
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/models.Config'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.APIResponse'
+      security:
+      - Bearer: []
+      summary: Will verify the secondary persistence.
+      tags:
+      - persistence
   /api/persistence/verify:
     post:
       description: Will verify the persistence.
@@ -756,6 +966,21 @@ paths:
       summary: Will verify the persistence.
       tags:
       - persistence
+  /health:
+    get:
+      description: Confirms that the Agent HTTP process can serve requests and reports
+        current camera stream and Hub heartbeat diagnostics. Operational dependency
+        failures do not change the liveness HTTP status.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/http.HealthResponse'
+      summary: Check Agent health
+      tags:
+      - health
 securityDefinitions:
   Bearer:
     in: header

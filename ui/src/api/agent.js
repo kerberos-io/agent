@@ -158,7 +158,9 @@ export function doVerifyCamera(streamType, config, onSuccess, onError) {
 }
 
 export function doGetDashboardInformation(onSuccess, onError) {
-  const endpoint = API.get(`dashboard`);
+  const endpoint = API.get(`dashboard`, {
+    timeout: 15000,
+  });
   endpoint
     .then((res) => {
       if (res.status !== 200) {

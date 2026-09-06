@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // AACTranscodingAvailable reports whether AAC→PCMU transcoding
@@ -45,7 +45,7 @@ func NewAACTranscoder() (*AACTranscoder, error) {
 	if err != nil {
 		return nil, errors.New("AAC transcoding not available: ffmpeg binary not found in PATH")
 	}
-	log.Log.Info("webrtc.aac_transcoder: using ffmpeg binary at " + ffmpegPath)
+	log.Info("webrtc.aac_transcoder: using ffmpeg binary at " + ffmpegPath)
 
 	cmd := exec.Command(
 		ffmpegPath,
@@ -96,19 +96,19 @@ func NewAACTranscoder() (*AACTranscoder, error) {
 				buffered := t.outBuf.Len()
 				t.outMu.Unlock()
 				if buffered <= 8192 || buffered%16000 == 0 {
-					log.Log.Debug("webrtc.aac_transcoder: ffmpeg produced PCMU bytes, buffered=" + strconv.Itoa(buffered))
+					log.Debug("webrtc.aac_transcoder: ffmpeg produced PCMU bytes, buffered=" + strconv.Itoa(buffered))
 				}
 			}
 			if readErr != nil {
 				if readErr != io.EOF {
-					log.Log.Warning("webrtc.aac_transcoder: stdout reader stopped: " + readErr.Error())
+					log.Warn("webrtc.aac_transcoder: stdout reader stopped: " + readErr.Error())
 				}
 				return
 			}
 		}
 	}()
 
-	log.Log.Info("webrtc.aac_transcoder: AAC → PCMU transcoder initialised (ffmpeg process)")
+	log.Info("webrtc.aac_transcoder: AAC → PCMU transcoder initialised (ffmpeg process)")
 	return t, nil
 }
 
@@ -129,22 +129,22 @@ func (t *AACTranscoder) Transcode(adtsData []byte) ([]byte, error) {
 		return nil, err
 	}
 	if len(adtsData) <= 512 || len(adtsData)%1024 == 0 {
-		log.Log.Debug("webrtc.aac_transcoder: wrote AAC bytes to ffmpeg, input=" + strconv.Itoa(len(adtsData)))
+		log.Debug("webrtc.aac_transcoder: wrote AAC bytes to ffmpeg, input=" + strconv.Itoa(len(adtsData)))
 	}
 
 	deadline := time.Now().Add(75 * time.Millisecond)
 	for {
 		data := t.readAvailable()
 		if len(data) > 0 {
-			log.Log.Debug("webrtc.aac_transcoder: returning PCMU bytes=" + strconv.Itoa(len(data)))
+			log.Debug("webrtc.aac_transcoder: returning PCMU bytes=" + strconv.Itoa(len(data)))
 			return data, nil
 		}
 
 		if time.Now().After(deadline) {
 			if stderr := t.stderrString(); stderr != "" {
-				log.Log.Warning("webrtc.aac_transcoder: no output before deadline, ffmpeg stderr: " + stderr)
+				log.Warn("webrtc.aac_transcoder: no output before deadline, ffmpeg stderr: " + stderr)
 			} else {
-				log.Log.Debug("webrtc.aac_transcoder: no PCMU output before deadline")
+				log.Debug("webrtc.aac_transcoder: no PCMU output before deadline")
 			}
 			return nil, nil
 		}
@@ -198,7 +198,7 @@ func (t *AACTranscoder) Close() {
 			_ = t.cmd.Process.Kill()
 			_, _ = t.cmd.Process.Wait()
 			if stderr := t.stderrString(); stderr != "" {
-				log.Log.Info("webrtc.aac_transcoder: ffmpeg stderr on close: " + stderr)
+				log.Info("webrtc.aac_transcoder: ffmpeg stderr on close: " + stderr)
 			}
 		}
 	})

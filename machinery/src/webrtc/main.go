@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -13,9 +12,9 @@ import (
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
+	log "github.com/sirupsen/logrus"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/pion/interceptor"
@@ -180,7 +179,7 @@ func cleanupPeerConnection(sessionKey string, wrapper *peerConnectionWrapper) {
 	wrapper.closeOnce.Do(func() {
 		if wrapper.connected.Swap(false) {
 			count := globalConnectionManager.DecrementPeerCount()
-			log.Log.Info("webrtc.main.cleanupPeerConnection(): Peer disconnected. Active peers: " + strconv.FormatInt(count, 10))
+			log.Info("webrtc.main.cleanupPeerConnection(): Peer disconnected. Active peers: " + strconv.FormatInt(count, 10))
 		}
 
 		// Remove per-peer tracks from broadcasters so the fan-out stops
@@ -196,7 +195,7 @@ func cleanupPeerConnection(sessionKey string, wrapper *peerConnectionWrapper) {
 
 		if wrapper.conn != nil {
 			if err := wrapper.conn.Close(); err != nil {
-				log.Log.Error("webrtc.main.cleanupPeerConnection(): error closing peer connection: " + err.Error())
+				log.Error("webrtc.main.cleanupPeerConnection(): error closing peer connection: " + err.Error())
 			}
 		}
 
@@ -254,7 +253,7 @@ func buildICEServers(w WebRTC) []pionWebRTC.ICEServer {
 func (w WebRTC) DecodeSessionDescription(data string) ([]byte, error) {
 	sd, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
-		log.Log.Error("webrtc.main.DecodeSessionDescription(): " + err.Error())
+		log.Error("webrtc.main.DecodeSessionDescription(): " + err.Error())
 		return []byte{}, err
 	}
 	return sd, nil
@@ -269,9 +268,9 @@ func (w WebRTC) CreateOffer(sd []byte) pionWebRTC.SessionDescription {
 }
 
 func RegisterCandidates(key string, candidate models.ReceiveHDCandidatesPayload) {
-	log.Log.Info("webrtc.main.RegisterCandidates(): " + candidate.Candidate)
+	log.Info("webrtc.main.RegisterCandidates(): " + candidate.Candidate)
 	if !globalConnectionManager.QueueCandidate(key, candidate.Candidate) {
-		log.Log.Info("webrtc.main.RegisterCandidates(): channel is full, dropping candidate")
+		log.Info("webrtc.main.RegisterCandidates(): channel is full, dropping candidate")
 	}
 }
 
@@ -305,18 +304,18 @@ func RegisterDefaultInterceptors(mediaEngine *pionWebRTC.MediaEngine, intercepto
 
 func publishSignalingMessageAsync(mqttClient mqtt.Client, topic string, payload []byte, description string) {
 	if mqttClient == nil {
-		log.Log.Error("webrtc.main.publishSignalingMessageAsync(): mqtt client is nil for " + description)
+		log.Error("webrtc.main.publishSignalingMessageAsync(): mqtt client is nil for " + description)
 		return
 	}
 
 	token := mqttClient.Publish(topic, 2, false, payload)
 	go func() {
 		if !token.WaitTimeout(5 * time.Second) {
-			log.Log.Warning("webrtc.main.publishSignalingMessageAsync(): timed out publishing " + description)
+			log.Warn("webrtc.main.publishSignalingMessageAsync(): timed out publishing " + description)
 			return
 		}
 		if err := token.Error(); err != nil {
-			log.Log.Error("webrtc.main.publishSignalingMessageAsync(): failed publishing " + description + ": " + err.Error())
+			log.Error("webrtc.main.publishSignalingMessageAsync(): failed publishing " + description + ": " + err.Error())
 		}
 	}()
 }
@@ -324,7 +323,7 @@ func publishSignalingMessageAsync(mqttClient mqtt.Client, topic string, payload 
 func sendCandidateSignal(configuration *models.Configuration, mqttClient mqtt.Client, hubKey string, handshake models.LiveHDHandshake, candidateJSON []byte) {
 	if handshake.Signaling != nil && handshake.Signaling.SendCandidate != nil {
 		if err := handshake.Signaling.SendCandidate(handshake.Payload.SessionID, string(candidateJSON)); err != nil {
-			log.Log.Error("webrtc.main.sendCandidateSignal(): " + err.Error())
+			log.Error("webrtc.main.sendCandidateSignal(): " + err.Error())
 		}
 		return
 	}
@@ -343,7 +342,7 @@ func sendCandidateSignal(configuration *models.Configuration, mqttClient mqtt.Cl
 	if err == nil {
 		publishSignalingMessageAsync(mqttClient, "kerberos/hub/"+hubKey, payload, "ICE candidate for session "+handshake.Payload.SessionID)
 	} else {
-		log.Log.Info("webrtc.main.sendCandidateSignal(): while packaging mqtt message: " + err.Error())
+		log.Info("webrtc.main.sendCandidateSignal(): while packaging mqtt message: " + err.Error())
 	}
 }
 
@@ -352,7 +351,7 @@ func sendAnswerSignal(configuration *models.Configuration, mqttClient mqtt.Clien
 
 	if handshake.Signaling != nil && handshake.Signaling.SendAnswer != nil {
 		if err := handshake.Signaling.SendAnswer(handshake.Payload.SessionID, encodedAnswer); err != nil {
-			log.Log.Error("webrtc.main.sendAnswerSignal(): " + err.Error())
+			log.Error("webrtc.main.sendAnswerSignal(): " + err.Error())
 		}
 		return
 	}
@@ -371,7 +370,7 @@ func sendAnswerSignal(configuration *models.Configuration, mqttClient mqtt.Clien
 	if err == nil {
 		publishSignalingMessageAsync(mqttClient, "kerberos/hub/"+hubKey, payload, "SDP answer for session "+handshake.Payload.SessionID)
 	} else {
-		log.Log.Info("webrtc.main.sendAnswerSignal(): while packaging mqtt message: " + err.Error())
+		log.Info("webrtc.main.sendAnswerSignal(): while packaging mqtt message: " + err.Error())
 	}
 }
 
@@ -393,7 +392,11 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 	// first so we start from a clean slate. Without this, the new request would
 	// race against a stale PC that still owns the per-peer broadcaster tracks.
 	if globalConnectionManager.CloseExistingPeerConnection(sessionKey) {
-		log.Log.Info("webrtc.main.InitializeWebRTCConnection(): closed stale peer connection for session " + handshakePayload.SessionID)
+		log.WithFields(log.Fields{
+			"component":  "webrtc",
+			"event":      "stale_peer_closed",
+			"session_id": handshakePayload.SessionID,
+		}).Debug("Closed stale WebRTC peer connection")
 	}
 	// Drain/reset the candidate channel too \u2014 leftover candidates from the
 	// prior session are not valid for the new ICE agent.
@@ -412,7 +415,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 		mediaEngine := &pionWebRTC.MediaEngine{}
 		if err := mediaEngine.RegisterDefaultCodecs(); err != nil {
-			log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong registering codecs for media engine: " + err.Error())
+			log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong registering codecs for media engine: " + err.Error())
 		}
 
 		// Create a InterceptorRegistry. This is the user configurable RTP/RTCP Pipeline.
@@ -455,17 +458,18 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 		if err != nil {
 			globalConnectionManager.CloseCandidateChannel(sessionKey)
-			log.Log.Error("webrtc.main.InitializeWebRTCConnection(): failed to create peer connection: " + err.Error() +
+			log.Error("webrtc.main.InitializeWebRTCConnection(): failed to create peer connection: " + err.Error() +
 				" (STUN configured: " + strconv.FormatBool(strings.TrimSpace(config.STUNURI) != "") +
 				", TURN configured: " + strconv.FormatBool(strings.TrimSpace(config.TURNURI) != "") +
 				", TURN username configured: " + strconv.FormatBool(config.TURNUsername != "") +
 				", TURN credential configured: " + strconv.FormatBool(config.TURNPassword != "") +
 				", ForceTurn: " + config.ForceTurn + ")")
+
 			return
 		}
 		if peerConnection == nil {
 			globalConnectionManager.CloseCandidateChannel(sessionKey)
-			log.Log.Error("webrtc.main.InitializeWebRTCConnection(): failed to create peer connection: pion returned a nil connection")
+			log.Error("webrtc.main.InitializeWebRTCConnection(): failed to create peer connection: pion returned a nil connection")
 			return
 		}
 
@@ -488,17 +492,17 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			if videoBroadcaster != nil {
 				peerVideoTrack, trackErr := videoBroadcaster.AddPeer(sessionKey)
 				if trackErr != nil {
-					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error creating per-peer video track: " + trackErr.Error())
+					log.Error("webrtc.main.InitializeWebRTCConnection(): error creating per-peer video track: " + trackErr.Error())
 					cleanupPeerConnection(sessionKey, wrapper)
 					return
 				}
 				if videoSender, err = peerConnection.AddTrack(peerVideoTrack); err != nil {
-					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding video track: " + err.Error())
+					log.Error("webrtc.main.InitializeWebRTCConnection(): error adding video track: " + err.Error())
 					cleanupPeerConnection(sessionKey, wrapper)
 					return
 				}
 			} else {
-				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): video track is nil, skipping video")
+				log.Info("webrtc.main.InitializeWebRTCConnection(): video track is nil, skipping video")
 			}
 
 			// Read incoming RTCP packets
@@ -507,7 +511,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			if videoSender != nil {
 				go func() {
 					defer func() {
-						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): video RTCP reader stopped")
+						log.Info("webrtc.main.InitializeWebRTCConnection(): video RTCP reader stopped")
 					}()
 					rtcpBuf := make([]byte, rtcpBufferSize)
 					for {
@@ -528,17 +532,17 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			if audioBroadcaster != nil {
 				peerAudioTrack, trackErr := audioBroadcaster.AddPeer(sessionKey)
 				if trackErr != nil {
-					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error creating per-peer audio track: " + trackErr.Error())
+					log.Error("webrtc.main.InitializeWebRTCConnection(): error creating per-peer audio track: " + trackErr.Error())
 					cleanupPeerConnection(sessionKey, wrapper)
 					return
 				}
 				if audioSender, err = peerConnection.AddTrack(peerAudioTrack); err != nil {
-					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding audio track: " + err.Error())
+					log.Error("webrtc.main.InitializeWebRTCConnection(): error adding audio track: " + err.Error())
 					cleanupPeerConnection(sessionKey, wrapper)
 					return
 				}
 			} else {
-				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): audio track is nil, skipping audio")
+				log.Info("webrtc.main.InitializeWebRTCConnection(): audio track is nil, skipping audio")
 			}
 
 			// Read incoming RTCP packets
@@ -547,7 +551,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			if audioSender != nil {
 				go func() {
 					defer func() {
-						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): audio RTCP reader stopped")
+						log.Info("webrtc.main.InitializeWebRTCConnection(): audio RTCP reader stopped")
 					}()
 					rtcpBuf := make([]byte, rtcpBufferSize)
 					for {
@@ -565,12 +569,13 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 			// Log ICE connection state changes for diagnostics
 			peerConnection.OnICEConnectionStateChange(func(iceState pionWebRTC.ICEConnectionState) {
-				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): ICE connection state changed to: " + iceState.String() +
+				log.Info("webrtc.main.InitializeWebRTCConnection(): ICE connection state changed to: " + iceState.String() +
 					" (session: " + handshakePayload.SessionID + ")")
+
 			})
 
 			peerConnection.OnConnectionStateChange(func(connectionState pionWebRTC.PeerConnectionState) {
-				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): connection state changed to: " + connectionState.String() +
+				log.Info("webrtc.main.InitializeWebRTCConnection(): connection state changed to: " + connectionState.String() +
 					" (session: " + handshakePayload.SessionID + ")")
 
 				switch connectionState {
@@ -579,10 +584,15 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 					// Start a grace period timer; if we don't recover, then cleanup.
 					wrapper.disconnectMu.Lock()
 					if wrapper.disconnectTimer == nil {
-						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): peer disconnected, waiting " +
+						log.Info("webrtc.main.InitializeWebRTCConnection(): peer disconnected, waiting " +
 							disconnectGracePeriod.String() + " for recovery (session: " + handshakePayload.SessionID + ")")
+
 						wrapper.disconnectTimer = time.AfterFunc(disconnectGracePeriod, func() {
-							log.Log.Info("webrtc.main.InitializeWebRTCConnection(): disconnect grace period expired, closing connection (session: " + handshakePayload.SessionID + ")")
+							log.WithFields(log.Fields{
+								"component":  "webrtc",
+								"event":      "disconnect_grace_expired",
+								"session_id": handshakePayload.SessionID,
+							}).Info("WebRTC disconnect grace period expired")
 							cleanupPeerConnection(sessionKey, wrapper)
 						})
 					}
@@ -614,13 +624,17 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 					if wrapper.disconnectTimer != nil {
 						wrapper.disconnectTimer.Stop()
 						wrapper.disconnectTimer = nil
-						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): connection recovered from disconnected state (session: " + handshakePayload.SessionID + ")")
+						log.WithFields(log.Fields{
+							"component":  "webrtc",
+							"event":      "connection_recovered",
+							"session_id": handshakePayload.SessionID,
+						}).Info("WebRTC connection recovered")
 					}
 					wrapper.disconnectMu.Unlock()
 
 					if wrapper.connected.CompareAndSwap(false, true) {
 						count := globalConnectionManager.IncrementPeerCount()
-						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Peer connected. Active peers: " + strconv.FormatInt(count, 10))
+						log.Info("webrtc.main.InitializeWebRTCConnection(): Peer connected. Active peers: " + strconv.FormatInt(count, 10))
 					}
 				}
 			})
@@ -632,10 +646,11 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			peerConnection.OnICECandidate(func(candidate *pionWebRTC.ICECandidate) {
 
 				if candidate == nil {
-					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): ICE gathering complete (candidate is nil)")
+					log.Info("webrtc.main.InitializeWebRTCConnection(): ICE gathering complete (candidate is nil)")
 					if !hasRelayCandidates {
-						log.Log.Error("webrtc.main.InitializeWebRTCConnection(): WARNING - No TURN (relay) candidates were gathered! TURN servers: " +
+						log.Error("webrtc.main.InitializeWebRTCConnection(): WARNING - No TURN (relay) candidates were gathered! TURN servers: " +
 							config.TURNURI + ", Username: " + config.TURNUsername + ", ForceTurn: " + config.ForceTurn)
+
 					}
 					return
 				}
@@ -664,7 +679,7 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 					hasRelayCandidates = true
 				}
 
-				log.Log.Info("webrtc.main.InitializeWebRTCConnection(): ICE candidate received - Type: " + candidateType +
+				log.Info("webrtc.main.InitializeWebRTCConnection(): ICE candidate received - Type: " + candidateType +
 					", Candidate: " + candidateStr)
 
 				//  Create a config map
@@ -673,9 +688,9 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 				if err == nil {
 					valueMap["candidate"] = string(candateBinary)
 					valueMap["session_id"] = handshakePayload.SessionID
-					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): sending " + candidateType + " candidate to hub")
+					log.Info("webrtc.main.InitializeWebRTCConnection(): sending " + candidateType + " candidate to hub")
 				} else {
-					log.Log.Error("webrtc.main.InitializeWebRTCConnection(): failed to marshal candidate: " + err.Error())
+					log.Error("webrtc.main.InitializeWebRTCConnection(): failed to marshal candidate: " + err.Error())
 				}
 
 				sendCandidateSignal(configuration, mqttClient, hubKey, handshake, candateBinary)
@@ -683,14 +698,18 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 			offer := w.CreateOffer(sd)
 			if err = peerConnection.SetRemoteDescription(offer); err != nil {
-				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting remote description: " + err.Error())
+				log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting remote description: " + err.Error())
 				cleanupPeerConnection(sessionKey, wrapper)
 				return
 			}
 
 			go func() {
 				defer func() {
-					log.Log.Info("webrtc.main.InitializeWebRTCConnection(): candidate processor stopped for session: " + handshakePayload.SessionID)
+					log.WithFields(log.Fields{
+						"component":  "webrtc",
+						"event":      "candidate_processor_stopped",
+						"session_id": handshakePayload.SessionID,
+					}).Debug("WebRTC candidate processor stopped")
 				}()
 
 				// Process remote candidates only after the remote description is set.
@@ -704,14 +723,14 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 						if !ok {
 							return
 						}
-						log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Received candidate from channel: " + candidate)
+						log.Info("webrtc.main.InitializeWebRTCConnection(): Received candidate from channel: " + candidate)
 						candidateInit, decodeErr := decodeICECandidate(candidate)
 						if decodeErr != nil {
-							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error decoding candidate: " + decodeErr.Error())
+							log.Error("webrtc.main.InitializeWebRTCConnection(): error decoding candidate: " + decodeErr.Error())
 							continue
 						}
 						if candidateErr := peerConnection.AddICECandidate(candidateInit); candidateErr != nil {
-							log.Log.Error("webrtc.main.InitializeWebRTCConnection(): error adding candidate: " + candidateErr.Error())
+							log.Error("webrtc.main.InitializeWebRTCConnection(): error adding candidate: " + candidateErr.Error())
 						}
 					}
 				}
@@ -719,11 +738,11 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 
 			answer, err := peerConnection.CreateAnswer(nil)
 			if err != nil {
-				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while creating answer: " + err.Error())
+				log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while creating answer: " + err.Error())
 				cleanupPeerConnection(sessionKey, wrapper)
 				return
 			} else if err = peerConnection.SetLocalDescription(answer); err != nil {
-				log.Log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting local description: " + err.Error())
+				log.Error("webrtc.main.InitializeWebRTCConnection(): something went wrong while setting local description: " + err.Error())
 				cleanupPeerConnection(sessionKey, wrapper)
 				return
 			}
@@ -731,13 +750,13 @@ func InitializeWebRTCConnection(configuration *models.Configuration, communicati
 			// Store peer connection in manager
 			globalConnectionManager.AddPeerConnection(sessionKey, wrapper)
 
-			log.Log.Info("webrtc.main.InitializeWebRTCConnection(): Send SDP answer")
+			log.Info("webrtc.main.InitializeWebRTCConnection(): Send SDP answer")
 
 			sendAnswerSignal(configuration, mqttClient, hubKey, handshake, answer)
 		}
 	} else {
 		globalConnectionManager.CloseCandidateChannel(sessionKey)
-		log.Log.Error("webrtc.main.InitializeWebRTCConnection(): failed to decode remote session description: " + err.Error())
+		log.Error("webrtc.main.InitializeWebRTCConnection(): failed to decode remote session description: " + err.Error())
 	}
 }
 
@@ -748,7 +767,7 @@ func NewVideoBroadcaster(streams []packets.Stream) *TrackBroadcaster {
 			return NewTrackBroadcaster(pionWebRTC.MimeTypeH264, "video", trackStreamID)
 		}
 	}
-	log.Log.Error("webrtc.main.NewVideoBroadcaster(): no H264 stream found")
+	log.Error("webrtc.main.NewVideoBroadcaster(): no H264 stream found")
 	return nil
 }
 
@@ -771,12 +790,16 @@ func NewAudioBroadcaster(streams []packets.Stream) *TrackBroadcaster {
 		}
 	}
 	if hasAAC {
-		log.Log.Info("webrtc.main.NewAudioBroadcaster(): AAC detected, creating PCMU audio track for transcoded output")
+		log.Info("webrtc.main.NewAudioBroadcaster(): AAC detected, creating PCMU audio track for transcoded output")
 		return NewTrackBroadcaster(pionWebRTC.MimeTypePCMU, "audio", trackStreamID)
 	} else if len(audioCodecNames) > 0 {
-		log.Log.Error(fmt.Sprintf("webrtc.main.NewAudioBroadcaster(): no supported audio codec found (detected: %s; supported: OPUS, PCM_MULAW, PCM_ALAW)", strings.Join(audioCodecNames, ", ")))
+		log.WithFields(log.Fields{
+			"component":       "webrtc",
+			"detected_codecs": audioCodecNames,
+			"event":           "unsupported_audio_codecs",
+		}).Error("No supported WebRTC audio codec found")
 	} else {
-		log.Log.Info("webrtc.main.NewAudioBroadcaster(): no audio stream found in camera feed")
+		log.Info("webrtc.main.NewAudioBroadcaster(): no audio stream found in camera feed")
 	}
 	return nil
 }
@@ -785,7 +808,7 @@ func NewVideoTrack(streams []packets.Stream) *pionWebRTC.TrackLocalStaticSample 
 	mimeType := pionWebRTC.MimeTypeH264
 	outboundVideoTrack, err := pionWebRTC.NewTrackLocalStaticSample(pionWebRTC.RTPCodecCapability{MimeType: mimeType}, "video", trackStreamID)
 	if err != nil {
-		log.Log.Error("webrtc.main.NewVideoTrack(): error creating video track: " + err.Error())
+		log.Error("webrtc.main.NewVideoTrack(): error creating video track: " + err.Error())
 		return nil
 	}
 	return outboundVideoTrack
@@ -812,18 +835,22 @@ func NewAudioTrack(streams []packets.Stream) *pionWebRTC.TrackLocalStaticSample 
 	if mimeType == "" {
 		if hasAAC {
 			mimeType = pionWebRTC.MimeTypePCMU
-			log.Log.Info("webrtc.main.NewAudioTrack(): AAC detected, creating PCMU audio track for transcoded output")
+			log.Info("webrtc.main.NewAudioTrack(): AAC detected, creating PCMU audio track for transcoded output")
 		} else if len(audioCodecNames) > 0 {
-			log.Log.Error(fmt.Sprintf("webrtc.main.NewAudioTrack(): no supported audio codec found (detected: %s; supported: OPUS, PCM_MULAW, PCM_ALAW)", strings.Join(audioCodecNames, ", ")))
+			log.WithFields(log.Fields{
+				"component":       "webrtc",
+				"detected_codecs": audioCodecNames,
+				"event":           "unsupported_audio_codecs",
+			}).Error("No supported WebRTC audio codec found")
 			return nil
 		} else {
-			log.Log.Info("webrtc.main.NewAudioTrack(): no audio stream found in camera feed")
+			log.Info("webrtc.main.NewAudioTrack(): no audio stream found in camera feed")
 			return nil
 		}
 	}
 	outboundAudioTrack, err := pionWebRTC.NewTrackLocalStaticSample(pionWebRTC.RTPCodecCapability{MimeType: mimeType}, "audio", trackStreamID)
 	if err != nil {
-		log.Log.Error("webrtc.main.NewAudioTrack(): error creating audio track: " + err.Error())
+		log.Error("webrtc.main.NewAudioTrack(): error creating audio track: " + err.Error())
 		return nil
 	}
 	return outboundAudioTrack
@@ -978,7 +1005,7 @@ func processVideoPacket(pkt packets.Packet, state *streamState, videoBroadcaster
 
 	if config.Capture.ForwardWebRTC == "true" {
 		// Remote forwarding not yet implemented
-		log.Log.Debug("webrtc.main.processVideoPacket(): remote forwarding not implemented")
+		log.Debug("webrtc.main.processVideoPacket(): remote forwarding not implemented")
 		return
 	}
 
@@ -1007,25 +1034,49 @@ func processAudioPacket(pkt packets.Packet, state *streamState, audioBroadcaster
 		if transcoder == nil {
 			state.aacErrors++
 			if state.aacErrors <= 3 || state.aacErrors%100 == 0 {
-				log.Log.Warning(fmt.Sprintf("webrtc.main.processAudioPacket(): AAC packet dropped because transcoder is nil (aac_packets=%d, input_bytes=%d)", state.aacPacketsSeen, len(pkt.Data)))
+				log.WithFields(log.Fields{
+					"aac_packets": state.aacPacketsSeen,
+					"component":   "webrtc",
+					"event":       "aac_packet_dropped",
+					"input_bytes": len(pkt.Data),
+					"reason":      "transcoder_unavailable",
+				}).Warn("AAC packet dropped")
 			}
 			return // no transcoder – silently drop
 		}
 		pcmu, err := transcoder.Transcode(pkt.Data)
 		if err != nil {
 			state.aacErrors++
-			log.Log.Error("webrtc.main.processAudioPacket(): AAC transcode error: " + err.Error())
+			log.WithError(err).WithFields(log.Fields{
+				"aac_packets": state.aacPacketsSeen,
+				"component":   "webrtc",
+				"event":       "aac_transcode_failed",
+				"input_bytes": len(pkt.Data),
+			}).Error("Failed to transcode AAC packet")
 			return
 		}
 		if len(pcmu) == 0 {
 			state.aacNoOutput++
 			if state.aacNoOutput <= 5 || state.aacNoOutput%100 == 0 {
-				log.Log.Debug(fmt.Sprintf("webrtc.main.processAudioPacket(): AAC packet produced no PCMU output yet (aac_packets=%d, no_output=%d, input_bytes=%d)", state.aacPacketsSeen, state.aacNoOutput, len(pkt.Data)))
+				log.WithFields(log.Fields{
+					"aac_packets":     state.aacPacketsSeen,
+					"component":       "webrtc",
+					"event":           "aac_output_buffering",
+					"input_bytes":     len(pkt.Data),
+					"no_output_count": state.aacNoOutput,
+				}).Debug("AAC decoder produced no PCMU output yet")
 			}
 			return // decoder still buffering
 		}
 		if state.aacPacketsSeen <= 5 || state.aacPacketsSeen%100 == 0 {
-			log.Log.Info(fmt.Sprintf("webrtc.main.processAudioPacket(): AAC transcoded to PCMU (aac_packets=%d, input_bytes=%d, output_bytes=%d, peers=%d)", state.aacPacketsSeen, len(pkt.Data), len(pcmu), audioBroadcaster.PeerCount()))
+			log.WithFields(log.Fields{
+				"aac_packets":  state.aacPacketsSeen,
+				"component":    "webrtc",
+				"event":        "aac_packet_transcoded",
+				"input_bytes":  len(pkt.Data),
+				"output_bytes": len(pcmu),
+				"peer_count":   audioBroadcaster.PeerCount(),
+			}).Debug("AAC packet transcoded to PCMU")
 		}
 		audioData = pcmu
 	}
@@ -1036,7 +1087,15 @@ func processAudioPacket(pkt packets.Packet, state *streamState, audioBroadcaster
 		state.lastAudioSample.Duration = sampleDuration(pkt, state.lastAudioSample.PacketTimestamp, 20*time.Millisecond)
 		state.audioSamplesSent++
 		if state.audioSamplesSent <= 5 || state.audioSamplesSent%100 == 0 {
-			log.Log.Debug(fmt.Sprintf("webrtc.main.processAudioPacket(): queueing audio sample (samples=%d, codec=%s, bytes=%d, duration_ms=%d, peers=%d)", state.audioSamplesSent, pkt.Codec, len(state.lastAudioSample.Data), state.lastAudioSample.Duration.Milliseconds(), audioBroadcaster.PeerCount()))
+			log.WithFields(log.Fields{
+				"codec":          pkt.Codec,
+				"component":      "webrtc",
+				"duration_ms":    state.lastAudioSample.Duration.Milliseconds(),
+				"event":          "audio_sample_queued",
+				"peer_count":     audioBroadcaster.PeerCount(),
+				"sample_bytes":   len(state.lastAudioSample.Data),
+				"samples_queued": state.audioSamplesSent,
+			}).Debug("WebRTC audio sample queued")
 		}
 		audioBroadcaster.WriteSample(*state.lastAudioSample)
 	}
@@ -1059,7 +1118,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 
 	// Check if at least one broadcaster is available
 	if videoBroadcaster == nil && audioBroadcaster == nil {
-		log.Log.Error("webrtc.main.WriteToTrack(): both video and audio broadcasters are nil, cannot proceed")
+		log.Error("webrtc.main.WriteToTrack(): both video and audio broadcasters are nil, cannot proceed")
 		return
 	}
 
@@ -1067,26 +1126,30 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 	codecs := detectCodecs(rtspClient)
 
 	if !codecs.hasValidCodecs() {
-		log.Log.Error("webrtc.main.WriteToTrack(): no valid video or audio codec found")
+		log.Error("webrtc.main.WriteToTrack(): no valid video or audio codec found")
 		return
 	}
 
 	// Create AAC transcoder if needed (AAC → G.711 µ-law).
 	var aacTranscoder *AACTranscoder
 	if codecs.hasAAC && audioBroadcaster != nil {
-		log.Log.Info(fmt.Sprintf("webrtc.main.WriteToTrack(): AAC audio detected, creating transcoder (audio_peers=%d)", audioBroadcaster.PeerCount()))
+		log.WithFields(log.Fields{
+			"component":  "webrtc",
+			"event":      "aac_transcoder_starting",
+			"peer_count": audioBroadcaster.PeerCount(),
+		}).Info("Starting AAC transcoder")
 		t, err := NewAACTranscoder()
 		if err != nil {
-			log.Log.Error("webrtc.main.WriteToTrack(): failed to create AAC transcoder: " + err.Error())
+			log.Error("webrtc.main.WriteToTrack(): failed to create AAC transcoder: " + err.Error())
 		} else {
 			aacTranscoder = t
-			log.Log.Info("webrtc.main.WriteToTrack(): AAC transcoder created successfully")
+			log.Info("webrtc.main.WriteToTrack(): AAC transcoder created successfully")
 			defer aacTranscoder.Close()
 		}
 	}
 
 	if config.Capture.TranscodingWebRTC == "true" {
-		log.Log.Info("webrtc.main.WriteToTrack(): transcoding config enabled")
+		log.Info("webrtc.main.WriteToTrack(): transcoding config enabled")
 	}
 
 	// Initialize streaming state
@@ -1096,14 +1159,25 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 	}
 
 	defer func() {
-		log.Log.Info(fmt.Sprintf("webrtc.main.WriteToTrack(): audio summary packets=%d aac_packets=%d sent=%d aac_no_output=%d aac_errors=%d peers=%d", state.audioPacketsSeen, state.aacPacketsSeen, state.audioSamplesSent, state.aacNoOutput, state.aacErrors, func() int {
+		peerCount := func() int {
 			if audioBroadcaster == nil {
 				return 0
 			}
 			return audioBroadcaster.PeerCount()
-		}()))
+		}()
+		log.WithFields(log.Fields{
+			"aac_errors":    state.aacErrors,
+			"aac_no_output": state.aacNoOutput,
+			"aac_packets":   state.aacPacketsSeen,
+			"audio_packets": state.audioPacketsSeen,
+			"component":     "webrtc",
+			"event":         "audio_stream_summary",
+			"peer_count":    peerCount,
+			"samples_sent":  state.audioSamplesSent,
+		}).Info("WebRTC audio stream summary")
+
 		writeFinalSamples(state, videoBroadcaster, audioBroadcaster)
-		log.Log.Info("webrtc.main.WriteToTrack(): stopped writing to track")
+		log.Info("webrtc.main.WriteToTrack(): stopped writing to track")
 	}()
 
 	var pkt packets.Packet
@@ -1137,7 +1211,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 		// wait for a recent keyframe before resuming video.
 		if shouldDropPacketForLatency(pkt) {
 			if !state.catchingUp {
-				log.Log.Warning("webrtc.main.WriteToTrack(): stream is lagging behind, dropping old packets until the next recent keyframe")
+				log.Warn("webrtc.main.WriteToTrack(): stream is lagging behind, dropping old packets until the next recent keyframe")
 			}
 			state.catchingUp = true
 			state.start = false
@@ -1154,7 +1228,7 @@ func WriteToTrack(livestreamCursor *packets.QueueCursor, configuration *models.C
 			state.catchingUp = false
 			state.start = false
 			state.receivedKeyFrame = false
-			log.Log.Info("webrtc.main.WriteToTrack(): caught up with live stream at a recent keyframe")
+			log.Info("webrtc.main.WriteToTrack(): caught up with live stream at a recent keyframe")
 		}
 
 		// Wait for first keyframe before processing

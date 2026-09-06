@@ -8,14 +8,14 @@ import (
 	geo "github.com/kellydunn/golang-geo"
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/conditions"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
+	log "github.com/sirupsen/logrus"
 )
 
 func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
 
-	log.Log.Debug("computervision.main.ProcessMotion(): start motion detection")
+	log.Debug("computervision.main.ProcessMotion(): start motion detection")
 	config := configuration.Config
 	loc, _ := time.LoadLocation(config.Timezone)
 
@@ -42,14 +42,14 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 
 	if continuousMode && !hasMotionRegion {
 
-		log.Log.Info("computervision.main.ProcessMotion(): continuous recording enabled and no motion region configured, so no motion detection required.")
+		log.Info("computervision.main.ProcessMotion(): continuous recording enabled and no motion region configured, so no motion detection required.")
 
 	} else {
 
 		if continuousMode {
-			log.Log.Info("computervision.main.ProcessMotion(): continuous recording enabled with a motion region, running motion detection for live-view visualisation only (no motion-triggered recording).")
+			log.Info("computervision.main.ProcessMotion(): continuous recording enabled with a motion region, running motion detection for live-view visualisation only (no motion-triggered recording).")
 		} else {
-			log.Log.Info("computervision.main.ProcessMotion(): motion detected is enabled, so starting the motion detection.")
+			log.Info("computervision.main.ProcessMotion(): motion detected is enabled, so starting the motion detection.")
 		}
 
 		hubKey := config.HubKey
@@ -185,7 +185,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 				// We'll validate those conditions and if not valid we'll not do anything.
 				detectMotion, err := conditions.Validate(loc, configuration)
 				if !detectMotion && err != nil {
-					log.Log.Debug("computervision.main.ProcessMotion(): " + err.Error() + ".")
+					log.Debug("computervision.main.ProcessMotion(): " + err.Error() + ".")
 				}
 
 				// Run detection when motion is enabled, OR when we're in continuous
@@ -235,7 +235,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 										if err == nil {
 											mqttClient.Publish("kerberos/hub/"+hubKey, 2, false, payload)
 										} else {
-											log.Log.Info("computervision.main.ProcessMotion(): failed to package MQTT message: " + err.Error())
+											log.Info("computervision.main.ProcessMotion(): failed to package MQTT message: " + err.Error())
 										}
 									} else {
 										mqttClient.Publish("kerberos/agent/"+deviceKey, 2, false, "motion")
@@ -255,7 +255,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 									Rectangle:       motionRectangle,
 								}
 								if !communication.TrySendMotion(dataToPass) {
-									log.Log.Warning("computervision.main.ProcessMotion(): motion channel unavailable or full, dropping recording trigger")
+									log.Warn("computervision.main.ProcessMotion(): motion channel unavailable or full, dropping recording trigger")
 								}
 							}
 						}
@@ -273,7 +273,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 		}
 	}
 
-	log.Log.Debug("computervision.main.ProcessMotion(): stop the motion detection.")
+	log.Debug("computervision.main.ProcessMotion(): stop the motion detection.")
 }
 
 func FindMotion(imageArray [3]*image.Gray, coordinatesPerRegion [][]int, pixelChangeThreshold int) (thresholdReached bool, changesDetected int, motionRectangle models.MotionRectangle, motionRectangles []models.MotionRectangle) {
@@ -376,14 +376,28 @@ func AbsDiffBitwiseAndThreshold(img1 *image.Gray, img2 *image.Gray, img3 *image.
 				endY = pixel[1]
 			}
 		}
-		log.Log.Debugf("Rectangle of changes detected: startX: %d, startY: %d, endX: %d, endY: %d", startX, startY, endX, endY)
+		log.WithFields(log.Fields{
+			"component": "computer_vision",
+			"end_x":     endX,
+			"end_y":     endY,
+			"event":     "motion_bounds_detected",
+			"start_x":   startX,
+			"start_y":   startY,
+		}).Debug("Motion bounds detected")
 		motionRectangle = models.MotionRectangle{
 			X:      startX,
 			Y:      startY,
 			Width:  endX - startX,
 			Height: endY - startY,
 		}
-		log.Log.Debugf("Motion rectangle: %+v", motionRectangle)
+		log.WithFields(log.Fields{
+			"component": "computer_vision",
+			"event":     "motion_rectangle_created",
+			"height":    motionRectangle.Height,
+			"width":     motionRectangle.Width,
+			"x":         motionRectangle.X,
+			"y":         motionRectangle.Y,
+		}).Debug("Motion rectangle created")
 	}
 
 	// Cluster the changed pixels into separate bounding boxes so the live view can

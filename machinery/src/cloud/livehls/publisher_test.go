@@ -156,8 +156,11 @@ func TestPublisherReturnsErrorOnNon2xx(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error on 400 response")
 	}
-	if !strings.Contains(err.Error(), "400 Bad Request") || !strings.Contains(err.Error(), "No user found with this public and private key") {
-		t.Fatalf("error = %q, want status and bounded Hub response", err)
+	if !strings.Contains(err.Error(), "status 400") || !strings.Contains(err.Error(), "71 response bytes") {
+		t.Fatalf("error = %q, want status code and response size", err)
+	}
+	if strings.Contains(err.Error(), "No user found with this public and private key") {
+		t.Fatalf("error exposed Hub response body: %q", err)
 	}
 }
 

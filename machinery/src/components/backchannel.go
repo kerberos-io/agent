@@ -3,17 +3,16 @@ package components
 import (
 	"bufio"
 	"context"
-	"fmt"
 	"math/rand"
 	"os"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
-	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 	"github.com/kerberos-io/joy4/av"
 	"github.com/pion/rtp"
+	log "github.com/sirupsen/logrus"
 	"github.com/zaf/g711"
 )
 
@@ -88,22 +87,17 @@ func GetBackChannelAudioCodec(streams []av.CodecData, communication *models.Comm
 	return nil
 }
 
-func WriteAudioToBackchannel(communication *models.Communication, rtspClient capture.RTSPClient) {
-	ctx := context.Background()
-	if communication.Context != nil {
-		ctx = *communication.Context
-	}
-
+func WriteAudioToBackchannel(ctx context.Context, communication *models.Communication, rtspClient capture.RTSPClient) {
 	writeAudioToBackchannel(ctx, ctx, communication.HandleAudio, rtspClient)
 }
 
 func writeAudioToBackchannel(ctx context.Context, otelContext context.Context, audioChannel <-chan models.AudioDataPartial, rtspClient backchannelClient) {
-	log.Log.Info("Audio.WriteAudioToBackchannel(): writing to backchannel audio codec")
+	log.Info("Audio.WriteAudioToBackchannel(): writing to backchannel audio codec")
 
 	if err := rtspClient.StartBackChannel(ctx, otelContext); err != nil {
-		log.Log.Error("Audio.WriteAudioToBackchannel(): error starting backchannel: " + err.Error())
+		log.Error("Audio.WriteAudioToBackchannel(): error starting backchannel: " + err.Error())
 		if !reconnectBackchannel(ctx, otelContext, rtspClient) {
-			log.Log.Info("Audio.WriteAudioToBackchannel(): stopped while reconnecting")
+			log.Info("Audio.WriteAudioToBackchannel(): stopped while reconnecting")
 			return
 		}
 	}
@@ -112,11 +106,11 @@ func writeAudioToBackchannel(ctx context.Context, otelContext context.Context, a
 	for {
 		select {
 		case <-ctx.Done():
-			log.Log.Info("Audio.WriteAudioToBackchannel(): stopped")
+			log.Info("Audio.WriteAudioToBackchannel(): stopped")
 			return
 		case audio, ok := <-audioChannel:
 			if !ok {
-				log.Log.Info("Audio.WriteAudioToBackchannel(): finished")
+				log.Info("Audio.WriteAudioToBackchannel(): finished")
 				return
 			}
 
@@ -127,9 +121,9 @@ func writeAudioToBackchannel(ctx context.Context, otelContext context.Context, a
 
 			pkt := packetizer.packet(audio, time.Now())
 			if err := rtspClient.WritePacket(pkt); err != nil {
-				log.Log.Error("Audio.WriteAudioToBackchannel(): error writing packet to backchannel: " + err.Error())
+				log.Error("Audio.WriteAudioToBackchannel(): error writing packet to backchannel: " + err.Error())
 				if !reconnectBackchannel(ctx, otelContext, rtspClient) {
-					log.Log.Info("Audio.WriteAudioToBackchannel(): stopped while reconnecting")
+					log.Info("Audio.WriteAudioToBackchannel(): stopped while reconnecting")
 					return
 				}
 				packetizer = newBackchannelPacketizer()
@@ -137,7 +131,7 @@ func writeAudioToBackchannel(ctx context.Context, otelContext context.Context, a
 			}
 
 			if !waitForBackchannel(ctx, time.Duration(len(audio.Data))*time.Second/backchannelSampleRate) {
-				log.Log.Info("Audio.WriteAudioToBackchannel(): stopped")
+				log.Info("Audio.WriteAudioToBackchannel(): stopped")
 				return
 			}
 		}
@@ -162,7 +156,7 @@ func reconnectBackchannel(ctx context.Context, otelContext context.Context, rtsp
 	backoff := backchannelReconnectInitial
 	for {
 		if err := rtspClient.Close(otelContext); err != nil {
-			log.Log.Error("Audio.WriteAudioToBackchannel(): error closing failed backchannel: " + err.Error())
+			log.Error("Audio.WriteAudioToBackchannel(): error closing failed backchannel: " + err.Error())
 		}
 		if ctx.Err() != nil {
 			return false
@@ -173,11 +167,11 @@ func reconnectBackchannel(ctx context.Context, otelContext context.Context, rtsp
 			err = rtspClient.StartBackChannel(ctx, otelContext)
 		}
 		if err == nil {
-			log.Log.Info("Audio.WriteAudioToBackchannel(): reconnected backchannel")
+			log.Info("Audio.WriteAudioToBackchannel(): reconnected backchannel")
 			return true
 		}
 
-		log.Log.Error("Audio.WriteAudioToBackchannel(): error reconnecting backchannel: " + err.Error())
+		log.Error("Audio.WriteAudioToBackchannel(): error reconnecting backchannel: " + err.Error())
 		if !waitForBackchannel(ctx, backoff) {
 			return false
 		}
@@ -204,7 +198,12 @@ func WriteFileToBackChannel(infile av.DemuxCloser) {
 	// Do the warmup!
 	file, err := os.Open("./audiofile.bye")
 	if err != nil {
-		fmt.Println("WriteFileToBackChannel: error opening audiofile.bye file")
+		log.WithError(err).WithFields(log.Fields{
+			"component": "backchannel",
+			"event":     "audio_file_open_failed",
+			"path":      "./audiofile.bye",
+		}).Error("Failed to open backchannel audio file")
+		return
 	}
 	defer file.Close()
 

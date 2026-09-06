@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	mp4ff "github.com/Eyevinn/mp4ff/mp4"
-	"github.com/kerberos-io/agent/machinery/src/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // LiveSegmenter turns a live stream of Annex B video samples into HLS-ready
@@ -217,7 +217,7 @@ func (ls *LiveSegmenter) buildInit() error {
 		// fall back to a manually built avcC just like the recording muxer does so
 		// those cameras still produce a valid init segment.
 		if err := trak.SetAVCDescriptor("avc1", sps, pps, true); err != nil {
-			log.Log.Warning("livehls: SetAVCDescriptor failed, using manual avcC fallback: " + err.Error())
+			log.Warn("livehls: SetAVCDescriptor failed, using manual avcC fallback: " + err.Error())
 			if fbErr := addAVCDescriptorFallback(trak, sps, pps, ls.width, ls.height); fbErr != nil {
 				return fmt.Errorf("livehls: AVC descriptor fallback: %w", fbErr)
 			}
@@ -279,7 +279,7 @@ func (ls *LiveSegmenter) WriteSample(isKeyframe bool, annexB []byte, ptsMs uint6
 	// A session must open on a random-access point; otherwise the first segment
 	// would reference frames that never arrived.
 	if !ls.started && !isKeyframe {
-		log.Log.Debug("LiveSegmenter.WriteSample(): dropping leading non-keyframe before first IDR")
+		log.Debug("LiveSegmenter.WriteSample(): dropping leading non-keyframe before first IDR")
 		return nil
 	}
 
@@ -352,7 +352,7 @@ func (ls *LiveSegmenter) openSegment(startPTS uint64) {
 	ls.seg = mp4ff.NewMediaSegment() // includes a CMAF styp box by default
 	frag, err := mp4ff.CreateFragment(ls.seqNr, ls.videoTrackID)
 	if err != nil {
-		log.Log.Error("LiveSegmenter.openSegment(): CreateFragment failed: " + err.Error())
+		log.Error("LiveSegmenter.openSegment(): CreateFragment failed: " + err.Error())
 		return
 	}
 	ls.seg.AddFragment(frag)
@@ -543,7 +543,7 @@ func (ls *LiveSegmenter) openPartFragment() {
 	ls.fragSeq++
 	frag, err := mp4ff.CreateFragment(ls.fragSeq, ls.videoTrackID)
 	if err != nil {
-		log.Log.Error("LiveSegmenter.openPartFragment(): CreateFragment failed: " + err.Error())
+		log.Error("LiveSegmenter.openPartFragment(): CreateFragment failed: " + err.Error())
 		return
 	}
 	ls.partFrag = frag

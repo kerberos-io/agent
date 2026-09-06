@@ -193,10 +193,9 @@ import "C"
 
 import (
 	"errors"
-	"fmt"
 	"unsafe"
 
-	"github.com/kerberos-io/agent/machinery/src/log"
+	log "github.com/sirupsen/logrus"
 	"github.com/zaf/g711"
 )
 
@@ -216,7 +215,7 @@ func NewAACTranscoder() (*AACTranscoder, error) {
 	if h == nil {
 		return nil, errors.New("failed to create AAC transcoder (FFmpeg AAC decoder not available?)")
 	}
-	log.Log.Info("webrtc.aac_transcoder: AAC → G.711 µ-law transcoder initialised (FFmpeg)")
+	log.Info("webrtc.aac_transcoder: AAC → G.711 µ-law transcoder initialised (FFmpeg)")
 	return &AACTranscoder{handle: h}, nil
 }
 
@@ -250,9 +249,16 @@ func (t *AACTranscoder) Transcode(adtsData []byte) ([]byte, error) {
 
 	// Log resampler details once.
 	if t.handle.swr_initialized == 1 && t.handle.in_sample_rate != 0 {
-		log.Log.Info(fmt.Sprintf(
-			"webrtc.aac_transcoder: first output – resampling %d Hz / %d ch → 8000 Hz mono → µ-law",
-			int(t.handle.in_sample_rate), int(t.handle.in_channels)))
+		log.WithFields(log.Fields{
+			"component":        "webrtc",
+			"event":            "aac_resampler_initialized",
+			"input_channels":   int(t.handle.in_channels),
+			"input_sample_hz":  int(t.handle.in_sample_rate),
+			"output_channels":  1,
+			"output_codec":     "PCMU",
+			"output_sample_hz": 8000,
+		}).Info("AAC resampler initialized")
+
 		// Prevent repeated logging by zeroing the field we check.
 		t.handle.in_sample_rate = 0
 	}
@@ -265,6 +271,6 @@ func (t *AACTranscoder) Close() {
 	if t != nil && t.handle != nil {
 		C.aac_transcoder_destroy(t.handle)
 		t.handle = nil
-		log.Log.Info("webrtc.aac_transcoder: transcoder closed")
+		log.Info("webrtc.aac_transcoder: transcoder closed")
 	}
 }

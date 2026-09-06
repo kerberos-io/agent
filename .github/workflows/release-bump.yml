@@ -58,16 +58,12 @@ jobs:
         architecture: [amd64]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Checkout
-        uses: actions/checkout@v3
-      - uses: benjlevesque/short-sha@v2.1
-        id: short-sha
-        with:
-          length: 7
+        uses: actions/checkout@v4
       - name: Run Build
         run: |
           docker build --provenance=false --build-arg VERSION=${{ needs.bump-release.outputs.tag }} -t ${{matrix.architecture}} .
@@ -96,16 +92,12 @@ jobs:
         architecture: [arm64]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Checkout
-        uses: actions/checkout@v3
-      - uses: benjlevesque/short-sha@v2.1
-        id: short-sha
-        with:
-          length: 7
+        uses: actions/checkout@v4
       - name: Run Build
         run: |
           docker build --provenance=false --build-arg VERSION=${{ needs.bump-release.outputs.tag }} -t ${{matrix.architecture}} .
@@ -129,7 +121,7 @@ jobs:
     needs: [bump-release, build-amd64, build-arm64]
     steps:
       - name: Login to DockerHub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}

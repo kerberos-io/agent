@@ -188,6 +188,103 @@ Next to attaching the configuration file, it is also possible to override the co
     -e AGENT_CAPTURE_CONTINUOUS=true \
     -d --restart=always kerberos/agent:latest
 
+Set `AGENT_PORT` to change the Agent's internal HTTP port. The environment
+variable takes precedence over `-port`. When using Docker, publish the same
+container port:
+
+```bash
+docker run -p 8082:8082 \
+  -e AGENT_PORT=8082 \
+  --name mycamera \
+  -d --restart=always kerberos/agent:latest
+```
+
+### Health checks and API responses
+
+`GET /health` is an unauthenticated liveness and diagnostics endpoint for
+container orchestrators and external monitors. `healthy` means that the Agent
+HTTP process can serve requests. Camera streams and Hub connectivity are
+reported independently in the response, so an external camera or Hub outage
+does not make Docker restart an otherwise functioning Agent process. Successful
+probes return `200 OK` and are logged at debug level to avoid periodic health
+checks filling production logs.
+
+```bash
+curl http://localhost:8082/health
+```
+
+```json
+{
+  "httpStatusCode": 200,
+  "applicationStatusCode": "get_success",
+  "entityStatusCode": "healthy",
+  "message": "Healthy",
+  "metadata": {
+    "applicationName": "agent",
+    "applicationVersion": "0.0.0",
+    "timestamp": 1788710400,
+    "path": "/health"
+  },
+  "data": {
+    "health": {
+      "description": "Agent HTTP service is healthy",
+      "cameraConnected": true,
+      "mainStream": {
+        "configured": true,
+        "connected": true,
+        "packagesProcessed": 183421,
+        "fps": 29.97,
+        "resolution": {
+          "width": 1920,
+          "height": 1080
+        },
+        "lastPacketAt": 1788710399
+      },
+      "subStream": {
+        "configured": true,
+        "connected": true,
+        "packagesProcessed": 91710,
+        "fps": 15,
+        "resolution": {
+          "width": 640,
+          "height": 360
+        },
+        "lastPacketAt": 1788710399
+      },
+      "hub": {
+        "configured": true,
+        "connected": true,
+        "lastHeartbeatAttemptAt": 1788710398,
+        "lastSuccessfulHeartbeatAt": 1788710398
+      }
+    }
+  }
+}
+```
+
+Stream `packagesProcessed` counts complete encoded video access units processed
+since the Agent process started; it does not count individual fragmented RTP
+packets. `fps` is the latest PTS-derived frame-rate estimate. Resolution is the
+most recently observed encoded width and height. `lastPacketAt`, Hub heartbeat
+timestamps, and response metadata timestamps are Unix seconds; `0` means that
+no value has been observed yet. A stream can be configured but temporarily
+disconnected.
+
+Hub `configured` means heartbeat delivery is enabled and has the required URI
+and key. Hub `connected` means the most recent heartbeat succeeded and the last
+success is no more than three minutes old. A failed heartbeat marks it
+disconnected immediately while retaining the last-success timestamp for
+diagnosis.
+
+New JSON endpoints should use this Hub-compatible response envelope rather than
+adding unrelated top-level response shapes. HTTP status describes the transport
+result, `applicationStatusCode` describes the operation, `entityStatusCode` and
+`message` describe the domain outcome, `metadata` carries request/application
+context, and endpoint-specific content belongs in a typed `data` object. Client
+responses must contain safe messages only; detailed internal errors belong in
+structured logs. Existing endpoints retain their legacy response shapes until
+they are migrated deliberately.
+
 ### Secure camera streams (RTSPS)
 
 The Agent accepts `rtsps://` camera URLs. Do not use `srtsp://`; RTSPS is RTSP over TLS. For a Bosch FLEXIDOME micro 3100i, enable **Secure RTSP** under **Network > Network Services** and use port `9554`:
@@ -207,6 +304,7 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
 | `LOG_LEVEL`                                 | Level for logging, could be "info", "warning", "debug", "error" or "fatal".                     | "info"                         |
 | `LOG_OUTPUT`                                | Logging output format "json" or "text".                                                         | "text"                         |
+| `AGENT_PORT`                                | HTTP web server port. Overrides the `-port` command-line value and must be between 1 and 65535. | "80"                           |
 | `AGENT_MODE`                                | You can choose to run this in 'release' for production, and or 'demo' for showcasing.           | "release"                      |
 | `AGENT_TLS_INSECURE`                        | Specify if you want to use `InsecureSkipVerify` for the internal HTTP client.                   | "false"                        |
 | `AGENT_USERNAME`                            | The username used to authenticate against the Kerberos Agent login page.                        | "root"                         |
@@ -260,6 +358,7 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_HUB_PRIVATE_KEY`                     | The secret access key linked to your account in Kerberos Hub.                                   | ""                             |
 | `AGENT_HUB_REGION`                          | The Kerberos Hub region, to which you want to upload.                                           | ""                             |
 | `AGENT_HUB_SITE`                            | The site ID of a site you've created in your Kerberos Hub account.                              | ""                             |
+| `AGENT_TUS_CHUNK_SIZE_BYTES`                | Bytes sent in each resumable-upload PATCH. Set to `0` or a negative value to send all remaining bytes in one PATCH. | "8388608" (8 MiB)              |
 | `AGENT_KERBEROSVAULT_URI`                   | The Kerberos Vault API url.                                                                     | "https://vault.domain.com/api" |
 | `AGENT_KERBEROSVAULT_ACCESS_KEY`            | The access key of a Kerberos Vault account.                                                     | ""                             |
 | `AGENT_KERBEROSVAULT_SECRET_KEY`            | The secret key of a Kerberos Vault account.                                                     | ""                             |
@@ -279,6 +378,27 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_ENCRYPTION_SYMMETRIC_KEY`            | The symmetric key (AES) to encrypt and decrypt requests sent over MQTT.                         | ""                             |
 | `AGENT_SIGNING`                             | Enable 'true' or disable 'false' for signing recordings.                                        | "true"                         |
 | `AGENT_SIGNING_PRIVATE_KEY`                 | The private key (RSA) to sign the recordings fingerprint to validate origin.                    | "" - uses default one if empty |
+
+### Resumable upload chunk size
+
+Hub and Vault resumable uploads use `AGENT_TUS_CHUNK_SIZE_BYTES` as the maximum
+body size of each tus `PATCH` request. The value is a number of bytes, not a
+number of chunks. If the variable is unset or invalid, the Agent uses 8 MiB:
+
+```dotenv
+# 8 MiB (default)
+AGENT_TUS_CHUNK_SIZE_BYTES=8388608
+
+# 4 MiB: more frequent checkpoints on unstable connections
+AGENT_TUS_CHUNK_SIZE_BYTES=4194304
+
+# Disable chunking and send all remaining bytes in one PATCH
+AGENT_TUS_CHUNK_SIZE_BYTES=0
+```
+
+Smaller chunks provide more frequent resumable checkpoints but create more HTTP
+requests. Larger chunks reduce request overhead but require more data to be
+retransmitted when a request fails.
 
 
 ## Encryption
@@ -454,11 +574,14 @@ its own broadcast and switching quality is simply a resubscribe:
 | `high` | `devices/<agent-key>/live.hang`       | highest-resolution camera stream           |
 | `low`  | `devices/<agent-key>/live-low.hang`   | sub stream (main stream when none is set)  |
 
-Each tier only uploads while it has at least one subscriber, so the tier nobody
-watches costs virtually no bandwidth. `AGENT_LIVE_MOQ_QUALITY` accepts `high` or
-`low` to pin the Agent to a single tier; viewers requesting the other tier then
-find no broadcast. Any other value (including the default) publishes both. The
-initial implementation publishes H.264 video only.
+Each tier uploads every frame while it has subscribers. While idle, it continues
+to upload fresh keyframes only. This keeps the relay's latest cached GOP current,
+so a new viewer does not initially render the final frame from the previous
+viewer session, while avoiding the bandwidth cost of continuously sending every
+delta frame. `AGENT_LIVE_MOQ_QUALITY` accepts `high` or `low` to pin the Agent to
+a single tier; viewers requesting the other tier then find no broadcast. Any
+other value (including the default) publishes both. The initial implementation
+publishes H.264 video only.
 
 Two bounded duration settings tune recovery for unusual network conditions:
 

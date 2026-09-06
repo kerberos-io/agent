@@ -210,17 +210,18 @@ func (self *QueueCursor) ReadPacketContext(ctx context.Context) (pkt Packet, err
 	if err := ctx.Err(); err != nil {
 		return Packet{}, err
 	}
-	stop := context.AfterFunc(ctx, func() {
-		self.que.lock.Lock()
-		self.que.cond.Broadcast()
-		self.que.lock.Unlock()
-	})
-	defer stop()
 	return self.readPacket(ctx, true)
 }
 
 func (self *QueueCursor) readPacket(ctx context.Context, cancellable bool) (pkt Packet, err error) {
 	self.que.cond.L.Lock()
+	var stop func() bool
+	defer func() {
+		self.que.cond.L.Unlock()
+		if stop != nil {
+			stop()
+		}
+	}()
 	buf := self.que.buf
 	if !self.gotpos {
 		self.pos = self.init(buf, self.que.videoidx)
@@ -245,9 +246,17 @@ func (self *QueueCursor) readPacket(ctx context.Context, cancellable bool) (pkt 
 			if err = ctx.Err(); err != nil {
 				break
 			}
+			if stop == nil {
+				stop = context.AfterFunc(ctx, func() {
+					// The write lock prevents cancellation from being signalled
+					// between the context check above and cond.Wait.
+					self.que.lock.Lock()
+					self.que.cond.Broadcast()
+					self.que.lock.Unlock()
+				})
+			}
 		}
 		self.que.cond.Wait()
 	}
-	self.que.cond.L.Unlock()
 	return
 }

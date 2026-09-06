@@ -36,3 +36,27 @@ func TestCaptureClientAccessCanRaceReplacement(t *testing.T) {
 	}()
 	workers.Wait()
 }
+
+func TestCaptureClearClientsOnlyClearsMatchingRun(t *testing.T) {
+	captureDevice := &Capture{}
+	oldMain := captureDevice.SetMainClient("rtsp://main/old")
+	oldSub := captureDevice.SetSubClient("rtsp://sub/old")
+	oldBackchannel := captureDevice.SetBackChannelClient("rtsp://back/old")
+
+	newMain := captureDevice.SetMainClient("rtsp://main/new")
+	newSub := captureDevice.SetSubClient("rtsp://sub/new")
+	newBackchannel := captureDevice.SetBackChannelClient("rtsp://back/new")
+
+	captureDevice.ClearClients(oldMain, oldSub, oldBackchannel)
+	if captureDevice.MainClient() != newMain {
+		t.Fatal("stale cleanup cleared the new main client")
+	}
+	if captureDevice.SubClient() != newSub {
+		t.Fatal("stale cleanup cleared the new sub client")
+	}
+
+	captureDevice.ClearClients(newMain, newSub, newBackchannel)
+	if captureDevice.MainClient() != nil || captureDevice.SubClient() != nil {
+		t.Fatal("matching cleanup did not clear current clients")
+	}
+}
