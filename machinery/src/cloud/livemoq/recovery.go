@@ -20,6 +20,24 @@ type FrameGate struct {
 	recovering bool
 }
 
+// AudienceGate publishes every frame while watched and only keyframes while
+// idle. The idle keyframes keep the relay's latest cached group current without
+// paying the bandwidth cost of a full stream when nobody is watching.
+type AudienceGate struct {
+	idle bool
+}
+
+func (g *AudienceGate) Allow(hasSubscribers bool, isKeyFrame bool) (allowed bool, enteredIdle bool) {
+	if hasSubscribers {
+		g.idle = false
+		return true, false
+	}
+
+	enteredIdle = !g.idle
+	g.idle = true
+	return isKeyFrame, enteredIdle
+}
+
 // WriteWatchdog tracks the single synchronous frame write performed by a MoQ
 // publisher so another goroutine can interrupt a wedged native call.
 type WriteWatchdog struct {
@@ -46,9 +64,8 @@ func (w *WriteWatchdog) Elapsed(now time.Time) (time.Duration, bool) {
 	return elapsed, true
 }
 
-// Reset closes the gate so publication resumes on the next keyframe. It is used
-// when the publisher stopped writing for a reason unrelated to the stream health
-// (no subscribers), so the next viewer never receives a partial GOP.
+// Reset closes the gate so publication resumes on the next keyframe. Entering
+// idle mode uses it to start the relay-cache refresh on a complete GOP.
 func (g *FrameGate) Reset() {
 	g.started = false
 	g.recovering = false

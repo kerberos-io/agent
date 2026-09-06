@@ -4,6 +4,7 @@ package cloud
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -128,8 +129,9 @@ func boundedMoQDuration(name string, fallback, minimum, maximum time.Duration) t
 // publishing each tier as its OWN broadcast (see livemoq.BroadcastPath): the
 // high tier from the camera's highest-resolution stream and the low tier from
 // its sub stream, so switching quality in the frontend is a resubscribe to the
-// other path. Each tier only uploads while it actually has subscribers, so the
-// second broadcast is close to free when nobody watches it.
+// other path. Each tier uploads every frame while watched and keyframes only
+// while idle, keeping the relay cache current without continuously sending the
+// full unused stream.
 func StartLiveStreamMoQ(
 	ctx context.Context,
 	configuration *models.Configuration,
@@ -280,24 +282,34 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	if err != nil {
 		return fmt.Errorf("create broadcast: %w", err)
 	}
-	defer broadcast.Finish()
+	var finishBroadcastOnce sync.Once
+	var finishBroadcastErr error
+	finishBroadcast := func() error {
+		finishBroadcastOnce.Do(func() {
+			finishBroadcastErr = broadcast.Finish()
+		})
+		return finishBroadcastErr
+	}
+	defer finishBroadcast()
 
 	stream, err := broadcast.PublishMedia("avc3", nil)
 	if err != nil {
 		return fmt.Errorf("create H.264 media stream: %w", err)
 	}
 	var finishStreamOnce sync.Once
-	finishStream := func() {
+	var finishStreamErr error
+	finishStream := func() error {
 		finishStreamOnce.Do(func() {
-			_ = stream.Finish()
+			finishStreamErr = stream.Finish()
 		})
+		return finishStreamErr
 	}
 	defer finishStream()
 
-	// Only upload while this tier is actually being watched. `publishing` starts
-	// true so the track becomes discoverable on the relay even before the first
-	// subscriber ever arrives; from the moment a viewer has attached once, the
-	// subscriber watcher takes over and idles the tier again when everybody left.
+	// Publish the complete stream while watched and only keyframes while idle.
+	// `publishing` starts true so the track becomes discoverable on the relay
+	// before the first subscriber; after that, the subscriber watcher selects the
+	// full-rate or keyframe-refresh mode.
 	publishing := &atomic.Bool{}
 	publishing.Store(true)
 	subscriberWatchDone := make(chan struct{})
@@ -308,8 +320,7 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	writeWatchdog := &livemoq.WriteWatchdog{}
 	writeWatchDone := make(chan struct{})
 	closePublisher := func() error {
-		finishStream()
-		return client.Close()
+		return closeLiveMoQPublisher(finishStream, finishBroadcast, client.Close)
 	}
 	go func() {
 		defer close(writeWatchDone)
@@ -324,10 +335,10 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 
 	cursor := config.queue.Latest()
 	gate := livemoq.FrameGate{}
+	audienceGate := livemoq.AudienceGate{}
 	deduplicator := livemoq.KeyframeDeduplicator{}
 	var lastSlowWriteWarning time.Time
 	var lastDuplicateKeyframeWarning time.Time
-	idle := false
 	for {
 		select {
 		case err := <-sessionClosed:
@@ -347,18 +358,15 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 			}
 			return fmt.Errorf("read packet: %w", err)
 		}
-		if !publishing.Load() {
-			// Keep draining the cursor so we stay at the live edge, but publish
-			// nothing. The gate is closed so the next viewer resumes on a keyframe.
-			if !idle {
-				gate.Reset()
-				deduplicator.Reset()
-				idle = true
-			}
+		if !packet.IsVideo || len(packet.Data) == 0 || !strings.EqualFold(packet.Codec, "H264") {
 			continue
 		}
-		idle = false
-		if !packet.IsVideo || len(packet.Data) == 0 || !strings.EqualFold(packet.Codec, "H264") {
+		allowedForAudience, enteredIdle := audienceGate.Allow(publishing.Load(), packet.IsKeyFrame)
+		if enteredIdle {
+			gate.Reset()
+			deduplicator.Reset()
+		}
+		if !allowedForAudience {
 			continue
 		}
 		allowed, event := gate.Allow(packet.IsKeyFrame, packet.CurrentTime, time.Now(), config.packetAgeLimit())
@@ -435,14 +443,24 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	}
 }
 
-func watchLiveStreamMoQWrites(ctx context.Context, closeClient func() error, watchdog *livemoq.WriteWatchdog, config liveMoQConfig) {
+func closeLiveMoQPublisher(finishStream, finishBroadcast, closeClient func() error) error {
+	streamErr := finishStream()
+	broadcastErr := finishBroadcast()
+	clientErr := closeClient()
+	return errors.Join(streamErr, broadcastErr, clientErr)
+}
+
+func watchLiveStreamMoQWrites(ctx context.Context, closePublisher func() error, watchdog *livemoq.WriteWatchdog, config liveMoQConfig) {
 	ticker := time.NewTicker(moQWriteWatchInterval)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
-			closeClient()
+			if err := closePublisher(); err != nil {
+				config.logEntry("publisher_close_failed").WithError(err).
+					Debug("MoQ publisher reported an error while closing")
+			}
 			return
 		case now := <-ticker.C:
 			writeDuration, active := watchdog.Elapsed(now)
@@ -457,7 +475,10 @@ func watchLiveStreamMoQWrites(ctx context.Context, closeClient func() error, wat
 			if config.communication != nil {
 				config.communication.RecordMoQWriteTimeout()
 			}
-			closeClient()
+			if err := closePublisher(); err != nil {
+				config.logEntry("publisher_close_failed").WithError(err).
+					Warn("MoQ publisher reported an error while closing after a write timeout")
+			}
 			return
 		}
 	}
@@ -486,6 +507,6 @@ func watchLiveStreamMoQSubscribers(ctx context.Context, stream *moq.MediaProduce
 			return
 		}
 		publishing.Store(false)
-		config.logEntry("subscribers_idle").Info("MoQ broadcast idle; waiting for subscribers")
+		config.logEntry("subscribers_idle").Info("MoQ broadcast idle; refreshing keyframes only")
 	}
 }

@@ -17,7 +17,7 @@ binary="${TMPDIR:-/tmp}/agent-moq"
 trap 'rm -f "$binary"' EXIT
 
 echo "==> Linking the MoQ Agent"
-GOWORK=off go build -tags moq -o "$binary" ./main.go
+GOWORK=off go build -tags moq -o "$binary" .
 
 echo "==> Running the linked binary"
 "$binary" -action version

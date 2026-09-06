@@ -574,11 +574,14 @@ its own broadcast and switching quality is simply a resubscribe:
 | `high` | `devices/<agent-key>/live.hang`       | highest-resolution camera stream           |
 | `low`  | `devices/<agent-key>/live-low.hang`   | sub stream (main stream when none is set)  |
 
-Each tier only uploads while it has at least one subscriber, so the tier nobody
-watches costs virtually no bandwidth. `AGENT_LIVE_MOQ_QUALITY` accepts `high` or
-`low` to pin the Agent to a single tier; viewers requesting the other tier then
-find no broadcast. Any other value (including the default) publishes both. The
-initial implementation publishes H.264 video only.
+Each tier uploads every frame while it has subscribers. While idle, it continues
+to upload fresh keyframes only. This keeps the relay's latest cached GOP current,
+so a new viewer does not initially render the final frame from the previous
+viewer session, while avoiding the bandwidth cost of continuously sending every
+delta frame. `AGENT_LIVE_MOQ_QUALITY` accepts `high` or `low` to pin the Agent to
+a single tier; viewers requesting the other tier then find no broadcast. Any
+other value (including the default) publishes both. The initial implementation
+publishes H.264 video only.
 
 Two bounded duration settings tune recovery for unusual network conditions:
 

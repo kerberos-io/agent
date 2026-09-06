@@ -48,6 +48,29 @@ func TestFrameGateAllowsMissingCaptureTime(t *testing.T) {
 	}
 }
 
+func TestAudienceGateRefreshesOnlyKeyframesWhileIdle(t *testing.T) {
+	gate := AudienceGate{}
+
+	if allowed, enteredIdle := gate.Allow(true, false); !allowed || enteredIdle {
+		t.Fatalf("active delta = (%t, %t), want (true, false)", allowed, enteredIdle)
+	}
+	if allowed, enteredIdle := gate.Allow(false, false); allowed || !enteredIdle {
+		t.Fatalf("first idle delta = (%t, %t), want (false, true)", allowed, enteredIdle)
+	}
+	if allowed, enteredIdle := gate.Allow(false, true); !allowed || enteredIdle {
+		t.Fatalf("idle keyframe = (%t, %t), want (true, false)", allowed, enteredIdle)
+	}
+	if allowed, enteredIdle := gate.Allow(false, false); allowed || enteredIdle {
+		t.Fatalf("later idle delta = (%t, %t), want (false, false)", allowed, enteredIdle)
+	}
+	if allowed, enteredIdle := gate.Allow(true, false); !allowed || enteredIdle {
+		t.Fatalf("resumed delta = (%t, %t), want (true, false)", allowed, enteredIdle)
+	}
+	if allowed, enteredIdle := gate.Allow(false, true); !allowed || !enteredIdle {
+		t.Fatalf("next idle keyframe = (%t, %t), want (true, true)", allowed, enteredIdle)
+	}
+}
+
 func TestWriteWatchdogTracksActiveWrite(t *testing.T) {
 	now := time.Unix(10, 0)
 	watchdog := WriteWatchdog{}

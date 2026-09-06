@@ -4,6 +4,8 @@ package cloud
 
 import (
 	"context"
+	"errors"
+	"reflect"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -12,6 +14,37 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/moq-dev/moq-go/moq"
 )
+
+func TestCloseLiveMoQPublisherFinishesBeforeClosingClient(t *testing.T) {
+	var order []string
+	streamErr := errors.New("stream finish failed")
+	broadcastErr := errors.New("broadcast finish failed")
+	clientErr := errors.New("client close failed")
+
+	err := closeLiveMoQPublisher(
+		func() error {
+			order = append(order, "stream")
+			return streamErr
+		},
+		func() error {
+			order = append(order, "broadcast")
+			return broadcastErr
+		},
+		func() error {
+			order = append(order, "client")
+			return clientErr
+		},
+	)
+
+	if want := []string{"stream", "broadcast", "client"}; !reflect.DeepEqual(order, want) {
+		t.Fatalf("shutdown order = %v, want %v", order, want)
+	}
+	for _, want := range []error{streamErr, broadcastErr, clientErr} {
+		if !errors.Is(err, want) {
+			t.Errorf("shutdown error %v does not include %v", err, want)
+		}
+	}
+}
 
 func TestWatchLiveStreamMoQWritesClosesClientWhenContextEnds(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
