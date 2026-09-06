@@ -331,7 +331,7 @@ func recordingPendingUpload(cloudDirectory, recordingName string) bool {
 	return false
 }
 
-func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient, mqttClient mqtt.Client) {
+func HandleRecordStream(queue *packets.Queue, configDirectory string, configuration *models.Configuration, communication *models.Communication, rtspClient RTSPClient, mqttClient mqtt.Client, motionEvents <-chan models.MotionDataPartial) {
 
 	config := configuration.Config
 	hubKey := config.HubKey
@@ -680,7 +680,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 			var videoTrack uint32
 			var audioTrack uint32
 
-			for motion := range communication.HandleMotion {
+			for motion := range motionEvents {
 
 				// Get as much packets we need.
 				var cursorError error
@@ -774,7 +774,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					now = time.Now().UnixMilli()
 					select {
-					case motion := <-communication.HandleMotion:
+					case motion := <-motionEvents:
 						motionTimestamp = now
 						log.Log.Info("capture.main.HandleRecordStream(motiondetection): motion detected while recording. Expanding recording.")
 						numberOfChanges := motion.NumberOfChanges
@@ -870,10 +870,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// restart when the recording has expired (heartbeat lapsed or max
 				// duration reached), so it ends here instead of recording forever.
 				if communication.IsRecordingManual.IsSet() && !manualRecordingExpired(communication, time.Now().UnixMilli()) {
-					select {
-					case communication.HandleMotion <- models.MotionDataPartial{Timestamp: time.Now().Unix(), NumberOfChanges: 100000000}:
-					default:
-					}
+					communication.TrySendMotion(models.MotionDataPartial{Timestamp: time.Now().Unix(), NumberOfChanges: 100000000})
 				}
 
 				// Update the name of the recording with the duration.
@@ -1030,13 +1027,14 @@ func Base64Image(captureDevice *Capture, communication *models.Communication, co
 	var cursor *packets.QueueCursor
 
 	// We'll pick the right client and decoder.
-	rtspClient := captureDevice.RTSPSubClient
+	rtspClient := captureDevice.SubClient()
 	if rtspClient != nil {
-		queue = communication.SubQueue
-		cursor = queue.Latest()
+		queue = communication.SubQueue.Load()
 	} else {
-		rtspClient = captureDevice.RTSPClient
-		queue = communication.Queue
+		rtspClient = captureDevice.MainClient()
+		queue = communication.Queue.Load()
+	}
+	if queue != nil {
 		cursor = queue.Latest()
 	}
 
@@ -1076,13 +1074,14 @@ func JpegImage(captureDevice *Capture, communication *models.Communication) imag
 	var cursor *packets.QueueCursor
 
 	// We'll pick the right client and decoder.
-	rtspClient := captureDevice.RTSPSubClient
+	rtspClient := captureDevice.SubClient()
 	if rtspClient != nil {
-		queue = communication.SubQueue
-		cursor = queue.Latest()
+		queue = communication.SubQueue.Load()
 	} else {
-		rtspClient = captureDevice.RTSPClient
-		queue = communication.Queue
+		rtspClient = captureDevice.MainClient()
+		queue = communication.Queue.Load()
+	}
+	if queue != nil {
 		cursor = queue.Latest()
 	}
 

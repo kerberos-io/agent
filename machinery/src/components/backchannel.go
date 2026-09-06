@@ -79,7 +79,7 @@ func GetBackChannelAudioCodec(streams []av.CodecData, communication *models.Comm
 			if stream.Type().String() == "PCM_MULAW" {
 				pcmuCodec := stream.(av.AudioCodecData)
 				if pcmuCodec.IsBackChannel() {
-					communication.HasBackChannel = true
+					communication.HasBackChannel.Store(true)
 					return pcmuCodec
 				}
 			}

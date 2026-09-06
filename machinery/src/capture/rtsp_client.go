@@ -3,36 +3,59 @@ package capture
 import (
 	"context"
 	"image"
+	"sync"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
 )
 
 type Capture struct {
+	clientsMu             sync.RWMutex
 	RTSPClient            *Golibrtsp
 	RTSPSubClient         *Golibrtsp
 	RTSPBackChannelClient *Golibrtsp
 }
 
 func (c *Capture) SetMainClient(rtspUrl string) *Golibrtsp {
-	c.RTSPClient = &Golibrtsp{
+	client := &Golibrtsp{
 		Url: rtspUrl,
 	}
-	return c.RTSPClient
+	c.clientsMu.Lock()
+	c.RTSPClient = client
+	c.clientsMu.Unlock()
+	return client
 }
 
 func (c *Capture) SetSubClient(rtspUrl string) *Golibrtsp {
-	c.RTSPSubClient = &Golibrtsp{
+	client := &Golibrtsp{
 		Url: rtspUrl,
 	}
-	return c.RTSPSubClient
+	c.clientsMu.Lock()
+	c.RTSPSubClient = client
+	c.clientsMu.Unlock()
+	return client
 }
 
 func (c *Capture) SetBackChannelClient(rtspUrl string) *Golibrtsp {
-	c.RTSPBackChannelClient = &Golibrtsp{
+	client := &Golibrtsp{
 		Url: rtspUrl,
 	}
-	return c.RTSPBackChannelClient
+	c.clientsMu.Lock()
+	c.RTSPBackChannelClient = client
+	c.clientsMu.Unlock()
+	return client
+}
+
+func (c *Capture) MainClient() *Golibrtsp {
+	c.clientsMu.RLock()
+	defer c.clientsMu.RUnlock()
+	return c.RTSPClient
+}
+
+func (c *Capture) SubClient() *Golibrtsp {
+	c.clientsMu.RLock()
+	defer c.clientsMu.RUnlock()
+	return c.RTSPSubClient
 }
 
 // RTSPClient is a interface that abstracts the RTSP client implementation.

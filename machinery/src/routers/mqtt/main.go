@@ -413,9 +413,7 @@ func HandleRecording(mqttClient mqtt.Client, hubKey string, payload models.Paylo
 				communication.RecordingManualStart.Store(now)
 				communication.RecordingManualHeartbeatSeen.UnSet()
 				log.Log.Info("routers.mqtt.main.HandleRecording(): manual recording started.")
-				select {
-				case communication.HandleMotion <- models.MotionDataPartial{Timestamp: timestamp, NumberOfChanges: 100000000}:
-				default:
+				if !communication.TrySendMotion(models.MotionDataPartial{Timestamp: timestamp, NumberOfChanges: 100000000}) {
 					log.Log.Warning("routers.mqtt.main.HandleRecording(): motion channel full, manual recording start not queued.")
 				}
 			}
@@ -514,9 +512,12 @@ func HandleUpdatePTZPosition(mqttClient mqtt.Client, hubKey string, payload mode
 	json.Unmarshal(jsonData, &onvifAction)
 
 	if onvifAction.Action != "" {
-		if communication.CameraConnected {
-			communication.HandleONVIF <- onvifAction
-			log.Log.Info("routers.mqtt.main.MQTTListenerHandleONVIF(): Received an action - " + onvifAction.Action)
+		if communication.CameraConnected.Load() {
+			if communication.TrySendONVIF(onvifAction) {
+				log.Log.Info("routers.mqtt.main.MQTTListenerHandleONVIF(): Received an action - " + onvifAction.Action)
+			} else {
+				log.Log.Warning("routers.mqtt.main.MQTTListenerHandleONVIF(): action channel unavailable or full")
+			}
 		} else {
 			log.Log.Info("routers.mqtt.main.MQTTListenerHandleONVIF(): received action, but camera is not connected.")
 		}
@@ -710,7 +711,7 @@ func HandleRequestSDStream(mqttClient mqtt.Client, hubKey string, payload models
 	json.Unmarshal(jsonData, &requestSDStreamPayload)
 
 	if requestSDStreamPayload.Timestamp != 0 {
-		if communication.CameraConnected {
+		if communication.CameraConnected.Load() {
 			// A viewer that opted into the HTTP transport is signalled on a separate
 			// channel so the producer ships its frames to hub-api over HTTP instead of
 			// publishing them over MQTT. Any other (or absent) transport keeps the
@@ -745,7 +746,7 @@ func HandleRequestHLSStream(mqttClient mqtt.Client, hubKey string, payload model
 	json.Unmarshal(jsonData, &requestHLSStreamPayload)
 
 	if requestHLSStreamPayload.Timestamp != 0 {
-		if communication.CameraConnected {
+		if communication.CameraConnected.Load() {
 			// Forward the requested quality ("auto"|"high"|"low"; empty => auto) so
 			// the producer can switch the live session between the main and sub
 			// stream on demand. The send doubles as the viewer keepalive.
@@ -768,7 +769,7 @@ func HandleRequestHDStream(mqttClient mqtt.Client, hubKey string, payload models
 	json.Unmarshal(jsonData, &requestHDStreamPayload)
 
 	if requestHDStreamPayload.Timestamp != 0 {
-		if communication.CameraConnected {
+		if communication.CameraConnected.Load() {
 			// Dedupe by session_id: the viewer republishes its offer while
 			// waiting for an answer (and the broker may redeliver), and we
 			// don't want to spawn multiple peer connections for the same
@@ -780,13 +781,11 @@ func HandleRequestHDStream(mqttClient mqtt.Client, hubKey string, payload models
 			}
 			// Set the Hub key, so we can send back the answer.
 			requestHDStreamPayload.HubKey = hubKey
-			if communication.HandleLiveHDHandshake == nil {
-				log.Log.Error("routers.mqtt.main.HandleRequestHDStream(): handshake channel is nil, dropping request")
-				return
-			}
-
-			communication.HandleLiveHDHandshake <- models.LiveHDHandshake{
+			if !communication.TrySendLiveHDHandshake(models.LiveHDHandshake{
 				Payload: requestHDStreamPayload,
+			}) {
+				log.Log.Error("routers.mqtt.main.HandleRequestHDStream(): handshake channel unavailable or full, dropping request")
+				return
 			}
 			log.Log.Info("routers.mqtt.main.HandleRequestHDStream(): received request to setup webrtc.")
 		} else {
@@ -803,7 +802,7 @@ func HandleReceiveHDCandidates(mqttClient mqtt.Client, hubKey string, payload mo
 	json.Unmarshal(jsonData, &receiveHDCandidatesPayload)
 
 	if receiveHDCandidatesPayload.Timestamp != 0 {
-		if communication.CameraConnected {
+		if communication.CameraConnected.Load() {
 			// Register candidate channel
 			key := configuration.Config.Key + "/" + receiveHDCandidatesPayload.SessionID
 			go webrtc.RegisterCandidates(key, receiveHDCandidatesPayload)
@@ -820,12 +819,15 @@ func HandleNavigatePTZ(mqttClient mqtt.Client, hubKey string, payload models.Pay
 	json.Unmarshal(jsonData, &navigatePTZPayload)
 
 	if navigatePTZPayload.Timestamp != 0 {
-		if communication.CameraConnected {
+		if communication.CameraConnected.Load() {
 			action := navigatePTZPayload.Action
 			var onvifAction models.OnvifAction
 			json.Unmarshal([]byte(action), &onvifAction)
-			communication.HandleONVIF <- onvifAction
-			log.Log.Info("routers.mqtt.main.HandleNavigatePTZ(): Received an action - " + onvifAction.Action)
+			if communication.TrySendONVIF(onvifAction) {
+				log.Log.Info("routers.mqtt.main.HandleNavigatePTZ(): Received an action - " + onvifAction.Action)
+			} else {
+				log.Log.Warning("routers.mqtt.main.HandleNavigatePTZ(): action channel unavailable or full")
+			}
 		} else {
 			log.Log.Info("routers.mqtt.main.HandleNavigatePTZ(): received action, but camera is not connected.")
 		}
@@ -839,7 +841,7 @@ func HandleTriggerRelay(mqttClient mqtt.Client, hubKey string, payload models.Pa
 	json.Unmarshal(jsonData, &triggerRelayPayload)
 
 	if triggerRelayPayload.Timestamp != 0 {
-		if communication.CameraConnected {
+		if communication.CameraConnected.Load() {
 			// Get token (name of relay)
 			token := triggerRelayPayload.Token
 			// Connect to Onvif device

@@ -115,7 +115,7 @@ func WebsocketHandler(c *gin.Context, configuration *models.Configuration, commu
 				}
 
 			case "stream-sd":
-				if communication.CameraConnected {
+				if communication.CameraConnected.Load() {
 					_, exists := sockets[clientID].Cancels["stream-sd"]
 					if exists {
 						log.Log.Debug("routers.websocket.main.WebsocketHandler(): already streaming sd for " + clientID)
@@ -144,13 +144,8 @@ func WebsocketHandler(c *gin.Context, configuration *models.Configuration, commu
 					break
 				}
 
-				if !communication.CameraConnected {
+				if !communication.CameraConnected.Load() {
 					writeWebRTCError(sockets[clientID], clientID, sessionID, "camera is not connected")
-					break
-				}
-
-				if communication.HandleLiveHDHandshake == nil {
-					writeWebRTCError(sockets[clientID], clientID, sessionID, "webrtc liveview is not available")
 					break
 				}
 
@@ -188,7 +183,9 @@ func WebsocketHandler(c *gin.Context, configuration *models.Configuration, commu
 					},
 				}
 
-				communication.HandleLiveHDHandshake <- handshake
+				if !communication.TrySendLiveHDHandshake(handshake) {
+					writeWebRTCError(sockets[clientID], clientID, handshake.Payload.SessionID, "camera is restarting or live-view queue is full")
+				}
 
 			case "webrtc-candidate":
 				sessionID := message.Message["session_id"]
@@ -199,7 +196,7 @@ func WebsocketHandler(c *gin.Context, configuration *models.Configuration, commu
 					break
 				}
 
-				if !communication.CameraConnected {
+				if !communication.CameraConnected.Load() {
 					writeWebRTCError(sockets[clientID], clientID, sessionID, "camera is not connected")
 					break
 				}
@@ -232,13 +229,14 @@ func ForwardSDStream(ctx context.Context, clientID string, connection *Connectio
 	var cursor *packets.QueueCursor
 
 	// We'll pick the right client and decoder.
-	rtspClient := captureDevice.RTSPSubClient
+	rtspClient := captureDevice.SubClient()
 	if rtspClient != nil {
-		queue = communication.SubQueue
-		cursor = queue.Latest()
+		queue = communication.SubQueue.Load()
 	} else {
-		rtspClient = captureDevice.RTSPClient
-		queue = communication.Queue
+		rtspClient = captureDevice.MainClient()
+		queue = communication.Queue.Load()
+	}
+	if queue != nil {
 		cursor = queue.Latest()
 	}
 

@@ -3,7 +3,6 @@
 <a target="_blank" href="https://kerberos.io"><img src="https://img.shields.io/badge/kerberos-website-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Agent"></a>
 <a target="_blank" href="https://doc.kerberos.io"><img src="https://img.shields.io/badge/kerberos-documentation-gray.svg?longCache=true&colorB=brightgreen" alt="Kerberos Agent"></a>
 
-<a target="_blank" href="https://circleci.com/gh/kerberos-io/agent"><img src="https://circleci.com/gh/kerberos-io/agent.svg?style=svg"/></a>
 <img src="https://github.com/kerberos-io/agent/workflows/Go/badge.svg"/>
 <img src="https://github.com/kerberos-io/agent/workflows/React/badge.svg"/>
 <img src="https://github.com/kerberos-io/agent/workflows/CodeQL/badge.svg"/>
@@ -461,6 +460,18 @@ watches costs virtually no bandwidth. `AGENT_LIVE_MOQ_QUALITY` accepts `high` or
 find no broadcast. Any other value (including the default) publishes both. The
 initial implementation publishes H.264 video only.
 
+Two bounded duration settings tune recovery for unusual network conditions:
+
+| Variable | Default | Allowed range |
+| -------- | ------- | ------------- |
+| `AGENT_LIVE_MOQ_MAX_PACKET_AGE` | `1.5s` | `250ms` to `30s` |
+| `AGENT_LIVE_MOQ_WRITE_TIMEOUT` | `5s` | `1s` to `1m` |
+
+Values use Go duration syntax and are clamped to the documented range. The
+dashboard API's `recovery` object reports per-tier reconnects, last successful
+frame/write timing, native write timeouts, watchdog restarts/cooldown, dropped
+run-channel events, and run-worker shutdown timeouts.
+
 The `/anon` relay route is intended for interoperability testing. Production
 deployments must set `AGENT_LIVE_MOQ_URL` to a short-lived, device-scoped
 publisher URL issued by Hub API.
@@ -472,8 +483,9 @@ monorepo devcontainer so it uses the Trixie base, then run the VS Code task
     cd machinery
     bash ./verify-moq-devcontainer.sh
 
-The check requires glibc 2.38 or newer, runs the tagged package tests, links the
-complete Agent with `-tags moq`, and executes the resulting binary's version
+The check requires glibc 2.38 or newer, runs the tagged package and in-process
+native QUIC lifecycle tests, links the complete Agent with `-tags moq`, and
+executes the resulting binary's version
 command. Both devcontainers also run this check during their post-create setup.
 
 ## What is new?

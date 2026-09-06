@@ -687,7 +687,7 @@ func SaveConfig(configDirectory string, config models.Config, configuration *mod
 			return err
 		}
 
-		if communication.CameraConnected {
+		if communication.CameraConnected.Load() {
 			select {
 			case communication.HandleBootstrap <- "restart":
 				log.Log.Info("config.main.SaveConfig(): update config, restart agent.")

@@ -254,7 +254,9 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 									NumberOfChanges: changesToReturn,
 									Rectangle:       motionRectangle,
 								}
-								communication.HandleMotion <- dataToPass //Save data to the channel
+								if !communication.TrySendMotion(dataToPass) {
+									log.Log.Warning("computervision.main.ProcessMotion(): motion channel unavailable or full, dropping recording trigger")
+								}
 							}
 						}
 					}

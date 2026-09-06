@@ -123,6 +123,9 @@ func HandleLiveStreamHLS(configuration *models.Configuration, communication *mod
 
 	for cursorError == nil {
 		pkt, cursorError = source.cursor.ReadPacket()
+		if cursorError != nil {
+			break
+		}
 
 		now := time.Now().Unix()
 		select {
@@ -332,9 +335,10 @@ type hlsStreamSource struct {
 // stream after a switch.
 func buildHLSSource(config models.Config, communication *models.Communication, useSub bool) hlsStreamSource {
 	cam := config.Capture.IPCamera
-	if useSub && communication.SubQueue != nil {
+	subQueue := communication.SubQueue.Load()
+	if useSub && subQueue != nil {
 		return hlsStreamSource{
-			cursor: communication.SubQueue.Latest(),
+			cursor: subQueue.Latest(),
 			sps:    cam.SubSPSNALUs,
 			pps:    cam.SubPPSNALUs,
 			vps:    cam.SubVPSNALUs,
@@ -343,8 +347,9 @@ func buildHLSSource(config models.Config, communication *models.Communication, u
 			label:  "sub",
 		}
 	}
+	mainQueue := communication.Queue.Load()
 	return hlsStreamSource{
-		cursor: communication.Queue.Latest(),
+		cursor: mainQueue.Latest(),
 		sps:    cam.SPSNALUs,
 		pps:    cam.PPSNALUs,
 		vps:    cam.VPSNALUs,

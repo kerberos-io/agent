@@ -102,10 +102,10 @@ func Discover(timeout time.Duration, subnets ...string) {
 	}
 }
 
-func HandleONVIFActions(configuration *models.Configuration, communication *models.Communication) {
+func HandleONVIFActions(configuration *models.Configuration, communication *models.Communication, actions <-chan models.OnvifAction) {
 	log.Log.Debug("onvif.HandleONVIFActions(): started")
 
-	for onvifAction := range communication.HandleONVIF {
+	for onvifAction := range actions {
 
 		// First we'll get the desired PTZ action from the payload
 		// We need to know if we need to move left, right, up, down, zoom in, zoom out, center.

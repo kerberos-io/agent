@@ -1,6 +1,9 @@
 package livemoq
 
-import "time"
+import (
+	"sync/atomic"
+	"time"
+)
 
 type FrameGateEvent uint8
 
@@ -15,6 +18,32 @@ const (
 type FrameGate struct {
 	started    bool
 	recovering bool
+}
+
+// WriteWatchdog tracks the single synchronous frame write performed by a MoQ
+// publisher so another goroutine can interrupt a wedged native call.
+type WriteWatchdog struct {
+	startedAt atomic.Int64
+}
+
+func (w *WriteWatchdog) Begin(now time.Time) {
+	w.startedAt.Store(now.UnixNano())
+}
+
+func (w *WriteWatchdog) End() {
+	w.startedAt.Store(0)
+}
+
+func (w *WriteWatchdog) Elapsed(now time.Time) (time.Duration, bool) {
+	startedAt := w.startedAt.Load()
+	if startedAt == 0 {
+		return 0, false
+	}
+	elapsed := now.Sub(time.Unix(0, startedAt))
+	if elapsed < 0 {
+		elapsed = 0
+	}
+	return elapsed, true
 }
 
 // Reset closes the gate so publication resumes on the next keyframe. It is used
