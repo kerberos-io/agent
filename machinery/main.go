@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,6 +28,22 @@ import (
 )
 
 var VERSION = utils.VERSION
+
+func resolveServerPort(flagValue, environmentValue string) (string, error) {
+	value := strings.TrimSpace(environmentValue)
+	if value == "" {
+		value = strings.TrimSpace(flagValue)
+	}
+	if value == "" {
+		value = "80"
+	}
+
+	port, err := strconv.Atoi(value)
+	if err != nil || port < 1 || port > 65535 {
+		return "", fmt.Errorf("port must be an integer between 1 and 65535, got %q", value)
+	}
+	return strconv.Itoa(port), nil
+}
 
 func startTracing(agentKey string, otelEndpoint string) (*trace.TracerProvider, error) {
 	serviceName := "agent-" + agentKey
@@ -100,6 +117,17 @@ func main() {
 	// Specify the timezone of the log: "UTC" or "Local".
 	timezone, _ := time.LoadLocation("CET")
 	configureLogging(logLevel, logOutput, timezone)
+	if action == "run" {
+		resolvedPort, err := resolveServerPort(port, os.Getenv("AGENT_PORT"))
+		if err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"component": "http",
+				"event":     "server_port_invalid",
+			}).Fatal("Invalid HTTP server port")
+			return
+		}
+		port = resolvedPort
+	}
 	log.WithFields(log.Fields{
 		"action":           action,
 		"component":        "agent",

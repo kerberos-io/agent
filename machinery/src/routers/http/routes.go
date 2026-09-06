@@ -14,6 +14,10 @@ import (
 
 func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) *gin.RouterGroup {
 
+	r.GET("/health", func(c *gin.Context) {
+		HealthCheck(c, communication)
+	})
+
 	r.GET("/ws", func(c *gin.Context) {
 		websocket.WebsocketHandler(c, configuration, communication, captureDevice)
 	})

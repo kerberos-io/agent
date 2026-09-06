@@ -149,6 +149,8 @@ func requestLogger() gin.HandlerFunc {
 			entry.Error("HTTP request completed")
 		case status >= 400:
 			entry.Warn("HTTP request completed")
+		case c.Request.URL.Path == "/health":
+			entry.Debug("HTTP request completed")
 		default:
 			entry.Info("HTTP request completed")
 		}

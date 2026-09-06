@@ -167,6 +167,14 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 	config := configuration.Config
 
 	status = "not started"
+	communication.CameraConnected.Store(false)
+	communication.MainStreamConnected.Store(false)
+	communication.SubStreamConnected.Store(false)
+	mainRTSP := config.Capture.IPCamera.RTSP
+	subRTSP := config.Capture.IPCamera.SubRTSP
+	communication.SetStreamConfigured(models.MainStream, mainRTSP != "")
+	communication.SetStreamConfigured(models.SubStream, subRTSP != "" && subRTSP != mainRTSP)
+
 	run := models.NewAgentRun(parent, communication, config.Offline != "true")
 	runFields := log.Fields{
 		"component": "agent_run",
@@ -197,7 +205,7 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 
 	// Currently only support H264 encoded cameras, this will change.
 	// Establishing the camera connection without backchannel if no substream
-	rtspUrl := config.Capture.IPCamera.RTSP
+	rtspUrl := mainRTSP
 	rtspClient = captureDevice.SetMainClient(rtspUrl)
 	run.SetMainClient(rtspClient)
 	if rtspUrl != "" {

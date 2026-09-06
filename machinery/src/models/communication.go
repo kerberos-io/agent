@@ -1,6 +1,7 @@
 package models
 
 import (
+	"math"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -36,6 +37,45 @@ type RecoveryTelemetry struct {
 	WatchdogRestarts          uint64               `json:"watchdogRestarts"`
 	WatchdogCooldownSeconds   int64                `json:"watchdogCooldownSeconds"`
 	RunWorkerShutdownTimeouts uint64               `json:"runWorkerShutdownTimeouts"`
+}
+
+type StreamKind uint8
+
+const (
+	MainStream StreamKind = iota
+	SubStream
+)
+
+type StreamRuntimeTelemetry struct {
+	Configured        bool
+	PackagesProcessed uint64
+	FPS               float64
+	Width             int64
+	Height            int64
+	LastPacketAt      int64
+}
+
+type streamRuntimeTelemetry struct {
+	configured        atomic.Bool
+	packagesProcessed atomic.Uint64
+	fpsBits           atomic.Uint64
+	width             atomic.Int64
+	height            atomic.Int64
+	lastPacketAt      atomic.Int64
+}
+
+type HubRuntimeTelemetry struct {
+	Configured                bool
+	Connected                 bool
+	LastHeartbeatAttemptAt    int64
+	LastSuccessfulHeartbeatAt int64
+}
+
+type hubRuntimeTelemetry struct {
+	configured                atomic.Bool
+	connected                 atomic.Bool
+	lastHeartbeatAttemptAt    atomic.Int64
+	lastSuccessfulHeartbeatAt atomic.Int64
 }
 
 type recoveryTelemetry struct {
@@ -108,7 +148,87 @@ type Communication struct {
 	MainStreamConnected          atomic.Bool
 	SubStreamConnected           atomic.Bool
 	HasBackChannel               atomic.Bool
+	mainStreamTelemetry          streamRuntimeTelemetry
+	subStreamTelemetry           streamRuntimeTelemetry
+	hubTelemetry                 hubRuntimeTelemetry
 	recovery                     recoveryTelemetry
+}
+
+func (c *Communication) streamTelemetry(stream StreamKind) *streamRuntimeTelemetry {
+	switch stream {
+	case MainStream:
+		return &c.mainStreamTelemetry
+	case SubStream:
+		return &c.subStreamTelemetry
+	default:
+		panic("unsupported stream kind")
+	}
+}
+
+func (c *Communication) SetStreamConfigured(stream StreamKind, configured bool) {
+	c.streamTelemetry(stream).configured.Store(configured)
+}
+
+func (c *Communication) RecordStreamPackage(stream StreamKind, fps float64, width, height int, at time.Time) {
+	telemetry := c.streamTelemetry(stream)
+	telemetry.packagesProcessed.Add(1)
+	if fps > 0 && !math.IsNaN(fps) && !math.IsInf(fps, 0) {
+		telemetry.fpsBits.Store(math.Float64bits(fps))
+	}
+	if width > 0 {
+		telemetry.width.Store(int64(width))
+	}
+	if height > 0 {
+		telemetry.height.Store(int64(height))
+	}
+	if !at.IsZero() {
+		telemetry.lastPacketAt.Store(at.Unix())
+	}
+}
+
+func (c *Communication) StreamRuntimeTelemetry(stream StreamKind) StreamRuntimeTelemetry {
+	telemetry := c.streamTelemetry(stream)
+	return StreamRuntimeTelemetry{
+		Configured:        telemetry.configured.Load(),
+		PackagesProcessed: telemetry.packagesProcessed.Load(),
+		FPS:               math.Float64frombits(telemetry.fpsBits.Load()),
+		Width:             telemetry.width.Load(),
+		Height:            telemetry.height.Load(),
+		LastPacketAt:      telemetry.lastPacketAt.Load(),
+	}
+}
+
+func (c *Communication) SetHubConfigured(configured bool) {
+	c.hubTelemetry.configured.Store(configured)
+	if !configured {
+		c.hubTelemetry.connected.Store(false)
+	}
+}
+
+func (c *Communication) RecordHubHeartbeatAttempt(at time.Time) {
+	if !at.IsZero() {
+		c.hubTelemetry.lastHeartbeatAttemptAt.Store(at.Unix())
+	}
+}
+
+func (c *Communication) RecordHubHeartbeatSuccess(at time.Time) {
+	if !at.IsZero() {
+		c.hubTelemetry.lastSuccessfulHeartbeatAt.Store(at.Unix())
+	}
+	c.hubTelemetry.connected.Store(true)
+}
+
+func (c *Communication) RecordHubHeartbeatFailure() {
+	c.hubTelemetry.connected.Store(false)
+}
+
+func (c *Communication) HubRuntimeTelemetry() HubRuntimeTelemetry {
+	return HubRuntimeTelemetry{
+		Configured:                c.hubTelemetry.configured.Load(),
+		Connected:                 c.hubTelemetry.connected.Load(),
+		LastHeartbeatAttemptAt:    c.hubTelemetry.lastHeartbeatAttemptAt.Load(),
+		LastSuccessfulHeartbeatAt: c.hubTelemetry.lastSuccessfulHeartbeatAt.Load(),
+	}
 }
 
 func (c *Communication) RecordMoQReconnect(quality string) {

@@ -29,12 +29,12 @@ func TestRequestLoggerEmitsStructuredFields(t *testing.T) {
 
 	router := gin.New()
 	router.Use(requestLogger())
-	router.GET("/health", func(c *gin.Context) {
+	router.GET("/status", func(c *gin.Context) {
 		c.Status(stdhttp.StatusNoContent)
 	})
 
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(stdhttp.MethodGet, "/health?token=do-not-log", nil)
+	request := httptest.NewRequest(stdhttp.MethodGet, "/status?token=do-not-log", nil)
 	router.ServeHTTP(response, request)
 
 	var entry map[string]interface{}
@@ -45,7 +45,7 @@ func TestRequestLoggerEmitsStructuredFields(t *testing.T) {
 		"component": "http",
 		"event":     "request_completed",
 		"method":    stdhttp.MethodGet,
-		"path":      "/health",
+		"path":      "/status",
 		"status":    float64(stdhttp.StatusNoContent),
 	} {
 		if got := entry[key]; got != want {
@@ -54,5 +54,36 @@ func TestRequestLoggerEmitsStructuredFields(t *testing.T) {
 	}
 	if bytes.Contains(output.Bytes(), []byte("do-not-log")) {
 		t.Fatalf("request log exposed query parameters: %q", output.String())
+	}
+}
+
+func TestRequestLoggerKeepsSuccessfulHealthChecksBelowInfo(t *testing.T) {
+	originalOutput := log.StandardLogger().Out
+	originalFormatter := log.StandardLogger().Formatter
+	originalLevel := log.GetLevel()
+	defer func() {
+		log.SetOutput(originalOutput)
+		log.SetFormatter(originalFormatter)
+		log.SetLevel(originalLevel)
+	}()
+
+	var output bytes.Buffer
+	log.SetOutput(&output)
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetLevel(log.InfoLevel)
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.Use(requestLogger())
+	router.GET("/health", func(c *gin.Context) {
+		c.Status(stdhttp.StatusNoContent)
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(stdhttp.MethodGet, "/health", nil)
+	router.ServeHTTP(response, request)
+
+	if output.Len() != 0 {
+		t.Fatalf("successful health check emitted an info log: %q", output.String())
 	}
 }

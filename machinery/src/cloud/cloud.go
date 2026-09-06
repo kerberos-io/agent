@@ -636,6 +636,7 @@ loop:
 
 		// We'll capture some more metrics, and send it to Hub, if not in offline mode ofcourse ;) ;)
 		if config.Offline == "true" {
+			communication.SetHubConfigured(false)
 			log.Debug("cloud.HandleHeartBeat(): stopping as Offline is enabled.")
 		} else {
 
@@ -659,6 +660,8 @@ loop:
 			if config.HubKey != "" {
 				key = config.HubKey
 			}
+			hubConfigured := hubURI != "" && key != ""
+			communication.SetHubConfigured(hubConfigured)
 
 			// Check if we have a friendly name or not.
 			name := config.Name
@@ -720,7 +723,7 @@ loop:
 			boottimeString = strings.ReplaceAll(boottimeString, "ago", "")
 
 			// We need a hub URI and hub public key before we will send a heartbeat
-			if hubURI != "" && key != "" {
+			if hubConfigured {
 
 				heartbeat := struct {
 					Key                 string          `json:"key"`
@@ -847,6 +850,7 @@ loop:
 				var jsonStr = []byte(object)
 				buffy := bytes.NewBuffer(jsonStr)
 				requestStarted := time.Now()
+				communication.RecordHubHeartbeatAttempt(requestStarted)
 				req, requestErr := http.NewRequest("POST", hubURI, buffy)
 				var resp *http.Response
 				if requestErr == nil {
@@ -858,9 +862,12 @@ loop:
 						_, _ = io.Copy(io.Discard, resp.Body)
 						resp.Body.Close()
 					}
-					communication.CloudTimestamp.Store(time.Now().Unix())
+					heartbeatAt := time.Now()
+					communication.CloudTimestamp.Store(heartbeatAt.Unix())
+					communication.RecordHubHeartbeatSuccess(heartbeatAt)
 					log.Info("cloud.HandleHeartBeat(): (200) Heartbeat received by Kerberos Hub.")
 				} else {
+					communication.RecordHubHeartbeatFailure()
 					responseBody, responseBodyTruncated, responseBodyErr := readHeartbeatResponseBody(resp)
 					if communication.CloudTimestamp != nil && communication.CloudTimestamp.Load() != nil {
 						communication.CloudTimestamp.Store(int64(0))
@@ -1759,7 +1766,7 @@ func VerifyPersistence(c *gin.Context, configDirectory string) {
 
 // VerifySecondaryPersistence godoc
 // @Router /api/persistence/secondary/verify [post]
-// @ID verify-persistence
+// @ID verify-secondary-persistence
 // @Security Bearer
 // @securityDefinitions.apikey Bearer
 // @in header

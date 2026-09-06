@@ -1112,6 +1112,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				// Count every complete video access unit. Keyframe-only counters make
 				// healthy cameras with GOPs longer than the watchdog window look stalled.
 				if streamType == "main" {
+					observedAt := time.Now()
 					r := communication.PackageCounter.Load().(int64)
 					log.WithFields(log.Fields{
 						"bytes":     len(pkt.Data),
@@ -1121,9 +1122,11 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 						"keyframe":  pkt.IsKeyFrame,
 						"stream":    streamType,
 					}).Trace("RTSP access unit received")
+					communication.RecordStreamPackage(models.MainStream, g.Streams[g.VideoH264Index].FPS, g.Streams[g.VideoH264Index].Width, g.Streams[g.VideoH264Index].Height, observedAt)
 					communication.PackageCounter.Store((r + 1) % 1000)
-					communication.LastPacketTimer.Store(time.Now().Unix())
+					communication.LastPacketTimer.Store(observedAt.Unix())
 				} else if streamType == "sub" {
+					observedAt := time.Now()
 					r := communication.PackageCounterSub.Load().(int64)
 					log.WithFields(log.Fields{
 						"bytes":     len(pkt.Data),
@@ -1133,8 +1136,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 						"keyframe":  pkt.IsKeyFrame,
 						"stream":    streamType,
 					}).Trace("RTSP access unit received")
+					communication.RecordStreamPackage(models.SubStream, g.Streams[g.VideoH264Index].FPS, g.Streams[g.VideoH264Index].Width, g.Streams[g.VideoH264Index].Height, observedAt)
 					communication.PackageCounterSub.Store((r + 1) % 1000)
-					communication.LastPacketTimerSub.Store(time.Now().Unix())
+					communication.LastPacketTimerSub.Store(observedAt.Unix())
 				}
 			}
 
@@ -1297,6 +1301,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				// Count every complete video access unit; random-access frames remain
 				// responsible only for GOP tracking above.
 				if streamType == "main" {
+					observedAt := time.Now()
 					r := communication.PackageCounter.Load().(int64)
 					log.WithFields(log.Fields{
 						"bytes":     len(pkt.Data),
@@ -1306,9 +1311,11 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 						"keyframe":  pkt.IsKeyFrame,
 						"stream":    streamType,
 					}).Trace("RTSP access unit received")
+					communication.RecordStreamPackage(models.MainStream, g.Streams[g.VideoH265Index].FPS, g.Streams[g.VideoH265Index].Width, g.Streams[g.VideoH265Index].Height, observedAt)
 					communication.PackageCounter.Store((r + 1) % 1000)
-					communication.LastPacketTimer.Store(time.Now().Unix())
+					communication.LastPacketTimer.Store(observedAt.Unix())
 				} else if streamType == "sub" {
+					observedAt := time.Now()
 					r := communication.PackageCounterSub.Load().(int64)
 					log.WithFields(log.Fields{
 						"bytes":     len(pkt.Data),
@@ -1318,8 +1325,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 						"keyframe":  pkt.IsKeyFrame,
 						"stream":    streamType,
 					}).Trace("RTSP access unit received")
+					communication.RecordStreamPackage(models.SubStream, g.Streams[g.VideoH265Index].FPS, g.Streams[g.VideoH265Index].Width, g.Streams[g.VideoH265Index].Height, observedAt)
 					communication.PackageCounterSub.Store((r + 1) % 1000)
-					communication.LastPacketTimerSub.Store(time.Now().Unix())
+					communication.LastPacketTimerSub.Store(observedAt.Unix())
 				}
 			}
 

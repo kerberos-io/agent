@@ -159,3 +159,63 @@ func TestCommunicationRecoveryTelemetry(t *testing.T) {
 		t.Fatalf("drop telemetry = %+v", got)
 	}
 }
+
+func TestCommunicationOperationalTelemetry(t *testing.T) {
+	communication := &Communication{}
+	mainPacketAt := time.Unix(1_788_710_401, 0)
+	subPacketAt := time.Unix(1_788_710_402, 0)
+	hubAttemptAt := time.Unix(1_788_710_403, 0)
+	hubSuccessAt := time.Unix(1_788_710_404, 0)
+
+	communication.SetStreamConfigured(MainStream, true)
+	communication.SetStreamConfigured(SubStream, true)
+	communication.RecordStreamPackage(MainStream, 29.97, 1920, 1080, mainPacketAt)
+	communication.RecordStreamPackage(MainStream, 29.97, 1920, 1080, mainPacketAt)
+	communication.RecordStreamPackage(SubStream, 15, 640, 360, subPacketAt)
+	communication.SetHubConfigured(true)
+	communication.RecordHubHeartbeatAttempt(hubAttemptAt)
+	communication.RecordHubHeartbeatSuccess(hubSuccessAt)
+
+	main := communication.StreamRuntimeTelemetry(MainStream)
+	if main != (StreamRuntimeTelemetry{
+		Configured:        true,
+		PackagesProcessed: 2,
+		FPS:               29.97,
+		Width:             1920,
+		Height:            1080,
+		LastPacketAt:      mainPacketAt.Unix(),
+	}) {
+		t.Fatalf("main stream telemetry = %+v", main)
+	}
+
+	sub := communication.StreamRuntimeTelemetry(SubStream)
+	if sub != (StreamRuntimeTelemetry{
+		Configured:        true,
+		PackagesProcessed: 1,
+		FPS:               15,
+		Width:             640,
+		Height:            360,
+		LastPacketAt:      subPacketAt.Unix(),
+	}) {
+		t.Fatalf("sub stream telemetry = %+v", sub)
+	}
+
+	hub := communication.HubRuntimeTelemetry()
+	if hub != (HubRuntimeTelemetry{
+		Configured:                true,
+		Connected:                 true,
+		LastHeartbeatAttemptAt:    hubAttemptAt.Unix(),
+		LastSuccessfulHeartbeatAt: hubSuccessAt.Unix(),
+	}) {
+		t.Fatalf("Hub telemetry = %+v", hub)
+	}
+
+	communication.RecordHubHeartbeatFailure()
+	if communication.HubRuntimeTelemetry().Connected {
+		t.Fatal("Hub telemetry remained connected after a failed heartbeat")
+	}
+	communication.SetHubConfigured(false)
+	if communication.HubRuntimeTelemetry().Configured {
+		t.Fatal("Hub telemetry remained configured after it was disabled")
+	}
+}
