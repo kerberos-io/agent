@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/cloud"
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	configService "github.com/kerberos-io/agent/machinery/src/config"
+	"github.com/kerberos-io/agent/machinery/src/lifecycle"
 	"github.com/kerberos-io/agent/machinery/src/log"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/onvif"
@@ -28,33 +28,6 @@ import (
 )
 
 var tracer = otel.Tracer("github.com/kerberos-io/agent/machinery/src/components")
-
-type runWorkers struct {
-	waitGroup sync.WaitGroup
-}
-
-func (w *runWorkers) Start(worker func()) {
-	w.waitGroup.Add(1)
-	go func() {
-		defer w.waitGroup.Done()
-		worker()
-	}()
-}
-
-func (w *runWorkers) Wait(timeout time.Duration) bool {
-	done := make(chan struct{})
-	go func() {
-		w.waitGroup.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		return true
-	case <-time.After(timeout):
-		return false
-	}
-}
 
 func Bootstrap(ctx context.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
 
@@ -136,6 +109,10 @@ func Bootstrap(ctx context.Context, configDirectory string, configuration *model
 			time.Sleep(time.Second * 3)
 			os.Exit(0)
 		}
+		if status == runStatusShutdownTimeout {
+			log.Log.Error("components.Kerberos.Bootstrap(): terminating after camera workers failed to stop")
+			os.Exit(1)
+		}
 
 		if status == "not started" {
 			// We will re open the configuration, might have changed :O!
@@ -167,7 +144,6 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	config := configuration.Config
 
 	status := "not started"
-	workers := &runWorkers{}
 	var rtspSubClient *capture.Golibrtsp
 	mainClientNeedsClose := false
 	subClientNeedsClose := false
@@ -309,8 +285,17 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	log.Log.Info("components.Kerberos.RunAgent(): SetMaxGopCount was set with: " + strconv.Itoa(int(config.Capture.PreRecording)+1))
 	queue.SetMaxGopCount(1) // We will adjust this later on, when we have the GOP size.
 	queue.WriteHeader(videoStreams)
-	workers.Start(func() {
-		rtspClient.Start(ctx, "main", queue, configuration, communication)
+	runSupervisor := lifecycle.NewSupervisor(*communication.Context)
+	var taskRegistrationErr error
+	registerTask := func(name string, policy lifecycle.TaskPolicy, task lifecycle.TaskFunc) {
+		if taskRegistrationErr != nil {
+			return
+		}
+		taskRegistrationErr = runSupervisor.Go(name, policy, task)
+	}
+
+	registerTask("rtsp-main-start", lifecycle.TaskPolicy{Required: true}, func(taskContext context.Context) error {
+		return rtspClient.Start(taskContext, "main", queue, configuration, communication)
 	})
 
 	// Main stream is connected and ready to go.
@@ -329,8 +314,8 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 		communication.SubQueue.Store(subQueue)
 		subQueue.SetMaxGopCount(1) // GOP time frame is set to 1 for motion detection and livestreaming.
 		subQueue.WriteHeader(videoSubStreams)
-		workers.Start(func() {
-			rtspSubClient.Start(ctx, "sub", subQueue, configuration, communication)
+		registerTask("rtsp-sub-start", lifecycle.TaskPolicy{Required: true}, func(taskContext context.Context) error {
+			return rtspSubClient.Start(taskContext, "sub", subQueue, configuration, communication)
 		})
 
 		// Sub stream is connected and ready to go.
@@ -340,13 +325,15 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// Handle livestream SD (low resolution over MQTT)
 	if subStreamEnabled {
 		livestreamCursor := subQueue.Latest()
-		workers.Start(func() {
+		registerTask("live-sd", lifecycle.TaskPolicy{}, func(context.Context) error {
 			cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspSubClient)
+			return nil
 		})
 	} else {
 		livestreamCursor := queue.Latest()
-		workers.Start(func() {
+		registerTask("live-sd", lifecycle.TaskPolicy{}, func(context.Context) error {
 			cloud.HandleLiveStreamSD(livestreamCursor, configuration, communication, mqttClient, rtspClient)
+			return nil
 		})
 	}
 
@@ -356,14 +343,16 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	// quality the viewer requests; "auto" prefers the sub stream when available.
 	// Like SD it is viewer-keepalive gated and produces no traffic while nobody is
 	// watching.
-	workers.Start(func() {
+	registerTask("live-hls", lifecycle.TaskPolicy{}, func(context.Context) error {
 		cloud.HandleLiveStreamHLS(configuration, communication, mqttClient, subStreamEnabled)
+		return nil
 	})
 
 	// MoQ is available only in the dedicated CGO/glibc build. The standard
 	// static Alpine build resolves this hook to a no-op.
-	workers.Start(func() {
+	registerTask("live-moq", lifecycle.TaskPolicy{}, func(context.Context) error {
 		cloud.StartLiveStreamMoQ(configuration, communication, subStreamEnabled)
+		return nil
 	})
 
 	// Handle livestream HD (high resolution over WEBRTC). Both the main and sub
@@ -374,76 +363,100 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 	motionEvents := make(chan models.MotionDataPartial, 10)
 	onvifActions := make(chan models.OnvifAction, 10)
 	communication.SetRunChannels(liveHDHandshakes, motionEvents, onvifActions)
-	workers.Start(func() {
+	registerTask("live-hd", lifecycle.TaskPolicy{}, func(context.Context) error {
 		cloud.HandleLiveStreamHD(configuration, communication, mqttClient, rtspClient, rtspSubClient, subStreamEnabled, liveHDHandshakes)
+		return nil
 	})
 
 	// Handle recording, will write an mp4 to disk.
-	workers.Start(func() {
+	recordingPolicy := lifecycle.TaskPolicy{}
+	if config.Capture.Recording != "false" {
+		recordingPolicy = lifecycle.TaskPolicy{Required: true, LongRunning: true}
+	}
+	registerTask("recording", recordingPolicy, func(context.Context) error {
 		capture.HandleRecordStream(queue, configDirectory, configuration, communication, rtspClient, mqttClient, motionEvents)
+		return nil
 	})
 
 	// Handle processing of motion
 	if subStreamEnabled {
 		motionCursor := subQueue.Latest()
-		workers.Start(func() {
+		registerTask("motion", lifecycle.TaskPolicy{}, func(context.Context) error {
 			computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspSubClient)
+			return nil
 		})
 	} else {
 		motionCursor := queue.Latest()
-		workers.Start(func() {
+		registerTask("motion", lifecycle.TaskPolicy{}, func(context.Context) error {
 			computervision.ProcessMotion(motionCursor, configuration, communication, mqttClient, rtspClient)
+			return nil
 		})
 	}
 
 	// Handle realtime processing if enabled.
 	if subStreamEnabled {
 		realtimeProcessingCursor := subQueue.Latest()
-		workers.Start(func() {
+		registerTask("realtime-processing", lifecycle.TaskPolicy{}, func(context.Context) error {
 			cloud.HandleRealtimeProcessing(realtimeProcessingCursor, configuration, communication, mqttClient, rtspClient)
+			return nil
 		})
 	} else {
 		realtimeProcessingCursor := queue.Latest()
-		workers.Start(func() {
+		registerTask("realtime-processing", lifecycle.TaskPolicy{}, func(context.Context) error {
 			cloud.HandleRealtimeProcessing(realtimeProcessingCursor, configuration, communication, mqttClient, rtspClient)
+			return nil
 		})
 	}
 
 	// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)
-	workers.Start(func() {
+	registerTask("upload", lifecycle.TaskPolicy{}, func(context.Context) error {
 		cloud.HandleUpload(configDirectory, configuration, communication)
+		return nil
 	})
 
 	// Handle ONVIF actions
-	workers.Start(func() {
+	registerTask("onvif-actions", lifecycle.TaskPolicy{}, func(context.Context) error {
 		onvif.HandleONVIFActions(configuration, communication, onvifActions)
+		return nil
 	})
 
 	// Handle ONVIF event stream — opt-in via Capture.ONVIFMotion="true".
 	// Stops when the agent's shared context is cancelled. The function
 	// is a no-op if ONVIFMotion is not enabled.
-	workers.Start(func() {
-		onvif.HandleONVIFEventStream(*communication.Context, configuration, communication)
+	registerTask("onvif-events", lifecycle.TaskPolicy{}, func(taskContext context.Context) error {
+		onvif.HandleONVIFEventStream(taskContext, configuration, communication)
+		return nil
 	})
 
 	if rtspBackChannelClient.HasBackChannel {
 		communication.HasBackChannel.Store(true)
-		workers.Start(func() {
+		registerTask("backchannel", lifecycle.TaskPolicy{}, func(context.Context) error {
 			WriteAudioToBackchannel(communication, rtspBackChannelClient)
+			return nil
 		})
 	}
-
-	// If we reach this point, we have a working RTSP connection.
-	communication.CameraConnected.Store(true)
 
 	// Otel end span
 	span.End()
 
-	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	// This will go into a blocking state, once this channel is triggered
-	// the agent will cleanup and restart.
+	if taskRegistrationErr != nil {
+		log.Log.Error("components.Kerberos.RunAgent(): failed to register camera task: " + taskRegistrationErr.Error())
+		status = "restart"
+		runSupervisor.BeginShutdown(taskRegistrationErr)
+	} else {
+		runSupervisor.Seal()
 
-	status = <-communication.HandleBootstrap
+		// If we reach this point, we have a working RTSP connection.
+		communication.CameraConnected.Store(true)
+
+		select {
+		case status = <-communication.HandleBootstrap:
+			runSupervisor.BeginShutdown(fmt.Errorf("camera run requested %s", status))
+		case failure := <-runSupervisor.Failures():
+			log.Log.Error("components.Kerberos.RunAgent(): supervised task failed: " + failure.Error())
+			status = "restart"
+		}
+	}
 
 	// If we reach this point, we are stopping the stream.
 	communication.CameraConnected.Store(false)
@@ -500,14 +513,41 @@ func RunAgent(configDirectory string, configuration *models.Configuration, commu
 
 	communication.CloseRunChannels()
 
-	if workers.Wait(runShutdownTimeout) {
+	waitContext, cancelWait := context.WithTimeout(context.Background(), runShutdownTimeout)
+	shutdownReport := runSupervisor.Wait(waitContext)
+	cancelWait()
+	if shutdownReport.Complete {
 		log.Log.Info("components.Kerberos.RunAgent(): all run workers stopped")
+		for _, task := range shutdownReport.Tasks {
+			if task.Status == lifecycle.TaskPanicked {
+				log.Log.Error(fmt.Sprintf(
+					"components.Kerberos.RunAgent(): task %q panicked during shutdown: %s",
+					task.Name,
+					task.Panic,
+				))
+				if status != "stop" {
+					status = "restart"
+				}
+			}
+		}
 	} else {
 		communication.RecordRunWorkerShutdownTimeout()
 		log.Log.Error("components.Kerberos.RunAgent(): timed out waiting for run workers to stop")
+		for _, task := range shutdownReport.Running {
+			log.Log.Error(fmt.Sprintf(
+				"components.Kerberos.RunAgent(): task %q still running after %s",
+				task.Name,
+				time.Since(task.StartedAt).Round(time.Millisecond),
+			))
+		}
+		status = runStatusShutdownTimeout
 	}
 	communication.Queue.Store(nil)
 	communication.SubQueue.Store(nil)
+
+	if status == runStatusShutdownTimeout {
+		return status
+	}
 
 	// Factory reads retry transient database failures, so release runtime
 	// resources before reopening configuration.
@@ -595,6 +635,7 @@ func ControlAgent(communication *models.Communication) {
 }
 
 const (
+	runStatusShutdownTimeout   = "shutdown timed out"
 	runShutdownTimeout         = 10 * time.Second
 	streamWatchdogInterval     = 5 * time.Second
 	streamWatchdogStallChecks  = 3

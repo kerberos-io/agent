@@ -1,31 +1,9 @@
 package components
 
 import (
-	"sync/atomic"
 	"testing"
 	"time"
 )
-
-func TestRunWorkersWaitsForCompletion(t *testing.T) {
-	workers := &runWorkers{}
-	release := make(chan struct{})
-	var completed atomic.Bool
-	workers.Start(func() {
-		<-release
-		completed.Store(true)
-	})
-
-	if workers.Wait(time.Millisecond) {
-		t.Fatal("Wait() completed while worker was blocked")
-	}
-	close(release)
-	if !workers.Wait(time.Second) {
-		t.Fatal("Wait() timed out after worker was released")
-	}
-	if !completed.Load() {
-		t.Fatal("worker completion was not observed")
-	}
-}
 
 func TestStreamRestartWatchdogCoalescesStallsAndBacksOff(t *testing.T) {
 	now := time.Unix(1_000, 0)
