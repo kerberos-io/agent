@@ -1,6 +1,8 @@
 package mqtt
 
 import (
+	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -51,5 +53,75 @@ func TestEnqueueLatestAudioDoesNotBlockNilChannel(t *testing.T) {
 	case <-done:
 	case <-time.After(100 * time.Millisecond):
 		t.Fatal("enqueueLatestAudio() blocked on a nil channel")
+	}
+}
+
+func TestRemoteAccessRequiresExplicitOptIn(t *testing.T) {
+	previous, present := os.LookupEnv(remoteAccessEnvironment)
+	t.Cleanup(func() {
+		if present {
+			_ = os.Setenv(remoteAccessEnvironment, previous)
+		} else {
+			_ = os.Unsetenv(remoteAccessEnvironment)
+		}
+	})
+
+	_ = os.Unsetenv(remoteAccessEnvironment)
+	if remoteAccessEnabled() {
+		t.Fatal("remoteAccessEnabled() = true without opt-in")
+	}
+	_ = os.Setenv(remoteAccessEnvironment, "true")
+	if !remoteAccessEnabled() {
+		t.Fatal("remoteAccessEnabled() = false after opt-in")
+	}
+}
+
+func TestNormalizeTerminalSize(t *testing.T) {
+	rows, columns := normalizeTerminalSize(0, 0)
+	if rows != 24 || columns != 80 {
+		t.Fatalf("normalizeTerminalSize(0, 0) = (%d, %d), want (24, 80)", rows, columns)
+	}
+
+	rows, columns = normalizeTerminalSize(500, 500)
+	if rows != 200 || columns != 400 {
+		t.Fatalf("normalizeTerminalSize(500, 500) = (%d, %d), want (200, 400)", rows, columns)
+	}
+}
+
+func TestDecodeRemotePayloadRejectsMissingSession(t *testing.T) {
+	_, err := decodeRemotePayload(models.Payload{Value: map[string]interface{}{
+		"kind": "shell",
+	}})
+	if err == nil {
+		t.Fatal("decodeRemotePayload() accepted a missing session id")
+	}
+}
+
+func TestRemoteSessionOpenRejectsUnprovenEncryption(t *testing.T) {
+	previous, present := os.LookupEnv(remoteAccessEnvironment)
+	t.Cleanup(func() {
+		if present {
+			_ = os.Setenv(remoteAccessEnvironment, previous)
+		} else {
+			_ = os.Unsetenv(remoteAccessEnvironment)
+		}
+	})
+	_ = os.Setenv(remoteAccessEnvironment, "true")
+
+	// The listener passes false when an envelope merely claims to be hidden but
+	// no ciphertext was successfully decrypted. The remote handler must reject it.
+	if err := validateRemoteAccess(false); !errors.Is(err, errRemoteUnauthenticated) {
+		t.Fatalf("validateRemoteAccess(false) error = %v, want %v", err, errRemoteUnauthenticated)
+	}
+}
+
+func TestRemoteSessionReservationIsIdempotent(t *testing.T) {
+	manager := newRemoteAccessManager()
+	session := &remoteSession{id: "session-1", kind: "logs"}
+	if _, err := manager.reserve(session); err != nil {
+		t.Fatalf("first reserve() failed: %v", err)
+	}
+	if _, err := manager.reserve(session); !errors.Is(err, errRemoteSessionExists) {
+		t.Fatalf("duplicate reserve() error = %v, want %v", err, errRemoteSessionExists)
 	}
 }

@@ -324,3 +324,23 @@ type TriggerRelay struct {
 	DeviceId  string `json:"device_id"` // device id
 	Token     string `json:"token"`     // token
 }
+
+// RemoteSessionPayload controls an interactive shell or log stream over MQTT.
+// Data is base64 encoded so terminal control bytes remain valid JSON.
+type RemoteSessionPayload struct {
+	Timestamp int64  `json:"timestamp"`
+	SessionID string `json:"session_id"`
+	Kind      string `json:"kind,omitempty"`
+	Data      string `json:"data,omitempty"`
+	Rows      uint16 `json:"rows,omitempty"`
+	Columns   uint16 `json:"columns,omitempty"`
+	Tail      int    `json:"tail,omitempty"`
+}
+
+type RemoteSessionStatus struct {
+	Timestamp int64  `json:"timestamp"`
+	SessionID string `json:"session_id"`
+	Kind      string `json:"kind"`
+	State     string `json:"state"`
+	Error     string `json:"error,omitempty"`
+}

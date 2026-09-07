@@ -344,6 +344,7 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_MQTT_URI`                            | An MQTT broker endpoint that is used for bi-directional communication (live view, onvif, etc)   | "tcp://mqtt.kerberos.io:1883"  |
 | `AGENT_MQTT_USERNAME`                       | Username of the MQTT broker.                                                                    | ""                             |
 | `AGENT_MQTT_PASSWORD`                       | Password of the MQTT broker.                                                                    | ""                             |
+| `AGENT_REMOTE_ACCESS_ENABLED`               | Allow encrypted Hub MQTT sessions to stream Agent logs and open an interactive shell. Enable only for trusted deployments. | "false"                        |
 | `AGENT_REALTIME_PROCESSING`                 | If `AGENT_REALTIME_PROCESSING` set to `true`, the agent will send key frames to the topic       | ""                             |
 | `AGENT_REALTIME_PROCESSING_TOPIC`           | The topic to which keyframes will be sent in base64 encoded format.                             | ""                             |
 | `AGENT_STUN_URI`                            | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn-fra1.kerberos.io:3478"|
@@ -378,6 +379,13 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_ENCRYPTION_SYMMETRIC_KEY`            | The symmetric key (AES) to encrypt and decrypt requests sent over MQTT.                         | ""                             |
 | `AGENT_SIGNING`                             | Enable 'true' or disable 'false' for signing recordings.                                        | "true"                         |
 | `AGENT_SIGNING_PRIVATE_KEY`                 | The private key (RSA) to sign the recordings fingerprint to validate origin.                    | "" - uses default one if empty |
+
+Remote console access is disabled unless `AGENT_REMOTE_ACCESS_ENABLED=true`.
+The Agent also rejects remote session messages unless Hub encryption or
+end-to-end MQTT encryption is configured and used. A remote shell runs inside
+the Agent process environment as the Agent operating-system user; it is not an
+SSH server and does not expose a new network port. Keep the feature disabled on
+deployments where Hub owners should not have operating-system access.
 
 ### Resumable upload chunk size
 
