@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -71,19 +72,15 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 		s3Client.SetCustomTransport(transport)
 	}
 
-	fileParts := strings.Split(fileName, "_")
-	if len(fileParts) == 1 {
+	recordingMetadata, ok := queuedRecordingMetadata(fileName)
+	if !ok {
+		recordingMetadata, ok = legacyS3RecordingMetadata(fileName, config.Key)
+	}
+	if !ok {
 		errorMessage := "UploadS3: " + fileName + " is not a valid name."
 		log.Error(errorMessage)
 		return false, true, errors.New(errorMessage)
 	}
-
-	deviceKey := config.Key
-	startRecording, _ := strconv.ParseInt(fileParts[0], 10, 64)
-	devicename := fileParts[2]
-	coordinates := fileParts[3]
-	//numberOfChanges := fileParts[4]
-	token, _ := strconv.Atoi(fileParts[5])
 
 	log.Info("UploadS3: Upload started for " + fileName)
 	fullname := "data/recordings/" + fileName
@@ -113,17 +110,7 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 		minio.PutObjectOptions{
 			ContentType:  "video/mp4",
 			StorageClass: "ONEZONE_IA",
-			UserMetadata: map[string]string{
-				"event-timestamp":         strconv.FormatInt(startRecording, 10),
-				"event-microseconds":      deviceKey,
-				"event-instancename":      devicename,
-				"event-regioncoordinates": coordinates,
-				"event-numberofchanges":   deviceKey,
-				"event-token":             strconv.Itoa(token),
-				"productid":               deviceKey,
-				"publickey":               aws_access_key_id,
-				"uploadtime":              "now",
-			},
+			UserMetadata: s3ObjectMetadata(recordingMetadata, config.Key, aws_access_key_id),
 		})
 
 	if err != nil {
@@ -134,4 +121,45 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 		log.Info("UploadS3: Upload Finished, file has been uploaded to bucket: " + strconv.FormatInt(n, 10))
 		return true, true, nil
 	}
+}
+
+func s3ObjectMetadata(metadata models.RecordingUploadMetadata, deviceKey string, publicKey string) map[string]string {
+	return map[string]string{
+		"event-timestamp":         strconv.FormatInt(metadata.Timestamp/1000, 10),
+		"event-microseconds":      strconv.FormatInt(metadata.Timestamp%1000, 10),
+		"event-instancename":      metadata.DeviceName,
+		"event-regioncoordinates": metadata.RegionCoordinates,
+		"event-numberofchanges":   metadata.NumberOfChanges,
+		"event-duration":          strconv.FormatUint(metadata.Duration, 10),
+		"event-token":             strconv.FormatUint(metadata.Duration, 10),
+		"productid":               deviceKey,
+		"publickey":               publicKey,
+		"uploadtime":              "now",
+	}
+}
+
+func legacyS3RecordingMetadata(fileName string, deviceKey string) (models.RecordingUploadMetadata, bool) {
+	fileParts := strings.Split(fileName, "_")
+	if len(fileParts) < 6 {
+		return models.RecordingUploadMetadata{}, false
+	}
+	seconds, secondsErr := strconv.ParseInt(fileParts[0], 10, 64)
+	milliseconds := int64(0)
+	precisionParts := strings.SplitN(fileParts[1], "-", 2)
+	if len(precisionParts) == 2 {
+		milliseconds, _ = strconv.ParseInt(precisionParts[1], 10, 64)
+	}
+	duration, durationErr := strconv.ParseUint(strings.TrimSuffix(fileParts[5], filepath.Ext(fileParts[5])), 10, 64)
+	if secondsErr != nil || durationErr != nil || milliseconds < 0 || milliseconds >= 1000 {
+		return models.RecordingUploadMetadata{}, false
+	}
+	return models.RecordingUploadMetadata{
+		FileName:          fileName,
+		DeviceKey:         deviceKey,
+		DeviceName:        fileParts[2],
+		Timestamp:         seconds*1000 + milliseconds,
+		Duration:          duration,
+		RegionCoordinates: fileParts[3],
+		NumberOfChanges:   fileParts[4],
+	}, true
 }

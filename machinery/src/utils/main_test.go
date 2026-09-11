@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"image/jpeg"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -108,13 +109,14 @@ func TestConfigurationLogFieldsOmitCredentialsAndEndpoints(t *testing.T) {
 }
 
 type stubFileInfo struct {
-	name string
+	name    string
+	modTime time.Time
 }
 
 func (s stubFileInfo) Name() string       { return s.name }
 func (s stubFileInfo) Size() int64        { return 0 }
 func (s stubFileInfo) Mode() os.FileMode  { return 0 }
-func (s stubFileInfo) ModTime() time.Time { return time.Unix(0, 0) }
+func (s stubFileInfo) ModTime() time.Time { return s.modTime }
 func (s stubFileInfo) IsDir() bool        { return false }
 func (s stubFileInfo) Sys() interface{}   { return nil }
 
@@ -149,5 +151,34 @@ func TestGetMediaFormattedHonorsTimestampRange(t *testing.T) {
 	}
 	if media[0].CameraKey != "camera-1" {
 		t.Fatalf("expected camera key to be preserved, got %s", media[0].CameraKey)
+	}
+}
+
+func TestGetMediaFormattedSupportsOpaqueFileNames(t *testing.T) {
+	root := t.TempDir()
+	recordingDirectory := filepath.Join(root, "recordings")
+	cloudDirectory := filepath.Join(root, "cloud")
+	if err := os.MkdirAll(cloudDirectory, 0755); err != nil {
+		t.Fatal(err)
+	}
+	fileName := "opaque recording.mp4"
+	marker := []byte(`{"filename":"opaque recording.mp4","timestamp":1785934709414}`)
+	if err := os.WriteFile(filepath.Join(cloudDirectory, models.RecordingUploadMetadataFileName(fileName)), marker, 0644); err != nil {
+		t.Fatal(err)
+	}
+	configuration := &models.Configuration{}
+	configuration.Config.Timezone = "UTC"
+
+	media := GetMediaFormatted([]os.FileInfo{stubFileInfo{name: fileName}}, recordingDirectory, configuration, models.EventFilter{})
+	if len(media) != 1 || media[0].Timestamp != "1785934709" {
+		t.Fatalf("GetMediaFormatted() = %#v", media)
+	}
+}
+
+func TestRecordingTimestampFallsBackToModificationTime(t *testing.T) {
+	want := time.Unix(1785934709, 0)
+	timestamp, ok := recordingTimestamp(stubFileInfo{name: "opaque.mp4", modTime: want}, "/tmp/recordings")
+	if !ok || timestamp != want.Unix() {
+		t.Fatalf("recordingTimestamp() = %d/%v, want %d/true", timestamp, ok, want.Unix())
 	}
 }

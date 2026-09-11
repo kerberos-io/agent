@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -191,50 +192,47 @@ func GetMediaFormatted(files []os.FileInfo, recordingDirectory string, configura
 	count := 0
 	for _, file := range files {
 		fileName := file.Name()
-		fileParts := strings.Split(fileName, "_")
-		if len(fileParts) == 6 {
-			timestamp := fileParts[0]
-			timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
-			if err == nil {
+		timestampInt, ok := recordingTimestamp(file, recordingDirectory)
+		if ok {
+			timestamp := strconv.FormatInt(timestampInt, 10)
 
-				if eventFilter.TimestampOffsetStart > 0 {
-					// TimestampOffsetStart represents the newest lower bound to include.
-					if timestampInt < eventFilter.TimestampOffsetStart {
-						continue
-					}
+			if eventFilter.TimestampOffsetStart > 0 {
+				// TimestampOffsetStart represents the newest lower bound to include.
+				if timestampInt < eventFilter.TimestampOffsetStart {
+					continue
 				}
+			}
 
-				// If we have an offset we will check if we should skip or not
-				if eventFilter.TimestampOffsetEnd > 0 {
-					// Medias are sorted from new to older. TimestampOffsetEnd holds the oldest
-					// timestamp of the previous batch of events. By doing this check, we make sure
-					// to skip the previous batch.
-					if timestampInt >= eventFilter.TimestampOffsetEnd {
-						continue
-					}
+			// If we have an offset we will check if we should skip or not
+			if eventFilter.TimestampOffsetEnd > 0 {
+				// Medias are sorted from new to older. TimestampOffsetEnd holds the oldest
+				// timestamp of the previous batch of events. By doing this check, we make sure
+				// to skip the previous batch.
+				if timestampInt >= eventFilter.TimestampOffsetEnd {
+					continue
 				}
+			}
 
-				loc, _ := time.LoadLocation(configuration.Config.Timezone)
-				time := time.Unix(timestampInt, 0).In(loc)
-				day := time.Format("02-01-2006")
-				timeString := time.Format("15:04:05")
-				shortDay := time.Format("Jan _2")
+			loc, _ := time.LoadLocation(configuration.Config.Timezone)
+			mediaTime := time.Unix(timestampInt, 0).In(loc)
+			day := mediaTime.Format("02-01-2006")
+			timeString := mediaTime.Format("15:04:05")
+			shortDay := mediaTime.Format("Jan _2")
 
-				media := models.Media{
-					Key:        fileName,
-					Path:       recordingDirectory + "/" + fileName,
-					CameraName: configuration.Config.Name,
-					CameraKey:  configuration.Config.Key,
-					Day:        day,
-					ShortDay:   shortDay,
-					Time:       timeString,
-					Timestamp:  timestamp,
-				}
-				filePaths = append(filePaths, media)
-				count = count + 1
-				if eventFilter.NumberOfElements > 0 && count >= eventFilter.NumberOfElements {
-					break
-				}
+			media := models.Media{
+				Key:        fileName,
+				Path:       recordingDirectory + "/" + fileName,
+				CameraName: configuration.Config.Name,
+				CameraKey:  configuration.Config.Key,
+				Day:        day,
+				ShortDay:   shortDay,
+				Time:       timeString,
+				Timestamp:  timestamp,
+			}
+			filePaths = append(filePaths, media)
+			count = count + 1
+			if eventFilter.NumberOfElements > 0 && count >= eventFilter.NumberOfElements {
+				break
 			}
 		}
 	}
@@ -244,21 +242,42 @@ func GetMediaFormatted(files []os.FileInfo, recordingDirectory string, configura
 func GetDays(files []os.FileInfo, recordingDirectory string, configuration *models.Configuration) []string {
 	days := []string{}
 	for _, file := range files {
-		fileName := file.Name()
-		fileParts := strings.Split(fileName, "_")
-		if len(fileParts) == 6 {
-			timestamp := fileParts[0]
-			timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
-			if err == nil {
-				loc, _ := time.LoadLocation(configuration.Config.Timezone)
-				time := time.Unix(timestampInt, 0).In(loc)
-				day := time.Format("02-01-2006")
-				days = append(days, day)
-			}
+		if timestamp, ok := recordingTimestamp(file, recordingDirectory); ok {
+			loc, _ := time.LoadLocation(configuration.Config.Timezone)
+			mediaTime := time.Unix(timestamp, 0).In(loc)
+			days = append(days, mediaTime.Format("02-01-2006"))
 		}
 	}
 	uniqueDays := Unique(days)
 	return uniqueDays
+}
+
+func recordingTimestamp(file os.FileInfo, recordingDirectory string) (int64, bool) {
+	markerPath := filepath.Join(filepath.Dir(recordingDirectory), "cloud", models.RecordingUploadMetadataFileName(file.Name()))
+	if value, err := os.ReadFile(markerPath); err == nil {
+		var metadata models.RecordingUploadMetadata
+		if json.Unmarshal(value, &metadata) == nil && metadata.Timestamp > 0 {
+			return metadata.Timestamp / 1000, true
+		}
+	}
+
+	if timestamp, ok := legacyRecordingTimestampFromFilename(file.Name()); ok {
+		return timestamp, true
+	}
+
+	if timestamp := file.ModTime().Unix(); timestamp > 0 {
+		return timestamp, true
+	}
+	return 0, false
+}
+
+func legacyRecordingTimestampFromFilename(fileName string) (int64, bool) {
+	fileParts := strings.Split(fileName, "_")
+	if len(fileParts) != 6 {
+		return 0, false
+	}
+	timestamp, err := strconv.ParseInt(fileParts[0], 10, 64)
+	return timestamp, err == nil
 }
 
 func Unique(intSlice []string) []string {

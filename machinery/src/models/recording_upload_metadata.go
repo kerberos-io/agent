@@ -11,11 +11,14 @@ const RecordingUploadMetadataExtension = ".metadata"
 // with a recording. New optional fields can be added without changing the queue
 // mechanism or breaking older agents.
 type RecordingUploadMetadata struct {
-	FileName  string  `json:"filename"`
-	DeviceKey string  `json:"device_key"`
-	Timestamp int64   `json:"timestamp"` // Unix milliseconds.
-	Duration  uint64  `json:"duration"`  // Milliseconds.
-	FPS       float64 `json:"fps,omitempty"`
+	FileName          string  `json:"filename"`
+	DeviceKey         string  `json:"device_key"`
+	DeviceName        string  `json:"device_name,omitempty"`
+	Timestamp         int64   `json:"timestamp"` // Unix milliseconds.
+	Duration          uint64  `json:"duration"`  // Milliseconds.
+	FPS               float64 `json:"fps,omitempty"`
+	RegionCoordinates string  `json:"region_coordinates,omitempty"`
+	NumberOfChanges   string  `json:"number_of_changes,omitempty"`
 }
 
 // RecordingUploadMetadataFileName returns the queue marker name associated

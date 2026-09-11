@@ -15,6 +15,9 @@ import (
 const recordingFPSHeader = "X-Kerberos-Storage-Fps"
 const recordingDurationHeader = "X-Kerberos-Storage-Duration"
 const recordingTimestampHeader = "X-Kerberos-Storage-Timestamp"
+const recordingDeviceNameHeader = "X-Kerberos-Storage-DeviceName"
+const recordingRegionCoordinatesHeader = "X-Kerberos-Storage-RegionCoordinates"
+const recordingNumberOfChangesHeader = "X-Kerberos-Storage-NumberOfChanges"
 
 // queuedRecordingFPS reads the FPS snapshot written into the upload marker
 // when the recording was finalized. Historical empty markers intentionally
@@ -83,6 +86,15 @@ func setQueuedRecordingMetadataHeaders(header http.Header, fileName string) {
 		}
 		if metadata.Timestamp > 0 {
 			header.Set(recordingTimestampHeader, strconv.FormatInt(metadata.Timestamp, 10))
+		}
+		if metadata.DeviceName != "" {
+			header.Set(recordingDeviceNameHeader, metadata.DeviceName)
+		}
+		if metadata.RegionCoordinates != "" {
+			header.Set(recordingRegionCoordinatesHeader, metadata.RegionCoordinates)
+		}
+		if metadata.NumberOfChanges != "" {
+			header.Set(recordingNumberOfChangesHeader, metadata.NumberOfChanges)
 		}
 	}
 }

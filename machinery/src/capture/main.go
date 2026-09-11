@@ -53,12 +53,15 @@ func publishRecordingState(mqttClient mqtt.Client, hubKey string, configuration 
 	}
 }
 
-func recordingUploadMetadata(name, deviceKey string, timestamp int64, mp4Video *video.MP4) models.RecordingUploadMetadata {
+func recordingUploadMetadata(name, deviceKey, deviceName, regionCoordinates, numberOfChanges string, timestamp int64, mp4Video *video.MP4) models.RecordingUploadMetadata {
 	metadata := models.RecordingUploadMetadata{
-		FileName:  filepath.Base(name),
-		DeviceKey: deviceKey,
-		Timestamp: timestamp,
-		Duration:  mp4Video.VideoTotalDuration,
+		FileName:          filepath.Base(name),
+		DeviceKey:         deviceKey,
+		DeviceName:        deviceName,
+		Timestamp:         timestamp,
+		Duration:          mp4Video.VideoTotalDuration,
+		RegionCoordinates: regionCoordinates,
+		NumberOfChanges:   numberOfChanges,
 	}
 	value := mp4Video.AverageFPS()
 	if value > 0 && value <= 240 && !math.IsInf(value, 0) && !math.IsNaN(value) {
@@ -502,7 +505,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video))
+					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, config.Name, "0-0-0-0", "-1", startRecording, mp4Video))
 
 					recordingStatus = "idle"
 
@@ -659,7 +662,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video))
+					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, config.Name, "0-0-0-0", "-1", startRecording, mp4Video))
 
 					recordingStatus = "idle"
 
@@ -926,7 +929,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 				}
 
-				queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, displayTime, mp4Video))
+				queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, config.Name, motionRectangleString, strconv.Itoa(numberOfChanges), displayTime, mp4Video))
 
 				// Clean up the recording directory if necessary.
 				CleanupRecordingDirectory(configDirectory, configuration)

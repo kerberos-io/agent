@@ -361,6 +361,9 @@ func addRecordingTusMetadata(values map[string]string, fileName string) {
 	if metadata.Timestamp > 0 {
 		values["timestamp"] = strconv.FormatInt(metadata.Timestamp, 10)
 	}
+	values["device_name"] = metadata.DeviceName
+	values["region_coordinates"] = metadata.RegionCoordinates
+	values["number_of_changes"] = metadata.NumberOfChanges
 }
 
 // tusCreate performs the tus "creation" request (POST). On success it returns

@@ -302,7 +302,7 @@ func TestUploadVaultResumable_HappyPath(t *testing.T) {
 	fileName := "1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4"
 	payload := bytes.Repeat([]byte("x"), 4096)
 	withRecording(t, fileName, payload)
-	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","timestamp":1785934709414,"duration":20452,"fps":29.97}`)
+	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","device_name":"camera-name","timestamp":1785934709414,"duration":20452,"fps":29.97,"region_coordinates":"1-2-3-4","number_of_changes":"57"}`)
 
 	uploaded, responded, supported, _, err := uploadVaultResumable(testVault(ts.URL), "pk", "dev", fileName, "test", "primary")
 	if err != nil {
@@ -327,6 +327,15 @@ func TestUploadVaultResumable_HappyPath(t *testing.T) {
 	}
 	if got := metadata["timestamp"]; got != "1785934709414" {
 		t.Fatalf("POST metadata timestamp = %q, want %q", got, "1785934709414")
+	}
+	if got := metadata["device_name"]; got != "camera-name" {
+		t.Fatalf("POST metadata device_name = %q, want camera-name", got)
+	}
+	if got := metadata["region_coordinates"]; got != "1-2-3-4" {
+		t.Fatalf("POST metadata region_coordinates = %q, want 1-2-3-4", got)
+	}
+	if got := metadata["number_of_changes"]; got != "57" {
+		t.Fatalf("POST metadata number_of_changes = %q, want 57", got)
 	}
 }
 
@@ -386,7 +395,7 @@ func TestQueuedRecordingFPSAllowsMissingHistoricalMarker(t *testing.T) {
 func TestQueuedRecordingMetadataHeaders(t *testing.T) {
 	fileName := "recording.mp4"
 	withRecording(t, fileName, []byte("recording"))
-	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","timestamp":1785934709414,"duration":20452,"fps":25}`)
+	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","device_name":"camera-name","timestamp":1785934709414,"duration":20452,"fps":25,"region_coordinates":"1-2-3-4","number_of_changes":"57"}`)
 
 	header := make(http.Header)
 	setQueuedRecordingMetadataHeaders(header, fileName)
@@ -398,6 +407,15 @@ func TestQueuedRecordingMetadataHeaders(t *testing.T) {
 	}
 	if got := header.Get(recordingTimestampHeader); got != "1785934709414" {
 		t.Fatalf("timestamp header = %q", got)
+	}
+	if got := header.Get(recordingDeviceNameHeader); got != "camera-name" {
+		t.Fatalf("device name header = %q", got)
+	}
+	if got := header.Get(recordingRegionCoordinatesHeader); got != "1-2-3-4" {
+		t.Fatalf("region coordinates header = %q", got)
+	}
+	if got := header.Get(recordingNumberOfChangesHeader); got != "57" {
+		t.Fatalf("number of changes header = %q", got)
 	}
 }
 

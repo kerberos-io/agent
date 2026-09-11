@@ -42,7 +42,7 @@ func TestQueueRecordingForUploadStoresFinalizedMetadata(t *testing.T) {
 	}
 
 	mp4Video := &video.MP4{VideoTotalDuration: 20452, SampleCount: 613}
-	metadata := recordingUploadMetadata("recording.mp4", "device-key", 1785934709414, mp4Video)
+	metadata := recordingUploadMetadata("recording.mp4", "device-key", "camera-name", "1-2-3-4", "57", 1785934709414, mp4Video)
 	queueRecordingForUpload(configDirectory, metadata)
 
 	got, err := os.ReadFile(filepath.Join(configDirectory, "data", "cloud", "recording.metadata"))
@@ -54,7 +54,7 @@ func TestQueueRecordingForUploadStoresFinalizedMetadata(t *testing.T) {
 		t.Fatalf("decode upload marker: %v", err)
 	}
 	expectedFPS := mp4Video.AverageFPS()
-	if stored.FileName != "recording.mp4" || stored.DeviceKey != "device-key" || stored.Timestamp != 1785934709414 || stored.Duration != 20452 || math.Abs(stored.FPS-expectedFPS) > 1e-9 {
+	if stored.FileName != "recording.mp4" || stored.DeviceKey != "device-key" || stored.DeviceName != "camera-name" || stored.Timestamp != 1785934709414 || stored.Duration != 20452 || stored.RegionCoordinates != "1-2-3-4" || stored.NumberOfChanges != "57" || math.Abs(stored.FPS-expectedFPS) > 1e-9 {
 		t.Fatalf("upload marker = %+v", stored)
 	}
 	if stored.FPS == math.Floor(stored.FPS) {
