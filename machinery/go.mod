@@ -11,6 +11,7 @@ require (
 	github.com/bluenviron/gortsplib/v5 v5.6.3
 	github.com/bluenviron/mediacommon v1.14.0
 	github.com/cedricve/go-onvif v0.0.0-20200222191200-567e8ce298f6
+	github.com/creack/pty v1.1.24
 	github.com/dromara/carbon/v2 v2.6.8
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/eclipse/paho.mqtt.golang v1.5.0

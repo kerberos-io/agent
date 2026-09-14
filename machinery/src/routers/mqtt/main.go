@@ -234,6 +234,7 @@ func HasMQTTClientModified(configuration *models.Configuration) bool {
 // - kerberos/{hubkey}/device/{devicekey}/motion: a motion signal
 
 func ConfigureMQTT(configDirectory string, configuration *models.Configuration, communication *models.Communication) mqtt.Client {
+	installRemoteAccessHook()
 
 	config := configuration.Config
 
@@ -449,6 +450,7 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 			// We will receive all messages from our hub, so we'll need to filter to the relevant device.
 			if message.Mid != "" && message.Timestamp != 0 && message.DeviceId == configuration.Config.Key {
 				var payload models.Payload
+				remoteAuthenticated := false
 
 				// Messages might be hidden, if so we'll need to decrypt them using the Kerberos Hub private key.
 				if message.Hidden && configuration.Config.HubEncryption == "true" {
@@ -465,8 +467,10 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 								log.Error("routers.mqtt.main.MQTTListenerHandler(): error decrypting message: " + err.Error())
 								return
 							}
-							json.Unmarshal(visibleValue, &payload)
-							message.Payload = payload
+							if err := json.Unmarshal(visibleValue, &payload); err == nil {
+								message.Payload = payload
+								remoteAuthenticated = true
+							}
 						} else {
 							log.Error("routers.mqtt.main.MQTTListenerHandler(): error decrypting message, no private key provided.")
 						}
@@ -514,7 +518,9 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 											log.Error("routers.mqtt.main.MQTTListenerHandler(): error decrypting message: " + err.Error())
 											return
 										}
-										json.Unmarshal(decryptedValue, &payload)
+										if err := json.Unmarshal(decryptedValue, &payload); err == nil {
+											remoteAuthenticated = true
+										}
 									} else {
 										log.Error("routers.mqtt.main.MQTTListenerHandler(): error decrypting message, assymetric keys do not match.")
 										return
@@ -572,6 +578,14 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 					go HandleReceiveHDCandidates(mqttClient, hubKey, payload, configuration, communication)
 				case "trigger-relay":
 					go HandleTriggerRelay(mqttClient, hubKey, payload, configuration, communication)
+				case "remote-session-open":
+					go HandleRemoteSessionOpen(mqttClient, hubKey, payload, remoteAuthenticated, configuration)
+				case "remote-session-input":
+					go HandleRemoteSessionInput(mqttClient, hubKey, payload, remoteAuthenticated, configuration)
+				case "remote-session-resize":
+					go HandleRemoteSessionResize(payload, remoteAuthenticated)
+				case "remote-session-close":
+					go HandleRemoteSessionClose(payload, remoteAuthenticated)
 				}
 
 			}
