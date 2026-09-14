@@ -34,6 +34,26 @@ var PREV_MQTTPassword string
 var PREV_HubKey string
 var PREV_AgentKey string
 
+type pahoErrorLogger struct{}
+
+func (pahoErrorLogger) Println(values ...interface{}) {
+	log.WithFields(log.Fields{
+		"component": "routers/mqtt",
+		"event":     "paho_error",
+	}).Error(strings.TrimSpace(fmt.Sprintln(values...)))
+}
+
+func (pahoErrorLogger) Printf(format string, values ...interface{}) {
+	log.WithFields(log.Fields{
+		"component": "routers/mqtt",
+		"event":     "paho_error",
+	}).Errorf(strings.TrimSpace(format), values...)
+}
+
+func init() {
+	mqtt.ERROR = pahoErrorLogger{}
+}
+
 func HasMQTTClientModified(configuration *models.Configuration) bool {
 	MTTURI := configuration.Config.MQTTURI
 	MTTUsername := configuration.Config.MQTTUsername
@@ -203,7 +223,7 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 				"component":  "routers/mqtt",
 				"event":      "initial_connection_timeout",
 				"timeout_ms": (30 * time.Second).Milliseconds(),
-			}).Error("Timed out establishing initial MQTT connection")
+			}).Warn("Initial MQTT connection is still retrying")
 		}
 		return mqc
 	}
