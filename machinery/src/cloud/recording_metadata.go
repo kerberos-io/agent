@@ -15,6 +15,7 @@ import (
 const recordingFPSHeader = "X-Kerberos-Storage-Fps"
 const recordingDurationHeader = "X-Kerberos-Storage-Duration"
 const recordingTimestampHeader = "X-Kerberos-Storage-Timestamp"
+const recordingEncryptedHeader = "X-Kerberos-Storage-Encrypted"
 
 // queuedRecordingFPS reads the FPS snapshot written into the upload marker
 // when the recording was finalized. Historical empty markers intentionally
@@ -83,6 +84,9 @@ func setQueuedRecordingMetadataHeaders(header http.Header, fileName string) {
 		}
 		if metadata.Timestamp > 0 {
 			header.Set(recordingTimestampHeader, strconv.FormatInt(metadata.Timestamp, 10))
+		}
+		if metadata.Encrypted {
+			header.Set(recordingEncryptedHeader, "true")
 		}
 	}
 }

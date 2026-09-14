@@ -16,6 +16,7 @@ type RecordingUploadMetadata struct {
 	Timestamp int64   `json:"timestamp"` // Unix milliseconds.
 	Duration  uint64  `json:"duration"`  // Milliseconds.
 	FPS       float64 `json:"fps,omitempty"`
+	Encrypted bool    `json:"encrypted,omitempty"`
 }
 
 // RecordingUploadMetadataFileName returns the queue marker name associated

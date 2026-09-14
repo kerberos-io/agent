@@ -361,6 +361,9 @@ func addRecordingTusMetadata(values map[string]string, fileName string) {
 	if metadata.Timestamp > 0 {
 		values["timestamp"] = strconv.FormatInt(metadata.Timestamp, 10)
 	}
+	if metadata.Encrypted {
+		values["encrypted"] = "true"
+	}
 }
 
 // tusCreate performs the tus "creation" request (POST). On success it returns

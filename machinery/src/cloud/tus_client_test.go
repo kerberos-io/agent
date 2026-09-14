@@ -386,7 +386,7 @@ func TestQueuedRecordingFPSAllowsMissingHistoricalMarker(t *testing.T) {
 func TestQueuedRecordingMetadataHeaders(t *testing.T) {
 	fileName := "recording.mp4"
 	withRecording(t, fileName, []byte("recording"))
-	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","timestamp":1785934709414,"duration":20452,"fps":25}`)
+	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","timestamp":1785934709414,"duration":20452,"fps":25,"encrypted":true}`)
 
 	header := make(http.Header)
 	setQueuedRecordingMetadataHeaders(header, fileName)
@@ -398,6 +398,14 @@ func TestQueuedRecordingMetadataHeaders(t *testing.T) {
 	}
 	if got := header.Get(recordingTimestampHeader); got != "1785934709414" {
 		t.Fatalf("timestamp header = %q", got)
+	}
+	if got := header.Get(recordingEncryptedHeader); got != "true" {
+		t.Fatalf("encrypted header = %q", got)
+	}
+	metadata := map[string]string{}
+	addRecordingTusMetadata(metadata, fileName)
+	if got := metadata["encrypted"]; got != "true" {
+		t.Fatalf("encrypted TUS metadata = %q", got)
 	}
 }
 
