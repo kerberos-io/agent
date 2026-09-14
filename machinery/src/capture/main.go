@@ -53,12 +53,13 @@ func publishRecordingState(mqttClient mqtt.Client, hubKey string, configuration 
 	}
 }
 
-func recordingUploadMetadata(name, deviceKey string, timestamp int64, mp4Video *video.MP4) models.RecordingUploadMetadata {
+func recordingUploadMetadata(name, deviceKey string, timestamp int64, mp4Video *video.MP4, encrypted bool) models.RecordingUploadMetadata {
 	metadata := models.RecordingUploadMetadata{
 		FileName:  filepath.Base(name),
 		DeviceKey: deviceKey,
 		Timestamp: timestamp,
 		Duration:  mp4Video.VideoTotalDuration,
+		Encrypted: encrypted,
 	}
 	value := mp4Video.AverageFPS()
 	if value > 0 && value <= 240 && !math.IsInf(value, 0) && !math.IsNaN(value) {
@@ -481,6 +482,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
 					}
 
+					encrypted := false
 					// Check if we need to encrypt the recording.
 					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
 						// reopen file into memory 'fullName'
@@ -493,6 +495,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
 								if err != nil {
 									log.Error("capture.main.HandleRecordStream(continuous): error writing file: " + err.Error())
+								} else {
+									encrypted = true
 								}
 							} else {
 								log.Error("capture.main.HandleRecordStream(continuous): error encrypting file: " + err.Error())
@@ -502,7 +506,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video))
+					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video, encrypted))
 
 					recordingStatus = "idle"
 
@@ -638,6 +642,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
 					}
 
+					encrypted := false
 					// Check if we need to encrypt the recording.
 					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
 						// reopen file into memory 'fullName'
@@ -650,6 +655,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
 								if err != nil {
 									log.Error("capture.main.HandleRecordStream(motiondetection): error writing file: " + err.Error())
+								} else {
+									encrypted = true
 								}
 							} else {
 								log.Error("capture.main.HandleRecordStream(motiondetection): error encrypting file: " + err.Error())
@@ -659,7 +666,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video))
+					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video, encrypted))
 
 					recordingStatus = "idle"
 
@@ -905,6 +912,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					log.Info("capture.main.HandleRecordStream(motiondetection): no video data recorded, not renaming file.")
 				}
 
+				encrypted := false
 				// Check if we need to encrypt the recording.
 				if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
 					// reopen file into memory 'fullName'
@@ -917,6 +925,8 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 							err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
 							if err != nil {
 								log.Error("capture.main.HandleRecordStream(motiondetection): error writing file: " + err.Error())
+							} else {
+								encrypted = true
 							}
 						} else {
 							log.Error("capture.main.HandleRecordStream(motiondetection): error encrypting file: " + err.Error())
@@ -926,7 +936,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 				}
 
-				queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, displayTime, mp4Video))
+				queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, displayTime, mp4Video, encrypted))
 
 				// Clean up the recording directory if necessary.
 				CleanupRecordingDirectory(configDirectory, configuration)
