@@ -341,7 +341,7 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_CAPTURE_PIXEL_CHANGE`                | If `CONTINUOUS` set to `false`, the number of pixel require to change before motion triggers.   | "150"                          |
 | `AGENT_CAPTURE_FRAGMENTED`                  | Set the format of the recorded MP4 to fragmented (suitable for HLS).                            | "false"                        |
 | `AGENT_CAPTURE_FRAGMENTED_DURATION`         | If `AGENT_CAPTURE_FRAGMENTED` set to `true`, define the duration (seconds) of a fragment.       | "8"                            |
-| `AGENT_MQTT_URI`                            | An MQTT broker endpoint that is used for bi-directional communication (live view, onvif, etc)   | "tcp://mqtt.kerberos.io:1883"  |
+| `AGENT_MQTT_URI`                            | MQTT broker endpoint for bi-directional communication. Accepts ActiveMQ `mqtt+ssl://` URLs.     | "tcp://mqtt.kerberos.io:1883"  |
 | `AGENT_MQTT_USERNAME`                       | Username of the MQTT broker.                                                                    | ""                             |
 | `AGENT_MQTT_PASSWORD`                       | Password of the MQTT broker.                                                                    | ""                             |
 | `AGENT_REMOTE_ACCESS_ENABLED`               | Allow encrypted Hub MQTT sessions to stream Agent logs and open an interactive shell. Enable only for trusted deployments. | "false"                        |
