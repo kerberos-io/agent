@@ -1,7 +1,9 @@
 package mqtt
 
 import (
+	"context"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -9,12 +11,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
+	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"context"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/kerberos-io/agent/machinery/src/capture"
@@ -24,6 +27,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/onvif"
 	"github.com/kerberos-io/agent/machinery/src/webrtc"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/net/proxy"
 )
 
 // We'll cache the MQTT settings to know if we need to reinitialize the MQTT client connection.
@@ -33,6 +37,177 @@ var PREV_MQTTUsername string
 var PREV_MQTTPassword string
 var PREV_HubKey string
 var PREV_AgentKey string
+
+type pahoErrorLogger struct{}
+
+func (pahoErrorLogger) Println(values ...interface{}) {
+	log.WithFields(log.Fields{
+		"component": "routers/mqtt",
+		"event":     "paho_error",
+	}).Error(strings.TrimSpace(fmt.Sprintln(values...)))
+}
+
+func (pahoErrorLogger) Printf(format string, values ...interface{}) {
+	log.WithFields(log.Fields{
+		"component": "routers/mqtt",
+		"event":     "paho_error",
+	}).Errorf(strings.TrimSpace(format), values...)
+}
+
+func init() {
+	mqtt.ERROR = pahoErrorLogger{}
+}
+
+func enableMQTTConnectionDiagnostics(options *mqtt.ClientOptions, brokerURL string) {
+	if !strings.Contains(brokerURL, "://") {
+		options.SetCustomOpenConnectionFn(openMQTTConnection)
+		return
+	}
+
+	parsedURL, err := url.Parse(brokerURL)
+	if err != nil {
+		return
+	}
+
+	switch strings.ToLower(parsedURL.Scheme) {
+	case "", "mqtt", "tcp", "ssl", "tls", "mqtts", "mqtt+ssl", "tcps":
+		options.SetCustomOpenConnectionFn(openMQTTConnection)
+	}
+}
+
+func openMQTTConnection(uri *url.URL, options mqtt.ClientOptions) (net.Conn, error) {
+	host := uri.Hostname()
+	fields := log.Fields{
+		"component": "routers/mqtt",
+		"host":      host,
+		"port":      uri.Port(),
+		"scheme":    uri.Scheme,
+	}
+	logMQTTDNSResolution(host, options.ConnectTimeout, fields)
+
+	connectionStartedAt := time.Now()
+	dialer := options.Dialer
+	if dialer == nil {
+		dialer = &net.Dialer{Timeout: options.ConnectTimeout}
+	}
+
+	proxyConfigured := os.Getenv("all_proxy") != ""
+	proxyMode := "direct"
+	if proxyConfigured {
+		proxyMode = "socks"
+	}
+	fields["proxy_mode"] = proxyMode
+	log.WithFields(fields).Info("Opening MQTT TCP connection")
+
+	var (
+		connection net.Conn
+		err        error
+	)
+	if proxyConfigured {
+		connection, err = proxy.FromEnvironment().Dial("tcp", uri.Host)
+	} else {
+		connection, err = dialer.Dial("tcp", uri.Host)
+	}
+	fields["duration_ms"] = time.Since(connectionStartedAt).Milliseconds()
+	if err != nil {
+		logMQTTNetworkError("MQTT TCP connection failed", err, fields)
+		return nil, err
+	}
+
+	fields["local_address"] = connection.LocalAddr().String()
+	fields["remote_address"] = connection.RemoteAddr().String()
+	log.WithFields(fields).Info("MQTT TCP connection established")
+
+	if !isSecureMQTTScheme(uri.Scheme) {
+		return connection, nil
+	}
+
+	tlsConfig := options.TLSConfig
+	if tlsConfig == nil {
+		tlsConfig = &tls.Config{}
+	} else {
+		tlsConfig = tlsConfig.Clone()
+	}
+	if tlsConfig.ServerName == "" {
+		tlsConfig.ServerName = host
+	}
+
+	tlsConnection := tls.Client(connection, tlsConfig)
+	tlsStartedAt := time.Now()
+	if options.ConnectTimeout > 0 {
+		_ = tlsConnection.SetDeadline(connectionStartedAt.Add(options.ConnectTimeout))
+	}
+	if err = tlsConnection.Handshake(); err != nil {
+		_ = connection.Close()
+		fields["duration_ms"] = time.Since(tlsStartedAt).Milliseconds()
+		fields["server_name"] = tlsConfig.ServerName
+		logMQTTNetworkError("MQTT TLS handshake failed", err, fields)
+		return nil, err
+	}
+	_ = tlsConnection.SetDeadline(time.Time{})
+
+	state := tlsConnection.ConnectionState()
+	fields["cipher_suite"] = tls.CipherSuiteName(state.CipherSuite)
+	fields["duration_ms"] = time.Since(tlsStartedAt).Milliseconds()
+	fields["server_name"] = tlsConfig.ServerName
+	fields["tls_version"] = tls.VersionName(state.Version)
+	log.WithFields(fields).Info("MQTT TLS handshake established")
+	return tlsConnection, nil
+}
+
+func logMQTTDNSResolution(host string, timeout time.Duration, fields log.Fields) {
+	if host == "" || net.ParseIP(host) != nil {
+		return
+	}
+
+	lookupTimeout := timeout
+	if lookupTimeout <= 0 || lookupTimeout > 5*time.Second {
+		lookupTimeout = 5 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), lookupTimeout)
+	defer cancel()
+
+	startedAt := time.Now()
+	addresses, err := net.DefaultResolver.LookupHost(ctx, host)
+	dnsFields := cloneLogFields(fields)
+	dnsFields["duration_ms"] = time.Since(startedAt).Milliseconds()
+	if err != nil {
+		logMQTTNetworkError("MQTT broker DNS resolution failed", err, dnsFields)
+		return
+	}
+
+	dnsFields["resolved_addresses"] = addresses
+	log.WithFields(dnsFields).Info("MQTT broker DNS resolved")
+}
+
+func logMQTTNetworkError(message string, err error, fields log.Fields) {
+	errorFields := cloneLogFields(fields)
+	if networkError, ok := err.(net.Error); ok {
+		errorFields["network_timeout"] = networkError.Timeout()
+	}
+	if operationError, ok := err.(*net.OpError); ok {
+		errorFields["network"] = operationError.Net
+		errorFields["operation"] = operationError.Op
+	}
+	log.WithError(err).WithFields(errorFields).Error(message)
+}
+
+func cloneLogFields(fields log.Fields) log.Fields {
+	cloned := make(log.Fields, len(fields))
+	for key, value := range fields {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func isSecureMQTTScheme(scheme string) bool {
+	switch strings.ToLower(scheme) {
+	case "ssl", "tls", "mqtts", "mqtt+ssl", "tcps":
+		return true
+	default:
+		return false
+	}
+}
 
 func HasMQTTClientModified(configuration *models.Configuration) bool {
 	MTTURI := configuration.Config.MQTTURI
@@ -116,6 +291,7 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 		// Some extra options to make sure the connection behaves
 		// properly. More information here: github.com/eclipse/paho.mqtt.golang.
 		//opts.SetCleanSession(true)
+		enableMQTTConnectionDiagnostics(opts, mqttURL)
 		opts.SetCleanSession(false)
 		opts.SetResumeSubs(true)
 		opts.SetStore(mqtt.NewMemoryStore())
@@ -203,7 +379,7 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 				"component":  "routers/mqtt",
 				"event":      "initial_connection_timeout",
 				"timeout_ms": (30 * time.Second).Milliseconds(),
-			}).Error("Timed out establishing initial MQTT connection")
+			}).Warn("Initial MQTT connection is still retrying")
 		}
 		return mqc
 	}
