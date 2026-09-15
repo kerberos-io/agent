@@ -20,6 +20,8 @@ var (
 	nextAgentRunID     atomic.Uint64
 )
 
+const defaultFrameProcessingRequestCapacity = 8
+
 type AgentRunClient interface {
 	Close(context.Context) error
 }
@@ -56,19 +58,21 @@ type AgentRun struct {
 	activated bool
 	stopping  bool
 
-	resourcesMu       sync.RWMutex
-	mainClient        AgentRunClient
-	subClient         AgentRunClient
-	backchannelClient AgentRunClient
-	mainQueue         *packets.Queue
-	subQueue          *packets.Queue
-	releaseClients    func()
+	resourcesMu          sync.RWMutex
+	mainClient           AgentRunClient
+	subClient            AgentRunClient
+	backchannelClient    AgentRunClient
+	mainQueue            *packets.Queue
+	subQueue             *packets.Queue
+	frameProcessingQueue *packets.Queue
+	releaseClients       func()
 
-	channelsMu       sync.RWMutex
-	channelsClosed   bool
-	liveHDHandshakes chan LiveHDHandshake
-	motionEvents     chan MotionDataPartial
-	onvifActions     chan OnvifAction
+	channelsMu              sync.RWMutex
+	channelsClosed          bool
+	liveHDHandshakes        chan LiveHDHandshake
+	motionEvents            chan MotionDataPartial
+	onvifActions            chan OnvifAction
+	frameProcessingRequests chan FrameProcessingWork
 
 	shutdownOnce   sync.Once
 	shutdownReport AgentRunShutdownReport
@@ -80,15 +84,16 @@ func NewAgentRun(parent context.Context, communication *Communication, stopUploa
 	}
 	ctx, cancel := context.WithCancelCause(parent)
 	run := &AgentRun{
-		id:               nextAgentRunID.Add(1),
-		ctx:              ctx,
-		cancel:           cancel,
-		supervisor:       lifecycle.NewSupervisor(ctx),
-		communication:    communication,
-		stopUpload:       stopUpload,
-		liveHDHandshakes: make(chan LiveHDHandshake, 100),
-		motionEvents:     make(chan MotionDataPartial, 10),
-		onvifActions:     make(chan OnvifAction, 10),
+		id:                      nextAgentRunID.Add(1),
+		ctx:                     ctx,
+		cancel:                  cancel,
+		supervisor:              lifecycle.NewSupervisor(ctx),
+		communication:           communication,
+		stopUpload:              stopUpload,
+		liveHDHandshakes:        make(chan LiveHDHandshake, 100),
+		motionEvents:            make(chan MotionDataPartial, 10),
+		onvifActions:            make(chan OnvifAction, 10),
+		frameProcessingRequests: make(chan FrameProcessingWork, defaultFrameProcessingRequestCapacity),
 	}
 	log.WithFields(log.Fields{
 		"component":   "agent_run",
@@ -233,6 +238,12 @@ func (r *AgentRun) SetSubQueue(queue *packets.Queue) {
 	r.resourcesMu.Unlock()
 }
 
+func (r *AgentRun) SetFrameProcessingQueue(queue *packets.Queue) {
+	r.resourcesMu.Lock()
+	r.frameProcessingQueue = queue
+	r.resourcesMu.Unlock()
+}
+
 func (r *AgentRun) SetClientRelease(release func()) {
 	r.resourcesMu.Lock()
 	r.releaseClients = release
@@ -267,6 +278,10 @@ func (r *AgentRun) MotionEvents() <-chan MotionDataPartial {
 
 func (r *AgentRun) ONVIFActions() <-chan OnvifAction {
 	return r.onvifActions
+}
+
+func (r *AgentRun) FrameProcessingRequests() <-chan FrameProcessingWork {
+	return r.frameProcessingRequests
 }
 
 func (r *AgentRun) TrySendLiveHDHandshake(handshake LiveHDHandshake) bool {
@@ -326,6 +341,30 @@ func (r *AgentRun) TrySendONVIF(action OnvifAction) bool {
 	}
 	select {
 	case r.onvifActions <- action:
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *AgentRun) TrySendFrameProcessingRequest(request FrameProcessingRequest) bool {
+	if r.isStopping() {
+		return false
+	}
+	r.channelsMu.RLock()
+	defer r.channelsMu.RUnlock()
+	if r.channelsClosed {
+		return false
+	}
+	r.resourcesMu.RLock()
+	queue := r.frameProcessingQueue
+	r.resourcesMu.RUnlock()
+	if queue == nil {
+		return false
+	}
+	work := FrameProcessingWork{Request: request, Cursor: queue.LatestAtCurrentTail()}
+	select {
+	case r.frameProcessingRequests <- work:
 		return true
 	default:
 		return false
@@ -458,6 +497,7 @@ func (r *AgentRun) closeChannels() {
 	close(r.liveHDHandshakes)
 	close(r.motionEvents)
 	close(r.onvifActions)
+	close(r.frameProcessingRequests)
 }
 
 func sendRunStop(ctx context.Context, channel chan<- string) bool {

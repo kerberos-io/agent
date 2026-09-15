@@ -12,44 +12,64 @@ type Configuration struct {
 // Config is the highlevel struct which contains all the configuration of
 // your Kerberos Open Source instance.
 type Config struct {
-	Type                    string       `json:"type"`
-	Key                     string       `json:"key"`
-	Name                    string       `json:"name"`
-	FriendlyName            string       `json:"friendly_name"`
-	Time                    string       `json:"time" bson:"time"`
-	Offline                 string       `json:"offline"`
-	AutoClean               string       `json:"auto_clean"`
-	RemoveAfterUpload       string       `json:"remove_after_upload"`
-	MaxDirectorySize        int64        `json:"max_directory_size"`
-	MinFreeSpace            int64        `json:"min_free_space,omitempty"`
-	Timezone                string       `json:"timezone"`
-	Capture                 Capture      `json:"capture"`
-	Timetable               []*Timetable `json:"timetable"`
-	Region                  *Region      `json:"region"`
-	Cloud                   string       `json:"cloud" bson:"cloud"`
-	S3                      *S3          `json:"s3,omitempty" bson:"s3,omitempty"`
-	KStorage                *KStorage    `json:"kstorage,omitempty" bson:"kstorage,omitempty"`
-	KStorageSecondary       *KStorage    `json:"kstorage_secondary,omitempty" bson:"kstorage_secondary,omitempty"`
-	Dropbox                 *Dropbox     `json:"dropbox,omitempty" bson:"dropbox,omitempty"`
-	MQTTURI                 string       `json:"mqtturi" bson:"mqtturi,omitempty"`
-	MQTTUsername            string       `json:"mqtt_username" bson:"mqtt_username"`
-	MQTTPassword            string       `json:"mqtt_password" bson:"mqtt_password"`
-	STUNURI                 string       `json:"stunuri" bson:"stunuri"`
-	ForceTurn               string       `json:"turn_force" bson:"turn_force"`
-	TURNURI                 string       `json:"turnuri" bson:"turnuri"`
-	TURNUsername            string       `json:"turn_username" bson:"turn_username"`
-	TURNPassword            string       `json:"turn_password" bson:"turn_password"`
-	HeartbeatURI            string       `json:"heartbeaturi" bson:"heartbeaturi"` /*obsolete*/
-	HubEncryption           string       `json:"hub_encryption" bson:"hub_encryption"`
-	HubURI                  string       `json:"hub_uri" bson:"hub_uri"`
-	HubKey                  string       `json:"hub_key" bson:"hub_key"`
-	HubPrivateKey           string       `json:"hub_private_key" bson:"hub_private_key"`
-	HubSite                 string       `json:"hub_site" bson:"hub_site"`
-	ConditionURI            string       `json:"condition_uri" bson:"condition_uri"`
-	Encryption              *Encryption  `json:"encryption,omitempty" bson:"encryption,omitempty"`
-	Signing                 *Signing     `json:"signing,omitempty" bson:"signing,omitempty"`
-	RealtimeProcessing      string       `json:"realtimeprocessing,omitempty" bson:"realtimeprocessing,omitempty"`
-	RealtimeProcessingTopic string       `json:"realtimeprocessing_topic" bson:"realtimeprocessing_topic"`
+	Type                    string           `json:"type"`
+	Key                     string           `json:"key"`
+	Name                    string           `json:"name"`
+	FriendlyName            string           `json:"friendly_name"`
+	Time                    string           `json:"time" bson:"time"`
+	Offline                 string           `json:"offline"`
+	AutoClean               string           `json:"auto_clean"`
+	RemoveAfterUpload       string           `json:"remove_after_upload"`
+	MaxDirectorySize        int64            `json:"max_directory_size"`
+	MinFreeSpace            int64            `json:"min_free_space,omitempty"`
+	Timezone                string           `json:"timezone"`
+	Capture                 Capture          `json:"capture"`
+	Timetable               []*Timetable     `json:"timetable"`
+	Region                  *Region          `json:"region"`
+	Cloud                   string           `json:"cloud" bson:"cloud"`
+	S3                      *S3              `json:"s3,omitempty" bson:"s3,omitempty"`
+	KStorage                *KStorage        `json:"kstorage,omitempty" bson:"kstorage,omitempty"`
+	KStorageSecondary       *KStorage        `json:"kstorage_secondary,omitempty" bson:"kstorage_secondary,omitempty"`
+	Dropbox                 *Dropbox         `json:"dropbox,omitempty" bson:"dropbox,omitempty"`
+	MQTTURI                 string           `json:"mqtturi" bson:"mqtturi,omitempty"`
+	MQTTUsername            string           `json:"mqtt_username" bson:"mqtt_username"`
+	MQTTPassword            string           `json:"mqtt_password" bson:"mqtt_password"`
+	STUNURI                 string           `json:"stunuri" bson:"stunuri"`
+	ForceTurn               string           `json:"turn_force" bson:"turn_force"`
+	TURNURI                 string           `json:"turnuri" bson:"turnuri"`
+	TURNUsername            string           `json:"turn_username" bson:"turn_username"`
+	TURNPassword            string           `json:"turn_password" bson:"turn_password"`
+	HeartbeatURI            string           `json:"heartbeaturi" bson:"heartbeaturi"` /*obsolete*/
+	HubEncryption           string           `json:"hub_encryption" bson:"hub_encryption"`
+	HubURI                  string           `json:"hub_uri" bson:"hub_uri"`
+	HubKey                  string           `json:"hub_key" bson:"hub_key"`
+	HubPrivateKey           string           `json:"hub_private_key" bson:"hub_private_key"`
+	HubSite                 string           `json:"hub_site" bson:"hub_site"`
+	ConditionURI            string           `json:"condition_uri" bson:"condition_uri"`
+	Encryption              *Encryption      `json:"encryption,omitempty" bson:"encryption,omitempty"`
+	Signing                 *Signing         `json:"signing,omitempty" bson:"signing,omitempty"`
+	FrameProcessing         *FrameProcessing `json:"frameProcessing,omitempty" bson:"frameProcessing,omitempty"`
+	RealtimeProcessing      string           `json:"realtimeprocessing,omitempty" bson:"realtimeprocessing,omitempty"`
+	RealtimeProcessingTopic string           `json:"realtimeprocessing_topic" bson:"realtimeprocessing_topic"`
+}
+
+// FrameProcessing configures keyframe-aligned JPEG delivery to an external
+// processor. It is independent from the legacy MQTT realtimeprocessing output.
+type FrameProcessing struct {
+	Enabled               string `json:"enabled,omitempty" bson:"enabled,omitempty"`
+	Endpoint              string `json:"endpoint,omitempty" bson:"endpoint,omitempty"`
+	Token                 string `json:"-" bson:"-"`
+	Profile               string `json:"profile,omitempty" bson:"profile,omitempty"`
+	AllowRequestedFrames  string `json:"allowRequestedFrames,omitempty" bson:"allowRequestedFrames,omitempty"`
+	Stream                string `json:"stream,omitempty" bson:"stream,omitempty"`
+	IntervalSeconds       int64  `json:"intervalSeconds,omitempty" bson:"intervalSeconds,omitempty"`
+	Width                 int    `json:"width,omitempty" bson:"width,omitempty"`
+	Height                int    `json:"height,omitempty" bson:"height,omitempty"`
+	JPEGQuality           int    `json:"jpegQuality,omitempty" bson:"jpegQuality,omitempty"`
+	RequestTimeoutSeconds int64  `json:"requestTimeoutSeconds,omitempty" bson:"requestTimeoutSeconds,omitempty"`
+	FrameTTLSeconds       int64  `json:"frameTtlSeconds,omitempty" bson:"frameTtlSeconds,omitempty"`
+	MaxFrameBytes         int64  `json:"maxFrameBytes,omitempty" bson:"maxFrameBytes,omitempty"`
+	PeriodicQueueCapacity int    `json:"periodicQueueCapacity,omitempty" bson:"periodicQueueCapacity,omitempty"`
 }
 
 // Capture defines which camera type (Id) you are using (IP, USB or Raspberry Pi camera),

@@ -14,6 +14,7 @@ import (
 
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/cloud"
+	"github.com/kerberos-io/agent/machinery/src/cloud/frameprocessing"
 	"github.com/kerberos-io/agent/machinery/src/computervision"
 	configService "github.com/kerberos-io/agent/machinery/src/config"
 	"github.com/kerberos-io/agent/machinery/src/lifecycle"
@@ -556,6 +557,74 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 			cloud.HandleRealtimeProcessing(realtimeProcessingCursor, configuration, communication, mqttClient, rtspClient)
 			return nil
 		})
+	}
+
+	// Frame Processing is the HTTP-based successor to the legacy MQTT
+	// realtime-processing output. Both remain independently configurable during
+	// the compatibility period.
+	frameProcessingConfig := configuration.Config.FrameProcessing
+	if frameProcessingConfig != nil && frameProcessingConfig.Enabled == "true" && configuration.Config.Offline != "true" {
+		selectedCursor := queue.Latest()
+		selectedRequestQueue := queue
+		selectedClient := rtspClient
+		selectedStream := "main"
+		selectionError := error(nil)
+		switch frameProcessingConfig.Stream {
+		case "auto", "":
+			if subStreamEnabled && rtspSubClient != nil && subQueue != nil {
+				selectedCursor = subQueue.Latest()
+				selectedRequestQueue = subQueue
+				selectedClient = rtspSubClient
+				selectedStream = "sub"
+			}
+		case "main":
+		case "sub":
+			if !subStreamEnabled || rtspSubClient == nil || subQueue == nil {
+				selectionError = errors.New("frameProcessing.stream is sub but no substream is available")
+			} else {
+				selectedCursor = subQueue.Latest()
+				selectedRequestQueue = subQueue
+				selectedClient = rtspSubClient
+				selectedStream = "sub"
+			}
+		default:
+			selectionError = fmt.Errorf("unsupported frameProcessing.stream %q", frameProcessingConfig.Stream)
+		}
+
+		registerTask("frame-processing", lifecycle.TaskPolicy{}, func(taskContext context.Context) error {
+			if selectionError != nil {
+				return selectionError
+			}
+			return frameprocessing.Run(
+				taskContext,
+				selectedCursor,
+				selectedClient,
+				*frameProcessingConfig,
+				configuration.Config.Key,
+				selectedStream,
+				communication,
+			)
+		})
+		if frameProcessingConfig.AllowRequestedFrames == "true" {
+			frameProcessingRequests := run.FrameProcessingRequests()
+			run.SetFrameProcessingQueue(selectedRequestQueue)
+			frameProcessingStatusPublisher := frameprocessing.NewMQTTStatusPublisher(mqttClient, config.HubKey, configuration)
+			registerTask("frame-processing-requested", lifecycle.TaskPolicy{}, func(taskContext context.Context) error {
+				if selectionError != nil {
+					return selectionError
+				}
+				return frameprocessing.RunRequested(
+					taskContext,
+					selectedClient,
+					*frameProcessingConfig,
+					configuration.Config.Key,
+					selectedStream,
+					frameProcessingRequests,
+					frameProcessingStatusPublisher,
+					communication,
+				)
+			})
+		}
 	}
 
 	// Handle Upload to cloud provider (Kerberos Hub, Kerberos Vault and others)

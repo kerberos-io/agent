@@ -347,6 +347,20 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_REMOTE_ACCESS_ENABLED`               | Allow encrypted Hub MQTT sessions to stream Agent logs and open an interactive shell. Enable only for trusted deployments. | "false"                        |
 | `AGENT_REALTIME_PROCESSING`                 | If `AGENT_REALTIME_PROCESSING` set to `true`, the agent will send key frames to the topic       | ""                             |
 | `AGENT_REALTIME_PROCESSING_TOPIC`           | The topic to which keyframes will be sent in base64 encoded format.                             | ""                             |
+| `AGENT_FRAME_PROCESSING_ENABLED`            | Send keyframe-aligned JPEGs to an external Frame Processor over HTTP.                           | "false"                        |
+| `AGENT_FRAME_PROCESSING_ENDPOINT`           | Full Frame Processor HTTP endpoint, including `/v1/frames`.                                     | ""                             |
+| `AGENT_FRAME_PROCESSING_TOKEN`              | Environment-only bearer token used to authenticate frame submissions; never returned by config APIs. | ""                         |
+| `AGENT_FRAME_PROCESSING_PROFILE`            | Processing profile included with each frame.                                                    | "never-trigger"                |
+| `AGENT_FRAME_PROCESSING_ALLOW_REQUESTED_FRAMES` | Allow authenticated MQTT `capture-frame` commands; frame bytes are still submitted over HTTP. | "false"                    |
+| `AGENT_FRAME_PROCESSING_STREAM`             | Source stream: `auto`, `main`, or `sub`; `auto` prefers the substream when available.           | "auto"                         |
+| `AGENT_FRAME_PROCESSING_INTERVAL_SECONDS`   | Target period between submissions; the first keyframe at or after each deadline is selected.   | "10"                           |
+| `AGENT_FRAME_PROCESSING_WIDTH`              | Output JPEG width; aspect ratio is preserved when height is `0`.                               | "640"                          |
+| `AGENT_FRAME_PROCESSING_HEIGHT`             | Output JPEG height; `0` derives it from the source aspect ratio.                               | "0"                            |
+| `AGENT_FRAME_PROCESSING_JPEG_QUALITY`       | JPEG quality from 1 through 100.                                                                | "70"                           |
+| `AGENT_FRAME_PROCESSING_REQUEST_TIMEOUT_SECONDS` | Maximum duration of one HTTP submission.                                                   | "5"                            |
+| `AGENT_FRAME_PROCESSING_FRAME_TTL_SECONDS`  | Time after capture during which the Frame Processor may accept the frame.                       | "30"                           |
+| `AGENT_FRAME_PROCESSING_MAX_FRAME_BYTES`    | Maximum encoded JPEG size; values above 16 MiB are rejected.                                    | "4194304"                      |
+| `AGENT_FRAME_PROCESSING_PERIODIC_QUEUE_CAPACITY` | Bounded latest-wins periodic frame queue capacity, from 1 through 64.                       | "1"                            |
 | `AGENT_STUN_URI`                            | When using WebRTC, you'll need to provide a STUN server.                                        | "stun:turn-fra1.kerberos.io:3478"|
 | `AGENT_FORCE_TURN`                          | Force using a TURN server, by generating relay candidates only.                                 | "false"                        |
 | `AGENT_TURN_URI`                            | When using WebRTC, you'll need to provide a TURN server.                                        | "turn:turn-fra1.kerberos.io:3478"|

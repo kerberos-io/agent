@@ -300,6 +300,9 @@ func initConfigPointers(config *models.Config) {
 	if config.Signing == nil {
 		config.Signing = &models.Signing{}
 	}
+	if config.FrameProcessing == nil {
+		config.FrameProcessing = &models.FrameProcessing{}
+	}
 	if config.Dropbox == nil {
 		config.Dropbox = &models.Dropbox{}
 	}
@@ -318,6 +321,9 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 	// Initialize the configuration for some new fields.
 	if configuration.Config.KStorageSecondary == nil {
 		configuration.Config.KStorageSecondary = &models.KStorage{}
+	}
+	if configuration.Config.FrameProcessing == nil {
+		configuration.Config.FrameProcessing = &models.FrameProcessing{}
 	}
 
 	for _, env := range environmentVariables {
@@ -541,6 +547,66 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 				configuration.Config.RealtimeProcessingTopic = value
 				break
 
+			/* Keyframe-aligned HTTP frame processing */
+			case "AGENT_FRAME_PROCESSING_ENABLED":
+				configuration.Config.FrameProcessing.Enabled = value
+				break
+			case "AGENT_FRAME_PROCESSING_ENDPOINT":
+				configuration.Config.FrameProcessing.Endpoint = value
+				break
+			case "AGENT_FRAME_PROCESSING_TOKEN":
+				configuration.Config.FrameProcessing.Token = value
+				break
+			case "AGENT_FRAME_PROCESSING_PROFILE":
+				configuration.Config.FrameProcessing.Profile = value
+				break
+			case "AGENT_FRAME_PROCESSING_ALLOW_REQUESTED_FRAMES":
+				configuration.Config.FrameProcessing.AllowRequestedFrames = value
+				break
+			case "AGENT_FRAME_PROCESSING_STREAM":
+				configuration.Config.FrameProcessing.Stream = value
+				break
+			case "AGENT_FRAME_PROCESSING_INTERVAL_SECONDS":
+				if interval, err := strconv.ParseInt(value, 10, 64); err == nil {
+					configuration.Config.FrameProcessing.IntervalSeconds = interval
+				}
+				break
+			case "AGENT_FRAME_PROCESSING_WIDTH":
+				if width, err := strconv.Atoi(value); err == nil {
+					configuration.Config.FrameProcessing.Width = width
+				}
+				break
+			case "AGENT_FRAME_PROCESSING_HEIGHT":
+				if height, err := strconv.Atoi(value); err == nil {
+					configuration.Config.FrameProcessing.Height = height
+				}
+				break
+			case "AGENT_FRAME_PROCESSING_JPEG_QUALITY":
+				if quality, err := strconv.Atoi(value); err == nil {
+					configuration.Config.FrameProcessing.JPEGQuality = quality
+				}
+				break
+			case "AGENT_FRAME_PROCESSING_REQUEST_TIMEOUT_SECONDS":
+				if timeout, err := strconv.ParseInt(value, 10, 64); err == nil {
+					configuration.Config.FrameProcessing.RequestTimeoutSeconds = timeout
+				}
+				break
+			case "AGENT_FRAME_PROCESSING_FRAME_TTL_SECONDS":
+				if ttl, err := strconv.ParseInt(value, 10, 64); err == nil {
+					configuration.Config.FrameProcessing.FrameTTLSeconds = ttl
+				}
+				break
+			case "AGENT_FRAME_PROCESSING_MAX_FRAME_BYTES":
+				if maxBytes, err := strconv.ParseInt(value, 10, 64); err == nil {
+					configuration.Config.FrameProcessing.MaxFrameBytes = maxBytes
+				}
+				break
+			case "AGENT_FRAME_PROCESSING_PERIODIC_QUEUE_CAPACITY":
+				if capacity, err := strconv.Atoi(value); err == nil {
+					configuration.Config.FrameProcessing.PeriodicQueueCapacity = capacity
+				}
+				break
+
 			/* WebRTC settings for live-streaming (remote) */
 			case "AGENT_STUN_URI":
 				configuration.Config.STUNURI = value
@@ -681,6 +747,41 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 	if applyDefaults && (configuration.Config.Capture.PixelChangeThreshold == nil || *configuration.Config.Capture.PixelChangeThreshold <= 0) {
 		defaultPixelChangeThreshold := 150
 		configuration.Config.Capture.PixelChangeThreshold = &defaultPixelChangeThreshold
+	}
+
+	if applyDefaults {
+		frameProcessing := configuration.Config.FrameProcessing
+		if frameProcessing == nil {
+			frameProcessing = &models.FrameProcessing{}
+			configuration.Config.FrameProcessing = frameProcessing
+		}
+		if frameProcessing.Profile == "" {
+			frameProcessing.Profile = "never-trigger"
+		}
+		if frameProcessing.Stream == "" {
+			frameProcessing.Stream = "auto"
+		}
+		if frameProcessing.IntervalSeconds <= 0 {
+			frameProcessing.IntervalSeconds = 10
+		}
+		if frameProcessing.Width <= 0 {
+			frameProcessing.Width = 640
+		}
+		if frameProcessing.JPEGQuality <= 0 || frameProcessing.JPEGQuality > 100 {
+			frameProcessing.JPEGQuality = 70
+		}
+		if frameProcessing.RequestTimeoutSeconds <= 0 {
+			frameProcessing.RequestTimeoutSeconds = 5
+		}
+		if frameProcessing.FrameTTLSeconds <= 0 {
+			frameProcessing.FrameTTLSeconds = 30
+		}
+		if frameProcessing.MaxFrameBytes <= 0 {
+			frameProcessing.MaxFrameBytes = 4 << 20
+		}
+		if frameProcessing.PeriodicQueueCapacity <= 0 {
+			frameProcessing.PeriodicQueueCapacity = 1
+		}
 	}
 
 	// Signing is a new feature, so if empty we set default values. Only applied

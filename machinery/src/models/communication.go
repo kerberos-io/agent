@@ -71,11 +71,33 @@ type HubRuntimeTelemetry struct {
 	LastSuccessfulHeartbeatAt int64
 }
 
+type FrameProcessingRuntimeTelemetry struct {
+	Configured    bool   `json:"configured"`
+	Sampled       uint64 `json:"sampled"`
+	Queued        uint64 `json:"queued"`
+	Dropped       uint64 `json:"dropped"`
+	Submitted     uint64 `json:"submitted"`
+	Failed        uint64 `json:"failed"`
+	QueueDepth    int64  `json:"queueDepth"`
+	LastSuccessAt int64  `json:"lastSuccessAt"`
+}
+
 type hubRuntimeTelemetry struct {
 	configured                atomic.Bool
 	connected                 atomic.Bool
 	lastHeartbeatAttemptAt    atomic.Int64
 	lastSuccessfulHeartbeatAt atomic.Int64
+}
+
+type frameProcessingRuntimeTelemetry struct {
+	configured    atomic.Bool
+	sampled       atomic.Uint64
+	queued        atomic.Uint64
+	dropped       atomic.Uint64
+	submitted     atomic.Uint64
+	failed        atomic.Uint64
+	queueDepth    atomic.Int64
+	lastSuccessAt atomic.Int64
 }
 
 type recoveryTelemetry struct {
@@ -151,6 +173,7 @@ type Communication struct {
 	mainStreamTelemetry          streamRuntimeTelemetry
 	subStreamTelemetry           streamRuntimeTelemetry
 	hubTelemetry                 hubRuntimeTelemetry
+	frameProcessingTelemetry     frameProcessingRuntimeTelemetry
 	recovery                     recoveryTelemetry
 }
 
@@ -228,6 +251,54 @@ func (c *Communication) HubRuntimeTelemetry() HubRuntimeTelemetry {
 		Connected:                 c.hubTelemetry.connected.Load(),
 		LastHeartbeatAttemptAt:    c.hubTelemetry.lastHeartbeatAttemptAt.Load(),
 		LastSuccessfulHeartbeatAt: c.hubTelemetry.lastSuccessfulHeartbeatAt.Load(),
+	}
+}
+
+func (c *Communication) SetFrameProcessingConfigured(configured bool) {
+	c.frameProcessingTelemetry.configured.Store(configured)
+	if !configured {
+		c.frameProcessingTelemetry.queueDepth.Store(0)
+	}
+}
+
+func (c *Communication) RecordFrameProcessingSample() {
+	c.frameProcessingTelemetry.sampled.Add(1)
+}
+
+func (c *Communication) RecordFrameProcessingQueued(depth int, dropped bool) {
+	c.frameProcessingTelemetry.queueDepth.Store(int64(depth))
+	c.frameProcessingTelemetry.queued.Add(1)
+	if dropped {
+		c.frameProcessingTelemetry.dropped.Add(1)
+	}
+}
+
+func (c *Communication) SetFrameProcessingQueueDepth(depth int) {
+	c.frameProcessingTelemetry.queueDepth.Store(int64(depth))
+}
+
+func (c *Communication) RecordFrameProcessingSuccess(at time.Time) {
+	c.frameProcessingTelemetry.submitted.Add(1)
+	if !at.IsZero() {
+		c.frameProcessingTelemetry.lastSuccessAt.Store(at.Unix())
+	}
+}
+
+func (c *Communication) RecordFrameProcessingFailure() {
+	c.frameProcessingTelemetry.failed.Add(1)
+}
+
+func (c *Communication) FrameProcessingRuntimeTelemetry() FrameProcessingRuntimeTelemetry {
+	telemetry := &c.frameProcessingTelemetry
+	return FrameProcessingRuntimeTelemetry{
+		Configured:    telemetry.configured.Load(),
+		Sampled:       telemetry.sampled.Load(),
+		Queued:        telemetry.queued.Load(),
+		Dropped:       telemetry.dropped.Load(),
+		Submitted:     telemetry.submitted.Load(),
+		Failed:        telemetry.failed.Load(),
+		QueueDepth:    telemetry.queueDepth.Load(),
+		LastSuccessAt: telemetry.lastSuccessAt.Load(),
 	}
 }
 
@@ -363,4 +434,9 @@ func (c *Communication) TrySendONVIF(action OnvifAction) bool {
 		return false
 	}
 	return true
+}
+
+func (c *Communication) TrySendFrameProcessingRequest(request FrameProcessingRequest) bool {
+	run := c.CurrentRun()
+	return run != nil && run.TrySendFrameProcessingRequest(request)
 }

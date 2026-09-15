@@ -140,6 +140,20 @@ func (self *Queue) Latest() *QueueCursor {
 	return cursor
 }
 
+// LatestAtCurrentTail returns a cursor fixed at the queue tail at call time.
+// Unlike Latest, its start position is not deferred until the first read. This
+// is used by command-driven consumers that must not skip packets arriving after
+// a request was accepted but before their first blocking read begins.
+func (self *Queue) LatestAtCurrentTail() *QueueCursor {
+	self.cond.L.Lock()
+	defer self.cond.L.Unlock()
+	return &QueueCursor{
+		que:    self,
+		pos:    self.buf.Tail,
+		gotpos: true,
+	}
+}
+
 // Create cursor position at oldest buffered packet.
 func (self *Queue) Oldest() *QueueCursor {
 	cursor := self.newCursor()

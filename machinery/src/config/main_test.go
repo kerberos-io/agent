@@ -44,6 +44,78 @@ func intPointer(value int) *int {
 	return &value
 }
 
+func TestApplyAgentEnvVarsFrameProcessing(t *testing.T) {
+	t.Setenv("AGENT_FRAME_PROCESSING_ENABLED", "true")
+	t.Setenv("AGENT_FRAME_PROCESSING_ENDPOINT", "http://processor:8080/v1/frames")
+	t.Setenv("AGENT_FRAME_PROCESSING_TOKEN", "secret")
+	t.Setenv("AGENT_FRAME_PROCESSING_PROFILE", "always-trigger")
+	t.Setenv("AGENT_FRAME_PROCESSING_ALLOW_REQUESTED_FRAMES", "true")
+	t.Setenv("AGENT_FRAME_PROCESSING_STREAM", "sub")
+	t.Setenv("AGENT_FRAME_PROCESSING_INTERVAL_SECONDS", "15")
+	t.Setenv("AGENT_FRAME_PROCESSING_WIDTH", "320")
+	t.Setenv("AGENT_FRAME_PROCESSING_HEIGHT", "180")
+	t.Setenv("AGENT_FRAME_PROCESSING_JPEG_QUALITY", "80")
+	t.Setenv("AGENT_FRAME_PROCESSING_REQUEST_TIMEOUT_SECONDS", "7")
+	t.Setenv("AGENT_FRAME_PROCESSING_FRAME_TTL_SECONDS", "45")
+	t.Setenv("AGENT_FRAME_PROCESSING_MAX_FRAME_BYTES", "2097152")
+	t.Setenv("AGENT_FRAME_PROCESSING_PERIODIC_QUEUE_CAPACITY", "2")
+
+	configuration := &models.Configuration{}
+	initConfigPointers(&configuration.Config)
+	applyAgentEnvVars(configuration, "", true)
+
+	got := configuration.Config.FrameProcessing
+	if got == nil {
+		t.Fatal("FrameProcessing is nil")
+	}
+	if got.Enabled != "true" || got.Endpoint != "http://processor:8080/v1/frames" || got.Token != "secret" {
+		t.Fatalf("FrameProcessing identity = %+v", got)
+	}
+	if got.Profile != "always-trigger" || got.AllowRequestedFrames != "true" || got.Stream != "sub" || got.IntervalSeconds != 15 {
+		t.Fatalf("FrameProcessing schedule = %+v", got)
+	}
+	if got.Width != 320 || got.Height != 180 || got.JPEGQuality != 80 {
+		t.Fatalf("FrameProcessing image = %+v", got)
+	}
+	if got.RequestTimeoutSeconds != 7 || got.FrameTTLSeconds != 45 || got.MaxFrameBytes != 2097152 || got.PeriodicQueueCapacity != 2 {
+		t.Fatalf("FrameProcessing delivery = %+v", got)
+	}
+}
+
+func TestApplyAgentEnvVarsFrameProcessingDefaults(t *testing.T) {
+	configuration := &models.Configuration{}
+	initConfigPointers(&configuration.Config)
+	applyAgentEnvVars(configuration, "", true)
+
+	got := configuration.Config.FrameProcessing
+	if got.Profile != "never-trigger" || got.Stream != "auto" || got.IntervalSeconds != 10 {
+		t.Fatalf("FrameProcessing defaults = %+v", got)
+	}
+	if got.Width != 640 || got.Height != 0 || got.JPEGQuality != 70 {
+		t.Fatalf("FrameProcessing image defaults = %+v", got)
+	}
+	if got.RequestTimeoutSeconds != 5 || got.FrameTTLSeconds != 30 || got.MaxFrameBytes != 4<<20 || got.PeriodicQueueCapacity != 1 {
+		t.Fatalf("FrameProcessing delivery defaults = %+v", got)
+	}
+}
+
+func TestOverrideWithEnvironmentVariablesInheritsGlobalFrameProcessing(t *testing.T) {
+	t.Setenv("GLOBAL_AGENT_FRAME_PROCESSING_ENABLED", "true")
+	t.Setenv("GLOBAL_AGENT_FRAME_PROCESSING_ENDPOINT", "https://processor.example/v1/frames")
+	t.Setenv("GLOBAL_AGENT_FRAME_PROCESSING_PROFILE", "never-trigger")
+
+	configuration := &models.Configuration{}
+	OverrideWithEnvironmentVariables(configuration)
+
+	got := configuration.Config.FrameProcessing
+	if got == nil || got.Enabled != "true" || got.Endpoint != "https://processor.example/v1/frames" {
+		t.Fatalf("effective FrameProcessing = %+v", got)
+	}
+	if configuration.CustomConfig.FrameProcessing == nil || configuration.CustomConfig.FrameProcessing.Enabled != "" {
+		t.Fatalf("custom FrameProcessing unexpectedly overrides global config: %+v", configuration.CustomConfig.FrameProcessing)
+	}
+}
+
 func TestNewFactoryConfigReadContextUsesDatabaseTimeout(t *testing.T) {
 	ctx, cancel := newFactoryConfigReadContext()
 	defer cancel()

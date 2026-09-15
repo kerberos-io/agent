@@ -120,6 +120,21 @@
 	"condition_uri": "",
 	"encryption": {},
 	"signing": {},
+	"frameProcessing": {
+		"enabled": "false",
+		"endpoint": "",
+		"profile": "never-trigger",
+		"allowRequestedFrames": "false",
+		"stream": "auto",
+		"intervalSeconds": 10,
+		"width": 640,
+		"height": 0,
+		"jpegQuality": 70,
+		"requestTimeoutSeconds": 5,
+		"frameTtlSeconds": 30,
+		"maxFrameBytes": 4194304,
+		"periodicQueueCapacity": 1
+	},
 	"realtimeprocessing": "false",
 	"realtimeprocessing_topic": ""
 }

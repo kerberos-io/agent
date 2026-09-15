@@ -35,6 +35,10 @@ func TestHealthCheckReturnsStandardPublicResponse(t *testing.T) {
 	communication.SetHubConfigured(true)
 	communication.RecordHubHeartbeatAttempt(now.Add(-2 * time.Second))
 	communication.RecordHubHeartbeatSuccess(now.Add(-time.Second))
+	communication.SetFrameProcessingConfigured(true)
+	communication.RecordFrameProcessingSample()
+	communication.RecordFrameProcessingQueued(1, false)
+	communication.RecordFrameProcessingSuccess(now.Add(-time.Second))
 
 	router := gin.New()
 	AddRoutes(router, authMiddleware, "", nil, communication, nil)
@@ -100,6 +104,9 @@ func TestHealthCheckReturnsStandardPublicResponse(t *testing.T) {
 	}
 	if !health.Hub.Configured || !health.Hub.Connected {
 		t.Errorf("data.health.hub = %+v, want configured and connected", health.Hub)
+	}
+	if !health.FrameProcessing.Configured || health.FrameProcessing.Sampled != 1 || health.FrameProcessing.Submitted != 1 {
+		t.Errorf("data.health.frameProcessing = %+v", health.FrameProcessing)
 	}
 }
 

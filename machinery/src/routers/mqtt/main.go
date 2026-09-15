@@ -1,6 +1,7 @@
 package mqtt
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"crypto/tls"
@@ -8,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -578,6 +580,8 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 					go HandleReceiveHDCandidates(mqttClient, hubKey, payload, configuration, communication)
 				case "trigger-relay":
 					go HandleTriggerRelay(mqttClient, hubKey, payload, configuration, communication)
+				case "capture-frame":
+					HandleCaptureFrame(mqttClient, hubKey, payload, remoteAuthenticated, configuration, communication)
 				case "remote-session-open":
 					go HandleRemoteSessionOpen(mqttClient, hubKey, payload, remoteAuthenticated, configuration)
 				case "remote-session-input":
@@ -604,6 +608,105 @@ func MQTTListenerHandler(mqttClient mqtt.Client, hubKey string, configDirectory 
 			log.Error("routers.mqtt.main.MQTTListenerHandler(): timed out while subscribing to " + agentListener)
 		}
 	}
+}
+
+func HandleCaptureFrame(mqttClient mqtt.Client, hubKey string, payload models.Payload, remoteAuthenticated bool, configuration *models.Configuration, communication *models.Communication) {
+	request, err := decodeFrameProcessingRequest(payload)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"component": "routers/mqtt",
+			"event":     "capture_frame_rejected",
+		}).Warn("Rejected invalid capture-frame command")
+		return
+	}
+	config := configuration.Config
+	if !frameProcessingCommandAuthenticated(config, remoteAuthenticated) {
+		log.WithFields(log.Fields{
+			"component":  "routers/mqtt",
+			"event":      "capture_frame_rejected",
+			"request_id": request.RequestID,
+		}).Warn("Rejected unauthenticated capture-frame command")
+		return
+	}
+	status := "accepted"
+	message := ""
+	frameProcessing := config.FrameProcessing
+	if frameProcessing == nil || frameProcessing.Enabled != "true" || frameProcessing.AllowRequestedFrames != "true" || config.Offline == "true" {
+		status = "rejected"
+		message = "frame processing is not available"
+	} else if request.ExpiresAt <= time.Now().UnixMilli() {
+		status = "expired"
+		message = "capture request expired"
+	} else if request.ExpiresAt-time.Now().UnixMilli() > frameProcessing.FrameTTLSeconds*1000 {
+		status = "rejected"
+		message = "capture request expiry exceeds configured frame TTL"
+	} else if !communication.TrySendFrameProcessingRequest(request) {
+		status = "rejected"
+		message = "requested-frame queue is unavailable or full"
+	}
+	publishFrameProcessingStatus(mqttClient, hubKey, configuration, models.FrameProcessingStatus{
+		SchemaVersion: models.FrameProcessingSchemaVersion,
+		RequestID:     request.RequestID,
+		DeviceID:      config.Key,
+		Status:        status,
+		OccurredAt:    time.Now().UnixMilli(),
+		Retryable:     status == "rejected" && message == "requested-frame queue is unavailable or full",
+		Message:       message,
+		TraceID:       request.TraceID,
+	})
+}
+
+func decodeFrameProcessingRequest(payload models.Payload) (models.FrameProcessingRequest, error) {
+	encoded, err := json.Marshal(payload.Value)
+	if err != nil {
+		return models.FrameProcessingRequest{}, fmt.Errorf("marshal capture-frame value: %w", err)
+	}
+	var request models.FrameProcessingRequest
+	decoder := json.NewDecoder(bytes.NewReader(encoded))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&request); err != nil {
+		return models.FrameProcessingRequest{}, fmt.Errorf("decode capture-frame value: %w", err)
+	}
+	if request.SchemaVersion != models.FrameProcessingSchemaVersion {
+		return models.FrameProcessingRequest{}, fmt.Errorf("unsupported schemaVersion %q", request.SchemaVersion)
+	}
+	if request.RequestID == "" || request.ProcessingProfile == "" || request.ExpiresAt <= 0 {
+		return models.FrameProcessingRequest{}, errors.New("requestId, processingProfile, and expiresAt are required")
+	}
+	return request, nil
+}
+
+func frameProcessingCommandAuthenticated(config models.Config, remoteAuthenticated bool) bool {
+	hubAuthenticationRequired := config.HubEncryption == "true" && config.HubPrivateKey != ""
+	endToEndAuthenticationRequired := config.Encryption != nil && config.Encryption.Enabled == "true"
+	return remoteAuthenticated || (!hubAuthenticationRequired && !endToEndAuthenticationRequired)
+}
+
+func publishFrameProcessingStatus(mqttClient mqtt.Client, hubKey string, configuration *models.Configuration, status models.FrameProcessingStatus) {
+	if mqttClient == nil || hubKey == "" {
+		return
+	}
+	encoded, err := json.Marshal(status)
+	if err != nil {
+		return
+	}
+	value := make(map[string]interface{})
+	if err := json.Unmarshal(encoded, &value); err != nil {
+		return
+	}
+	payload, err := models.PackageMQTTMessage(configuration, models.Message{
+		Payload: models.Payload{
+			Version:  models.FrameProcessingSchemaVersion,
+			Action:   models.FrameProcessingStatusAction,
+			DeviceId: status.DeviceID,
+			Value:    value,
+		},
+	})
+	if err != nil {
+		log.WithError(err).Warn("Failed to package frame-processing status")
+		return
+	}
+	mqttClient.Publish("kerberos/hub/"+hubKey, 1, false, payload)
 }
 
 func HandleRecording(mqttClient mqtt.Client, hubKey string, payload models.Payload, configuration *models.Configuration, communication *models.Communication) {

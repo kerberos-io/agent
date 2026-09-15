@@ -112,6 +112,31 @@ func TestAgentRunOwnsAndShutsDownResources(t *testing.T) {
 	if _, ok := <-run.ONVIFActions(); ok {
 		t.Fatal("ONVIF channel remained open")
 	}
+	if _, ok := <-run.FrameProcessingRequests(); ok {
+		t.Fatal("frame-processing request channel remained open")
+	}
+}
+
+func TestAgentRunBoundsFrameProcessingRequests(t *testing.T) {
+	communication := &Communication{}
+	run := NewAgentRun(context.Background(), communication, false)
+	queue := packets.NewQueue()
+	run.SetMainQueue(queue)
+	run.SetFrameProcessingQueue(queue)
+	if err := run.Activate(); err != nil {
+		t.Fatal(err)
+	}
+	run.Seal()
+	t.Cleanup(func() { run.Shutdown(context.Background(), errors.New("test complete")) })
+
+	for index := 0; index < defaultFrameProcessingRequestCapacity; index++ {
+		if !communication.TrySendFrameProcessingRequest(FrameProcessingRequest{RequestID: "request"}) {
+			t.Fatalf("request %d was rejected before the queue was full", index)
+		}
+	}
+	if communication.TrySendFrameProcessingRequest(FrameProcessingRequest{RequestID: "overflow"}) {
+		t.Fatal("overflow request was accepted")
+	}
 }
 
 func TestAgentRunShutdownIsConcurrentAndIdempotent(t *testing.T) {

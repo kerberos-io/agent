@@ -157,6 +157,55 @@ func TestRemoteAccessRequiresExplicitOptIn(t *testing.T) {
 	}
 }
 
+func TestDecodeFrameProcessingRequest(t *testing.T) {
+	request, err := decodeFrameProcessingRequest(models.Payload{Value: map[string]interface{}{
+		"schemaVersion":     "1.0",
+		"requestId":         "request-1",
+		"processingProfile": "always-trigger",
+		"expiresAt":         float64(2_000),
+		"traceId":           "trace-1",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.RequestID != "request-1" || request.ExpiresAt != 2_000 || request.TraceID != "trace-1" {
+		t.Fatalf("decoded request = %+v", request)
+	}
+}
+
+func TestDecodeFrameProcessingRequestRejectsUnknownField(t *testing.T) {
+	_, err := decodeFrameProcessingRequest(models.Payload{Value: map[string]interface{}{
+		"schemaVersion":     "1.0",
+		"requestId":         "request-1",
+		"processingProfile": "always-trigger",
+		"expiresAt":         float64(2_000),
+		"unexpected":        true,
+	}})
+	if err == nil {
+		t.Fatal("decodeFrameProcessingRequest() accepted an unknown field")
+	}
+}
+
+func TestFrameProcessingCommandAuthentication(t *testing.T) {
+	plainConfig := models.Config{}
+	if !frameProcessingCommandAuthenticated(plainConfig, false) {
+		t.Fatal("trusted plaintext broker configuration rejected a command")
+	}
+
+	hiddenConfig := models.Config{HubEncryption: "true", HubPrivateKey: "private"}
+	if frameProcessingCommandAuthenticated(hiddenConfig, false) {
+		t.Fatal("Hub-encrypted configuration accepted plaintext command")
+	}
+	if !frameProcessingCommandAuthenticated(hiddenConfig, true) {
+		t.Fatal("Hub-encrypted configuration rejected authenticated command")
+	}
+
+	e2eConfig := models.Config{Encryption: &models.Encryption{Enabled: "true"}}
+	if frameProcessingCommandAuthenticated(e2eConfig, false) {
+		t.Fatal("end-to-end encrypted configuration accepted plaintext command")
+	}
+}
+
 func TestNormalizeTerminalSize(t *testing.T) {
 	rows, columns := normalizeTerminalSize(0, 0)
 	if rows != 24 || columns != 80 {

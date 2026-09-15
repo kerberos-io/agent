@@ -42,11 +42,12 @@ type HubHealth struct {
 
 // Health describes the Agent process health exposed to API clients.
 type Health struct {
-	Description     string       `json:"description"`
-	CameraConnected bool         `json:"cameraConnected"`
-	MainStream      StreamHealth `json:"mainStream"`
-	SubStream       StreamHealth `json:"subStream"`
-	Hub             HubHealth    `json:"hub"`
+	Description     string                                 `json:"description"`
+	CameraConnected bool                                   `json:"cameraConnected"`
+	MainStream      StreamHealth                           `json:"mainStream"`
+	SubStream       StreamHealth                           `json:"subStream"`
+	Hub             HubHealth                              `json:"hub"`
+	FrameProcessing models.FrameProcessingRuntimeTelemetry `json:"frameProcessing"`
 }
 
 // HealthResponseData contains the typed payload of a health response.
@@ -108,6 +109,7 @@ func buildHealth(communication *models.Communication, now time.Time) Health {
 			LastHeartbeatAttemptAt:    hubTelemetry.LastHeartbeatAttemptAt,
 			LastSuccessfulHeartbeatAt: hubTelemetry.LastSuccessfulHeartbeatAt,
 		},
+		FrameProcessing: communication.FrameProcessingRuntimeTelemetry(),
 	}
 }
 
