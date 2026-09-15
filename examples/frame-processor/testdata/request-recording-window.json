@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "requestId": "request-example-1",
+  "frameId": "frame-example-1",
+  "capturedAt": 1789380000123,
+  "preRollSeconds": 10,
+  "eventClipSeconds": 30,
+  "expiresAt": 4102444800000,
+  "processingProfile": "always-trigger",
+  "traceId": "trace-example-1"
+}

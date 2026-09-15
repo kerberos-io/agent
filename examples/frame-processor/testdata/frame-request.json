@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0",
+  "requestId": "request-example-1",
+  "deviceIds": ["camera-1"],
+  "processingProfile": "always-trigger",
+  "expiresAt": 4102444800000,
+  "traceId": "trace-example-1"
+}

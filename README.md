@@ -524,6 +524,11 @@ Once signed in you'll see the dashboard page. After successfull configuration of
 
 The `machinery` is a **Golang** project which delivers two functions: it acts as the Kerberos Agent which is doing all the heavy lifting with camera processing and other kinds of logic and on the other hand it acts as a webserver (Rest API) that allows communication from the web (React) or any other custom application. The API is documented using `swagger`.
 
+An executable reference for the Agent frame-processing HTTP and MQTT contracts is
+available in [`examples/frame-processor`](examples/frame-processor). It provides
+deterministic processing profiles for integration testing without requiring a
+machine-learning runtime.
+
 You can simply run the `machinery` using following commands.
 
     git clone https://github.com/kerberos-io/agent
