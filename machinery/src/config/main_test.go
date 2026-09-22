@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -10,6 +11,53 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+func TestApplyAgentEnvVarsDeploymentName(t *testing.T) {
+	tests := []struct {
+		name           string
+		prefix         string
+		deploymentName string
+		agentName      string
+		initialName    string
+		initialDisplay string
+		wantName       string
+		wantDisplay    string
+	}{
+		{name: "deployment fallback", deploymentName: "camera-1", wantName: "camera-1", wantDisplay: "camera-1"},
+		{name: "explicit display name", deploymentName: "camera-1", agentName: "Front Door", wantName: "camera-1", wantDisplay: "Front Door"},
+		{name: "existing display name", deploymentName: "camera-1", initialDisplay: "Front Door", wantName: "camera-1", wantDisplay: "Front Door"},
+		{name: "deployment overrides bundled identity", deploymentName: "camera-1", initialName: "default", wantName: "camera-1", wantDisplay: "camera-1"},
+		{name: "no deployment", initialName: "existing", initialDisplay: "Existing Camera", wantName: "existing", wantDisplay: "Existing Camera"},
+		{name: "standalone display name", agentName: "Front Door", wantDisplay: "Front Door"},
+		{name: "global layer excludes deployment", prefix: "GLOBAL_", deploymentName: "camera-1"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("DEPLOYMENT_NAME", test.deploymentName)
+			t.Setenv(test.prefix+"AGENT_NAME", test.agentName)
+			if test.agentName == "" {
+				if err := os.Unsetenv(test.prefix + "AGENT_NAME"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			configuration := &models.Configuration{Config: models.Config{
+				Name:         test.initialName,
+				FriendlyName: test.initialDisplay,
+			}}
+			initConfigPointers(&configuration.Config)
+
+			applyAgentEnvVars(configuration, test.prefix, false)
+
+			if got := configuration.Config.Name; got != test.wantName {
+				t.Errorf("Name = %q, want %q", got, test.wantName)
+			}
+			if got := configuration.Config.FriendlyName; got != test.wantDisplay {
+				t.Errorf("FriendlyName = %q, want %q", got, test.wantDisplay)
+			}
+		})
+	}
+}
 
 func TestApplyAgentEnvVarsPixelChangeThresholdDefault(t *testing.T) {
 	tests := []struct {

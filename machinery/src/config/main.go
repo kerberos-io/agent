@@ -315,6 +315,15 @@ func initConfigPointers(config *models.Config) {
 func applyAgentEnvVars(configuration *models.Configuration, prefix string, applyDefaults bool) {
 	environmentVariables := os.Environ()
 
+	if prefix == "" {
+		if deploymentName := os.Getenv("DEPLOYMENT_NAME"); deploymentName != "" {
+			configuration.Config.Name = deploymentName
+			if configuration.Config.FriendlyName == "" {
+				configuration.Config.FriendlyName = deploymentName
+			}
+		}
+	}
+
 	// Initialize the configuration for some new fields.
 	if configuration.Config.KStorageSecondary == nil {
 		configuration.Config.KStorageSecondary = &models.KStorage{}
