@@ -3,6 +3,7 @@ package cloud
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -304,7 +305,9 @@ func TestUploadVaultResumable_HappyPath(t *testing.T) {
 	withRecording(t, fileName, payload)
 	withQueuedRecordingFPS(t, fileName, `{"filename":"recording.mp4","device_key":"device-key","timestamp":1785934709414,"duration":20452,"fps":29.97}`)
 
-	uploaded, responded, supported, _, err := uploadVaultResumable(testVault(ts.URL), "pk", "dev", fileName, "test", "primary")
+	vault := testVault(ts.URL)
+	vault.CustomHeaders = `{"site_id":"site-1","equipment_id":"equipment-3"}`
+	uploaded, responded, supported, _, err := uploadVaultResumable(vault, "pk", "dev", fileName, "test", "primary")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -327,6 +330,23 @@ func TestUploadVaultResumable_HappyPath(t *testing.T) {
 	}
 	if got := metadata["timestamp"]; got != "1785934709414" {
 		t.Fatalf("POST metadata timestamp = %q, want %q", got, "1785934709414")
+	}
+	var customHeaders map[string]string
+	if err := json.Unmarshal([]byte(metadata["custom_headers"]), &customHeaders); err != nil {
+		t.Fatal(err)
+	}
+	if customHeaders["site_id"] != "site-1" || customHeaders["equipment_id"] != "equipment-3" {
+		t.Fatalf("POST custom header metadata = %#v", customHeaders)
+	}
+	for _, method := range []string{http.MethodPost, http.MethodHead, http.MethodPatch} {
+		for _, request := range srv.requestsForMethod(method) {
+			if request.header.Get("site_id") != "site-1" || request.header.Get("equipment_id") != "equipment-3" {
+				t.Fatalf("%s custom headers = %#v", method, request.header)
+			}
+			if request.header.Get(customHeadersManifestHeader) == "" {
+				t.Fatalf("%s is missing the custom header manifest", method)
+			}
+		}
 	}
 }
 

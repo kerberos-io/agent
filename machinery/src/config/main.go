@@ -612,6 +612,9 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 			case "AGENT_KERBEROSVAULT_DIRECTORY":
 				configuration.Config.KStorage.Directory = value
 				break
+			case "AGENT_KERBEROSVAULT_CUSTOM_HEADERS":
+				configuration.Config.KStorage.CustomHeaders = value
+				break
 
 			/* Retry policy and timeout */
 			case "AGENT_KERBEROSVAULT_MAX_RETRIES":
@@ -642,6 +645,9 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 				break
 			case "AGENT_KERBEROSVAULT_SECONDARY_DIRECTORY":
 				configuration.Config.KStorageSecondary.Directory = value
+				break
+			case "AGENT_KERBEROSVAULT_SECONDARY_CUSTOM_HEADERS":
+				configuration.Config.KStorageSecondary.CustomHeaders = value
 				break
 
 			/* When storing in dropbox */

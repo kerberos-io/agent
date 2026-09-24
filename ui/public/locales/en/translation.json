@@ -223,6 +223,8 @@
       "kerberosvault_description_accesskey": "The access key of your Vault account.",
       "kerberosvault_secretkey": "Secret key",
       "kerberosvault_description_secretkey": "The secret key of your Vault account.",
+      "kerberosvault_customheaders": "Custom upload headers",
+      "kerberosvault_description_customheaders": "A JSON object of custom HTTP headers, for example {\"site_id\":\"site-1\",\"line_id\":\"line-2\"}. These values are included as metadata in Vault integration messages.",
       "kerberosvault_maxretries": "Max retries",
       "kerberosvault_description_maxretries": "The maximum number of retries to upload a recording.",
       "kerberosvault_timeout": "Timeout",

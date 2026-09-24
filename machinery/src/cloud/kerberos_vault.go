@@ -178,6 +178,10 @@ func sendToVault(vault models.KStorage, publicKey, deviceKey, fileName, label, s
 // is sent as the body of a POST to {URI}/storage. Kept for backwards
 // compatibility with vault deployments that do not support resumable uploads.
 func uploadVaultLegacy(vault models.KStorage, publicKey, deviceKey, fileName, label string) (bool, bool, string, error) {
+	customHeaders, err := parseCustomVaultHeaders(vault.CustomHeaders)
+	if err != nil {
+		return false, false, "", err
+	}
 	fullname := "data/recordings/" + fileName
 
 	file, err := os.Open(fullname)
@@ -203,6 +207,9 @@ func uploadVaultLegacy(vault models.KStorage, publicKey, deviceKey, fileName, la
 	}
 	req.Header.Set("Content-Type", "video/mp4")
 	setVaultHeaders(req.Header, vault, publicKey, deviceKey, fileName)
+	if err := setCustomVaultHeaders(req.Header, customHeaders); err != nil {
+		return false, false, "", err
+	}
 	setQueuedRecordingMetadataHeaders(req.Header, fileName)
 
 	client := newVaultHTTPClient(0)
@@ -267,7 +274,7 @@ func newVaultHTTPClient(timeout time.Duration) *http.Client {
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
-	client := &http.Client{Transport: transport}
+	client := &http.Client{Transport: transport, CheckRedirect: stripVaultHeadersOnCrossHostRedirect}
 	if timeout > 0 {
 		client.Timeout = timeout
 	}
