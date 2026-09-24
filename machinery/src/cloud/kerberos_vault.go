@@ -274,7 +274,7 @@ func newVaultHTTPClient(timeout time.Duration) *http.Client {
 		transport.TLSClientConfig.InsecureSkipVerify = true
 	}
 
-	client := &http.Client{Transport: transport}
+	client := &http.Client{Transport: transport, CheckRedirect: stripVaultHeadersOnCrossHostRedirect}
 	if timeout > 0 {
 		client.Timeout = timeout
 	}

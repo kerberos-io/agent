@@ -34,9 +34,6 @@ var disallowedCustomHeaders = map[string]struct{}{
 	"transfer-encoding":   {},
 	"tus-resumable":       {},
 	"upgrade":             {},
-	"upload-length":       {},
-	"upload-metadata":     {},
-	"upload-offset":       {},
 }
 
 func parseCustomVaultHeaders(value string) (map[string]string, error) {
@@ -44,18 +41,25 @@ func parseCustomVaultHeaders(value string) (map[string]string, error) {
 		return nil, nil
 	}
 
-	var headers map[string]string
-	if err := json.Unmarshal([]byte(value), &headers); err != nil {
+	// Decode into pointers so JSON null values can be told apart from strings.
+	var rawHeaders map[string]*string
+	if err := json.Unmarshal([]byte(value), &rawHeaders); err != nil {
 		return nil, fmt.Errorf("custom Vault headers must be a JSON object of string values: %w", err)
 	}
-	if headers == nil {
+	if rawHeaders == nil {
 		return nil, errors.New("custom Vault headers must be a JSON object of string values")
 	}
-	if len(headers) > maxCustomHeaders {
+	if len(rawHeaders) > maxCustomHeaders {
 		return nil, fmt.Errorf("custom Vault headers exceed the limit of %d", maxCustomHeaders)
 	}
-	seen := make(map[string]struct{}, len(headers))
-	for name, value := range headers {
+	headers := make(map[string]string, len(rawHeaders))
+	seen := make(map[string]struct{}, len(rawHeaders))
+	for name, rawValue := range rawHeaders {
+		if rawValue == nil {
+			return nil, fmt.Errorf("custom Vault header %q must be a string, not null", name)
+		}
+		value := *rawValue
+		headers[name] = value
 		if err := validateCustomVaultHeader(name, value); err != nil {
 			return nil, err
 		}
@@ -76,6 +80,9 @@ func validateCustomVaultHeader(name, value string) error {
 	if strings.HasPrefix(lowerName, "x-kerberos-") {
 		return fmt.Errorf("custom Vault header %q uses the reserved X-Kerberos namespace", name)
 	}
+	if strings.HasPrefix(lowerName, "upload-") {
+		return fmt.Errorf("custom Vault header %q uses the reserved tus Upload namespace", name)
+	}
 	if _, disallowed := disallowedCustomHeaders[lowerName]; disallowed {
 		return fmt.Errorf("custom Vault header %q is reserved", name)
 	}
@@ -83,7 +90,7 @@ func validateCustomVaultHeader(name, value string) error {
 		return fmt.Errorf("custom Vault header %q exceeds the %d byte value limit", name, maxCustomHeaderValueLength)
 	}
 	for _, character := range value {
-		if character == '\r' || character == '\n' || character == 0x7f || (character < 0x20 && character != '\t') {
+		if character < 0x20 || character == 0x7f {
 			return fmt.Errorf("custom Vault header %q contains an invalid value", name)
 		}
 	}
@@ -117,7 +124,8 @@ func setCustomVaultHeaders(headers http.Header, customHeaders map[string]string)
 			return err
 		}
 		names = append(names, name)
-		headers.Set(name, value)
+		// Assign directly so the configured name is not canonicalised by Set.
+		headers[name] = []string{value}
 	}
 	sort.Strings(names)
 	manifest, err := json.Marshal(names)
@@ -126,6 +134,50 @@ func setCustomVaultHeaders(headers http.Header, customHeaders map[string]string)
 	}
 	headers.Set(customHeadersManifestHeader, base64.RawURLEncoding.EncodeToString(manifest))
 	return nil
+}
+
+const maxVaultRedirects = 10
+
+// stripVaultHeadersOnCrossHostRedirect removes Vault credentials and the
+// customer-supplied metadata (custom headers, their manifest and the tus
+// Upload-Metadata that embeds them) before following a redirect to another host.
+func stripVaultHeadersOnCrossHostRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= maxVaultRedirects {
+		return fmt.Errorf("stopped after %d redirects", maxVaultRedirects)
+	}
+	if len(via) == 0 || req.URL.Host == via[0].URL.Host {
+		return nil
+	}
+
+	customNames := customVaultHeaderNamesFromManifest(req.Header)
+	for name := range req.Header {
+		canonicalName := http.CanonicalHeaderKey(name)
+		_, custom := customNames[strings.ToLower(name)]
+		if custom || strings.HasPrefix(canonicalName, "X-Kerberos-") || canonicalName == "Upload-Metadata" {
+			delete(req.Header, name)
+		}
+	}
+	return nil
+}
+
+func customVaultHeaderNamesFromManifest(headers http.Header) map[string]struct{} {
+	encoded := headers.Get(customHeadersManifestHeader)
+	if encoded == "" {
+		return nil
+	}
+	manifest, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil
+	}
+	var names []string
+	if err := json.Unmarshal(manifest, &names); err != nil {
+		return nil
+	}
+	lowerNames := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		lowerNames[strings.ToLower(name)] = struct{}{}
+	}
+	return lowerNames
 }
 
 func encodeCustomVaultHeaders(customHeaders map[string]string) (string, error) {

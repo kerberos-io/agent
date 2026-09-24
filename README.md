@@ -478,8 +478,8 @@ stores it as `kstorage.custom_headers` in `config.json`.
 
 The rules for this value are:
 
-- It must be a JSON object with string values. Numbers, arrays, and nested
-  objects are rejected.
+- It must be a JSON object with string values. Numbers, `null`, arrays, and
+  nested objects are rejected.
 - It can contain up to 32 headers, with names up to 128 characters and values
   up to 4096 bytes.
 - Header names must be valid HTTP tokens (letters, digits, and ``!#$%&'*+-.^_`|~``).
@@ -489,12 +489,14 @@ The rules for this value are:
   `Authorization`, `Cookie`, `Host`, `Content-Type`, `Content-Length`,
   `Trace-Id`, tus protocol headers (`Tus-Resumable`, `Upload-*`), and
   hop-by-hop headers.
-- Values cannot contain line breaks or control characters.
+- Values cannot contain line breaks, tabs, or other control characters.
 
 If the value is invalid, the Agent logs an error and does not upload to that
 Vault until the configuration is fixed. The recording stays queued, so it will
 upload once the value is corrected. Header names reach Vault unchanged, but
-proxies may normalise their casing.
+proxies may normalise their casing. If Vault redirects an upload to another
+host, the Agent removes the custom headers and Vault credentials before
+following the redirect.
 
 
 ## Encryption
