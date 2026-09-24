@@ -365,11 +365,13 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_KERBEROSVAULT_SECRET_KEY`            | The secret key of a Kerberos Vault account.                                                     | ""                             |
 | `AGENT_KERBEROSVAULT_PROVIDER`              | A Kerberos Vault provider you have created (optional).                                          | ""                             |
 | `AGENT_KERBEROSVAULT_DIRECTORY`             | The directory, in the Kerberos vault, where the recordings will be stored.                      | ""                             |
+| `AGENT_KERBEROSVAULT_CUSTOM_HEADERS`        | JSON object of custom upload headers that Vault includes as integration metadata.               | `{"site_id":"site-1"}`         |
 | `AGENT_KERBEROSVAULT_SECONDARY_URI`         | The Kerberos Vault API url.                                                                     | "https://vault.domain.com/api" |
 | `AGENT_KERBEROSVAULT_SECONDARY_ACCESS_KEY`  | The access key of a secondary Kerberos Vault account.                                           | ""                             |
 | `AGENT_KERBEROSVAULT_SECONDARY_SECRET_KEY`  | The secret key of a secondary Kerberos Vault account.                                           | ""                             |
 | `AGENT_KERBEROSVAULT_SECONDARY_PROVIDER`    | A secondary Kerberos Vault provider you have created (optional).                                | ""                             |
 | `AGENT_KERBEROSVAULT_SECONDARY_DIRECTORY`   | The directory, in the secondary Kerberos vault, where the recordings will be stored.            | ""                             |
+| `AGENT_KERBEROSVAULT_SECONDARY_CUSTOM_HEADERS` | JSON object of custom upload headers for the secondary Vault.                                | `{"site_id":"site-1"}`         |
 | `AGENT_DROPBOX_ACCESS_TOKEN`                | The Access Token from your Dropbox app, that is used to leverage the Dropbox SDK.               | ""                             |
 | `AGENT_DROPBOX_DIRECTORY`                   | The directory, in Dropbox, where the recordings will be stored.                                 | ""                             |
 | `AGENT_ENCRYPTION`                          | Enable 'true' or disable 'false' end-to-end encryption for MQTT messages.                       | "false"                        |

@@ -88,6 +88,22 @@ func TestApplyAgentEnvVarsPixelChangeThresholdDefault(t *testing.T) {
 	}
 }
 
+func TestApplyAgentEnvVarsVaultCustomHeaders(t *testing.T) {
+	t.Setenv("AGENT_KERBEROSVAULT_CUSTOM_HEADERS", `{"site_id":"site-1"}`)
+	t.Setenv("AGENT_KERBEROSVAULT_SECONDARY_CUSTOM_HEADERS", `{"site_id":"site-2"}`)
+	configuration := &models.Configuration{}
+	initConfigPointers(&configuration.Config)
+
+	applyAgentEnvVars(configuration, "", false)
+
+	if got := configuration.Config.KStorage.CustomHeaders; got != `{"site_id":"site-1"}` {
+		t.Fatalf("primary custom headers = %q", got)
+	}
+	if got := configuration.Config.KStorageSecondary.CustomHeaders; got != `{"site_id":"site-2"}` {
+		t.Fatalf("secondary custom headers = %q", got)
+	}
+}
+
 func intPointer(value int) *int {
 	return &value
 }

@@ -311,6 +311,10 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 // X-Kerberos-Storage-* headers on every request and routing (directory/provider)
 // is additionally carried in the tus Upload-Metadata.
 func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName, label, slot string) (bool, bool, bool, string, error) {
+	customHeaders, err := parseCustomVaultHeaders(vault.CustomHeaders)
+	if err != nil {
+		return false, false, true, "", err
+	}
 	baseURL := strings.TrimRight(vault.URI, "/") + tusUploadPath
 	metadataValues := map[string]string{
 		"filename":  fileName,
@@ -321,10 +325,22 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 		"cloudkey":  publicKey,
 		"fps":       queuedRecordingFPS(fileName),
 	}
+	if encodedHeaders, err := encodeCustomVaultHeaders(customHeaders); err != nil {
+		return false, false, true, "", err
+	} else if encodedHeaders != "" {
+		metadataValues["custom_headers"] = encodedHeaders
+	}
+	customRequestHeaders := http.Header{}
+	if err := setCustomVaultHeaders(customRequestHeaders, customHeaders); err != nil {
+		return false, false, true, "", err
+	}
 	addRecordingTusMetadata(metadataValues, fileName)
 	metadata := encodeTusMetadata(metadataValues)
 	setHeaders := func(h http.Header, fn string) {
 		setVaultTusHeaders(h, vault, publicKey, deviceKey, fn)
+		for name, values := range customRequestHeaders {
+			h[name] = append([]string(nil), values...)
+		}
 	}
 	return runTusUpload(baseURL, metadata, fileName, label, slot, setHeaders)
 }

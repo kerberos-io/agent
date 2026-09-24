@@ -2545,6 +2545,28 @@ export class Settings extends React.Component {
                       <Input
                         noPadding
                         label={t(
+                          'settings.persistence.kerberosvault_customheaders'
+                        )}
+                        placeholder={t(
+                          'settings.persistence.kerberosvault_description_customheaders'
+                        )}
+                        value={
+                          config.kstorage
+                            ? config.kstorage.custom_headers || ''
+                            : ''
+                        }
+                        onChange={(value) =>
+                          this.onUpdateField(
+                            'kstorage',
+                            'custom_headers',
+                            value,
+                            config.kstorage
+                          )
+                        }
+                      />
+                      <Input
+                        noPadding
+                        label={t(
                           'settings.persistence.kerberosvault_directory'
                         )}
                         placeholder={t(
@@ -2810,6 +2832,28 @@ export class Settings extends React.Component {
                       this.onUpdateField(
                         'kstorage_secondary',
                         'secret_access_key',
+                        value,
+                        config.kstorage_secondary
+                      )
+                    }
+                  />
+                  <Input
+                    noPadding
+                    label={t(
+                      'settings.persistence.kerberosvault_customheaders'
+                    )}
+                    placeholder={t(
+                      'settings.persistence.kerberosvault_description_customheaders'
+                    )}
+                    value={
+                      config.kstorage_secondary
+                        ? config.kstorage_secondary.custom_headers || ''
+                        : ''
+                    }
+                    onChange={(value) =>
+                      this.onUpdateField(
+                        'kstorage_secondary',
+                        'custom_headers',
                         value,
                         config.kstorage_secondary
                       )

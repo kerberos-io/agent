@@ -1296,6 +1296,9 @@ const docTemplate = `{
                     "description": "old way, remove this",
                     "type": "string"
                 },
+                "custom_headers": {
+                    "type": "string"
+                },
                 "directory": {
                     "type": "string"
                 },
