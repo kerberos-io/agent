@@ -410,6 +410,92 @@ Smaller chunks provide more frequent resumable checkpoints but create more HTTP
 requests. Larger chunks reduce request overhead but require more data to be
 retransmitted when a request fails.
 
+### Custom metadata headers for Kerberos Vault
+
+Use `AGENT_KERBEROSVAULT_CUSTOM_HEADERS` to attach your own metadata (for
+example a site, line, or equipment identifier) to every recording uploaded to
+Kerberos Vault. The value is a JSON object whose keys are header names and whose
+values are strings. The Agent sends these as HTTP headers on every upload, and
+Vault adds them to the `metadata` object of its integration messages (Kafka,
+MQTT, SQS, RabbitMQ, etc.):
+
+```json
+{
+  "timestamp": "2026-09-24T15:06:45Z",
+  "key": "agent1/1790262405_3-425_agent1_0-0-0-0_-1_10000.mp4",
+  "device": "agent1",
+  "metadata": {
+    "site_id": "site-1",
+    "line_id": "line-2",
+    "equipment_id": "equipment-3"
+  }
+}
+```
+
+The value must be valid JSON on a single line, so wrap it in single quotes in a
+shell:
+
+```bash
+docker run -p 80:80 --name mycamera \
+  -e AGENT_CLOUD=kstorage \
+  -e AGENT_KERBEROSVAULT_URI=https://vault.domain.com/api \
+  -e AGENT_KERBEROSVAULT_ACCESS_KEY=xxx \
+  -e AGENT_KERBEROSVAULT_SECRET_KEY=xxx \
+  -e AGENT_KERBEROSVAULT_DIRECTORY=agent1 \
+  -e AGENT_KERBEROSVAULT_CUSTOM_HEADERS='{"site_id":"site-1","line_id":"line-2","equipment_id":"equipment-3"}' \
+  -d --restart=always kerberos/agent:latest
+```
+
+In `docker compose` or an `.env` file:
+
+```yaml
+services:
+  agent:
+    image: kerberos/agent:latest
+    environment:
+      AGENT_CLOUD: kstorage
+      AGENT_KERBEROSVAULT_CUSTOM_HEADERS: '{"site_id":"site-1","line_id":"line-2","equipment_id":"equipment-3"}'
+```
+
+```dotenv
+AGENT_KERBEROSVAULT_CUSTOM_HEADERS={"site_id":"site-1","line_id":"line-2","equipment_id":"equipment-3"}
+```
+
+In Kubernetes, quote the value so YAML keeps it as a string:
+
+```yaml
+env:
+  - name: AGENT_KERBEROSVAULT_CUSTOM_HEADERS
+    value: '{"site_id":"site-1","line_id":"line-2","equipment_id":"equipment-3"}'
+```
+
+Use `AGENT_KERBEROSVAULT_SECONDARY_CUSTOM_HEADERS` for the secondary Vault. In
+ConfigMap deployments you can set shared defaults with the `GLOBAL_` prefix
+(for example `GLOBAL_AGENT_KERBEROSVAULT_CUSTOM_HEADERS`) and override them per
+agent with `AGENT_KERBEROSVAULT_CUSTOM_HEADERS`. You can also set the same JSON
+under **Settings → Persistence → Custom upload headers** in the Agent UI, which
+stores it as `kstorage.custom_headers` in `config.json`.
+
+The rules for this value are:
+
+- It must be a JSON object with string values. Numbers, arrays, and nested
+  objects are rejected.
+- It can contain up to 32 headers, with names up to 128 characters and values
+  up to 4096 bytes.
+- Header names must be valid HTTP tokens (letters, digits, and ``!#$%&'*+-.^_`|~``).
+  Keys are matched case-insensitively, so `site_id` and `SITE_ID` cannot both
+  be used.
+- Reserved names are rejected: anything starting with `X-Kerberos-`,
+  `Authorization`, `Cookie`, `Host`, `Content-Type`, `Content-Length`,
+  `Trace-Id`, tus protocol headers (`Tus-Resumable`, `Upload-*`), and
+  hop-by-hop headers.
+- Values cannot contain line breaks or control characters.
+
+If the value is invalid, the Agent logs an error and does not upload to that
+Vault until the configuration is fixed. The recording stays queued, so it will
+upload once the value is corrected. Header names reach Vault unchanged, but
+proxies may normalise their casing.
+
 
 ## Encryption
 
