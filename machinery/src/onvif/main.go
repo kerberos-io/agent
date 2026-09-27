@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -130,7 +132,7 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 
 					if onvifAction.Action == "absolute-move" {
 
-						// We will move the camera to zero position.
+						// Move the camera to the saved absolute position.
 						x := ptzAction.X
 						y := ptzAction.Y
 						z := ptzAction.Z
@@ -141,41 +143,12 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 						// Log functions
 						log.Debug("onvif.HandleONVIFActions(): functions: " + strings.Join(functions, ", "))
 
-						// Check if we need to use absolute or continuous move
-						/*canAbsoluteMove := false
-						canContinuousMove := false
-
-						if len(functions) > 0 {
-							for _, function := range functions {
-								if function == "AbsolutePanTiltMove" || function == "AbsoluteZoomMove" {
-									canAbsoluteMove = true
-								} else if function == "ContinuousPanTiltMove" || function == "ContinuousZoomMove" {
-									canContinuousMove = true
-								}
-							}
-						}*/
-
-						// Ideally we should be able to use the AbsolutePanTiltMove function, but it looks like
-						// the current detection through GetPTZFuntionsFromDevice is not working properly. Therefore we will fallback
-						// on the ContinuousPanTiltMove function which is more compatible with more cameras.
-						err = AbsolutePanTiltMoveFake(device, configurations, token, x, y, z)
+						err = MoveToPosition(device, configurations, token, x, y, z)
 						if err != nil {
-							log.Debug("onvif.HandleONVIFActions() - AbsolutePanTitleMoveFake: " + err.Error())
+							log.Error("onvif.HandleONVIFActions() - MoveToPosition: " + err.Error())
 						} else {
-							log.Info("onvif.HandleONVIFActions() - AbsolutePanTitleMoveFake: successfully moved camera.")
+							log.Info("onvif.HandleONVIFActions() - MoveToPosition: successfully moved camera.")
 						}
-
-						/*if canAbsoluteMove {
-							err = AbsolutePanTiltMove(device, configurations, token, x, y, z)
-							if err != nil {
-								log.Error("HandleONVIFActions (AbsolutePanTitleMove): " + err.Error())
-							}
-						} else if canContinuousMove {
-							err = AbsolutePanTiltMoveFake(device, configurations, token, x, y, z)
-							if err != nil {
-								log.Error("HandleONVIFActions (AbsolutePanTitleMoveFake): " + err.Error())
-							}
-						}*/
 
 					} else if onvifAction.Action == "preset" {
 
@@ -471,16 +444,20 @@ func handleONVIFResponse(operation string, response *http.Response, requestErr e
 }
 
 func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, tilt float64, zoom float64) error {
+	if len(configuration.PTZConfiguration) == 0 {
+		return errors.New("camera returned no PTZ configuration")
+	}
+	ptzConfiguration := configuration.PTZConfiguration[0]
 
 	absolutePantiltVector := xsdonvif.Vector2D{
 		X:     pan,
 		Y:     tilt,
-		Space: configuration.PTZConfiguration[0].DefaultAbsolutePantTiltPositionSpace,
+		Space: ptzConfiguration.DefaultAbsolutePantTiltPositionSpace,
 	}
 
 	absoluteZoomVector := xsdonvif.Vector1D{
 		X:     zoom,
-		Space: configuration.PTZConfiguration[0].DefaultAbsoluteZoomPositionSpace,
+		Space: ptzConfiguration.DefaultAbsoluteZoomPositionSpace,
 	}
 
 	resp, err := device.CallMethod(ptz.AbsoluteMove{
@@ -493,240 +470,325 @@ func AbsolutePanTiltMove(device *onvif.Device, configuration ptz.GetConfiguratio
 	return handleONVIFResponse("absolute_move", resp, err)
 }
 
-// This function will simulate the AbsolutePanTiltMove function.
-// However the AboslutePanTiltMove function is not working on all cameras.
-// So we'll use the ContinuousMove function to simulate the AbsolutePanTiltMove function using the position polling.
-func AbsolutePanTiltMoveFake(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, tilt float64, zoom float64) error {
-	position, err := GetPosition(device, token)
-	if position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01 && position.PanTilt.Y >= tilt-0.01 && position.PanTilt.Y <= tilt+0.01 && position.Zoom.X >= zoom-0.01 && position.Zoom.X <= zoom+0.01 {
-		log.Debug("AbsolutePanTiltMoveFake: already at position")
-	} else {
-
-		// The speed of panning, the higher the faster we'll pan the camera
-		// value is a range between 0 and 1.
-		speed := 0.6
-		wait := 100 * time.Millisecond
-
-		// We'll move quickly to the position (might be inaccurate)
-		err = ZoomOutCompletely(device, configuration, token)
-		err = PanUntilPosition(device, configuration, token, pan, zoom, speed, wait)
-		err = TiltUntilPosition(device, configuration, token, tilt, zoom, speed, wait)
-
-		// Now we'll move a bit slower to make sure we are ok (will be more accurate)
-		speed = 0.1
-		wait = 200 * time.Millisecond
-
-		err = PanUntilPosition(device, configuration, token, pan, zoom, speed, wait)
-		err = TiltUntilPosition(device, configuration, token, tilt, zoom, speed, wait)
-		err = ZoomUntilPosition(device, configuration, token, zoom, speed, wait)
-
-		return err
-	}
-	return err
+type ptzMoveClient interface {
+	GetPosition() (xsdonvif.PTZVector, error)
+	AbsoluteMove(ptzTarget) error
+	ContinuousMove(ptzVelocity) error
+	Stop() error
 }
 
-func ZoomOutCompletely(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken) error {
-	// Zoom out completely!!!
-	zoomOut := xsdonvif.Vector1D{
-		X:     -1,
-		Space: configuration.PTZConfiguration[0].DefaultContinuousZoomVelocitySpace,
+type ptzTarget struct {
+	Pan  float64
+	Tilt float64
+	Zoom float64
+}
+
+type ptzVelocity struct {
+	Pan  float64
+	Tilt float64
+	Zoom float64
+}
+
+type ptzMoveSupport struct {
+	Absolute   bool
+	Continuous bool
+}
+
+type ptzMoveOptions struct {
+	PanTolerance      float64
+	TiltTolerance     float64
+	ZoomTolerance     float64
+	NativeTimeout     time.Duration
+	ContinuousTimeout time.Duration
+	NoProgressTimeout time.Duration
+	PollInterval      time.Duration
+	ProgressEpsilon   float64
+	VelocityGain      float64
+	MinVelocity       float64
+	MaxVelocity       float64
+	VelocityChange    float64
+}
+
+var defaultPTZMoveOptions = ptzMoveOptions{
+	PanTolerance:      0.01,
+	TiltTolerance:     0.005,
+	ZoomTolerance:     0.005,
+	NativeTimeout:     8 * time.Second,
+	ContinuousTimeout: 15 * time.Second,
+	NoProgressTimeout: 3 * time.Second,
+	PollInterval:      150 * time.Millisecond,
+	ProgressEpsilon:   0.001,
+	VelocityGain:      1.5,
+	MinVelocity:       0.08,
+	MaxVelocity:       0.7,
+	VelocityChange:    0.05,
+}
+
+type devicePTZMoveClient struct {
+	device        *onvif.Device
+	configuration xsdonvif.PTZConfiguration
+	token         xsdonvif.ReferenceToken
+}
+
+func (client *devicePTZMoveClient) GetPosition() (xsdonvif.PTZVector, error) {
+	return GetPosition(client.device, client.token)
+}
+
+func (client *devicePTZMoveClient) AbsoluteMove(target ptzTarget) error {
+	configuration := ptz.GetConfigurationsResponse{
+		PTZConfiguration: []xsdonvif.PTZConfiguration{client.configuration},
 	}
-	_, err := device.CallMethod(ptz.ContinuousMove{
-		ProfileToken: &token,
-		Velocity: xsdonvif.PTZSpeedZoom{
-			Zoom: zoomOut,
+	return AbsolutePanTiltMove(client.device, configuration, client.token, target.Pan, target.Tilt, target.Zoom)
+}
+
+func (client *devicePTZMoveClient) ContinuousMove(velocity ptzVelocity) error {
+	panTilt := xsdonvif.Vector2D{
+		X:     velocity.Pan,
+		Y:     velocity.Tilt,
+		Space: client.configuration.DefaultContinuousPanTiltVelocitySpace,
+	}
+	zoom := xsdonvif.Vector1D{
+		X:     velocity.Zoom,
+		Space: client.configuration.DefaultContinuousZoomVelocitySpace,
+	}
+	resp, err := client.device.CallMethod(ptz.ContinuousMove{
+		ProfileToken: &client.token,
+		Velocity: ptz.Speed{
+			PanTilt: &panTilt,
+			Zoom:    &zoom,
 		},
 	})
-	if err != nil {
-		log.Error("ZoomOutCompletely: " + err.Error())
-	}
+	return handleONVIFResponse("continuous_move_to_position", resp, err)
+}
 
-	for {
-		position, _ := GetPosition(device, token)
-		if position.Zoom.X == 0 {
-			break
-		}
-		time.Sleep(250 * time.Millisecond)
-	}
-
-	_, err = device.CallMethod(ptz.Stop{
-		ProfileToken: token,
+func (client *devicePTZMoveClient) Stop() error {
+	resp, err := client.device.CallMethod(ptz.Stop{
+		ProfileToken: client.token,
+		PanTilt:      true,
 		Zoom:         true,
 	})
+	return handleONVIFResponse("move_to_position_stop", resp, err)
+}
+
+func MoveToPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, tilt float64, zoom float64) error {
+	if len(configuration.PTZConfiguration) == 0 {
+		return errors.New("camera returned no PTZ configuration")
+	}
+	ptzConfiguration := configuration.PTZConfiguration[0]
+	client := &devicePTZMoveClient{
+		device:        device,
+		configuration: ptzConfiguration,
+		token:         token,
+	}
+	support := ptzMoveSupport{
+		Absolute: ptzConfiguration.DefaultAbsolutePantTiltPositionSpace != nil &&
+			ptzConfiguration.DefaultAbsoluteZoomPositionSpace != nil,
+		Continuous: ptzConfiguration.DefaultContinuousPanTiltVelocitySpace != nil &&
+			ptzConfiguration.DefaultContinuousZoomVelocitySpace != nil,
+	}
+	return moveToPosition(client, support, ptzTarget{Pan: pan, Tilt: tilt, Zoom: zoom}, defaultPTZMoveOptions)
+}
+
+// AbsolutePanTiltMoveFake preserves the continuous-move compatibility path for callers that explicitly request it.
+func AbsolutePanTiltMoveFake(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, tilt float64, zoom float64) error {
+	if len(configuration.PTZConfiguration) == 0 {
+		return errors.New("camera returned no PTZ configuration")
+	}
+	ptzConfiguration := configuration.PTZConfiguration[0]
+	client := &devicePTZMoveClient{
+		device:        device,
+		configuration: ptzConfiguration,
+		token:         token,
+	}
+	support := ptzMoveSupport{
+		Continuous: ptzConfiguration.DefaultContinuousPanTiltVelocitySpace != nil &&
+			ptzConfiguration.DefaultContinuousZoomVelocitySpace != nil,
+	}
+	return moveToPosition(client, support, ptzTarget{Pan: pan, Tilt: tilt, Zoom: zoom}, defaultPTZMoveOptions)
+}
+
+func moveToPosition(client ptzMoveClient, support ptzMoveSupport, target ptzTarget, options ptzMoveOptions) error {
+	if err := validatePTZTarget(target); err != nil {
+		return err
+	}
+
+	position, err := client.GetPosition()
 	if err != nil {
-		log.Error("ZoomOutCompletely: " + err.Error())
+		return fmt.Errorf("read initial PTZ position: %w", err)
 	}
-	return err
+	_, _, reached, err := ptzTargetError(position, target, options)
+	if err != nil {
+		return err
+	}
+	if reached {
+		return nil
+	}
+
+	var nativeErr error
+	if support.Absolute {
+		if err := client.AbsoluteMove(target); err != nil {
+			nativeErr = fmt.Errorf("native absolute move: %w", err)
+		} else if err := waitForPTZTarget(client, target, options.NativeTimeout, options); err != nil {
+			nativeErr = fmt.Errorf("verify native absolute move: %w", err)
+		} else {
+			return nil
+		}
+
+		if err := client.Stop(); err != nil {
+			nativeErr = errors.Join(nativeErr, fmt.Errorf("stop native absolute move: %w", err))
+		}
+		log.WithError(nativeErr).Warn("Native ONVIF absolute move failed; using continuous-move fallback")
+	}
+
+	if !support.Continuous {
+		if nativeErr != nil {
+			return errors.Join(nativeErr, errors.New("camera does not advertise complete continuous PTZ support"))
+		}
+		return errors.New("camera does not advertise a supported absolute or continuous PTZ movement method")
+	}
+
+	if err := moveContinuouslyToPTZTarget(client, target, options); err != nil {
+		if nativeErr != nil {
+			return errors.Join(nativeErr, fmt.Errorf("continuous-move fallback: %w", err))
+		}
+		return fmt.Errorf("continuous move: %w", err)
+	}
+	return nil
 }
 
-func PanUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, zoom float64, speed float64, wait time.Duration) error {
-	position, err := GetPosition(device, token)
+func waitForPTZTarget(client ptzMoveClient, target ptzTarget, timeout time.Duration, options ptzMoveOptions) error {
+	deadline := time.Now().Add(timeout)
+	lastProgress := time.Now()
+	bestDistance := math.Inf(1)
 
-	if position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01 {
-
-	} else {
-
-		// We'll need to determine if we need to move CW or CCW.
-		// Check the current position and compare it with the desired position.
-		directionX := speed
-		if position.PanTilt.X > pan {
-			directionX = speed * -1
-		}
-
-		panTiltVector := xsdonvif.Vector2D{
-			X:     directionX,
-			Y:     0,
-			Space: configuration.PTZConfiguration[0].DefaultContinuousPanTiltVelocitySpace,
-		}
-		resp, err := device.CallMethod(ptz.ContinuousMove{
-			ProfileToken: &token,
-			Velocity: xsdonvif.PTZSpeedPanTilt{
-				PanTilt: panTiltVector,
-			},
-		})
-		err = handleONVIFResponse("continuous_pan", resp, err)
-
-		// While moving we'll check if we reached the desired position.
-		// or if we overshot the desired position.
-
-		// Break after 3seconds
-		now := time.Now()
-		for {
-			position, _ := GetPosition(device, token)
-			if position.PanTilt.X == -1 || position.PanTilt.X == 1 || (directionX > 0 && position.PanTilt.X >= pan) || (directionX < 0 && position.PanTilt.X <= pan) || (position.PanTilt.X >= pan-0.01 && position.PanTilt.X <= pan+0.01) {
-				break
-			}
-			if time.Since(now) > 3*time.Second {
-				break
-			}
-			time.Sleep(wait)
-		}
-
-		_, err = device.CallMethod(ptz.Stop{
-			ProfileToken: token,
-			PanTilt:      true,
-			Zoom:         true,
-		})
-
+	for {
+		position, err := client.GetPosition()
 		if err != nil {
-			log.Error("ContinuousPanTiltMove (Pan): " + err.Error())
+			return fmt.Errorf("read PTZ position: %w", err)
 		}
+		_, distance, reached, err := ptzTargetError(position, target, options)
+		if err != nil {
+			return err
+		}
+		if reached {
+			return nil
+		}
+
+		now := time.Now()
+		if bestDistance-distance >= options.ProgressEpsilon {
+			bestDistance = distance
+			lastProgress = now
+		}
+		if !now.Before(deadline) {
+			return fmt.Errorf("target not reached within %s", timeout)
+		}
+		if now.Sub(lastProgress) >= options.NoProgressTimeout {
+			return fmt.Errorf("PTZ position made no progress for %s", options.NoProgressTimeout)
+		}
+		time.Sleep(options.PollInterval)
 	}
-	return err
 }
 
-func TiltUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, tilt float64, zoom float64, speed float64, wait time.Duration) error {
-	position, err := GetPosition(device, token)
+func moveContinuouslyToPTZTarget(client ptzMoveClient, target ptzTarget, options ptzMoveOptions) (err error) {
+	defer func() {
+		if stopErr := client.Stop(); stopErr != nil {
+			err = errors.Join(err, fmt.Errorf("stop continuous move: %w", stopErr))
+		}
+	}()
 
-	if position.PanTilt.Y >= tilt-0.005 && position.PanTilt.Y <= tilt+0.005 {
+	deadline := time.Now().Add(options.ContinuousTimeout)
+	lastProgress := time.Now()
+	bestDistance := math.Inf(1)
+	var lastVelocity ptzVelocity
+	haveVelocity := false
 
-	} else {
-
-		// We'll need to determine if we need to move CW or CCW.
-		// Check the current position and compare it with the desired position.
-		directionY := speed
-		if position.PanTilt.Y > tilt {
-			directionY = speed * -1
+	for {
+		position, positionErr := client.GetPosition()
+		if positionErr != nil {
+			return fmt.Errorf("read PTZ position: %w", positionErr)
+		}
+		delta, distance, reached, targetErr := ptzTargetError(position, target, options)
+		if targetErr != nil {
+			return targetErr
+		}
+		if reached {
+			return nil
 		}
 
-		panTiltVector := xsdonvif.Vector2D{
-			X:     0,
-			Y:     directionY,
-			Space: configuration.PTZConfiguration[0].DefaultContinuousPanTiltVelocitySpace,
-		}
-
-		velocity := xsdonvif.PTZSpeedPanTilt{
-			PanTilt: panTiltVector,
-		}
-
-		resp, err := device.CallMethod(ptz.ContinuousMove{
-			ProfileToken: &token,
-			Velocity:     velocity,
-		})
-		err = handleONVIFResponse("continuous_tilt", resp, err)
-
-		// While moving we'll check if we reached the desired position.
-		// or if we overshot the desired position.
-
-		// Break after 3seconds
 		now := time.Now()
-		for {
-			position, _ := GetPosition(device, token)
-			if position.PanTilt.Y == -1 || position.PanTilt.Y == 1 || (directionY > 0 && position.PanTilt.Y >= tilt) || (directionY < 0 && position.PanTilt.Y <= tilt) || (position.PanTilt.Y >= tilt-0.005 && position.PanTilt.Y <= tilt+0.005) {
-				break
-			}
-			if time.Since(now) > 3*time.Second {
-				break
-			}
-			time.Sleep(wait)
+		if bestDistance-distance >= options.ProgressEpsilon {
+			bestDistance = distance
+			lastProgress = now
+		}
+		if !now.Before(deadline) {
+			return fmt.Errorf("target not reached within %s", options.ContinuousTimeout)
+		}
+		if now.Sub(lastProgress) >= options.NoProgressTimeout {
+			return fmt.Errorf("PTZ position made no progress for %s", options.NoProgressTimeout)
 		}
 
-		_, err = device.CallMethod(ptz.Stop{
-			ProfileToken: token,
-			PanTilt:      true,
-			Zoom:         true,
-		})
-
-		if err != nil {
-			log.Error("ContinuousPanTiltMove (Tilt): " + err.Error())
+		velocity := ptzVelocity{
+			Pan:  proportionalPTZVelocity(delta.Pan, options.PanTolerance, options),
+			Tilt: proportionalPTZVelocity(delta.Tilt, options.TiltTolerance, options),
+			Zoom: proportionalPTZVelocity(delta.Zoom, options.ZoomTolerance, options),
 		}
+		if !haveVelocity || ptzVelocityChanged(lastVelocity, velocity, options.VelocityChange) {
+			if moveErr := client.ContinuousMove(velocity); moveErr != nil {
+				return fmt.Errorf("set continuous PTZ velocity: %w", moveErr)
+			}
+			lastVelocity = velocity
+			haveVelocity = true
+		}
+		time.Sleep(options.PollInterval)
 	}
-	return err
 }
 
-func ZoomUntilPosition(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, zoom float64, speed float64, wait time.Duration) error {
-	position, err := GetPosition(device, token)
+func ptzTargetError(position xsdonvif.PTZVector, target ptzTarget, options ptzMoveOptions) (ptzVelocity, float64, bool, error) {
+	if position.PanTilt == nil || position.Zoom == nil {
+		return ptzVelocity{}, 0, false, errors.New("camera returned an incomplete PTZ position")
+	}
+	delta := ptzVelocity{
+		Pan:  target.Pan - position.PanTilt.X,
+		Tilt: target.Tilt - position.PanTilt.Y,
+		Zoom: target.Zoom - position.Zoom.X,
+	}
+	reached := math.Abs(delta.Pan) <= options.PanTolerance &&
+		math.Abs(delta.Tilt) <= options.TiltTolerance &&
+		math.Abs(delta.Zoom) <= options.ZoomTolerance
+	distance := math.Abs(delta.Pan) + math.Abs(delta.Tilt) + math.Abs(delta.Zoom)
+	return delta, distance, reached, nil
+}
 
-	if position.Zoom.X >= zoom-0.005 && position.Zoom.X <= zoom+0.005 {
+func proportionalPTZVelocity(delta float64, tolerance float64, options ptzMoveOptions) float64 {
+	if math.Abs(delta) <= tolerance {
+		return 0
+	}
+	speed := math.Abs(delta) * options.VelocityGain
+	speed = math.Max(options.MinVelocity, math.Min(speed, options.MaxVelocity))
+	return math.Copysign(speed, delta)
+}
 
-	} else {
+func ptzVelocityChanged(previous ptzVelocity, next ptzVelocity, threshold float64) bool {
+	return math.Abs(previous.Pan-next.Pan) >= threshold ||
+		math.Abs(previous.Tilt-next.Tilt) >= threshold ||
+		math.Abs(previous.Zoom-next.Zoom) >= threshold
+}
 
-		// We'll need to determine if we need to move CW or CCW.
-		// Check the current position and compare it with the desired position.
-		directionZ := speed
-		if position.Zoom.X > zoom {
-			directionZ = speed * -1
-		}
-
-		zoomVector := xsdonvif.Vector1D{
-			X:     directionZ,
-			Space: configuration.PTZConfiguration[0].DefaultContinuousZoomVelocitySpace,
-		}
-		resp, err := device.CallMethod(ptz.ContinuousMove{
-			ProfileToken: &token,
-			Velocity: xsdonvif.PTZSpeedZoom{
-				Zoom: zoomVector,
-			},
-		})
-		err = handleONVIFResponse("continuous_zoom_to_position", resp, err)
-
-		// While moving we'll check if we reached the desired position.
-		// or if we overshot the desired position.
-
-		// Break after 3seconds
-		now := time.Now()
-		for {
-			position, _ := GetPosition(device, token)
-			if position.Zoom.X == -1 || position.Zoom.X == 1 || (directionZ > 0 && position.Zoom.X >= zoom) || (directionZ < 0 && position.Zoom.X <= zoom) || (position.Zoom.X >= zoom-0.005 && position.Zoom.X <= zoom+0.005) {
-				break
-			}
-			if time.Since(now) > 3*time.Second {
-				break
-			}
-			time.Sleep(wait)
-		}
-
-		_, err = device.CallMethod(ptz.Stop{
-			ProfileToken: token,
-			PanTilt:      true,
-			Zoom:         true,
-		})
-
-		if err != nil {
-			log.Error("ContinuousPanTiltMove (Zoom): " + err.Error())
+func validatePTZTarget(target ptzTarget) error {
+	values := []struct {
+		name  string
+		value float64
+	}{
+		{name: "pan", value: target.Pan},
+		{name: "tilt", value: target.Tilt},
+		{name: "zoom", value: target.Zoom},
+	}
+	for _, value := range values {
+		if math.IsNaN(value.value) || math.IsInf(value.value, 0) {
+			return fmt.Errorf("invalid PTZ %s target", value.name)
 		}
 	}
-	return err
+	return nil
 }
 
 func ContinuousPanTilt(device *onvif.Device, configuration ptz.GetConfigurationsResponse, token xsdonvif.ReferenceToken, pan float64, tilt float64) error {
@@ -894,6 +956,10 @@ func GetPTZFunctionsFromDevice(configurations ptz.GetConfigurationsResponse) ([]
 	var functions []string
 	canZoom := false
 	canPanTilt := false
+
+	if len(configurations.PTZConfiguration) == 0 {
+		return functions, canZoom, canPanTilt
+	}
 
 	if configurations.PTZConfiguration[0].DefaultAbsolutePantTiltPositionSpace != nil {
 		functions = append(functions, "AbsolutePanTiltMove")
