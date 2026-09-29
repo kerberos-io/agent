@@ -1070,6 +1070,10 @@ func Base64Image(captureDevice *Capture, communication *models.Communication, co
 					count++
 					continue
 				}
+			} else {
+				// A stopped run closes this queue permanently. Retrying its
+				// cursor would spin on EOF even after the HTTP client leaves.
+				break
 			}
 		} else {
 			break
@@ -1113,6 +1117,10 @@ func JpegImage(captureDevice *Capture, communication *models.Communication) imag
 				} else {
 					break
 				}
+			} else {
+				// A stopped run closes this queue permanently. Retrying its
+				// cursor would spin on EOF even after the HTTP client leaves.
+				break
 			}
 		} else {
 			break
