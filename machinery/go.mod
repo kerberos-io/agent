@@ -25,7 +25,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/kellydunn/golang-geo v0.7.0
 	github.com/kerberos-io/joy4 v1.0.64
-	github.com/kerberos-io/onvif v1.2.2
+	github.com/kerberos-io/onvif v1.2.3
 	github.com/minio/minio-go/v6 v6.0.57
 	github.com/moq-dev/moq-go v0.5.7
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
