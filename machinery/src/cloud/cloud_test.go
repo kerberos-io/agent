@@ -15,6 +15,7 @@ import (
 	goonvif "github.com/kerberos-io/onvif"
 	goonvifdevice "github.com/kerberos-io/onvif/device"
 	goonvifptz "github.com/kerberos-io/onvif/ptz"
+	goonvifxsd "github.com/kerberos-io/onvif/xsd/onvif"
 )
 
 func TestHeartbeatFailureLogOmitsHubResponseBody(t *testing.T) {
@@ -589,4 +590,61 @@ func countString(values []string, want string) int {
 		}
 	}
 	return count
+}
+
+// Some devices accept the subscription but reject the pulls, or never publish
+// the initial I/O state. The relay outputs and digital inputs must then be
+// queried directly instead of reporting no I/O at all.
+func TestHeartbeatONVIFPayloadFallsBackToDirectIOWhenSubscriptionsReturnNoEvents(t *testing.T) {
+	restoreHeartbeatONVIFStubs(t)
+
+	device := newTestONVIFDevice()
+	camera := models.IPCamera{
+		ONVIFXAddr:    "http://camera/onvif",
+		ONVIFUsername: "operator",
+		ONVIFPassword: "secret",
+	}
+
+	state := newHeartbeatONVIFState()
+	state.cameraConfiguration = camera
+	state.cameraKey = heartbeatONVIFCameraKey(camera)
+	state.device = device
+	state.staticLoaded = true
+	state.staticPayload.enabled = "true"
+
+	heartbeatCreatePullPointSubscription = func(*goonvif.Device) (string, error) {
+		return "pull-point", nil
+	}
+	heartbeatGetEventMessages = func(*goonvif.Device, string) ([]agentonvif.ONVIFEvents, error) {
+		return nil, errors.New("pull rejected")
+	}
+	heartbeatUnsubscribePullPoint = func(*goonvif.Device, string) error {
+		return nil
+	}
+	var relayCalls, inputCalls int
+	heartbeatGetRelayOutputs = func(*goonvif.Device) (goonvifdevice.GetRelayOutputsResponse, error) {
+		relayCalls++
+		return goonvifdevice.GetRelayOutputsResponse{RelayOutputs: []goonvifxsd.RelayOutput{{DeviceEntity: goonvifxsd.DeviceEntity{Token: "relay0"}}}}, nil
+	}
+	heartbeatGetDigitalInputs = func(*goonvif.Device) (goonvifdevice.GetDigitalInputsResponse, error) {
+		inputCalls++
+		return goonvifdevice.GetDigitalInputsResponse{DigitalInputs: []goonvifxsd.DigitalInput{{Token: "di0"}}}, nil
+	}
+
+	payload := getHeartbeatONVIFPayload(camera, state)
+
+	if relayCalls != 1 || inputCalls != 1 {
+		t.Fatalf("direct I/O queries: relay=%d inputs=%d, want 1 each", relayCalls, inputCalls)
+	}
+	var events []agentonvif.ONVIFEvents
+	if err := json.Unmarshal(payload.eventsList, &events); err != nil {
+		t.Fatalf("payload.eventsList is not valid JSON: %v", err)
+	}
+	got := map[string]string{}
+	for _, event := range events {
+		got[event.Key] = event.Type
+	}
+	if got["relay0"] != "output" || got["di0"] != "input" || len(got) != 2 {
+		t.Fatalf("payload.eventsList = %s, want relay0 output and di0 input", payload.eventsList)
+	}
 }

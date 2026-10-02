@@ -541,11 +541,21 @@ func (state *heartbeatONVIFState) fetchEvents(device *goonvif.Device) ([]byte, b
 		}
 	}
 
-	if !initialStateSubscriptionCreated && state.loopPullPoint == "" {
+	// Fall back to querying the relay outputs and digital inputs directly when
+	// no subscription could be created, and also when the subscriptions
+	// produced no I/O events: some devices accept the subscription but reject
+	// the pulls, or never publish the initial I/O state.
+	noSubscription := !initialStateSubscriptionCreated && state.loopPullPoint == ""
+	if noSubscription || heartbeatEventsListEmpty(onvifEventsList) {
 		return state.fallbackEvents(device), operationFailed
 	}
 
 	return onvifEventsList, operationFailed
+}
+
+func heartbeatEventsListEmpty(eventsList []byte) bool {
+	trimmed := strings.TrimSpace(string(eventsList))
+	return trimmed == "" || trimmed == "[]" || trimmed == "null"
 }
 
 func getHeartbeatONVIFPayload(camera models.IPCamera, state *heartbeatONVIFState) heartbeatONVIFPayload {
