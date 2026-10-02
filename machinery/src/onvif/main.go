@@ -1108,6 +1108,23 @@ func CreatePullPointSubscription(dev *onvif.Device) (string, error) {
 	return pullPointAdress, err
 }
 
+const (
+	wsAddressingNamespace = "http://www.w3.org/2005/08/addressing"
+	pullMessagesAction    = "http://www.onvif.org/ver10/events/wsdl/PullPointSubscription/PullMessagesRequest"
+	unsubscribeAction     = "http://docs.oasis-open.org/wsn/bw-2/SubscriptionManager/UnsubscribeRequest"
+)
+
+// subscriptionAddressingHeader builds the WS-Addressing Action and To headers
+// for a request sent to a pull-point subscription. Some devices identify the
+// subscription from wsa:To rather than the request URL, and reject requests
+// without it as NotAuthorized.
+func subscriptionAddressingHeader(subscriptionAddress string, action string) string {
+	var address bytes.Buffer
+	_ = xml.EscapeText(&address, []byte(subscriptionAddress))
+	return `<wsa:Action xmlns:wsa="` + wsAddressingNamespace + `">` + action + `</wsa:Action>` +
+		`<wsa:To xmlns:wsa="` + wsAddressingNamespace + `">` + address.String() + `</wsa:To>`
+}
+
 func UnsubscribePullPoint(dev *onvif.Device, pullPointAddress string) error {
 
 	// Unsubscribe from the device
@@ -1121,7 +1138,7 @@ func UnsubscribePullPoint(dev *onvif.Device, pullPointAddress string) error {
 		return err
 	}
 
-	res, err := dev.SendSoap(pullPointAddress, string(requestBody))
+	res, err := dev.SendSoapWithHeader(pullPointAddress, string(requestBody), subscriptionAddressingHeader(pullPointAddress, unsubscribeAction))
 	if err != nil {
 		log.WithError(err).WithFields(log.Fields{
 			"component": "onvif",
@@ -1203,7 +1220,7 @@ func GetEventMessages(dev *onvif.Device, pullPointAddress string) ([]ONVIFEvents
 				log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
 				return eventsArray, err
 			}
-			res, err := dev.SendSoap(string(subscriptionURI), string(requestBody))
+			res, err := dev.SendSoapWithHeader(string(subscriptionURI), string(requestBody), subscriptionAddressingHeader(subscriptionURI, pullMessagesAction))
 			if err != nil {
 				log.Error("onvif.main.GetEventMessages(pullMessages): " + err.Error())
 				return eventsArray, err
