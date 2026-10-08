@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 )
 
 func TestPreRecordingGOPCount(t *testing.T) {
@@ -133,4 +135,99 @@ func TestRTSPSTLSConfig(t *testing.T) {
 			t.Fatal("rtspsTLSConfig() error = nil, want invalid CA error")
 		}
 	})
+}
+
+func TestVideoReferenceStateDropsDependentFramesUntilRandomAccess(t *testing.T) {
+	state := &videoReferenceState{}
+
+	accepted, recovered := state.accept(false)
+	if accepted || recovered != 0 || state.droppedAccessUnits != 1 {
+		t.Fatalf("initial dependent frame = (accepted=%t, recovered=%d, dropped=%d), want (false, 0, 1)",
+			accepted, recovered, state.droppedAccessUnits)
+	}
+
+	accepted, recovered = state.accept(true)
+	if !accepted || recovered != 1 || !state.valid {
+		t.Fatalf("random-access recovery = (accepted=%t, recovered=%d, valid=%t), want (true, 1, true)",
+			accepted, recovered, state.valid)
+	}
+
+	if expected, gap := state.observeSequence(100); gap || expected != 100 {
+		t.Fatalf("first sequence observation = (expected=%d, gap=%t), want (100, false)", expected, gap)
+	}
+	if expected, gap := state.observeSequence(102); !gap || expected != 101 || state.valid {
+		t.Fatalf("sequence gap = (expected=%d, gap=%t, valid=%t), want (101, true, false)",
+			expected, gap, state.valid)
+	}
+
+	accepted, recovered = state.accept(false)
+	if accepted || recovered != 0 || state.droppedAccessUnits != 1 {
+		t.Fatalf("post-loss dependent frame = (accepted=%t, recovered=%d, dropped=%d), want (false, 0, 1)",
+			accepted, recovered, state.droppedAccessUnits)
+	}
+
+	accepted, recovered = state.accept(true)
+	if !accepted || recovered != 1 || !state.valid {
+		t.Fatalf("post-loss recovery = (accepted=%t, recovered=%d, valid=%t), want (true, 1, true)",
+			accepted, recovered, state.valid)
+	}
+}
+
+func TestVideoReferenceStateAcceptsSequenceWraparound(t *testing.T) {
+	state := &videoReferenceState{valid: true}
+
+	if _, gap := state.observeSequence(^uint16(0)); gap {
+		t.Fatal("first sequence observation reported a gap")
+	}
+	if expected, gap := state.observeSequence(0); gap || expected != 0 || !state.valid {
+		t.Fatalf("sequence wraparound = (expected=%d, gap=%t, valid=%t), want (0, false, true)",
+			expected, gap, state.valid)
+	}
+}
+
+func TestH264FrameNumTrackerDetectsMissingIDR(t *testing.T) {
+	tracker := &h264FrameNumTracker{}
+	tracker.setSPS(&h264.SPS{
+		Log2MaxFrameNumMinus4: 1,
+		FrameMbsOnlyFlag:      true,
+	})
+
+	if _, _, gap, ok := tracker.observe([][]byte{testH264Slice(h264.NALUTypeIDR, 0)}); !ok || gap {
+		t.Fatalf("initial IDR observation = (ok=%t, gap=%t), want (true, false)", ok, gap)
+	}
+	for frameNum := uint32(1); frameNum <= 24; frameNum++ {
+		if expected, received, gap, ok := tracker.observe([][]byte{testH264Slice(h264.NALUTypeNonIDR, frameNum)}); !ok || gap {
+			t.Fatalf("frame_num %d observation = (expected=%d, received=%d, ok=%t, gap=%t), want no gap",
+				frameNum, expected, received, ok, gap)
+		}
+	}
+
+	expected, received, gap, ok := tracker.observe([][]byte{testH264Slice(h264.NALUTypeNonIDR, 1)})
+	if !ok || !gap || expected != 25 || received != 1 {
+		t.Fatalf("missing IDR transition = (expected=%d, received=%d, ok=%t, gap=%t), want (25, 1, true, true)",
+			expected, received, ok, gap)
+	}
+}
+
+func TestH264FrameNumTrackerResetsAtIDR(t *testing.T) {
+	tracker := &h264FrameNumTracker{}
+	tracker.setSPS(&h264.SPS{
+		Log2MaxFrameNumMinus4: 1,
+		FrameMbsOnlyFlag:      true,
+	})
+
+	tracker.observe([][]byte{testH264Slice(h264.NALUTypeIDR, 0)})
+	tracker.observe([][]byte{testH264Slice(h264.NALUTypeNonIDR, 1)})
+	if expected, received, gap, ok := tracker.observe([][]byte{testH264Slice(h264.NALUTypeIDR, 0)}); !ok || gap {
+		t.Fatalf("IDR reset = (expected=%d, received=%d, ok=%t, gap=%t), want no gap",
+			expected, received, ok, gap)
+	}
+	if expected, received, gap, ok := tracker.observe([][]byte{testH264Slice(h264.NALUTypeNonIDR, 1)}); !ok || gap || expected != 1 || received != 1 {
+		t.Fatalf("post-IDR frame = (expected=%d, received=%d, ok=%t, gap=%t), want (1, 1, true, false)",
+			expected, received, ok, gap)
+	}
+}
+
+func testH264Slice(naluType h264.NALUType, frameNum uint32) []byte {
+	return []byte{0x60 | byte(naluType), 0xE0 | byte(frameNum&0x1F)}
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/bluenviron/gortsplib/v5/pkg/format/rtplpcm"
 	"github.com/bluenviron/gortsplib/v5/pkg/format/rtpmpeg4audio"
 	"github.com/bluenviron/gortsplib/v5/pkg/format/rtpsimpleaudio"
+	"github.com/bluenviron/mediacommon/pkg/bits"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
 	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4audio"
@@ -159,13 +160,10 @@ type Golibrtsp struct {
 }
 
 // streamHealth instruments the RTSP read path. gortsplib delivers every RTP
-// packet on a single read goroutine; queue.WritePacket() is synchronous, so if
-// a downstream consumer (recording, muxing, WebRTC) is slow or the process is
-// CPU-starved, WritePacket() blocks, the TCP socket is not drained, and the
-// camera advances RTP sequence numbers -> "RTP packets lost". This type makes
-// the two failure modes distinguishable:
-//   - large writeMax / writeAvg  => downstream back-pressure (our side).
-//   - large gapMax with fast writes => upstream network / camera stall.
+// packet on a single read goroutine, so prolonged queue lock contention or
+// process starvation can delay socket reads. Queue consumers process packets
+// after releasing the lock; a slow recorder therefore falls behind its cursor
+// instead of directly blocking WritePacket.
 type streamHealth struct {
 	mu          sync.Mutex
 	windowStart time.Time
@@ -176,6 +174,149 @@ type streamHealth struct {
 	gapMax      time.Duration
 	lost        uint64
 	decodeErrs  int64
+}
+
+type videoReferenceState struct {
+	haveSequence       bool
+	lastSequence       uint16
+	valid              bool
+	droppedAccessUnits uint64
+}
+
+type h264FrameNumTracker struct {
+	sps          *h264.SPS
+	haveFrameNum bool
+	lastFrameNum uint32
+}
+
+const maxH264SliceHeaderBytes = 64
+
+func (t *h264FrameNumTracker) setSPS(sps *h264.SPS) {
+	if sps == nil {
+		return
+	}
+	if t.sps == nil ||
+		t.sps.Log2MaxFrameNumMinus4 != sps.Log2MaxFrameNumMinus4 ||
+		t.sps.SeparateColourPlaneFlag != sps.SeparateColourPlaneFlag ||
+		t.sps.FrameMbsOnlyFlag != sps.FrameMbsOnlyFlag {
+		t.haveFrameNum = false
+	}
+	copy := *sps
+	t.sps = &copy
+}
+
+func (t *h264FrameNumTracker) observe(au [][]byte) (uint32, uint32, bool, bool) {
+	if t.sps == nil || !t.sps.FrameMbsOnlyFlag {
+		return 0, 0, false, false
+	}
+
+	for _, nalu := range au {
+		if len(nalu) == 0 {
+			continue
+		}
+		naluType := h264.NALUType(nalu[0] & 0x1F)
+		if naluType != h264.NALUTypeIDR && naluType != h264.NALUTypeNonIDR {
+			continue
+		}
+
+		frameNum, err := h264SliceFrameNum(nalu, t.sps)
+		if err != nil {
+			return 0, 0, false, false
+		}
+		if naluType == h264.NALUTypeIDR {
+			t.haveFrameNum = true
+			t.lastFrameNum = frameNum
+			return frameNum, frameNum, false, true
+		}
+
+		// Non-reference pictures do not advance the reference-picture frame_num
+		// sequence and therefore cannot prove that a reference picture is missing.
+		if (nalu[0]>>5)&0x03 == 0 {
+			return frameNum, frameNum, false, true
+		}
+		if !t.haveFrameNum {
+			t.haveFrameNum = true
+			t.lastFrameNum = frameNum
+			return frameNum, frameNum, false, true
+		}
+
+		frameNumBits := t.sps.Log2MaxFrameNumMinus4 + 4
+		if frameNumBits > 16 {
+			return 0, 0, false, false
+		}
+		maxFrameNum := uint32(1) << frameNumBits
+		expected := (t.lastFrameNum + 1) & (maxFrameNum - 1)
+		gap := frameNum != expected
+		t.lastFrameNum = frameNum
+		return expected, frameNum, gap, true
+	}
+
+	return 0, 0, false, false
+}
+
+func h264SliceFrameNum(nalu []byte, sps *h264.SPS) (uint32, error) {
+	if len(nalu) < 2 || sps == nil {
+		return 0, errors.New("H264 slice or SPS is missing")
+	}
+	frameNumBits := sps.Log2MaxFrameNumMinus4 + 4
+	if frameNumBits > 16 {
+		return 0, fmt.Errorf("invalid H264 frame_num width: %d", frameNumBits)
+	}
+	header := nalu[1:]
+	if len(header) > maxH264SliceHeaderBytes {
+		header = header[:maxH264SliceHeaderBytes]
+	}
+	header = h264.EmulationPreventionRemove(header)
+	pos := 0
+
+	for range 3 {
+		if _, err := bits.ReadGolombUnsigned(header, &pos); err != nil {
+			return 0, fmt.Errorf("read H264 slice header: %w", err)
+		}
+	}
+	if sps.SeparateColourPlaneFlag {
+		if _, err := bits.ReadBits(header, &pos, 2); err != nil {
+			return 0, fmt.Errorf("read H264 colour plane: %w", err)
+		}
+	}
+	frameNum, err := bits.ReadBits(header, &pos, int(frameNumBits))
+	if err != nil {
+		return 0, fmt.Errorf("read H264 frame_num: %w", err)
+	}
+	return uint32(frameNum), nil
+}
+
+func (s *videoReferenceState) observeSequence(sequence uint16) (uint16, bool) {
+	expected := sequence
+	gap := false
+	if s.haveSequence {
+		expected = s.lastSequence + 1
+		gap = sequence != expected
+		if gap {
+			s.valid = false
+		}
+	}
+	s.haveSequence = true
+	s.lastSequence = sequence
+	return expected, gap
+}
+
+func (s *videoReferenceState) invalidate() {
+	s.valid = false
+}
+
+func (s *videoReferenceState) accept(randomAccess bool) (bool, uint64) {
+	if randomAccess {
+		dropped := s.droppedAccessUnits
+		s.droppedAccessUnits = 0
+		s.valid = true
+		return true, dropped
+	}
+	if !s.valid {
+		s.droppedAccessUnits++
+		return false, 0
+	}
+	return true, 0
 }
 
 const (
@@ -190,9 +331,9 @@ func newStreamHealth() *streamHealth {
 }
 
 // observePacket records one processed video frame: the wall-clock gap since the
-// previous frame (arrival cadence) and how long WritePacket() blocked
-// (back-pressure). It emits an immediate warning when either side stalls and a
-// periodic summary every streamHealthWindow.
+// previous frame and how long WritePacket spent acquiring and updating the
+// queue. It emits an immediate warning when either side stalls and a periodic
+// summary every streamHealthWindow.
 func (h *streamHealth) observePacket(streamType string, writeDur time.Duration) {
 	if h == nil {
 		return
@@ -264,9 +405,9 @@ func (h *streamHealth) observePacket(streamType string, writeDur time.Duration) 
 	}
 }
 
-// observeLost is invoked by gortsplib when RTP sequence numbers skip. On a TCP
-// transport this means the sender (camera) dropped packets because we were not
-// reading fast enough, not loss on the wire.
+// observeLost is invoked by gortsplib when RTP sequence numbers skip. With the
+// configured TCP transport, the sender or an upstream RTSP component omitted
+// those packets; sender-side pressure is one possible cause.
 func (h *streamHealth) observeLost(streamType string, lost uint64) {
 	if h == nil {
 		return
@@ -887,6 +1028,14 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	// called when a video RTP packet arrives for H264
 	var filteredAU [][]byte
 	if g.VideoH264Media != nil && g.VideoH264Forma != nil {
+		referenceState := &videoReferenceState{}
+		frameNumTracker := &h264FrameNumTracker{}
+		if len(g.VideoH264Forma.SPS) > 0 {
+			var sps h264.SPS
+			if sps.Unmarshal(g.VideoH264Forma.SPS) == nil {
+				frameNumTracker.setSPS(&sps)
+			}
+		}
 
 		// Extracts DTS from the bitstream to support B-frame H264 streams.
 		// Created once per stream (tracks reorder state across access units).
@@ -900,6 +1049,16 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 			case <-communication.HandleStream:
 				return
 			default:
+			}
+
+			if expected, gap := referenceState.observeSequence(rtppkt.SequenceNumber); gap {
+				log.WithFields(log.Fields{
+					"component":                "capture",
+					"event":                    "video_rtp_sequence_gap",
+					"expected_sequence_number": expected,
+					"received_sequence_number": rtppkt.SequenceNumber,
+					"stream":                   streamType,
+				}).Warn("RTP sequence gap invalidated video reference chain")
 			}
 
 			if len(rtppkt.Payload) > 0 {
@@ -917,6 +1076,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				// this is a keyframe.
 				au, errDecode := g.VideoH264Decoder.Decode(rtppkt)
 				if errDecode != nil {
+					if errDecode != rtph264.ErrMorePacketsNeeded {
+						referenceState.invalidate()
+					}
 					if errDecode != rtph264.ErrNonStartingPacketAndNoPrevious && errDecode != rtph264.ErrMorePacketsNeeded {
 						log.Error("capture.golibrtsp.Start(): " + errDecode.Error())
 					}
@@ -961,6 +1123,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 						if errSPS == nil {
 							// Debug SPS information
 							g.debugSPSInfo(&sps, streamType)
+							frameNumTracker.setSPS(&sps)
 
 							// Get width
 							g.Streams[g.VideoH264Index].Width = sps.Width()
@@ -1020,6 +1183,39 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 				if len(filteredAU) <= 1 || (!nonIDRPresent && !idrPresent) {
 					return
+				}
+
+				if expected, received, gap, ok := frameNumTracker.observe(au); ok && gap {
+					referenceState.invalidate()
+					log.WithFields(log.Fields{
+						"component":          "capture",
+						"event":              "h264_frame_num_gap",
+						"expected_frame_num": expected,
+						"received_frame_num": received,
+						"stream":             streamType,
+					}).Warn("H264 frame_num gap invalidated video reference chain")
+				}
+
+				accepted, recoveredDropped := referenceState.accept(idrPresent)
+				if !accepted {
+					if referenceState.droppedAccessUnits == 1 {
+						log.WithFields(log.Fields{
+							"codec":     "H264",
+							"component": "capture",
+							"event":     "dependent_access_units_dropped",
+							"stream":    streamType,
+						}).Warn("Dropping dependent video frames until the next IDR")
+					}
+					return
+				}
+				if recoveredDropped > 0 {
+					log.WithFields(log.Fields{
+						"codec":                "H264",
+						"component":            "capture",
+						"dropped_access_units": recoveredDropped,
+						"event":                "video_reference_chain_recovered",
+						"stream":               streamType,
+					}).Info("Video reference chain recovered at IDR")
 				}
 
 				if idrPresent {
@@ -1165,6 +1361,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 	// called when a video RTP packet arrives for H265
 	if g.VideoH265Media != nil && g.VideoH265Forma != nil {
+		referenceState := &videoReferenceState{}
 
 		// Extracts DTS from the bitstream to support B-frame H265 streams.
 		// Created once per stream (tracks reorder state across access units).
@@ -1178,6 +1375,16 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 			case <-communication.HandleStream:
 				return
 			default:
+			}
+
+			if expected, gap := referenceState.observeSequence(rtppkt.SequenceNumber); gap {
+				log.WithFields(log.Fields{
+					"component":                "capture",
+					"event":                    "video_rtp_sequence_gap",
+					"expected_sequence_number": expected,
+					"received_sequence_number": rtppkt.SequenceNumber,
+					"stream":                   streamType,
+				}).Warn("RTP sequence gap invalidated video reference chain")
 			}
 
 			if len(rtppkt.Payload) > 0 {
@@ -1195,6 +1402,9 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 				// this is a keyframe.
 				au, errDecode := g.VideoH265Decoder.Decode(rtppkt)
 				if errDecode != nil {
+					if errDecode != rtph265.ErrMorePacketsNeeded {
+						referenceState.invalidate()
+					}
 					if errDecode != rtph265.ErrNonStartingPacketAndNoPrevious && errDecode != rtph265.ErrMorePacketsNeeded {
 						log.Error("capture.golibrtsp.Start(): " + errDecode.Error())
 					}
@@ -1242,6 +1452,28 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 
 				if len(au) <= 1 {
 					return
+				}
+
+				accepted, recoveredDropped := referenceState.accept(isRandomAccess)
+				if !accepted {
+					if referenceState.droppedAccessUnits == 1 {
+						log.WithFields(log.Fields{
+							"codec":     "H265",
+							"component": "capture",
+							"event":     "dependent_access_units_dropped",
+							"stream":    streamType,
+						}).Warn("Dropping dependent video frames until the next random-access frame")
+					}
+					return
+				}
+				if recoveredDropped > 0 {
+					log.WithFields(log.Fields{
+						"codec":                "H265",
+						"component":            "capture",
+						"dropped_access_units": recoveredDropped,
+						"event":                "video_reference_chain_recovered",
+						"stream":               streamType,
+					}).Info("Video reference chain recovered at random-access frame")
 				}
 
 				// add VPS, SPS and PPS before random access access unit

@@ -40,6 +40,9 @@ func NewQueue() *Queue {
 }
 
 func (self *Queue) SetMaxGopCount(n int) {
+	if n < 1 {
+		n = 1
+	}
 	self.lock.Lock()
 	self.maxgopcount = n
 	self.lock.Unlock()
@@ -97,20 +100,31 @@ func (self *Queue) WritePacket(pkt Packet) (err error) {
 	self.lock.Lock()
 
 	self.buf.Push(pkt)
-	if pkt.Idx == int8(self.videoidx) && pkt.IsKeyFrame {
+	isVideoKeyframe := pkt.Idx == int8(self.videoidx) && pkt.IsKeyFrame
+	if isVideoKeyframe {
 		self.curgopcount++
-	}
 
-	for self.curgopcount >= self.maxgopcount && self.buf.Count > 1 {
-		pkt := self.buf.Pop()
-		if pkt.Idx == int8(self.videoidx) && pkt.IsKeyFrame {
-			self.curgopcount--
-		}
-		if self.curgopcount < self.maxgopcount {
-			break
+		for self.curgopcount > self.maxgopcount && self.buf.Count > 0 {
+			for self.buf.Count > 0 {
+				oldest := self.buf.Pop()
+				if oldest.Idx == int8(self.videoidx) && oldest.IsKeyFrame {
+					self.curgopcount--
+					break
+				}
+			}
+
+			// Discard the dependent frames from the evicted GOP as well. Keeping
+			// them would let an overrun cursor resume on a P-frame whose reference
+			// keyframe is no longer in the queue.
+			for self.buf.Count > 0 {
+				oldest := self.buf.Get(self.buf.Head)
+				if oldest.Idx == int8(self.videoidx) && oldest.IsKeyFrame {
+					break
+				}
+				self.buf.Pop()
+			}
 		}
 	}
-	//println("shrink", self.curgopcount, self.maxgopcount, self.buf.Head, self.buf.Tail, "count", self.buf.Count, "size", self.buf.Size)
 
 	self.cond.Broadcast()
 
