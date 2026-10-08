@@ -107,3 +107,102 @@ func TestQueueCursorReadPacketContextDoesNotAllocateWhenPacketIsAvailable(t *tes
 		t.Fatalf("ReadPacketContext() allocations = %.2f, want 0", allocations)
 	}
 }
+
+func TestQueueEvictionKeepsKeyframeAtHead(t *testing.T) {
+	queue := NewQueue()
+	if err := queue.WriteHeader([]Stream{{Index: 0, IsVideo: true}}); err != nil {
+		t.Fatal(err)
+	}
+	queue.SetMaxGopCount(2)
+
+	for _, packet := range []Packet{
+		{Idx: 0, IsVideo: true, IsKeyFrame: true, Data: []byte("IDR-0")},
+		{Idx: 1, IsAudio: true, Data: []byte("audio-0")},
+		{Idx: 0, IsVideo: true, Data: []byte("P-0")},
+		{Idx: 0, IsVideo: true, IsKeyFrame: true, Data: []byte("IDR-1")},
+		{Idx: 0, IsVideo: true, Data: []byte("P-1")},
+		{Idx: 0, IsVideo: true, IsKeyFrame: true, Data: []byte("IDR-2")},
+	} {
+		if err := queue.WritePacket(packet); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	oldest, err := queue.Oldest().ReadPacket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !oldest.IsKeyFrame || string(oldest.Data) != "IDR-1" {
+		t.Fatalf("oldest packet = %q (keyframe=%t), want IDR-1 keyframe", oldest.Data, oldest.IsKeyFrame)
+	}
+}
+
+func TestQueueWithSingleGOPRetainsCurrentKeyframe(t *testing.T) {
+	queue := NewQueue()
+	if err := queue.WriteHeader([]Stream{{Index: 0, IsVideo: true}}); err != nil {
+		t.Fatal(err)
+	}
+	queue.SetMaxGopCount(1)
+
+	for _, packet := range []Packet{
+		{Idx: 0, IsVideo: true, IsKeyFrame: true, Data: []byte("IDR-0")},
+		{Idx: 0, IsVideo: true, Data: []byte("P-0")},
+		{Idx: 0, IsVideo: true, IsKeyFrame: true, Data: []byte("IDR-1")},
+	} {
+		if err := queue.WritePacket(packet); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	oldest, err := queue.Oldest().ReadPacket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !oldest.IsKeyFrame || string(oldest.Data) != "IDR-1" {
+		t.Fatalf("oldest packet = %q (keyframe=%t), want IDR-1 keyframe", oldest.Data, oldest.IsKeyFrame)
+	}
+}
+
+func TestLaggingQueueCursorResumesAtKeyframe(t *testing.T) {
+	queue := NewQueue()
+	if err := queue.WriteHeader([]Stream{{Index: 0, IsVideo: true}}); err != nil {
+		t.Fatal(err)
+	}
+	queue.SetMaxGopCount(2)
+
+	for _, packet := range []Packet{
+		{Idx: 0, IsVideo: true, IsKeyFrame: true, Data: []byte("IDR-0")},
+		{Idx: 0, IsVideo: true, Data: []byte("P-0")},
+		{Idx: 0, IsVideo: true, IsKeyFrame: true, Data: []byte("IDR-1")},
+	} {
+		if err := queue.WritePacket(packet); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cursor := queue.Oldest()
+	first, err := cursor.ReadPacket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(first.Data) != "IDR-0" {
+		t.Fatalf("first packet = %q, want IDR-0", first.Data)
+	}
+
+	for _, packet := range []Packet{
+		{Idx: 0, IsVideo: true, Data: []byte("P-1")},
+		{Idx: 0, IsVideo: true, IsKeyFrame: true, Data: []byte("IDR-2")},
+	} {
+		if err := queue.WritePacket(packet); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	resumed, err := cursor.ReadPacket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resumed.IsKeyFrame || string(resumed.Data) != "IDR-1" {
+		t.Fatalf("resumed packet = %q (keyframe=%t), want IDR-1 keyframe", resumed.Data, resumed.IsKeyFrame)
+	}
+}
