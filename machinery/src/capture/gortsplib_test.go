@@ -228,6 +228,22 @@ func TestH264FrameNumTrackerResetsAtIDR(t *testing.T) {
 	}
 }
 
+func TestH264FrameNumTrackerHonorsPermittedGaps(t *testing.T) {
+	tracker := &h264FrameNumTracker{}
+	tracker.setSPS(&h264.SPS{
+		Log2MaxFrameNumMinus4:          1,
+		FrameMbsOnlyFlag:               true,
+		GapsInFrameNumValueAllowedFlag: true,
+	})
+
+	tracker.observe([][]byte{testH264Slice(h264.NALUTypeIDR, 0)})
+	expected, received, gap, ok := tracker.observe([][]byte{testH264Slice(h264.NALUTypeNonIDR, 2)})
+	if !ok || gap || expected != 1 || received != 2 {
+		t.Fatalf("permitted frame_num gap = (expected=%d, received=%d, ok=%t, gap=%t), want (1, 2, true, false)",
+			expected, received, ok, gap)
+	}
+}
+
 func testH264Slice(naluType h264.NALUType, frameNum uint32) []byte {
 	return []byte{0x60 | byte(naluType), 0xE0 | byte(frameNum&0x1F)}
 }

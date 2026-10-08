@@ -246,7 +246,10 @@ func (t *h264FrameNumTracker) observe(au [][]byte) (uint32, uint32, bool, bool) 
 		}
 		maxFrameNum := uint32(1) << frameNumBits
 		expected := (t.lastFrameNum + 1) & (maxFrameNum - 1)
-		gap := frameNum != expected
+		// When the SPS permits frame_num gaps, the decoder is required to
+		// synthesize non-existing pictures and the discontinuity is not evidence
+		// of transport loss. RTP/depacketizer errors still invalidate references.
+		gap := frameNum != expected && !t.sps.GapsInFrameNumValueAllowedFlag
 		t.lastFrameNum = frameNum
 		return expected, frameNum, gap, true
 	}
