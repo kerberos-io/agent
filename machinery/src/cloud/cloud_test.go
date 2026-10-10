@@ -77,6 +77,56 @@ func TestVerifyPersistenceKerberosHubUsesAuthorizationHead(t *testing.T) {
 	}
 }
 
+func TestVerifyPersistenceKerberosHubStripsCredentialsOnCrossHostRedirect(t *testing.T) {
+	var redirectedHeaders http.Header
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		redirectedHeaders = r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer target.Close()
+
+	var originalHeaders http.Header
+	hub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		originalHeaders = r.Header.Clone()
+		http.Redirect(w, r, target.URL+"/storage/upload", http.StatusTemporaryRedirect)
+	}))
+	defer hub.Close()
+
+	config := models.Config{
+		Cloud:         "kerberoshub",
+		Key:           "camera-1",
+		Name:          "front-door",
+		HubURI:        hub.URL,
+		HubKey:        "project-public",
+		HubPrivateKey: "project-private",
+		S3:            &models.S3{Region: "eu"},
+	}
+	payload, err := json.Marshal(config)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/persistence/verify", bytes.NewReader(payload))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	VerifyPersistence(ctx, t.TempDir())
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	for _, header := range []string{"X-Kerberos-Hub-PublicKey", "X-Kerberos-Hub-PrivateKey"} {
+		if originalHeaders.Get(header) == "" {
+			t.Errorf("%s was not sent to the configured Hub", header)
+		}
+		if got := redirectedHeaders.Get(header); got != "" {
+			t.Errorf("%s leaked to redirect target: %q", header, got)
+		}
+	}
+}
+
 func TestHubPersistenceVerificationErrorExplainsStatus(t *testing.T) {
 	for _, test := range []struct {
 		status int
