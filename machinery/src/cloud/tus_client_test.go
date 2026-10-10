@@ -934,6 +934,32 @@ func TestUploadKerberosHubFallsBackThroughHubAfterTusCreateServerErrors(t *testi
 	}
 }
 
+func TestTusCreateReportsSanitizedServerErrorCodes(t *testing.T) {
+	const sensitiveMessage = "credential=do-not-log-this"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = io.WriteString(w, "ERR_INTERNAL_SERVER_ERROR: operation error S3: CreateMultipartUpload, api error AccessDenied: "+sensitiveMessage)
+	}))
+	defer server.Close()
+
+	_, status, err := tusCreate(server.Client(), server.URL, 8, "", func(http.Header, string) {}, "f.mp4")
+	if status != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", status, http.StatusInternalServerError)
+	}
+	if err == nil {
+		t.Fatal("error = nil, want create failure")
+	}
+	message := err.Error()
+	for _, want := range []string{"ERR_INTERNAL_SERVER_ERROR", "backend=AccessDenied"} {
+		if !strings.Contains(message, want) {
+			t.Errorf("error %q does not contain %q", message, want)
+		}
+	}
+	if strings.Contains(message, sensitiveMessage) {
+		t.Fatalf("error exposed backend message: %q", message)
+	}
+}
+
 func TestUploadHubResumableDoesNotFallbackAfterCreateClientError(t *testing.T) {
 	srv := newFakeTus()
 	srv.createStatus = http.StatusBadRequest

@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -49,6 +50,12 @@ func resumableUploadsEnabled() bool {
 const tusDefaultChunkSize int64 = 8 << 20 // 8 MiB (>= S3 multipart minimum part size)
 
 const tusProgressBucketPercent int64 = 10
+const tusErrorBodyLimit int64 = 16 << 10
+
+var (
+	tusErrorCodePattern    = regexp.MustCompile(`\bERR_[A-Z0-9_]+\b`)
+	tusBackendErrorPattern = regexp.MustCompile(`\bapi error ([A-Za-z][A-Za-z0-9._-]{0,63}):`)
+)
 
 // tusChunkSize returns the number of bytes to send per PATCH request. It
 // defaults to tusDefaultChunkSize (8 MiB) and can be overridden with the
@@ -400,16 +407,33 @@ func tusCreate(client *http.Client, baseURL string, size int64, metadata string,
 	if err != nil {
 		return "", 0, err
 	}
-	io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, tusErrorBodyLimit))
+		_, _ = io.Copy(io.Discard, resp.Body)
+		details := tusErrorDetails(body)
+		if details != "" {
+			return "", resp.StatusCode, fmt.Errorf("unexpected status creating upload: %s (%s)", resp.Status, details)
+		}
 		return "", resp.StatusCode, fmt.Errorf("unexpected status creating upload: %s", resp.Status)
 	}
+	_, _ = io.Copy(io.Discard, resp.Body)
 	location := resp.Header.Get("Location")
 	if location == "" {
 		return "", resp.StatusCode, errors.New("missing Location header in create response")
 	}
 	return resolveTusLocation(baseURL, location), resp.StatusCode, nil
+}
+
+func tusErrorDetails(body []byte) string {
+	var details []string
+	if code := tusErrorCodePattern.Find(body); len(code) != 0 {
+		details = append(details, string(code))
+	}
+	if match := tusBackendErrorPattern.FindSubmatch(body); len(match) == 2 {
+		details = append(details, "backend="+string(match[1]))
+	}
+	return strings.Join(details, ", ")
 }
 
 // tusHead performs the tus "offset" request (HEAD) and returns the current
