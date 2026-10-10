@@ -53,7 +53,7 @@ func TestVerifyPersistenceKerberosHubUsesAuthorizationHead(t *testing.T) {
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/persistence/verify", bytes.NewReader(payload))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 
-	VerifyPersistence(ctx, t.TempDir())
+	VerifyPersistence(ctx, t.TempDir(), server.URL)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
@@ -77,7 +77,7 @@ func TestVerifyPersistenceKerberosHubUsesAuthorizationHead(t *testing.T) {
 	}
 }
 
-func TestVerifyPersistenceKerberosHubStripsCredentialsOnCrossHostRedirect(t *testing.T) {
+func TestVerifyPersistenceKerberosHubRejectsCrossHostRedirect(t *testing.T) {
 	var redirectedHeaders http.Header
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		redirectedHeaders = r.Header.Clone()
@@ -112,18 +112,90 @@ func TestVerifyPersistenceKerberosHubStripsCredentialsOnCrossHostRedirect(t *tes
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/persistence/verify", bytes.NewReader(payload))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 
-	VerifyPersistence(ctx, t.TempDir())
+	VerifyPersistence(ctx, t.TempDir(), hub.URL)
 
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
 	}
 	for _, header := range []string{"X-Kerberos-Hub-PublicKey", "X-Kerberos-Hub-PrivateKey"} {
 		if originalHeaders.Get(header) == "" {
 			t.Errorf("%s was not sent to the configured Hub", header)
 		}
-		if got := redirectedHeaders.Get(header); got != "" {
-			t.Errorf("%s leaked to redirect target: %q", header, got)
+		if redirectedHeaders != nil {
+			t.Errorf("redirect target received a request with %s=%q", header, redirectedHeaders.Get(header))
 		}
+	}
+}
+
+func TestVerifyPersistenceKerberosHubRejectsUnsavedURI(t *testing.T) {
+	requestCount := 0
+	untrusted := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer untrusted.Close()
+
+	config := models.Config{
+		Cloud:         "kerberoshub",
+		Key:           "camera-1",
+		Name:          "front-door",
+		HubURI:        untrusted.URL,
+		HubKey:        "project-public",
+		HubPrivateKey: "project-private",
+		S3:            &models.S3{Region: "eu"},
+	}
+	payload, err := json.Marshal(config)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/persistence/verify", bytes.NewReader(payload))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	VerifyPersistence(ctx, t.TempDir(), "https://saved-hub.example.com")
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+	if requestCount != 0 {
+		t.Fatalf("untrusted Hub received %d requests, want none", requestCount)
+	}
+}
+
+func TestVerifyHubRejectsUnsavedURI(t *testing.T) {
+	requestCount := 0
+	untrusted := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer untrusted.Close()
+
+	config := models.Config{
+		HubURI:        untrusted.URL,
+		HubKey:        "project-public",
+		HubPrivateKey: "project-private",
+	}
+	payload, err := json.Marshal(config)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/hub/verify", bytes.NewReader(payload))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	VerifyHub(ctx, "https://saved-hub.example.com")
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body = %s", recorder.Code, http.StatusBadRequest, recorder.Body.String())
+	}
+	if requestCount != 0 {
+		t.Fatalf("untrusted Hub received %d requests, want none", requestCount)
 	}
 }
 

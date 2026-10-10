@@ -65,12 +65,12 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 
 			// Will verify the hub settings.
 			api.POST("/hub/verify", func(c *gin.Context) {
-				cloud.VerifyHub(c)
+				cloud.VerifyHub(c, configuration.Config.HubURI)
 			})
 
 			// Will verify the persistence settings.
 			api.POST("/persistence/verify", func(c *gin.Context) {
-				cloud.VerifyPersistence(c, configDirectory)
+				cloud.VerifyPersistence(c, configDirectory, configuration.Config.HubURI)
 			})
 
 			// Will verify the secondary persistence settings.

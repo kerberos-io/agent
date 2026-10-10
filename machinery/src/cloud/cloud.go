@@ -1454,13 +1454,19 @@ func HandleRealtimeProcessing(processingCursor *packets.QueueCursor, configurati
 // @Summary Will verify the hub connectivity.
 // @Description Will verify the hub connectivity.
 // @Success 200 {object} models.APIResponse
-func VerifyHub(c *gin.Context) {
+func VerifyHub(c *gin.Context, configuredHubURI string) {
 
 	var config models.Config
 	err := c.BindJSON(&config)
 
 	if err == nil {
-		hubURI := config.HubURI
+		hubURI, err := configuredHubVerificationURI(config.HubURI, configuredHubURI)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, models.APIResponse{
+				Data: "cloud.VerifyHub(): " + err.Error(),
+			})
+			return
+		}
 		publicKey := config.HubKey
 		privateKey := config.HubPrivateKey
 
@@ -1473,9 +1479,9 @@ func VerifyHub(c *gin.Context) {
 				tr := &http.Transport{
 					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 				}
-				client = &http.Client{Transport: tr}
+				client = &http.Client{Transport: tr, CheckRedirect: rejectHubVerificationRedirect}
 			} else {
-				client = &http.Client{}
+				client = &http.Client{CheckRedirect: rejectHubVerificationRedirect}
 			}
 
 			resp, err := client.Do(req)
@@ -1524,7 +1530,7 @@ func VerifyHub(c *gin.Context) {
 // @Summary Will verify the persistence.
 // @Description Will verify the persistence.
 // @Success 200 {object} models.APIResponse
-func VerifyPersistence(c *gin.Context, configDirectory string) {
+func VerifyPersistence(c *gin.Context, configDirectory, configuredHubURI string) {
 
 	var config models.Config
 	err := c.BindJSON(&config)
@@ -1545,8 +1551,17 @@ func VerifyPersistence(c *gin.Context, configDirectory string) {
 					Data: msg,
 				})
 			} else {
+				hubURI, err := configuredHubVerificationURI(config.HubURI, configuredHubURI)
+				if err != nil {
+					msg := "cloud.VerifyPersistence(kerberoshub): " + err.Error()
+					log.Error(msg)
+					c.JSON(http.StatusBadRequest, models.APIResponse{
+						Data: msg,
+					})
+					return
+				}
 
-				req, err := http.NewRequest(http.MethodHead, config.HubURI+"/storage/upload", nil)
+				req, err := http.NewRequest(http.MethodHead, hubURI+"/storage/upload", nil)
 				if err != nil {
 					msg := "cloud.VerifyPersistence(kerberoshub): error creating Kerberos Hub upload authorization request: " + err.Error()
 					log.Error(msg)
@@ -1571,9 +1586,9 @@ func VerifyPersistence(c *gin.Context, configDirectory string) {
 					tr := &http.Transport{
 						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 					}
-					client = &http.Client{Transport: tr, CheckRedirect: stripHubCredentialsOnCrossHostRedirect}
+					client = &http.Client{Transport: tr, CheckRedirect: rejectHubVerificationRedirect}
 				} else {
-					client = &http.Client{CheckRedirect: stripHubCredentialsOnCrossHostRedirect}
+					client = &http.Client{CheckRedirect: rejectHubVerificationRedirect}
 				}
 
 				resp, err := client.Do(req)
@@ -1766,6 +1781,22 @@ func VerifyPersistence(c *gin.Context, configDirectory string) {
 			Data: msg,
 		})
 	}
+}
+
+func configuredHubVerificationURI(requested, configured string) (string, error) {
+	requested = strings.TrimRight(strings.TrimSpace(requested), "/")
+	configured = strings.TrimRight(strings.TrimSpace(configured), "/")
+	if configured == "" {
+		return "", errors.New("save the Hub URI before verifying it")
+	}
+	if requested != configured {
+		return "", errors.New("the Hub URI does not match the saved configuration; save it before verifying")
+	}
+	return configured, nil
+}
+
+func rejectHubVerificationRedirect(_ *http.Request, _ []*http.Request) error {
+	return http.ErrUseLastResponse
 }
 
 func hubPersistenceVerificationError(statusCode int) string {
