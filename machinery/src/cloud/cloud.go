@@ -1537,6 +1537,7 @@ func VerifyPersistence(c *gin.Context, configDirectory string) {
 			if config.HubURI == "" ||
 				config.HubKey == "" ||
 				config.HubPrivateKey == "" ||
+				config.S3 == nil ||
 				config.S3.Region == "" {
 				msg := "cloud.VerifyPersistence(kerberoshub): Kerberos Hub not properly configured."
 				log.Error(msg)
@@ -1545,24 +1546,14 @@ func VerifyPersistence(c *gin.Context, configDirectory string) {
 				})
 			} else {
 
-				// Open test-480p.mp4
-				file, err := os.Open(configDirectory + "/data/test-480p.mp4")
+				req, err := http.NewRequest(http.MethodHead, config.HubURI+"/storage/upload", nil)
 				if err != nil {
-					msg := "cloud.VerifyPersistence(kerberoshub): error reading test-480p.mp4: " + err.Error()
+					msg := "cloud.VerifyPersistence(kerberoshub): error creating Kerberos Hub upload authorization request: " + err.Error()
 					log.Error(msg)
 					c.JSON(400, models.APIResponse{
 						Data: msg,
 					})
-				}
-				defer file.Close()
-
-				req, err := http.NewRequest("POST", config.HubURI+"/storage/upload", file)
-				if err != nil {
-					msg := "cloud.VerifyPersistence(kerberoshub): error reading Kerberos Hub HEAD request, " + config.HubURI + "/storage: " + err.Error()
-					log.Error(msg)
-					c.JSON(400, models.APIResponse{
-						Data: msg,
-					})
+					return
 				}
 
 				timestamp := time.Now().Unix()
@@ -1580,9 +1571,9 @@ func VerifyPersistence(c *gin.Context, configDirectory string) {
 					tr := &http.Transport{
 						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 					}
-					client = &http.Client{Transport: tr}
+					client = &http.Client{Transport: tr, CheckRedirect: stripHubCredentialsOnCrossHostRedirect}
 				} else {
-					client = &http.Client{}
+					client = &http.Client{CheckRedirect: stripHubCredentialsOnCrossHostRedirect}
 				}
 
 				resp, err := client.Do(req)
@@ -1598,14 +1589,17 @@ func VerifyPersistence(c *gin.Context, configDirectory string) {
 							Data: msg,
 						})
 					} else {
-						msg := "cloud.VerifyPersistence(kerberoshub): upload not allowed using the configured credentials"
+						msg := hubPersistenceVerificationError(resp.StatusCode)
 						log.Error(msg)
 						c.JSON(400, models.APIResponse{
 							Data: msg,
 						})
 					}
 				} else {
-					msg := "cloud.VerifyPersistence(kerberoshub): Error creating Kerberos Hub request"
+					msg := "cloud.VerifyPersistence(kerberoshub): Kerberos Hub upload authorization request failed"
+					if err != nil {
+						msg += ": " + err.Error()
+					}
 					log.Error(msg)
 					c.JSON(400, models.APIResponse{
 						Data: msg,
@@ -1772,6 +1766,19 @@ func VerifyPersistence(c *gin.Context, configDirectory string) {
 			Data: msg,
 		})
 	}
+}
+
+func hubPersistenceVerificationError(statusCode int) string {
+	reason := "Kerberos Hub rejected upload authorization"
+	switch statusCode {
+	case http.StatusBadRequest:
+		reason += ": the credentials or device/project assignment are invalid, or the storage limit was reached"
+	case http.StatusUnauthorized:
+		reason += ": the account has no active subscription or the subscription expired"
+	case http.StatusForbidden:
+		reason += ": the device is muted"
+	}
+	return "cloud.VerifyPersistence(kerberoshub): " + reason + " (HTTP " + strconv.Itoa(statusCode) + ")"
 }
 
 // VerifySecondaryPersistence godoc
