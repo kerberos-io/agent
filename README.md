@@ -602,7 +602,10 @@ The `web` is a **React** project which is the main entry point for an end user t
     cd ui
     yarn start
 
-This will start a webserver and launches the web app on port `3000`.
+This starts the web app on port `3000`. In development, the UI connects to the
+Agent API on port `8082`. Override that port when needed:
+
+    REACT_APP_AGENT_API_PORT=9090 yarn start
 
 ![login-agent](./assets/img/agent-login.gif)
 
@@ -618,9 +621,14 @@ You can simply run the `machinery` using following commands.
 
     git clone https://github.com/kerberos-io/agent
     cd machinery
-    go run main.go -action run -port 80
+    go run main.go -action run -port 8082
 
-This will launch the Kerberos Agent and run a webserver on port `80`. You can change the port by your own preference. We strongly support the usage of [Goland](https://www.jetbrains.com/go/) or [Visual Studio Code](https://code.visualstudio.com/), as it comes with all the debugging and linting features built in.
+This will launch the Kerberos Agent and run a webserver on port `8082`, matching
+the UI development default. You can change the port together with
+`REACT_APP_AGENT_API_PORT`. We strongly support the usage of
+[Goland](https://www.jetbrains.com/go/) or
+[Visual Studio Code](https://code.visualstudio.com/), as it comes with all the
+debugging and linting features built in.
 
 ![VSCode desktop](./assets/img/vscode-desktop.png)
 

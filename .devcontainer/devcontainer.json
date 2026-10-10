@@ -18,7 +18,7 @@
 	},
 	"forwardPorts": [
 		3000,
-		8080
+		8082
 	],
 	"postCreateCommand": "cd ui && yarn install && yarn build && cd ../machinery && go mod download && bash ./verify-moq-devcontainer.sh"
 }
