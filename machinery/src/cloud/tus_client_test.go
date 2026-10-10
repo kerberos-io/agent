@@ -46,6 +46,8 @@ type fakeTus struct {
 	// unsupported makes the creation endpoint return 404, simulating an older
 	// vault without a tus endpoint.
 	unsupported bool
+	// createStatus makes every creation request fail with the configured status.
+	createStatus int
 	// failFinalize causes the next N completing PATCH requests to return 502
 	// after storing the bytes, simulating a failed completion hook.
 	failFinalize int
@@ -132,6 +134,13 @@ func (s *fakeTus) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		if s.unsupported {
 			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if s.createStatus != 0 {
+			s.mu.Lock()
+			s.creates++
+			s.mu.Unlock()
+			w.WriteHeader(s.createStatus)
 			return
 		}
 		length, _ := strconv.ParseInt(r.Header.Get("Upload-Length"), 10, 64)
@@ -837,6 +846,109 @@ func TestUploadHubResumable_Unsupported(t *testing.T) {
 	}
 	if supported {
 		t.Fatal("expected supported=false so the caller falls back to the legacy upload")
+	}
+}
+
+func TestUploadHubResumableFallsBackAfterCreateServerErrors(t *testing.T) {
+	srv := newFakeTus()
+	srv.createStatus = http.StatusInternalServerError
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	fileName := "f.mp4"
+	withRecording(t, fileName, []byte("hello"))
+	oldDelay := tusBackoffBaseDelay
+	tusBackoffBaseDelay = time.Millisecond
+	t.Cleanup(func() { tusBackoffBaseDelay = oldDelay })
+
+	uploaded, responded, supported, _, err := uploadHubResumable(testHubConfig(ts.URL), fileName, "test", "hub")
+	if uploaded {
+		t.Fatal("uploaded = true, want false")
+	}
+	if !responded {
+		t.Fatal("responded = false, want true")
+	}
+	if supported {
+		t.Fatal("supported = true, want false so the caller uses the legacy upload")
+	}
+	if err == nil {
+		t.Fatal("error = nil, want resumable create failure")
+	}
+	if got := srv.createCount(); got != 4 {
+		t.Fatalf("create attempts = %d, want 4", got)
+	}
+}
+
+func TestUploadKerberosHubFallsBackThroughHubAfterTusCreateServerErrors(t *testing.T) {
+	fileName := "f.mp4"
+	payload := []byte("recording")
+	withRecording(t, fileName, payload)
+	t.Setenv("AGENT_DISABLE_RESUMABLE_UPLOAD", "")
+
+	oldDelay := tusBackoffBaseDelay
+	tusBackoffBaseDelay = time.Millisecond
+	t.Cleanup(func() { tusBackoffBaseDelay = oldDelay })
+
+	var tusCreates, legacyHeads, legacyPosts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == tusUploadPath:
+			tusCreates++
+			w.WriteHeader(http.StatusInternalServerError)
+		case r.Method == http.MethodHead && r.URL.Path == "/storage/upload":
+			legacyHeads++
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodPost && r.URL.Path == "/storage/upload":
+			legacyPosts++
+			got, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Errorf("read legacy upload: %v", err)
+			}
+			if !bytes.Equal(got, payload) {
+				t.Errorf("legacy upload body = %q, want %q", got, payload)
+			}
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	config := testHubConfig(server.URL)
+	uploaded, responded, err := UploadKerberosHub(&models.Configuration{Config: *config}, fileName)
+	if err != nil {
+		t.Fatalf("UploadKerberosHub error: %v", err)
+	}
+	if !uploaded || !responded {
+		t.Fatalf("UploadKerberosHub = uploaded %v, responded %v; want true, true", uploaded, responded)
+	}
+	if tusCreates != 4 {
+		t.Errorf("tus create attempts = %d, want 4", tusCreates)
+	}
+	if legacyHeads != 1 {
+		t.Errorf("legacy Hub authorization requests = %d, want 1", legacyHeads)
+	}
+	if legacyPosts != 1 {
+		t.Errorf("legacy Hub upload requests = %d, want 1", legacyPosts)
+	}
+}
+
+func TestUploadHubResumableDoesNotFallbackAfterCreateClientError(t *testing.T) {
+	srv := newFakeTus()
+	srv.createStatus = http.StatusBadRequest
+	ts := httptest.NewServer(srv)
+	defer ts.Close()
+
+	fileName := "f.mp4"
+	withRecording(t, fileName, []byte("hello"))
+	oldDelay := tusBackoffBaseDelay
+	tusBackoffBaseDelay = time.Millisecond
+	t.Cleanup(func() { tusBackoffBaseDelay = oldDelay })
+
+	_, _, supported, _, _ := uploadHubResumable(testHubConfig(ts.URL), fileName, "test", "hub")
+	if !supported {
+		t.Fatal("supported = false for a client rejection, which must not bypass authorization via legacy fallback")
 	}
 }
 

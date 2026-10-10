@@ -144,6 +144,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 
 	sidecar := tusSidecarPath(fileName, slot)
 	uploadURL := loadTusResumeState(sidecar, baseURL)
+	uploadEstablished := uploadURL != ""
 
 	const maxAttempts = 4
 	restartedAfterComplete := false
@@ -181,6 +182,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 				continue
 			}
 			uploadURL = created
+			uploadEstablished = true
 			saveTusResumeState(sidecar, tusResumeState{UploadURL: uploadURL, VaultURI: baseURL, Size: size})
 		}
 
@@ -290,7 +292,15 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 	// report responded=false so the caller keeps the recording queued and retries
 	// later instead of consuming its retry budget and entering the long back-off
 	// timeout.
-	return false, lastStatus > 0, true, "resumable upload did not complete after retries", errors.New(label + ": resumable upload did not complete after retries")
+	supported = true
+	if !uploadEstablished && lastStatus >= http.StatusInternalServerError {
+		// A persistent server failure before creation means no upload URL was
+		// issued and no recording bytes were sent. Falling back to the legacy
+		// endpoint is therefore safe and preserves uploads while the server-side
+		// tus/provider path is unavailable.
+		supported = false
+	}
+	return false, lastStatus > 0, supported, "resumable upload did not complete after retries", errors.New(label + ": resumable upload did not complete after retries")
 }
 
 // uploadVaultResumable uploads a recording directly to a Kerberos Vault using
