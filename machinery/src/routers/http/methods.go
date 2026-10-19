@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -281,6 +282,53 @@ func DoOnvifZoom(c *gin.Context) {
 						Message: "Something went wrong: " + err.Error(),
 					})
 				}
+			} else {
+				c.JSON(400, models.APIResponse{
+					Message: "Something went wrong: " + err.Error(),
+				})
+			}
+		} else {
+			c.JSON(400, models.APIResponse{
+				Message: "Something went wrong: " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, models.APIResponse{
+			Message: "Something went wrong: " + err.Error(),
+		})
+	}
+}
+
+// DoOnvifFocus godoc
+// @Router /api/camera/onvif/focus [post]
+// @ID camera-onvif-focus
+// @Tags onvif
+// @Param focus body models.OnvifFocus true "OnvifFocus"
+// @Summary Focusing the camera near or far.
+// @Description Focusing the camera near (positive) or far (negative).
+// @Success 200 {object} models.APIResponse
+func DoOnvifFocus(c *gin.Context) {
+	var onvifFocus models.OnvifFocus
+	err := c.BindJSON(&onvifFocus)
+	if err == nil && onvifFocus.OnvifCredentials.ONVIFXAddr == "" {
+		err = errors.New("missing onvif_xaddr")
+	}
+
+	if err == nil {
+
+		cameraConfiguration := models.IPCamera{
+			ONVIFXAddr:    onvifFocus.OnvifCredentials.ONVIFXAddr,
+			ONVIFUsername: onvifFocus.OnvifCredentials.ONVIFUsername,
+			ONVIFPassword: onvifFocus.OnvifCredentials.ONVIFPassword,
+		}
+		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+
+		if err == nil {
+			err := onvif.ContinuousFocus(device, onvifFocus.Focus)
+			if err == nil {
+				c.JSON(200, models.APIResponse{
+					Message: "Successfully focused the camera",
+				})
 			} else {
 				c.JSON(400, models.APIResponse{
 					Message: "Something went wrong: " + err.Error(),

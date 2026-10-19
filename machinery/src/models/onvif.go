@@ -12,6 +12,7 @@ type OnvifActionPTZ struct {
 	Down   int     `json:"down" bson:"down"`
 	Center int     `json:"center" bson:"center"`
 	Zoom   float64 `json:"zoom" bson:"zoom"`
+	Focus  float64 `json:"focus" bson:"focus"`
 	X      float64 `json:"x" bson:"x"`
 	Y      float64 `json:"y" bson:"y"`
 	Z      float64 `json:"z" bson:"z"`

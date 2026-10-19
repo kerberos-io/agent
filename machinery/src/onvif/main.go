@@ -119,7 +119,27 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 		// Connect to Onvif device
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, _, err := ConnectToOnvifDevice(&cameraConfiguration)
-		if err == nil {
+		if err == nil && (onvifAction.Action == "focus" || onvifAction.Action == "autofocus") {
+
+			// Focus goes through the imaging service, so it also works on
+			// cameras without PTZ (e.g. fixed cameras with a motorised lens).
+			if onvifAction.Action == "focus" {
+				err := ContinuousFocus(device, ptzAction.Focus)
+				if err != nil {
+					log.Error("onvif.HandleONVIFActions() - ContinuousFocus: " + err.Error())
+				} else {
+					log.Info("onvif.HandleONVIFActions() - ContinuousFocus: successfully focused camera")
+				}
+			} else {
+				err := AutoFocus(device)
+				if err != nil {
+					log.Error("onvif.HandleONVIFActions() - AutoFocus: " + err.Error())
+				} else {
+					log.Info("onvif.HandleONVIFActions() - AutoFocus: successfully triggered autofocus")
+				}
+			}
+
+		} else if err == nil {
 
 			// Get token from the first profile
 			token, err := GetTokenFromProfile(device, 0)

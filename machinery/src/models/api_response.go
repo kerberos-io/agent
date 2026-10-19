@@ -68,6 +68,11 @@ type OnvifZoom struct {
 	Zoom             float64          `json:"zoom,omitempty" bson:"zoom"`
 }
 
+type OnvifFocus struct {
+	OnvifCredentials OnvifCredentials `json:"onvif_credentials,omitempty" bson:"onvif_credentials"`
+	Focus            float64          `json:"focus,omitempty" bson:"focus"`
+}
+
 type OnvifPreset struct {
 	OnvifCredentials OnvifCredentials `json:"onvif_credentials,omitempty" bson:"onvif_credentials"`
 	Preset           string           `json:"preset,omitempty" bson:"preset"`
