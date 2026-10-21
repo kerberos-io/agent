@@ -5,13 +5,13 @@ package cloud
 import (
 	"bytes"
 	"errors"
-	"os"
 
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox"
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox/files"
 	"github.com/dropbox/dropbox-sdk-go-unofficial/v6/dropbox/users"
 	"github.com/gin-gonic/gin"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -37,14 +37,12 @@ func UploadDropbox(configuration *models.Configuration, fileName string) (bool, 
 	// Upload to Dropbox
 	log.Info("UploadDropbox: Uploading to Dropbox")
 	log.Info("UploadDropbox: Upload started for " + fileName)
-	fullname := "data/recordings/" + fileName
-
 	dConfig := dropbox.Config{
 		Token:    token,
 		LogLevel: dropbox.LogInfo, // if needed, set the desired logging level. Default is off
 	}
 
-	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
+	file, err := utils.OpenRecording("data/recordings", fileName)
 	if file != nil {
 		defer func() {
 			if cerr := file.Close(); cerr != nil {

@@ -2,6 +2,7 @@ package cloud
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"os"
@@ -10,12 +11,16 @@ import (
 	"strings"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
+	log "github.com/sirupsen/logrus"
 )
 
 const recordingFPSHeader = "X-Kerberos-Storage-Fps"
 const recordingDurationHeader = "X-Kerberos-Storage-Duration"
 const recordingTimestampHeader = "X-Kerberos-Storage-Timestamp"
 const recordingEncryptedHeader = "X-Kerberos-Storage-Encrypted"
+const recordingDeviceNameHeader = "X-Kerberos-Storage-DeviceName"
+const recordingRegionHeader = "X-Kerberos-Storage-RegionCoordinates"
+const recordingChangesHeader = "X-Kerberos-Storage-NumberOfChanges"
 
 // queuedRecordingFPS reads the FPS snapshot written into the upload marker
 // when the recording was finalized. Historical empty markers intentionally
@@ -61,6 +66,14 @@ func decodeRecordingUploadMetadata(value []byte) (models.RecordingUploadMetadata
 }
 
 func readRecordingUploadMetadata(fileName string) ([]byte, bool) {
+	value, err := readRecordingUploadMetadataFile(fileName)
+	if err != nil && !os.IsNotExist(err) {
+		log.WithError(err).Error("Failed to read recording upload metadata")
+	}
+	return value, err == nil
+}
+
+func readRecordingUploadMetadataFile(fileName string) ([]byte, error) {
 	markerNames := []string{
 		models.RecordingUploadMetadataFileName(fileName),
 		filepath.Base(fileName),
@@ -68,10 +81,13 @@ func readRecordingUploadMetadata(fileName string) ([]byte, bool) {
 	for _, markerName := range markerNames {
 		value, err := os.ReadFile(filepath.Join("data", "cloud", markerName))
 		if err == nil {
-			return value, true
+			return value, nil
+		}
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("read recording upload metadata %s: %w", markerName, err)
 		}
 	}
-	return nil, false
+	return nil, os.ErrNotExist
 }
 
 func setQueuedRecordingMetadataHeaders(header http.Header, fileName string) {
@@ -79,6 +95,18 @@ func setQueuedRecordingMetadataHeaders(header http.Header, fileName string) {
 		header.Set(recordingFPSHeader, fps)
 	}
 	if metadata, ok := queuedRecordingMetadata(fileName); ok {
+		if metadata.DeviceKey != "" {
+			header.Set("X-Kerberos-Storage-Device", metadata.DeviceKey)
+		}
+		if metadata.DeviceName != "" {
+			header.Set(recordingDeviceNameHeader, metadata.DeviceName)
+		}
+		if metadata.RegionCoordinates != "" {
+			header.Set(recordingRegionHeader, metadata.RegionCoordinates)
+		}
+		if metadata.NumberOfChanges != "" {
+			header.Set(recordingChangesHeader, metadata.NumberOfChanges)
+		}
 		if metadata.Duration > 0 {
 			header.Set(recordingDurationHeader, strconv.FormatUint(metadata.Duration, 10))
 		}

@@ -191,51 +191,32 @@ func GetMediaFormatted(files []os.FileInfo, recordingDirectory string, configura
 	count := 0
 	for _, file := range files {
 		fileName := file.Name()
-		fileParts := strings.Split(fileName, "_")
-		if len(fileParts) == 6 {
-			timestamp := fileParts[0]
-			timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
-			if err == nil {
-
-				if eventFilter.TimestampOffsetStart > 0 {
-					// TimestampOffsetStart represents the newest lower bound to include.
-					if timestampInt < eventFilter.TimestampOffsetStart {
-						continue
-					}
-				}
-
-				// If we have an offset we will check if we should skip or not
-				if eventFilter.TimestampOffsetEnd > 0 {
-					// Medias are sorted from new to older. TimestampOffsetEnd holds the oldest
-					// timestamp of the previous batch of events. By doing this check, we make sure
-					// to skip the previous batch.
-					if timestampInt >= eventFilter.TimestampOffsetEnd {
-						continue
-					}
-				}
-
-				loc, _ := time.LoadLocation(configuration.Config.Timezone)
-				time := time.Unix(timestampInt, 0).In(loc)
-				day := time.Format("02-01-2006")
-				timeString := time.Format("15:04:05")
-				shortDay := time.Format("Jan _2")
-
-				media := models.Media{
-					Key:        fileName,
-					Path:       recordingDirectory + "/" + fileName,
-					CameraName: configuration.Config.Name,
-					CameraKey:  configuration.Config.Key,
-					Day:        day,
-					ShortDay:   shortDay,
-					Time:       timeString,
-					Timestamp:  timestamp,
-				}
-				filePaths = append(filePaths, media)
-				count = count + 1
-				if eventFilter.NumberOfElements > 0 && count >= eventFilter.NumberOfElements {
-					break
-				}
-			}
+		recordedAt, err := RecordingStartTime(fileName)
+		if err != nil {
+			continue
+		}
+		timestamp := recordedAt.Unix()
+		if eventFilter.TimestampOffsetStart > 0 && timestamp < eventFilter.TimestampOffsetStart {
+			continue
+		}
+		if eventFilter.TimestampOffsetEnd > 0 && timestamp >= eventFilter.TimestampOffsetEnd {
+			continue
+		}
+		loc, _ := time.LoadLocation(configuration.Config.Timezone)
+		localTime := recordedAt.In(loc)
+		filePaths = append(filePaths, models.Media{
+			Key:        fileName,
+			Path:       recordingDirectory + "/" + fileName,
+			CameraName: configuration.Config.Name,
+			CameraKey:  configuration.Config.Key,
+			Day:        localTime.Format("02-01-2006"),
+			ShortDay:   localTime.Format("Jan _2"),
+			Time:       localTime.Format("15:04:05"),
+			Timestamp:  strconv.FormatInt(timestamp, 10),
+		})
+		count++
+		if eventFilter.NumberOfElements > 0 && count >= eventFilter.NumberOfElements {
+			break
 		}
 	}
 	return filePaths
@@ -244,18 +225,12 @@ func GetMediaFormatted(files []os.FileInfo, recordingDirectory string, configura
 func GetDays(files []os.FileInfo, recordingDirectory string, configuration *models.Configuration) []string {
 	days := []string{}
 	for _, file := range files {
-		fileName := file.Name()
-		fileParts := strings.Split(fileName, "_")
-		if len(fileParts) == 6 {
-			timestamp := fileParts[0]
-			timestampInt, err := strconv.ParseInt(timestamp, 10, 64)
-			if err == nil {
-				loc, _ := time.LoadLocation(configuration.Config.Timezone)
-				time := time.Unix(timestampInt, 0).In(loc)
-				day := time.Format("02-01-2006")
-				days = append(days, day)
-			}
+		recordedAt, err := RecordingStartTime(file.Name())
+		if err != nil {
+			continue
 		}
+		loc, _ := time.LoadLocation(configuration.Config.Timezone)
+		days = append(days, recordedAt.In(loc).Format("02-01-2006"))
 	}
 	uniqueDays := Unique(days)
 	return uniqueDays
@@ -278,10 +253,13 @@ func NumberOfFilesInDirectory(path string) int {
 	return len(files)
 }
 
-// NumberOfMP4sInDirectory returns the count of all files with mp4 extension in current directory
+// NumberOfMP4sInDirectory counts MP4 files, including dated subdirectories.
 func NumberOfMP4sInDirectory(path string) int {
-	pattern := filepath.Join(path, "*.mp4")
-	files, _ := filepath.Glob(pattern)
+	files, err := ReadRecordingDirectory(path)
+	if err != nil {
+		log.WithError(err).Error("Could not count recordings")
+		return 0
+	}
 	return len(files)
 }
 
@@ -409,25 +387,13 @@ func Decrypt(directoryOrFile string, symmetricKey []byte) {
 
 	var files []string
 	if fileInfo.IsDir() {
-		// Create decrypted directory
-		err = os.MkdirAll(directoryOrFile+"/decrypted", 0755)
-		if err != nil {
-			log.Fatal(err.Error())
-			return
-		}
-		dir, err := os.ReadDir(directoryOrFile)
+		dir, err := ReadRecordingDirectory(directoryOrFile)
 		if err != nil {
 			log.Fatal(err.Error())
 			return
 		}
 		for _, file := range dir {
-			// Check if file is not a directory
-			if !file.IsDir() {
-				// Check if an mp4 file
-				if strings.HasSuffix(file.Name(), ".mp4") {
-					files = append(files, directoryOrFile+"/"+file.Name())
-				}
-			}
+			files = append(files, filepath.Join(directoryOrFile, file.Name()))
 		}
 	} else {
 		files = append(files, directoryOrFile)
@@ -449,13 +415,12 @@ func Decrypt(directoryOrFile string, symmetricKey []byte) {
 			return
 		}
 
-		// Write decrypted content to file with appended .decrypted
-		// Get filename split by / and get last element.
-		fileParts := strings.Split(file, "/")
-		fileName := fileParts[len(fileParts)-1]
-		pathToFile := strings.Join(fileParts[:len(fileParts)-1], "/")
-
-		err = os.WriteFile(pathToFile+"/decrypted/"+fileName, []byte(decrypted), 0644)
+		outputDirectory := filepath.Join(filepath.Dir(file), "decrypted")
+		if err := os.MkdirAll(outputDirectory, 0o755); err != nil {
+			log.Fatal(err.Error())
+			return
+		}
+		err = os.WriteFile(filepath.Join(outputDirectory, filepath.Base(file)), []byte(decrypted), 0644)
 		if err != nil {
 			log.Fatal(err.Error())
 			return

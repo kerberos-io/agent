@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -35,10 +36,23 @@ func UploadKerberosVault(configuration *models.Configuration, fileName string) (
 	// This can happen when the file was already removed (e.g. cleanup, or an
 	// earlier successful upload). Skip it so the watcher drops the marker
 	// instead of retrying indefinitely.
-	info, err := os.Stat("data/recordings/" + fileName)
+	filePath, err := utils.ResolveRecordingPath("data/recordings", fileName)
 	if err != nil {
-		log.Info("UploadKerberosVault: skipping " + fileName + ", file doesn't exist anymore")
-		return false, false, nil
+		if os.IsNotExist(err) {
+			log.Info("UploadKerberosVault: skipping " + fileName + ", file doesn't exist anymore")
+			return false, false, nil
+		}
+		log.WithError(err).Error("UploadKerberosVault: could not resolve recording path")
+		return false, true, err
+	}
+	info, err := os.Stat(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Info("UploadKerberosVault: skipping " + fileName + ", file doesn't exist anymore")
+			return false, false, nil
+		}
+		log.WithError(err).Error("UploadKerberosVault: could not stat recording")
+		return false, true, err
 	}
 	if info.Size() == 0 {
 		log.Warn("UploadKerberosVault: skipping " + fileName + ", recording is empty")
@@ -182,9 +196,7 @@ func uploadVaultLegacy(vault models.KStorage, publicKey, deviceKey, fileName, la
 	if err != nil {
 		return false, false, "", err
 	}
-	fullname := "data/recordings/" + fileName
-
-	file, err := os.Open(fullname)
+	file, err := utils.OpenRecording("data/recordings", fileName)
 	if file != nil {
 		defer file.Close()
 	}

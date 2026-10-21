@@ -10,11 +10,58 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
+func TestPickRecordingToCleanupAcrossDatedDirectories(t *testing.T) {
+	for _, legacyMarker := range []bool{false, true} {
+		t.Run(map[bool]string{false: "metadata", true: "legacy"}[legacyMarker], func(t *testing.T) {
+			recordingsDir, cloudDir := newCleanupDirs(t)
+			pendingName := "2026/01/01/oldest_pending.mp4"
+			safeName := "2026/01/02/uploaded.mp4"
+			writeRecording(t, recordingsDir, pendingName, 30)
+			if legacyMarker {
+				if err := os.WriteFile(filepath.Join(cloudDir, filepath.Base(pendingName)), nil, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				markPending(t, cloudDir, pendingName)
+			}
+			writeRecording(t, recordingsDir, safeName, 20)
+			writeRecording(t, recordingsDir, "flat_uploaded.mp4", 10)
+			name, pending, err := pickRecordingToCleanup(recordingsDir, cloudDir)
+			if err != nil || pending || name != safeName {
+				t.Fatalf("cleanup = (%q, %v, %v), want (%q, false, nil)", name, pending, err, safeName)
+			}
+		})
+	}
+}
+
+func TestCleanupDatedPendingRecordingRemovesFlatMarker(t *testing.T) {
+	recordingsDir, cloudDir := newCleanupDirs(t)
+	name := "2026/01/01/pending.mp4"
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(recordingsDir, name)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeSizedRecording(t, recordingsDir, name, 2*1000*1000)
+	markPending(t, cloudDir, name)
+	config := &models.Configuration{Config: models.Config{AutoClean: "true", MaxDirectorySize: 1}}
+	CleanupRecordingDirectory(filepath.Dir(filepath.Dir(recordingsDir)), config)
+	for _, filePath := range []string{
+		filepath.Join(recordingsDir, name),
+		filepath.Join(cloudDir, models.RecordingUploadMetadataFileName(name)),
+	} {
+		if _, err := os.Stat(filePath); !os.IsNotExist(err) {
+			t.Fatalf("expected %s to be removed, got %v", filePath, err)
+		}
+	}
+}
+
 // writeRecording creates a file under recordingsDir and sets its modtime so the
 // tests can control the "oldest" ordering deterministically.
 func writeRecording(t *testing.T, recordingsDir, name string, ageMinutes int) {
 	t.Helper()
 	full := filepath.Join(recordingsDir, name)
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatalf("mkdir recording directory: %v", err)
+	}
 	if err := os.WriteFile(full, []byte("data"), 0o644); err != nil {
 		t.Fatalf("write recording %s: %v", name, err)
 	}

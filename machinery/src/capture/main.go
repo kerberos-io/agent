@@ -53,13 +53,16 @@ func publishRecordingState(mqttClient mqtt.Client, hubKey string, configuration 
 	}
 }
 
-func recordingUploadMetadata(name, deviceKey string, timestamp int64, mp4Video *video.MP4, encrypted bool) models.RecordingUploadMetadata {
+func recordingUploadMetadata(name string, config models.Config, timestamp int64, mp4Video *video.MP4, encrypted bool, coordinates string, changes int) models.RecordingUploadMetadata {
 	metadata := models.RecordingUploadMetadata{
-		FileName:  filepath.Base(name),
-		DeviceKey: deviceKey,
-		Timestamp: timestamp,
-		Duration:  mp4Video.VideoTotalDuration,
-		Encrypted: encrypted,
+		FileName:          filepath.Base(name),
+		DeviceKey:         config.Key,
+		Timestamp:         timestamp,
+		Duration:          mp4Video.VideoTotalDuration,
+		Encrypted:         encrypted,
+		DeviceName:        config.Name,
+		RegionCoordinates: coordinates,
+		NumberOfChanges:   strconv.Itoa(changes),
 	}
 	value := mp4Video.AverageFPS()
 	if value > 0 && value <= 240 && !math.IsInf(value, 0) && !math.IsNaN(value) {
@@ -190,7 +193,7 @@ func CleanupRecordingDirectory(configDirectory string, configuration *models.Con
 		return
 	}
 
-	if err := os.Remove(recordingsDirectory + "/" + name); err != nil {
+	if err := utils.RemoveRecording(recordingsDirectory, name); err != nil {
 		log.Info("HandleRecordStream: something went wrong, " + err.Error())
 		return
 	}
@@ -275,7 +278,7 @@ func defaultReserveMB(totalMB int64) int64 {
 // overall with pending=true, signalling the caller that it is about to drop an
 // un-uploaded recording as a last resort.
 func pickRecordingToCleanup(recordingsDirectory, cloudDirectory string) (string, bool, error) {
-	entries, err := os.ReadDir(recordingsDirectory)
+	entries, err := utils.ReadRecordingDirectory(recordingsDirectory)
 	if err != nil {
 		return "", false, err
 	}
@@ -284,14 +287,7 @@ func pickRecordingToCleanup(recordingsDirectory, cloudDirectory string) (string,
 	var oldestSafeTime, oldestAnyTime time.Time
 
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		info, err := entry.Info()
-		if err != nil || !info.Mode().IsRegular() {
-			continue
-		}
-		modTime := info.ModTime()
+		modTime := entry.ModTime()
 
 		if oldestAnyName == "" || modTime.Before(oldestAnyTime) {
 			oldestAnyName = entry.Name()
@@ -449,39 +445,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// Cleanup muxer
 					start = false
 
-					// Update the name of the recording with the duration.
-					// We will update the name of the recording with the duration in milliseconds.
-					if mp4Video.VideoTotalDuration > 0 {
-						duration := mp4Video.VideoTotalDuration
-						// Update the name with the duration in milliseconds.
-						startRecordingSeconds := startRecording / 1000      // convert to seconds
-						startRecordingMilliseconds := startRecording % 1000 // convert to milliseconds
-						s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
-							strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" +
-							strconv.FormatInt(startRecordingMilliseconds, 10) + "_" +
-							config.Name + "_" +
-							"0-0-0-0" + "_" + // region coordinates, we
-							"-1" + "_" + // token
-							strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording
-							//utils.VERSION // version of the agent
-
-						oldName := name
-						name = s + ".mp4"
-						fullName = configDirectory + "/data/recordings/" + name
-						log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
-
-						// Rename the file to the new name.
-						err := os.Rename(
-							configDirectory+"/data/recordings/"+oldName,
-							configDirectory+"/data/recordings/"+s+".mp4")
-
-						if err != nil {
-							log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
-						}
-					} else {
-						log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
-					}
-
 					encrypted := false
 					// Check if we need to encrypt the recording.
 					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
@@ -506,7 +469,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video, encrypted))
+					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config, startRecording, mp4Video, encrypted, "0-0-0-0", -1))
 
 					recordingStatus = "idle"
 
@@ -531,29 +494,17 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 
 					start = true
 
-					// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
-					// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
-					// - Timestamp
-					// - Size + - + microseconds
-					// - device
-					// - Region
-					// - Number of changes
-					// - Token
-
 					startRecording = pkt.CurrentTime
-					startRecordingSeconds := startRecording / 1000            // convert to seconds
-					startRecordingMilliseconds := startRecording % 1000       // convert to milliseconds
-					s := strconv.FormatInt(startRecordingSeconds, 10) + "_" + // start timestamp in seconds
-						strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" + // length of milliseconds
-						strconv.FormatInt(startRecordingMilliseconds, 10) + "_" + // milliseconds
-						config.Name + "_" + // device name
-						"0-0-0-0" + "_" + // region coordinates, we will not use this for continuous recording
-						"0" + "_" + // token
-						"0" + "_" //+ // duration of recording in milliseconds
-					//utils.VERSION // version of the agent
-
-					name = s + ".mp4"
-					fullName = configDirectory + "/data/recordings/" + name
+					name, err = utils.RecordingFileName(startRecording, config.Key)
+					if err == nil {
+						fullName, err = utils.CreateRecordingPath(configDirectory+"/data/recordings", name, time.UnixMilli(startRecording))
+					}
+					if err != nil {
+						log.WithError(err).Error("capture: could not create continuous recording path")
+						start = false
+						pkt = nextPkt
+						continue
+					}
 
 					// Running...
 					log.Info("capture.main.HandleRecordStream(continuous): recording started")
@@ -609,39 +560,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					// Cleanup muxer
 					start = false
 
-					// Update the name of the recording with the duration.
-					// We will update the name of the recording with the duration in milliseconds.
-					if mp4Video.VideoTotalDuration > 0 {
-						duration := mp4Video.VideoTotalDuration
-						// Update the name with the duration in milliseconds.
-						startRecordingSeconds := startRecording / 1000      // convert to seconds
-						startRecordingMilliseconds := startRecording % 1000 // convert to milliseconds
-						s := strconv.FormatInt(startRecordingSeconds, 10) + "_" +
-							strconv.Itoa(len(strconv.FormatInt(startRecordingMilliseconds, 10))) + "-" +
-							strconv.FormatInt(startRecordingMilliseconds, 10) + "_" +
-							config.Name + "_" +
-							"0-0-0-0" + "_" + // region coordinates, we
-							"-1" + "_" + // token
-							strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording
-							//utils.VERSION // version of the agent
-
-						oldName := name
-						name = s + ".mp4"
-						fullName = configDirectory + "/data/recordings/" + name
-						log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
-
-						// Rename the file to the new name.
-						err := os.Rename(
-							configDirectory+"/data/recordings/"+oldName,
-							configDirectory+"/data/recordings/"+s+".mp4")
-
-						if err != nil {
-							log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
-						}
-					} else {
-						log.Info("capture.main.HandleRecordStream(continuous): no video data recorded, not renaming file.")
-					}
-
 					encrypted := false
 					// Check if we need to encrypt the recording.
 					if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
@@ -666,7 +584,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						}
 					}
 
-					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, startRecording, mp4Video, encrypted))
+					queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config, startRecording, mp4Video, encrypted, "0-0-0-0", -1))
 
 					recordingStatus = "idle"
 
@@ -721,17 +639,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					continue
 				}
 
-				// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
-				// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
-				// - Timestamp
-				// - Size + - + microseconds
-				// - device
-				// - Region
-				// - Number of changes
-				// - Token
-
-				displayTimeSeconds := displayTime / 1000      // convert to seconds
-				displayTimeMilliseconds := displayTime % 1000 // convert to milliseconds
+				displayTimeSeconds := displayTime / 1000
 				motionRectangleString := "0-0-0-0"
 				if motion.Rectangle.X != 0 || motion.Rectangle.Y != 0 ||
 					motion.Rectangle.Width != 0 || motion.Rectangle.Height != 0 {
@@ -742,17 +650,15 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 				// Get the number of changes from the motion detection.
 				numberOfChanges := motion.NumberOfChanges
 
-				s := strconv.FormatInt(displayTimeSeconds, 10) + "_" + // start timestamp in seconds
-					strconv.Itoa(len(strconv.FormatInt(displayTimeMilliseconds, 10))) + "-" + // length of milliseconds
-					strconv.FormatInt(displayTimeMilliseconds, 10) + "_" + // milliseconds
-					config.Name + "_" + // device name
-					motionRectangleString + "_" + // region coordinates, we will not use this for continuous recording
-					strconv.Itoa(numberOfChanges) + "_" + // number of changes
-					"0" // + "_" + // duration of recording in milliseconds
-					//utils.VERSION // version of the agent
-
-				name := s + ".mp4"
-				fullName := configDirectory + "/data/recordings/" + name
+				name, err := utils.RecordingFileName(displayTime, config.Key)
+				var fullName string
+				if err == nil {
+					fullName, err = utils.CreateRecordingPath(configDirectory+"/data/recordings", name, time.UnixMilli(displayTime))
+				}
+				if err != nil {
+					log.WithError(err).Error("capture: could not create motion recording path")
+					continue
+				}
 
 				// Running...
 				log.Info("capture.main.HandleRecordStream(motiondetection): recording started (" + name + ")" + " at " + strconv.FormatInt(displayTimeSeconds, 10) + " unix")
@@ -880,38 +786,6 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					communication.TrySendMotion(models.MotionDataPartial{Timestamp: time.Now().Unix(), NumberOfChanges: 100000000})
 				}
 
-				// Update the name of the recording with the duration.
-				// We will update the name of the recording with the duration in milliseconds.
-				if mp4Video.VideoTotalDuration > 0 {
-					duration := mp4Video.VideoTotalDuration
-
-					// Update the name with the duration in milliseconds.
-					s := strconv.FormatInt(displayTimeSeconds, 10) + "_" +
-						strconv.Itoa(len(strconv.FormatInt(displayTimeMilliseconds, 10))) + "-" +
-						strconv.FormatInt(displayTimeMilliseconds, 10) + "_" +
-						config.Name + "_" +
-						motionRectangleString + "_" +
-						strconv.Itoa(numberOfChanges) + "_" + // number of changes
-						strconv.FormatInt(int64(duration), 10) // + "_" + // duration of recording in milliseconds
-						//utils.VERSION // version of the agent
-
-					oldName := name
-					name = s + ".mp4"
-					fullName = configDirectory + "/data/recordings/" + name
-					log.Info("capture.main.HandleRecordStream(motiondetection): renamed file from: " + oldName + " to: " + name)
-
-					// Rename the file to the new name.
-					err := os.Rename(
-						configDirectory+"/data/recordings/"+oldName,
-						configDirectory+"/data/recordings/"+s+".mp4")
-
-					if err != nil {
-						log.Error("capture.main.HandleRecordStream(motiondetection): error renaming file: " + err.Error())
-					}
-				} else {
-					log.Info("capture.main.HandleRecordStream(motiondetection): no video data recorded, not renaming file.")
-				}
-
 				encrypted := false
 				// Check if we need to encrypt the recording.
 				if config.Encryption != nil && config.Encryption.Enabled == "true" && config.Encryption.Recordings == "true" && config.Encryption.SymmetricKey != "" {
@@ -936,7 +810,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					}
 				}
 
-				queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config.Key, displayTime, mp4Video, encrypted))
+				queueRecordingForUpload(configDirectory, recordingUploadMetadata(name, config, displayTime, mp4Video, encrypted, motionRectangleString, numberOfChanges))
 
 				// Clean up the recording directory if necessary.
 				CleanupRecordingDirectory(configDirectory, configuration)

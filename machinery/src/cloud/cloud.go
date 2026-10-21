@@ -125,7 +125,7 @@ func HandleUpload(configDirectory string, configuration *models.Configuration, c
 						// Check if we need to remove the original recording
 						// removeAfterUpload is set to false by default
 						if config.RemoveAfterUpload != "false" {
-							err := os.Remove(configDirectory + "/data/recordings/" + fileName)
+							err := utils.RemoveRecording(configDirectory+"/data/recordings", fileName)
 							if err != nil {
 								log.Error("HandleUpload: " + err.Error())
 							}

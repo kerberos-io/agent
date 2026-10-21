@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -106,7 +107,7 @@ func logTusUploadProgress(label string, offset, size int64, loggedBucket *int64)
 // creation request; it is empty on HEAD/PATCH/DELETE.
 type tusHeaderFunc func(h http.Header, fileName string)
 
-// runTusUpload performs a resumable (tus) upload of data/recordings/<fileName>
+// runTusUpload performs a resumable (tus) upload of a flat or dated recording.
 // to baseURL, sending target-specific authentication/routing headers via
 // setHeaders on every request. It encapsulates the create/resume/chunk/finalize
 // state machine shared by the Kerberos Vault (direct) and Kerberos Hub (proxied)
@@ -120,9 +121,7 @@ type tusHeaderFunc func(h http.Header, fileName string)
 //     should fall back to the legacy single-POST upload (older deployments).
 //   - body:      a short message for logging.
 func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tusHeaderFunc) (uploaded bool, responded bool, supported bool, body string, err error) {
-	fullname := "data/recordings/" + fileName
-
-	file, ferr := os.Open(fullname)
+	file, ferr := utils.OpenRecording("data/recordings", fileName)
 	if file != nil {
 		defer file.Close()
 	}
@@ -358,6 +357,12 @@ func addRecordingTusMetadata(values map[string]string, fileName string) {
 	if !ok {
 		return
 	}
+	if metadata.DeviceKey != "" {
+		values["device"] = metadata.DeviceKey
+	}
+	values["device_name"] = metadata.DeviceName
+	values["region_coordinates"] = metadata.RegionCoordinates
+	values["number_of_changes"] = metadata.NumberOfChanges
 	if metadata.Duration > 0 {
 		values["duration"] = strconv.FormatUint(metadata.Duration, 10)
 	}
@@ -500,6 +505,7 @@ func setVaultTusHeaders(h http.Header, vault models.KStorage, publicKey, deviceK
 	h.Set("X-Kerberos-Storage-Capture", "IPCamera")
 	if fileName != "" {
 		h.Set("X-Kerberos-Storage-FileName", fileName)
+		setQueuedRecordingMetadataHeaders(h, fileName)
 	}
 }
 
@@ -516,6 +522,7 @@ func setHubTusHeaders(h http.Header, config *models.Config, fileName string) {
 	h.Set("X-Kerberos-Storage-Capture", "IPCamera")
 	if fileName != "" {
 		h.Set("X-Kerberos-Storage-FileName", fileName)
+		setQueuedRecordingMetadataHeaders(h, fileName)
 	}
 }
 

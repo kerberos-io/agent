@@ -2,15 +2,20 @@ package cloud
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 	"github.com/minio/minio-go/v6"
 	log "github.com/sirupsen/logrus"
 )
@@ -18,15 +23,6 @@ import (
 func UploadS3(configuration *models.Configuration, fileName string) (bool, bool, error) {
 
 	config := configuration.Config
-
-	// timestamp_microseconds_instanceName_regionCoordinates_numberOfChanges_token
-	// 1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4
-	// - Timestamp
-	// - Size + - + microseconds
-	// - device
-	// - Region
-	// - Number of changes
-	// - Token
 
 	if config.S3 == nil {
 		errorMessage := "UploadS3: Uploading Failed, as no settings found"
@@ -72,34 +68,14 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 		s3Client.SetCustomTransport(transport)
 	}
 
-	fileParts := strings.Split(fileName, "_")
-	if len(fileParts) < 6 {
-		errorMessage := "UploadS3: " + fileName + " is not a valid name."
-		log.Error(errorMessage)
-		return false, true, errors.New(errorMessage)
-	}
-
-	deviceKey := config.Key
-	if deviceKey == "" || strings.ContainsAny(deviceKey, "/\\") {
-		errorMessage := "UploadS3: missing or invalid device key."
-		log.Error(errorMessage)
-		return false, true, errors.New(errorMessage)
-	}
-	startRecording, err := strconv.ParseInt(fileParts[0], 10, 64)
+	objectName, userMetadata, err := s3RecordingUploadDetails(config, fileName, aws_access_key_id)
 	if err != nil {
-		errorMessage := "UploadS3: invalid recording timestamp in " + fileName + ": " + err.Error()
-		log.Error(errorMessage)
-		return false, true, errors.New(errorMessage)
+		log.WithError(err).Error("UploadS3: invalid recording upload metadata")
+		return false, true, err
 	}
-	devicename := fileParts[2]
-	coordinates := fileParts[3]
-	//numberOfChanges := fileParts[4]
-	token, _ := strconv.Atoi(fileParts[5])
 
 	log.Info("UploadS3: Upload started for " + fileName)
-	fullname := "data/recordings/" + fileName
-
-	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
+	file, err := utils.OpenRecording("data/recordings", fileName)
 	if file != nil {
 		defer file.Close()
 	}
@@ -118,23 +94,13 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 	}
 
 	n, err := s3Client.PutObject(config.S3.Bucket,
-		s3RecordingObjectName(config.S3.Username, deviceKey, startRecording),
+		objectName,
 		file,
 		fileInfo.Size(),
 		minio.PutObjectOptions{
 			ContentType:  "video/mp4",
 			StorageClass: "ONEZONE_IA",
-			UserMetadata: map[string]string{
-				"event-timestamp":         strconv.FormatInt(startRecording, 10),
-				"event-microseconds":      deviceKey,
-				"event-instancename":      devicename,
-				"event-regioncoordinates": coordinates,
-				"event-numberofchanges":   deviceKey,
-				"event-token":             strconv.Itoa(token),
-				"productid":               deviceKey,
-				"publickey":               aws_access_key_id,
-				"uploadtime":              "now",
-			},
+			UserMetadata: userMetadata,
 		})
 
 	if err != nil {
@@ -148,6 +114,92 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 }
 
 func s3RecordingObjectName(username, deviceKey string, startRecording int64) string {
-	return username + "/" + time.Unix(startRecording, 0).UTC().Format("2006/01/02") +
+	return username + "/" + time.UnixMilli(startRecording).UTC().Format("2006/01/02") +
 		"/" + strconv.FormatInt(startRecording, 10) + "-" + deviceKey + ".mp4"
+}
+
+func s3RecordingUploadDetails(config models.Config, fileName, publicKey string) (string, map[string]string, error) {
+	value, err := readRecordingUploadMetadataFile(fileName)
+	if err != nil && !os.IsNotExist(err) {
+		return "", nil, err
+	}
+
+	deviceKey := config.Key
+	var startRecording int64
+	userMetadata := map[string]string{
+		"publickey":  publicKey,
+		"uploadtime": "now",
+	}
+	marker := strings.TrimSpace(string(value))
+	_, fpsErr := strconv.ParseFloat(marker, 64)
+	if err == nil && marker != "" && fpsErr != nil {
+		var metadata models.RecordingUploadMetadata
+		if err := json.Unmarshal(value, &metadata); err != nil {
+			return "", nil, fmt.Errorf("decode recording upload metadata for %s: %w", fileName, err)
+		}
+		if metadata.FileName != "" && metadata.FileName != filepath.Base(fileName) {
+			return "", nil, fmt.Errorf("recording upload metadata filename does not match %s", fileName)
+		}
+		if metadata.Timestamp <= 0 {
+			return "", nil, fmt.Errorf("invalid recording timestamp in upload metadata for %s", fileName)
+		}
+		deviceKey = metadata.DeviceKey
+		startRecording = metadata.Timestamp
+		userMetadata["event-instancename"] = config.Name
+		if metadata.DeviceName != "" {
+			userMetadata["event-instancename"] = metadata.DeviceName
+		}
+		if metadata.RegionCoordinates != "" {
+			userMetadata["event-regioncoordinates"] = metadata.RegionCoordinates
+		}
+		if metadata.NumberOfChanges != "" {
+			userMetadata["event-numberofchanges"] = metadata.NumberOfChanges
+		}
+		userMetadata["event-microseconds"] = strconv.FormatInt(metadata.Timestamp%1000*1000, 10)
+		userMetadata["duration"] = strconv.FormatUint(metadata.Duration, 10)
+		userMetadata["encrypted"] = strconv.FormatBool(metadata.Encrypted)
+		if metadata.FPS > 0 && metadata.FPS <= 240 {
+			userMetadata["fps"] = strconv.FormatFloat(metadata.FPS, 'f', -1, 64)
+		}
+	} else {
+		// Empty and FPS-only markers predate structured recording metadata.
+		fileParts := strings.Split(fileName, "_")
+		if len(fileParts) < 6 {
+			return "", nil, fmt.Errorf("%s is not a valid legacy recording name", fileName)
+		}
+		startRecording, err = strconv.ParseInt(fileParts[0], 10, 64)
+		if err != nil {
+			return "", nil, fmt.Errorf("invalid recording timestamp in %s: %w", fileName, err)
+		}
+		if startRecording <= 0 || startRecording > math.MaxInt64/1000 {
+			return "", nil, fmt.Errorf("invalid recording timestamp in %s", fileName)
+		}
+		startRecording *= 1000
+		_, precision, found := strings.Cut(fileParts[1], "-")
+		if found {
+			fraction, err := strconv.ParseInt(precision, 10, 64)
+			if err != nil || fraction < 0 || fraction >= 1000000 {
+				return "", nil, fmt.Errorf("invalid recording precision in %s", fileName)
+			}
+			if len(precision) > 3 {
+				fraction /= 1000
+			}
+			startRecording += fraction
+		}
+		token, _ := strconv.Atoi(fileParts[5])
+		userMetadata["event-microseconds"] = deviceKey
+		userMetadata["event-instancename"] = fileParts[2]
+		userMetadata["event-regioncoordinates"] = fileParts[3]
+		userMetadata["event-numberofchanges"] = deviceKey
+		userMetadata["event-token"] = strconv.Itoa(token)
+	}
+	if deviceKey == "" || strings.ContainsAny(deviceKey, "/\\") {
+		return "", nil, errors.New("missing or invalid recording device key")
+	}
+	if startRecording <= 0 {
+		return "", nil, fmt.Errorf("invalid recording timestamp for %s", fileName)
+	}
+	userMetadata["event-timestamp"] = strconv.FormatInt(startRecording/1000, 10)
+	userMetadata["productid"] = deviceKey
+	return s3RecordingObjectName(config.S3.Username, deviceKey, startRecording), userMetadata, nil
 }

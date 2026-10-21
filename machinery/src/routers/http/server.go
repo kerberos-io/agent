@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	jwt "github.com/appleboy/gin-jwt/v2"
@@ -19,6 +20,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/capture"
 	"github.com/kerberos-io/agent/machinery/src/encryption"
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -160,9 +162,9 @@ func requestLogger() gin.HandlerFunc {
 func Files(c *gin.Context, configDirectory string, configuration *models.Configuration) {
 
 	// Get File
-	filePath := configDirectory + "/data/recordings" + c.Param("filepath")
-	_, err := os.Open(filePath)
+	filePath, err := utils.ResolveRecordingPath(configDirectory+"/data/recordings", strings.TrimPrefix(c.Param("filepath"), "/"))
 	if err != nil {
+		log.WithError(err).Warn("Could not resolve recording for playback")
 		c.JSON(404, gin.H{"error": "File not found"})
 		return
 	}
