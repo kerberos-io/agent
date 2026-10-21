@@ -76,6 +76,26 @@ There are a myriad of cameras out there (USB, IP and other cameras), and it migh
 1. [What is new?](#what-is-new)
 1. [Contributors](#contributors)
 
+### Direct S3 recording layout
+
+Direct S3 uploads store recordings as
+`<s3.username>/yyyy/mm/dd/<timestamp>-<deviceKey>.mp4`. The timestamp is the
+recording's Unix timestamp in seconds, derived from its local filename, and the
+date is its UTC date, not the upload date. The device key is the configured Agent
+key and must be non-empty and contain no path separators. Retried uploads use
+the same object key, even after midnight. Recordings from the same device starting
+in the same second share an object key.
+
+This replaces the previous `<s3.username>/<filename>.mp4` layout for new uploads.
+Existing objects are not moved; consumers of direct S3 uploads must support both
+layouts when reading historical recordings. Local Agent recordings and uploads
+through Kerberos Vault or Kerberos Hub are unchanged.
+
+The shorter S3 filename cannot be decoded by legacy filename-only consumers.
+Integrations must preserve structured recording metadata, including the device
+key (`productid`) and recording timestamp (`event-timestamp`), as well as the full
+object key.
+
 ## Quickstart - Docker
 
 The easiest way to get your Kerberos Agent up and running is to use our public image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you have selected a specific tag, run `docker` command below, which will open the web interface of your Kerberos agent on port `80`, and off you go. For a more configurable and persistent deployment have a look at [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent).

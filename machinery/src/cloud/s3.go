@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/minio/minio-go/v6"
@@ -72,14 +73,24 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 	}
 
 	fileParts := strings.Split(fileName, "_")
-	if len(fileParts) == 1 {
+	if len(fileParts) < 6 {
 		errorMessage := "UploadS3: " + fileName + " is not a valid name."
 		log.Error(errorMessage)
 		return false, true, errors.New(errorMessage)
 	}
 
 	deviceKey := config.Key
-	startRecording, _ := strconv.ParseInt(fileParts[0], 10, 64)
+	if deviceKey == "" || strings.ContainsAny(deviceKey, "/\\") {
+		errorMessage := "UploadS3: missing or invalid device key."
+		log.Error(errorMessage)
+		return false, true, errors.New(errorMessage)
+	}
+	startRecording, err := strconv.ParseInt(fileParts[0], 10, 64)
+	if err != nil {
+		errorMessage := "UploadS3: invalid recording timestamp in " + fileName + ": " + err.Error()
+		log.Error(errorMessage)
+		return false, true, errors.New(errorMessage)
+	}
 	devicename := fileParts[2]
 	coordinates := fileParts[3]
 	//numberOfChanges := fileParts[4]
@@ -107,7 +118,7 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 	}
 
 	n, err := s3Client.PutObject(config.S3.Bucket,
-		config.S3.Username+"/"+fileName,
+		s3RecordingObjectName(config.S3.Username, deviceKey, startRecording),
 		file,
 		fileInfo.Size(),
 		minio.PutObjectOptions{
@@ -134,4 +145,9 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 		log.Info("UploadS3: Upload Finished, file has been uploaded to bucket: " + strconv.FormatInt(n, 10))
 		return true, true, nil
 	}
+}
+
+func s3RecordingObjectName(username, deviceKey string, startRecording int64) string {
+	return username + "/" + time.Unix(startRecording, 0).UTC().Format("2006/01/02") +
+		"/" + strconv.FormatInt(startRecording, 10) + "-" + deviceKey + ".mp4"
 }
