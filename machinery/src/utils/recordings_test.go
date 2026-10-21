@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -199,6 +201,80 @@ func TestReadRecordingDirectoryIncludesFlatAndDatedMedia(t *testing.T) {
 	filtered := GetMediaFormatted(files, directory, config, models.EventFilter{TimestampOffsetStart: 1767355200})
 	if len(filtered) != 1 || filtered[0].Key != names[1] {
 		t.Fatalf("unexpected filtered nested media: %+v", filtered)
+	}
+}
+
+func TestReadRecordingDirectoryContinuesAfterConcurrentDeletion(t *testing.T) {
+	for _, origin := range []string{"Info", "WalkDir"} {
+		t.Run(origin, func(t *testing.T) {
+			directory := t.TempDir()
+			for _, name := range []string{"deleted.mp4", "surviving.mp4"} {
+				if err := os.WriteFile(filepath.Join(directory, name), []byte("video"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			entries, err := os.ReadDir(directory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			files, err := readRecordingDirectory(directory, func(root string, visit fs.WalkDirFunc) error {
+				deleted := filepath.Join(root, entries[0].Name())
+				if err := os.Remove(deleted); err != nil {
+					t.Fatal(err)
+				}
+				var err error
+				if origin == "Info" {
+					err = visit(deleted, entries[0], nil)
+				} else {
+					err = visit(deleted, nil, &fs.PathError{Op: "lstat", Path: deleted, Err: fs.ErrNotExist})
+				}
+				if err != nil {
+					return err
+				}
+				return visit(filepath.Join(root, entries[1].Name()), entries[1], nil)
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(files) != 1 || files[0].Name() != "surviving.mp4" || files[0].Size() != 5 {
+				t.Fatalf("expected surviving recording after concurrent deletion, got %v", files)
+			}
+		})
+	}
+}
+
+type recordingDirEntryInfoError struct {
+	fs.DirEntry
+	err error
+}
+
+func (entry recordingDirEntryInfoError) Info() (fs.FileInfo, error) {
+	return nil, entry.err
+}
+
+func TestReadRecordingDirectoryReportsOtherScanErrors(t *testing.T) {
+	for _, origin := range []string{"Info", "WalkDir"} {
+		t.Run(origin, func(t *testing.T) {
+			directory := t.TempDir()
+			filePath := filepath.Join(directory, "recording.mp4")
+			if err := os.WriteFile(filePath, []byte("video"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			entries, err := os.ReadDir(directory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantErr := &fs.PathError{Op: "lstat", Path: filePath, Err: fs.ErrPermission}
+			files, err := readRecordingDirectory(directory, func(root string, visit fs.WalkDirFunc) error {
+				if origin == "Info" {
+					return visit(filePath, recordingDirEntryInfoError{DirEntry: entries[0], err: wantErr}, nil)
+				}
+				return visit(filePath, nil, wantErr)
+			})
+			if !errors.Is(err, fs.ErrPermission) || files != nil {
+				t.Fatalf("scan = %v, %v; want permission error without partial results", files, err)
+			}
+		})
 	}
 }
 

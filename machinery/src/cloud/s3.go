@@ -146,6 +146,13 @@ func s3RecordingUploadDetails(config models.Config, fileName, publicKey string) 
 		deviceKey = metadata.DeviceKey
 		startRecording = metadata.Timestamp
 		userMetadata["event-instancename"] = config.Name
+		if metadata.DeviceName == "" || metadata.RegionCoordinates == "" || metadata.NumberOfChanges == "" {
+			if description, ok := s3LegacyRecordingDescription(fileName); ok {
+				for key, value := range description {
+					userMetadata[key] = value
+				}
+			}
+		}
 		if metadata.DeviceName != "" {
 			userMetadata["event-instancename"] = metadata.DeviceName
 		}
@@ -202,4 +209,48 @@ func s3RecordingUploadDetails(config models.Config, fileName, publicKey string) 
 	userMetadata["event-timestamp"] = strconv.FormatInt(startRecording/1000, 10)
 	userMetadata["productid"] = deviceKey
 	return s3RecordingObjectName(config.S3.Username, deviceKey, startRecording), userMetadata, nil
+}
+
+func s3LegacyRecordingDescription(fileName string) (map[string]string, bool) {
+	base := filepath.Base(fileName)
+	if filepath.Ext(base) != ".mp4" {
+		return nil, false
+	}
+	parts := strings.Split(strings.TrimSuffix(base, ".mp4"), "_")
+	if len(parts) != 6 || parts[2] == "" {
+		return nil, false
+	}
+	seconds, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil || seconds <= 0 || seconds > math.MaxInt64/1000 {
+		return nil, false
+	}
+	digits, fraction, found := strings.Cut(parts[1], "-")
+	precision, err := strconv.Atoi(digits)
+	if !found || err != nil || precision < 1 || precision > 6 || len(fraction) != precision {
+		return nil, false
+	}
+	if _, err := strconv.ParseUint(fraction, 10, 64); err != nil {
+		return nil, false
+	}
+	coordinates := strings.Split(parts[3], "-")
+	if len(coordinates) != 4 {
+		return nil, false
+	}
+	for _, coordinate := range coordinates {
+		if _, err := strconv.ParseUint(coordinate, 10, 64); err != nil {
+			return nil, false
+		}
+	}
+	changes, err := strconv.ParseInt(parts[4], 10, 64)
+	if err != nil || changes < -1 {
+		return nil, false
+	}
+	if _, err := strconv.ParseUint(parts[5], 10, 64); err != nil {
+		return nil, false
+	}
+	return map[string]string{
+		"event-instancename":      parts[2],
+		"event-regioncoordinates": parts[3],
+		"event-numberofchanges":   parts[4],
+	}, true
 }

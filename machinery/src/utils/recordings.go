@@ -107,9 +107,16 @@ func (file recordingFileInfo) Name() string {
 // ReadRecordingDirectory returns MP4s with root-relative names, preserving the
 // file information used by the existing sorting and media formatting helpers.
 func ReadRecordingDirectory(directory string) ([]os.FileInfo, error) {
+	return readRecordingDirectory(directory, filepath.WalkDir)
+}
+
+func readRecordingDirectory(directory string, walkDir func(string, fs.WalkDirFunc) error) ([]os.FileInfo, error) {
 	files := []os.FileInfo{}
-	err := filepath.WalkDir(directory, func(filePath string, entry fs.DirEntry, err error) error {
+	err := walkDir(directory, func(filePath string, entry fs.DirEntry, err error) error {
 		if err != nil {
+			if os.IsNotExist(err) && filePath != directory {
+				return nil
+			}
 			return err
 		}
 		if entry.IsDir() && entry.Name() == "decrypted" && filePath != directory {
@@ -120,6 +127,9 @@ func ReadRecordingDirectory(directory string) ([]os.FileInfo, error) {
 		}
 		info, err := entry.Info()
 		if err != nil {
+			if os.IsNotExist(err) {
+				return nil
+			}
 			return err
 		}
 		name, err := filepath.Rel(directory, filePath)

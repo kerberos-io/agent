@@ -70,6 +70,109 @@ func TestS3RecordingUploadDetailsUsesCheckpoint(t *testing.T) {
 	}
 }
 
+func TestS3RecordingUploadDetailsBackfillsLegacyCheckpointDescriptions(t *testing.T) {
+	const legacyName = "1564859471_6-474162_recorded-camera_1-2-3-4_1153_27.mp4"
+	tests := []struct {
+		name        string
+		fileName    string
+		camera      string
+		region      string
+		changes     string
+		wantCamera  string
+		wantRegion  string
+		wantChanges string
+	}{
+		{"pre-upgrade checkpoint", legacyName, "", "", "", "recorded-camera", "1-2-3-4", "1153"},
+		{"checkpoint camera", legacyName, "snapshot-camera", "", "", "snapshot-camera", "1-2-3-4", "1153"},
+		{"checkpoint region", legacyName, "", "5-6-7-8", "", "recorded-camera", "5-6-7-8", "1153"},
+		{"checkpoint zero changes", legacyName, "", "", "0", "recorded-camera", "1-2-3-4", "0"},
+		{"dated reference", "2019/08/03/" + legacyName, "", "", "", "recorded-camera", "1-2-3-4", "1153"},
+		{"continuous recording", "1564859471_3-474_recorded-camera_0-0-0-0_-1_27.mp4", "", "", "", "recorded-camera", "0-0-0-0", "-1"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			withRecording(t, filepath.Base(tt.fileName), []byte("recording"))
+			metadata := models.RecordingUploadMetadata{
+				FileName:          filepath.Base(tt.fileName),
+				DeviceKey:         "checkpoint-key",
+				Timestamp:         1767355200123,
+				Duration:          20452,
+				FPS:               29.97,
+				Encrypted:         true,
+				DeviceName:        tt.camera,
+				RegionCoordinates: tt.region,
+				NumberOfChanges:   tt.changes,
+			}
+			payload, err := json.Marshal(metadata)
+			if err != nil {
+				t.Fatal(err)
+			}
+			withQueuedRecordingFPS(t, tt.fileName, string(payload))
+			config := models.Config{Key: "current-key", Name: "current-camera", S3: &models.S3{Username: "user"}}
+			objectName, got, err := s3RecordingUploadDetails(config, tt.fileName, "public-key")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if want := "user/2026/01/02/1767355200123-checkpoint-key.mp4"; objectName != want {
+				t.Fatalf("object name = %q, want %q", objectName, want)
+			}
+			want := map[string]string{
+				"publickey":               "public-key",
+				"uploadtime":              "now",
+				"event-instancename":      tt.wantCamera,
+				"event-regioncoordinates": tt.wantRegion,
+				"event-numberofchanges":   tt.wantChanges,
+				"event-microseconds":      "123000",
+				"event-timestamp":         "1767355200",
+				"productid":               "checkpoint-key",
+				"duration":                "20452",
+				"fps":                     "29.97",
+				"encrypted":               "true",
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("metadata = %#v, want %#v", got, want)
+			}
+		})
+	}
+}
+
+func TestS3RecordingUploadDetailsDoesNotBackfillInvalidLegacyNames(t *testing.T) {
+	for _, fileName := range []string{
+		"1767355200123-checkpoint-key.mp4",
+		"invalid_6-474162_camera_0-0-0-0_1153_27.mp4",
+		"1564859471_6-invalid_camera_0-0-0-0_1153_27.mp4",
+		"1564859471_3-474162_camera_0-0-0-0_1153_27.mp4",
+		"1564859471_6-474162__0-0-0-0_1153_27.mp4",
+		"1564859471_6-474162_camera_invalid_1153_27.mp4",
+		"1564859471_6-474162_camera_0-0-0-0_invalid_27.mp4",
+		"1564859471_6-474162_camera_0-0-0-0_1153_invalid.mp4",
+		"1564859471_6-474162_camera_0-0-0-0_1153_27_extra.mp4",
+	} {
+		t.Run(fileName, func(t *testing.T) {
+			withRecording(t, fileName, []byte("recording"))
+			metadata := models.RecordingUploadMetadata{
+				FileName: fileName, DeviceKey: "checkpoint-key", Timestamp: 1767355200123, Duration: 20452,
+			}
+			payload, err := json.Marshal(metadata)
+			if err != nil {
+				t.Fatal(err)
+			}
+			withQueuedRecordingFPS(t, fileName, string(payload))
+			config := models.Config{Key: "current-key", Name: "current-camera", S3: &models.S3{Username: "user"}}
+			objectName, got, err := s3RecordingUploadDetails(config, fileName, "public-key")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if objectName != "user/2026/01/02/1767355200123-checkpoint-key.mp4" ||
+				got["event-instancename"] != "current-camera" || got["event-regioncoordinates"] != "" ||
+				got["event-numberofchanges"] != "" || got["event-timestamp"] != "1767355200" ||
+				got["productid"] != "checkpoint-key" {
+				t.Fatalf("unexpected fallback for invalid legacy name: %q, %#v", objectName, got)
+			}
+		})
+	}
+}
+
 func TestS3RecordingUploadDetailsLegacyMarkers(t *testing.T) {
 	for _, marker := range []string{"missing", "empty", "fps-only", "old-marker-name"} {
 		t.Run(marker, func(t *testing.T) {

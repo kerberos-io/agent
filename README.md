@@ -99,6 +99,9 @@ back to the legacy filename format and configured Agent key. A structured
 checkpoint takes precedence over both the filename and current configured key;
 an invalid or unreadable checkpoint is reported as an upload error, not silently
 replaced with filename-derived values.
+For older structured checkpoints, missing camera name, region, and change count
+are recovered from a validated legacy filename. Populated checkpoint fields
+take precedence, and the checkpoint timestamp and device key remain authoritative.
 
 The shorter filename cannot be decoded by legacy filename-only consumers.
 Integrations must preserve structured recording metadata, including the device
