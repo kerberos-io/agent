@@ -22,6 +22,80 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/utils"
 )
 
+func TestResumableEOFRestartPreservesLatestFailure(t *testing.T) {
+	previousDelay := tusBackoffBaseDelay
+	tusBackoffBaseDelay = 0
+	t.Cleanup(func() { tusBackoffBaseDelay = previousDelay })
+	const fileName = "1767355200123-device-key.mp4"
+	withRecording(t, fileName, []byte("recording"))
+	fake := newFakeTus()
+	fake.failFinalize = 1
+	var heads atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodHead && heads.Add(1) <= 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		fake.ServeHTTP(w, r)
+	}))
+	defer server.Close()
+
+	uploaded, responded, supported, _, err := uploadVaultResumable(testVault(server.URL), "public", "device-key", fileName, "test", "primary")
+	if uploaded || !responded || !supported || err == nil ||
+		!strings.Contains(err.Error(), "unexpected status on PATCH: 502 Bad Gateway") ||
+		strings.Contains(err.Error(), "503 Service Unavailable") {
+		t.Fatalf("upload = %t/%t/%t, %v; want the latest finalization failure after EOF restart", uploaded, responded, supported, err)
+	}
+	patches, _ := fake.patchCounts()
+	if heads.Load() != 4 || fake.createCount() != 1 || patches != 1 ||
+		len(fake.requestsForMethod(http.MethodDelete)) != 1 {
+		t.Fatalf("unexpected retry sequence: heads=%d, creates=%d, patches=%d", heads.Load(), fake.createCount(), patches)
+	}
+}
+
+func TestResumableCreationKeepsLocationAfterBodyReadError(t *testing.T) {
+	previousDelay := tusBackoffBaseDelay
+	tusBackoffBaseDelay = 0
+	t.Cleanup(func() { tusBackoffBaseDelay = previousDelay })
+	const fileName = "1767355200123-device-key.mp4"
+	payload := []byte("recording")
+	withRecording(t, fileName, payload)
+	fake := newFakeTus()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			w.Header().Set("Content-Length", "100")
+			fake.ServeHTTP(w, r)
+			_, _ = io.WriteString(w, "short")
+			return
+		}
+		fake.ServeHTTP(w, r)
+	}))
+	defer server.Close()
+
+	uploaded, responded, supported, _, err := uploadVaultResumable(testVault(server.URL), "public", "device-key", fileName, "test", "primary")
+	if !uploaded || !responded || !supported || err != nil {
+		t.Fatalf("upload = %t/%t/%t, %v; want success despite the interrupted optional creation body", uploaded, responded, supported, err)
+	}
+	if fake.createCount() != 1 || fake.totalBytes() != int64(len(payload)) {
+		t.Fatalf("created %d slots and uploaded %d bytes; want one reused slot and %d bytes", fake.createCount(), fake.totalBytes(), len(payload))
+	}
+}
+
+func TestTusCreateStillRequiresLocationAfterBodyReadError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = io.WriteString(w, "short")
+	}))
+	defer server.Close()
+	location, status, err := tusCreate(server.Client(), server.URL, 8, "",
+		func(http.Header, string) {}, "1767355200123-device-key.mp4")
+	if location != "" || status != http.StatusCreated || err == nil ||
+		!strings.Contains(err.Error(), "missing Location") {
+		t.Fatalf("creation = %q, %d, %v; want missing Location error", location, status, err)
+	}
+}
+
 func TestTusCreateReportsBoundedServerErrors(t *testing.T) {
 	for _, tc := range []struct {
 		name string

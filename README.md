@@ -467,6 +467,8 @@ retransmitted when a request fails.
 An HTTP 500 during resumable creation is a server/provider failure, not proof
 that the recording filename is invalid. Creation errors include up to 4 KiB of
 the server response, and the final retry error retains the latest failure cause.
+Created upload sessions remain usable if only the optional creation response
+body is interrupted; the successful response's `Location` is retained.
 Check the corresponding Hub/Vault logs and storage-provider configuration.
 As a temporary diagnostic workaround, set `AGENT_DISABLE_RESUMABLE_UPLOAD=true`
 and restart Agent to use ordinary uploads. This does not change the recording
