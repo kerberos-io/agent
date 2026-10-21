@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -78,10 +79,8 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 		}).Info("Resumable Hub upload unavailable; using legacy upload")
 	}
 
-	fullname := "data/recordings/" + fileName
-
 	// Check if we still have the file otherwise we abort the request.
-	file, err := os.OpenFile(fullname, os.O_RDWR, 0755)
+	file, err := utils.OpenRecording("data/recordings", fileName)
 	if file != nil {
 		defer file.Close()
 	}

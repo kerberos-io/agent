@@ -964,7 +964,7 @@ func GetDashboard(c *gin.Context, configDirectory string, configuration *models.
 	// All days stored in this agent.
 	days := []string{}
 	latestEvents := []models.Media{}
-	files, err := utils.ReadDirectory(recordingDirectory)
+	files, err := utils.ReadRecordingDirectory(recordingDirectory)
 	if err == nil {
 		events := utils.GetSortedDirectory(files)
 
@@ -975,6 +975,8 @@ func GetDashboard(c *gin.Context, configDirectory string, configuration *models.
 		var eventFilter models.EventFilter
 		eventFilter.NumberOfElements = 5
 		latestEvents = utils.GetMediaFormatted(events, recordingDirectory, configuration, eventFilter) // will get 5 latest recordings.
+	} else {
+		log.WithError(err).Error("Could not list recordings for Agent status")
 	}
 
 	c.JSON(200, gin.H{
@@ -1007,7 +1009,7 @@ func GetLatestEvents(c *gin.Context, configDirectory string, configuration *mode
 			eventFilter.NumberOfElements = 10
 		}
 		recordingDirectory := configDirectory + "/data/recordings"
-		files, err := utils.ReadDirectory(recordingDirectory)
+		files, err := utils.ReadRecordingDirectory(recordingDirectory)
 		if err == nil {
 			events := utils.GetSortedDirectory(files)
 			// We will get all recordings from the directory (as defined by the filter).
@@ -1036,7 +1038,7 @@ func GetLatestEvents(c *gin.Context, configDirectory string, configuration *mode
 // @Success 200
 func GetDays(c *gin.Context, configDirectory string, configuration *models.Configuration, communication *models.Communication) {
 	recordingDirectory := configDirectory + "/data/recordings"
-	files, err := utils.ReadDirectory(recordingDirectory)
+	files, err := utils.ReadRecordingDirectory(recordingDirectory)
 	if err == nil {
 		events := utils.GetSortedDirectory(files)
 		days := utils.GetDays(events, recordingDirectory, configuration)

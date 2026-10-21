@@ -18,7 +18,85 @@ import (
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
+	"github.com/kerberos-io/agent/machinery/src/utils"
 )
+
+func TestUploadKerberosVaultReadsDatedLocalRecordings(t *testing.T) {
+	previousCount, previousTimeout := kstorageRetryCount, kstorageRetryTimeout
+	t.Cleanup(func() { kstorageRetryCount, kstorageRetryTimeout = previousCount, previousTimeout })
+	for _, transport := range []string{"resumable", "legacy"} {
+		t.Run(transport, func(t *testing.T) {
+			const fileName = "1564859471123-device-key.mp4"
+			payload := bytes.Repeat([]byte("video"), 1024)
+			withRecording(t, fileName, payload)
+			datedPath, err := utils.CreateRecordingPath("data/recordings", fileName, time.Unix(1564859471, 0))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Rename(filepath.Join("data/recordings", fileName), datedPath); err != nil {
+				t.Fatal(err)
+			}
+			withQueuedRecordingFPS(t, fileName, `{"filename":"1564859471123-device-key.mp4","device_key":"device-key","timestamp":1564859471123,"duration":27,"fps":25,"device_name":"camera-name","region_coordinates":"1-2-3-4","number_of_changes":"57"}`)
+			fake := newFakeTus()
+			var legacyBody []byte
+			var legacyHeaders http.Header
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if transport == "resumable" {
+					fake.ServeHTTP(w, r)
+					return
+				}
+				body, readErr := io.ReadAll(r.Body)
+				if readErr != nil {
+					t.Error(readErr)
+				}
+				legacyBody = body
+				legacyHeaders = r.Header.Clone()
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer server.Close()
+			if transport == "legacy" {
+				t.Setenv("AGENT_DISABLE_RESUMABLE_UPLOAD", "true")
+			} else {
+				t.Setenv("AGENT_DISABLE_RESUMABLE_UPLOAD", "false")
+			}
+			kstorageRetryCount, kstorageRetryTimeout = 0, 0
+			vault := testVault(server.URL)
+			config := &models.Configuration{Config: models.Config{
+				Key:               "changed-config-key",
+				KStorage:          &vault,
+				KStorageSecondary: &models.KStorage{},
+			}}
+			uploaded, configured, err := UploadKerberosVault(config, fileName)
+			if err != nil || !uploaded || !configured {
+				t.Fatalf("UploadKerberosVault() = (%v, %v, %v), want success", uploaded, configured, err)
+			}
+			if transport == "resumable" {
+				if got := fake.totalBytes(); got != int64(len(payload)) {
+					t.Fatalf("uploaded %d bytes, want %d", got, len(payload))
+				}
+				posts := fake.requestsForMethod(http.MethodPost)
+				if len(posts) != 1 {
+					t.Fatalf("got %d creation requests, want 1", len(posts))
+				}
+				metadata := decodeTusMetadata(posts[0].header.Get("Upload-Metadata"))
+				if metadata["filename"] != fileName || metadata["directory"] != "dir" || metadata["timestamp"] != "1564859471123" ||
+					metadata["device"] != "device-key" || metadata["device_name"] != "camera-name" ||
+					metadata["region_coordinates"] != "1-2-3-4" || metadata["number_of_changes"] != "57" {
+					t.Fatalf("unexpected upload metadata: %#v", metadata)
+				}
+			} else if !bytes.Equal(legacyBody, payload) ||
+				legacyHeaders.Get("X-Kerberos-Storage-FileName") != fileName ||
+				legacyHeaders.Get("X-Kerberos-Storage-Directory") != "dir" ||
+				legacyHeaders.Get("X-Kerberos-Storage-Device") != "device-key" ||
+				legacyHeaders.Get(recordingDeviceNameHeader) != "camera-name" ||
+				legacyHeaders.Get(recordingRegionHeader) != "1-2-3-4" ||
+				legacyHeaders.Get(recordingChangesHeader) != "57" ||
+				legacyHeaders.Get(recordingTimestampHeader) != "1564859471123" {
+				t.Fatalf("unexpected legacy upload: %d bytes, headers %#v", len(legacyBody), legacyHeaders)
+			}
+		})
+	}
+}
 
 // fakeUpload tracks the state of a single resumable upload on the fake server.
 type fakeUpload struct {
