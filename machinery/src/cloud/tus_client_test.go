@@ -14,12 +14,79 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/utils"
 )
+
+func TestTusCreateReportsBoundedServerErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{"server error", "ERR_INTERNAL_SERVER_ERROR: A region must be set when sending requests to S3.\n", "A region must be set"},
+		{"empty error", "", "500 Internal Server Error"},
+		{"large error", strings.Repeat("x", 10000), "[truncated]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = io.WriteString(w, tc.body)
+			}))
+			defer server.Close()
+			location, status, err := tusCreate(server.Client(), server.URL, 8, "",
+				func(http.Header, string) {}, "1767355200123-device-key.mp4")
+			if location != "" || status != http.StatusInternalServerError || err == nil ||
+				!strings.Contains(err.Error(), tc.want) || len(err.Error()) > 4300 {
+				t.Fatalf("creation = %q, %d, %v; want bounded server error", location, status, err)
+			}
+		})
+	}
+}
+
+func TestResumableCreateFailureRetainsServerCause(t *testing.T) {
+	previousDelay := tusBackoffBaseDelay
+	tusBackoffBaseDelay = 0
+	t.Cleanup(func() { tusBackoffBaseDelay = previousDelay })
+	for _, integration := range []string{"vault", "hub"} {
+		t.Run(integration, func(t *testing.T) {
+			const fileName = "1767355200123-device-key.mp4"
+			withRecording(t, fileName, []byte("recording"))
+			var requests atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				if r.Method != http.MethodPost || r.URL.Path != tusUploadPath {
+					t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+				}
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = io.WriteString(w, "ERR_INTERNAL_SERVER_ERROR: A region must be set when sending requests to S3.")
+			}))
+			defer server.Close()
+			var uploaded, responded, supported bool
+			var err error
+			if integration == "vault" {
+				uploaded, responded, supported, _, err = uploadVaultResumable(testVault(server.URL), "public", "device-key", fileName, "test", "primary")
+			} else {
+				uploaded, responded, supported, _, err = uploadHubResumable(testHubConfig(server.URL), fileName, "test", "hub")
+			}
+			if uploaded || !responded || !supported || err == nil ||
+				!strings.Contains(err.Error(), "resumable upload did not complete after retries") ||
+				!strings.Contains(err.Error(), "A region must be set") {
+				t.Fatalf("upload = %t/%t/%t, %v; want original server cause after retries", uploaded, responded, supported, err)
+			}
+			if requests.Load() != 4 {
+				t.Fatalf("creation attempts = %d, want 4 without legacy fallback", requests.Load())
+			}
+			if _, err := os.Stat(filepath.Join("data/recordings", fileName)); err != nil {
+				t.Fatalf("failed upload must retain the local recording: %v", err)
+			}
+		})
+	}
+}
 
 func TestUploadKerberosVaultReadsDatedLocalRecordings(t *testing.T) {
 	previousCount, previousTimeout := kstorageRetryCount, kstorageRetryTimeout

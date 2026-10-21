@@ -164,13 +164,16 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 	// and loop forever, wedging the upload worker on one recording and saturating the
 	// uplink.
 	highWaterOffset := int64(0)
+	var lastErr error
 
 	for attempt := 0; attempt < maxAttempts; attempt++ {
+		lastErr = nil
 		// (1) Ensure we have an active upload URL, creating one if needed.
 		if uploadURL == "" {
 			created, status, cerr := tusCreate(client, baseURL, size, metadata, setHeaders, fileName)
 			lastStatus = status
 			if cerr != nil {
+				lastErr = cerr
 				if status == http.StatusNotFound || status == http.StatusMethodNotAllowed || status == http.StatusNotImplemented {
 					// The vault does not implement tus; let the caller fall back.
 					return false, false, false, "", cerr
@@ -187,6 +190,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 		offset, status, herr := tusHead(client, uploadURL, setHeaders)
 		lastStatus = status
 		if herr != nil {
+			lastErr = herr
 			if status == http.StatusNotFound || status == http.StatusGone {
 				// The upload expired/was removed server-side; start over.
 				removeTusResumeState(sidecar)
@@ -243,6 +247,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 			newOffset, status, respBody, perr := tusPatch(client, uploadURL, offset, patchLen, file, setHeaders)
 			lastStatus = status
 			if perr != nil {
+				lastErr = perr
 				if status >= 400 {
 					// Definitive rejection (e.g. provider push failed during finalize).
 					// Re-evaluate via HEAD on the next iteration to decide retry/restart.
@@ -289,7 +294,12 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 	// report responded=false so the caller keeps the recording queued and retries
 	// later instead of consuming its retry budget and entering the long back-off
 	// timeout.
-	return false, lastStatus > 0, true, "resumable upload did not complete after retries", errors.New(label + ": resumable upload did not complete after retries")
+	message := label + ": resumable upload did not complete after retries"
+	err = errors.New(message)
+	if lastErr != nil {
+		err = fmt.Errorf("%s: %w", message, lastErr)
+	}
+	return false, lastStatus > 0, true, "resumable upload did not complete after retries", err
 }
 
 // uploadVaultResumable uploads a recording directly to a Kerberos Vault using
@@ -395,10 +405,27 @@ func tusCreate(client *http.Client, baseURL string, size int64, metadata string,
 	if err != nil {
 		return "", 0, err
 	}
-	io.Copy(io.Discard, resp.Body)
-
 	if resp.StatusCode != http.StatusCreated {
+		const maxErrorBodyBytes = 4096
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes+1))
+		if readErr != nil {
+			return "", resp.StatusCode, fmt.Errorf("unexpected status creating upload: %s; read error response: %w", resp.Status, readErr)
+		}
+		truncated := len(body) > maxErrorBodyBytes
+		if truncated {
+			body = body[:maxErrorBodyBytes]
+		}
+		message := strings.TrimSpace(string(body))
+		if truncated {
+			message += " [truncated]"
+		}
+		if message != "" {
+			return "", resp.StatusCode, fmt.Errorf("unexpected status creating upload: %s: %q", resp.Status, message)
+		}
 		return "", resp.StatusCode, fmt.Errorf("unexpected status creating upload: %s", resp.Status)
+	}
+	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+		return "", resp.StatusCode, fmt.Errorf("read upload creation response: %w", err)
 	}
 	location := resp.Header.Get("Location")
 	if location == "" {
