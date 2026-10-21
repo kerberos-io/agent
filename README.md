@@ -464,6 +464,15 @@ Smaller chunks provide more frequent resumable checkpoints but create more HTTP
 requests. Larger chunks reduce request overhead but require more data to be
 retransmitted when a request fails.
 
+An HTTP 500 during resumable creation is a server/provider failure, not proof
+that the recording filename is invalid. Creation errors include up to 4 KiB of
+the server response, and the final retry error retains the latest failure cause.
+Check the corresponding Hub/Vault logs and storage-provider configuration.
+As a temporary diagnostic workaround, set `AGENT_DISABLE_RESUMABLE_UPLOAD=true`
+and restart Agent to use ordinary uploads. This does not change the recording
+filename or remove its structured metadata, but interrupted uploads restart
+from the beginning. Remove the override after fixing the provider issue.
+
 ### Custom metadata headers for Kerberos Vault
 
 Use `AGENT_KERBEROSVAULT_CUSTOM_HEADERS` to attach your own metadata (for
