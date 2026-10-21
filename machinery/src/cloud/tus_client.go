@@ -167,7 +167,6 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 	var lastErr error
 
 	for attempt := 0; attempt < maxAttempts; attempt++ {
-		lastErr = nil
 		// (1) Ensure we have an active upload URL, creating one if needed.
 		if uploadURL == "" {
 			created, status, cerr := tusCreate(client, baseURL, size, metadata, setHeaders, fileName)
@@ -424,8 +423,9 @@ func tusCreate(client *http.Client, baseURL string, size int64, metadata string,
 		}
 		return "", resp.StatusCode, fmt.Errorf("unexpected status creating upload: %s", resp.Status)
 	}
+	// Location identifies the created upload; its response body is optional.
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
-		return "", resp.StatusCode, fmt.Errorf("read upload creation response: %w", err)
+		log.WithError(err).WithField("component", "tus").Debug("Could not drain optional upload creation response body")
 	}
 	location := resp.Header.Get("Location")
 	if location == "" {
