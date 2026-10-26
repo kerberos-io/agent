@@ -115,3 +115,14 @@ ARMv7, not ARMv6 variants. The complete nightly manifest must therefore remain
 blocked rather than silently publishing an incomplete architecture set. ARMv6
 needs an independently validated cross-build/media-runtime strategy before its
 support can be claimed; do not resolve the failure by weakening the gates.
+
+### Current native validation blocker
+
+The ARM64 build and read-only/cap-drop production, demo and FFmpeg smoke passed
+in [CI run 40410591639](https://github.com/kerberos-io/agent/actions/runs/40410591639).
+The strict vulnerability gate then failed: the refreshed Debian 13.7 runtime
+reported 212 HIGH/CRITICAL package findings, including FFmpeg 7.1.5 and curl
+8.14.1, with no fixed Debian versions reported. The run uploaded the complete
+inventory and SPDX SBOM in `agent-image-evidence-ARM64-1`. This is **not** a
+security-clean image or permission to ship it; resolving these native-library
+findings without dropping required capture/codecs remains a rollout blocker.
