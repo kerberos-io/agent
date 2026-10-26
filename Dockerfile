@@ -38,7 +38,7 @@ RUN yarn install --frozen-lockfile --non-interactive
 COPY ui/public ./public
 COPY ui/src ./src
 COPY ui/.eslintrc.json ui/.prettierrc.json ./
-RUN yarn build && test -s /src/machinery/www/index.html
+RUN mkdir -p /src/machinery && yarn build && test -s /src/machinery/www/index.html
 
 # Native FFmpeg capture/transcoding and the opt-in remote terminal require
 # glibc, codecs and /bin/sh. Keep this media exception, not a scratch image.
