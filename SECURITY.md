@@ -108,3 +108,10 @@ media/shell/healthcheck exceptions, publish to `kerberos/agent`, and retain the
 downloadable release tar assets. Centralized digest-bound signing, provenance
 and published-image verification must be integrated before treating this
 rollout as fully validated. Do not substitute the incompatible worker profile.
+
+Native release validation targets AMD64 and ARM64. The legacy nightly ARMv6
+matrix is currently blocked: the pinned Go and Node upstream indexes provide
+ARMv7, not ARMv6 variants. The complete nightly manifest must therefore remain
+blocked rather than silently publishing an incomplete architecture set. ARMv6
+needs an independently validated cross-build/media-runtime strategy before its
+support can be claimed; do not resolve the failure by weakening the gates.

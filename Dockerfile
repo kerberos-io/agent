@@ -25,8 +25,10 @@ RUN --mount=type=cache,target=/go/pkg/mod,sharing=locked \
 FROM build-machinery AS test
 RUN --mount=type=cache,target=/go/pkg/mod,sharing=locked \
     --mount=type=cache,target=/root/.cache/go-build,sharing=locked \
-    go vet ./... && go test -p=1 ./... && \
-    go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./... && \
+    BUILD_TAGS=timetzdata,netgo,osusergo && \
+    case "${TARGETARCH:-$(go env GOARCH)}" in amd64|arm64) BUILD_TAGS="moq,${BUILD_TAGS}" ;; esac && \
+    go vet -tags "${BUILD_TAGS}" ./... && go test -p=1 -tags "${BUILD_TAGS}" ./... && \
+    go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -tags "${BUILD_TAGS}" ./... && \
     go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -mode=binary /out/main
 
 FROM node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d AS build-ui
