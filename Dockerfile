@@ -1,155 +1,84 @@
-
-ARG GO_IMAGE=golang:1.25-trixie
-ARG RUNTIME_IMAGE=debian:trixie-slim
+# syntax=docker/dockerfile:1.7
+FROM golang:1.26.10-trixie@sha256:909771fef53e3dcb0950255f0c9a8b4728c3b841e61509c7b29b098de7ee02d4 AS build-machinery
 ARG VERSION=0.0.0
-FROM ${GO_IMAGE} AS build-machinery
-LABEL AUTHOR=uug.ai
-
-# Re-declare VERSION inside this stage so the value passed via
-# `--build-arg VERSION=...` (e.g. the release tag) is available below.
-# ARGs declared before the first FROM are not visible inside build stages.
-ARG VERSION
 ARG TARGETARCH
-
-ENV GOROOT=/usr/local/go
-ENV GOPATH=/go
-ENV PATH=$GOPATH/bin:$GOROOT/bin:/usr/local/lib:$PATH
-ENV GOSUMDB=off
-
-##########################################
-# Installing some additional dependencies.
-
-RUN apt-get update && apt-get install -y --fix-missing --no-install-recommends \
-	git build-essential cmake pkg-config unzip libgtk2.0-dev \
-	curl ca-certificates libavcodec-dev libavutil-dev libcurl4-openssl-dev \
-	libssl-dev libjpeg62-turbo-dev libswscale-dev && \
-	rm -rf /var/lib/apt/lists/*
-
-##############################################################################
-# Copy dependency metadata first so module downloads can be cached separately.
-
-RUN mkdir -p /go/src/github.com/kerberos-io/agent
-WORKDIR /go/src/github.com/kerberos-io/agent/machinery
-COPY machinery/go.mod machinery/go.sum ./
-RUN go mod download
-
-##############################################################################
-# Copy the rest of the source after dependencies are primed.
-
-COPY machinery ./
-RUN rm -rf .env
-
-##################
-# Build Machinery
-
-RUN RESOLVED_VERSION="${VERSION:-0.0.0}" && \
-	printf '%s' "${RESOLVED_VERSION}" > version && \
-	BUILD_TAGS=timetzdata,netgo,osusergo && \
-	case "${TARGETARCH:-$(go env GOARCH)}" in amd64|arm64) BUILD_TAGS="moq,${BUILD_TAGS}" ;; esac && \
-	go build -o main -tags "${BUILD_TAGS}" --ldflags "-s -w -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${RESOLVED_VERSION}" . && \
-	mkdir -p /agent && \
-	mv main /agent && \
-	mv version /agent && \
-	mv data /agent && \
-	mkdir -p /agent/data/cloud && \
-	mkdir -p /agent/data/snapshots && \
-	mkdir -p /agent/data/log && \
-	mkdir -p /agent/data/recordings && \
-	mkdir -p /agent/data/capture-test && \
-	mkdir -p /agent/data/config
-
-####################################
-# Let's create a /dist folder containing just the files necessary for runtime.
-# Later, it will be copied as the / (root) of the output image.
-
-WORKDIR /dist
-RUN cp -r /agent ./
-
-####################################################################################
-# This will collect dependent libraries so they're later copied to the final image.
-
-RUN /dist/agent/main version
-
-FROM node:22-alpine AS build-ui
-
-RUN apk update && apk upgrade --available && sync
-
-########################
-# Build Web (React app)
-
-RUN mkdir -p /go/src/github.com/kerberos-io/agent/machinery/www
-WORKDIR /go/src/github.com/kerberos-io/agent/ui
-COPY ui/package.json ui/yarn.lock ./
-RUN yarn config set network-timeout 300000 && yarn --frozen-lockfile
-COPY ui ./
-RUN yarn build
-
-####################################
-# Let's create a /dist folder containing just the files necessary for runtime.
-# Later, it will be copied as the / (root) of the output image.
-
-WORKDIR /dist
-RUN mkdir -p ./agent && cp -r /go/src/github.com/kerberos-io/agent/machinery/www ./agent/
-
-############################################
-# Publish main binary to GitHub release
-
-FROM ${RUNTIME_IMAGE}
-
-############################
-# Protect by non-root user.
-
+ENV GOTOOLCHAIN=local CGO_ENABLED=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
-	ca-certificates curl ffmpeg libatomic1 libcap2-bin libstdc++6 && \
-	rm -rf /var/lib/apt/lists/* && \
-	groupadd --system kerberosio && \
-	useradd --system --gid kerberosio --groups video --create-home agent && \
-	chmod 0755 /home/agent
+    pkg-config libavcodec-dev libavutil-dev libswscale-dev && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /src/machinery
+COPY machinery/go.mod machinery/go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod,sharing=locked \
+    go mod download && go mod verify
+COPY machinery/*.go ./
+COPY machinery/docs ./docs
+COPY machinery/src ./src
+RUN --mount=type=cache,target=/go/pkg/mod,sharing=locked \
+    --mount=type=cache,target=/root/.cache/go-build,sharing=locked \
+    BUILD_TAGS=timetzdata,netgo,osusergo && \
+    case "${TARGETARCH:-$(go env GOARCH)}" in amd64|arm64) BUILD_TAGS="moq,${BUILD_TAGS}" ;; esac && \
+    go build -mod=readonly -trimpath -buildvcs=false -tags "${BUILD_TAGS}" \
+      -ldflags="-w -buildid= -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${VERSION}" \
+      -o /out/main . && \
+    printf '%s' "${VERSION}" > /out/version && /out/main -action version
 
-#################################
-# Copy files from previous images
+FROM build-machinery AS test
+RUN --mount=type=cache,target=/go/pkg/mod,sharing=locked \
+    --mount=type=cache,target=/root/.cache/go-build,sharing=locked \
+    go vet ./... && go test -p=1 ./... && \
+    go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./... && \
+    go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -mode=binary /out/main
 
-COPY --chown=0:0 --from=build-machinery /dist /
-COPY --chown=0:0 --from=build-ui /dist /
+FROM node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d AS build-ui
+WORKDIR /src/ui
+COPY ui/package.json ui/yarn.lock ./
+RUN yarn install --frozen-lockfile --non-interactive
+COPY ui/public ./public
+COPY ui/src ./src
+COPY ui/.eslintrc.json ui/.prettierrc.json ./
+RUN yarn build && test -s /src/machinery/www/index.html
 
-##################
-# Try running agent
+# Native FFmpeg capture/transcoding and the opt-in remote terminal require
+# glibc, codecs and /bin/sh. Keep this media exception, not a scratch image.
+FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS runtime-files
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl ffmpeg libatomic1 libstdc++6 && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/* && \
+    groupadd --gid 65532 kerberosio && \
+    useradd --uid 65532 --gid 65532 --groups video --home-dir /home/agent \
+      --no-create-home --shell /bin/sh agent && \
+    find / -xdev -type f -perm /6000 -exec chmod a-s {} + && \
+    rm -f /usr/bin/apt /usr/bin/apt-* /usr/bin/dpkg /usr/bin/dpkg-* \
+      /usr/sbin/dpkg-* /usr/sbin/useradd /usr/sbin/groupadd \
+      /usr/sbin/usermod /usr/sbin/userdel /usr/sbin/groupmod /usr/sbin/groupdel && \
+    rm -rf /usr/lib/apt /usr/lib/dpkg && \
+    install -d -o 0 -g 0 -m 0755 /home/agent && \
+    install -d -o 65532 -g 65532 -m 0750 \
+      /home/agent/data /home/agent/data/cloud /home/agent/data/snapshots \
+      /home/agent/data/log /home/agent/data/recordings /home/agent/data/capture-test \
+      /home/agent/data/config /home/agent/data/tus
+COPY --chown=65532:65532 --chmod=0640 machinery/data/config/config.json machinery/data/config/user.json /home/agent/data/config/
+COPY --chown=0:0 --chmod=0444 machinery/data/config/config.json /home/agent/data/config.template.json
+COPY --chown=0:0 --chmod=0444 machinery/data/test-480p.mp4 /home/agent/data/test-480p.mp4
 
-RUN mv /agent/* /home/agent/
-RUN /home/agent/main version
-
-#######################
-# Make template config
-
-RUN cp /home/agent/data/config/config.json /home/agent/data/config.template.json
-
-###########################
-# Set permissions correctly
-
-RUN chown -R agent:kerberosio /home/agent/data
-RUN chown -R agent:kerberosio /home/agent/www
-
-###########################
-# Grant the necessary root capabilities to the process trying to bind to the privileged port
-RUN setcap 'cap_net_bind_service=+ep' /home/agent/main
-
-###################
-# Run non-root user
-
-USER agent
-
-######################################
-# By default the app runs on port 80
-
-EXPOSE 80
-
-######################################
-# Check if agent is still running
-
-HEALTHCHECK CMD curl --fail "http://localhost:${AGENT_PORT:-80}/health" || exit 1
-
-###################################################
-# Leeeeettttt'ssss goooooo!!!
-# Run the shizzle from the right working directory.
+FROM runtime-files
+ARG VERSION=0.0.0
+ARG REVISION=unknown
+ARG CREATED
+LABEL org.opencontainers.image.title="agent" \
+      org.opencontainers.image.description="Kerberos edge camera and media agent" \
+      org.opencontainers.image.source="https://github.com/kerberos-io/agent" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}" \
+      org.opencontainers.image.created="${CREATED}" \
+      org.opencontainers.image.vendor="UUG.AI"
+COPY --from=build-machinery --chown=0:0 --chmod=0555 /out/main /home/agent/main
+COPY --from=build-machinery --chown=0:0 --chmod=0444 /out/version /home/agent/version
+COPY --from=build-ui --chown=0:0 /src/machinery/www /home/agent/www
+COPY --chown=0:0 --chmod=0444 ui/package.json ui/yarn.lock /usr/share/agent-ui/
+USER 65532:65532
 WORKDIR /home/agent
+EXPOSE 80/tcp
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
+    CMD curl --fail --silent "http://localhost:${AGENT_PORT:-80}/health" || exit 1
 CMD ["./main", "-action", "run"]
