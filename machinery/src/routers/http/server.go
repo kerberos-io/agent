@@ -43,6 +43,15 @@ import (
 // @in header
 // @name Authorization
 
+func demoEnvironmentMiddleware(path string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.URL.Path == "/env.js" && (c.Request.Method == "GET" || c.Request.Method == "HEAD") {
+			c.File(path)
+			c.Abort()
+		}
+	}
+}
+
 func StartServer(configDirectory string, configuration *models.Configuration, communication *models.Communication, captureDevice *capture.Capture) {
 
 	// Set release mode
@@ -84,17 +93,9 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	AddRoutes(r, authMiddleware, configDirectory, configuration, communication, captureDevice)
 
 	// Update environment variables
-	environmentVariables := configDirectory + "/www/env.js"
 	if os.Getenv("AGENT_MODE") == "demo" {
 		demoEnvironmentVariables := configDirectory + "/www/env.demo.js"
-		// Move demo environment variables to environment variables
-		err := os.Rename(demoEnvironmentVariables, environmentVariables)
-		if err != nil {
-			log.WithError(err).WithFields(log.Fields{
-				"component": "http",
-				"event":     "demo_environment_move_failed",
-			}).Fatal("Failed to activate demo UI environment")
-		}
+		r.Use(demoEnvironmentMiddleware(demoEnvironmentVariables))
 	}
 
 	// Add static routes to UI

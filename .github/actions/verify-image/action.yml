@@ -1,0 +1,52 @@
+name: Verify Agent production image
+description: Native media smoke, vulnerability and SBOM gates for the exact image to publish
+inputs:
+  image:
+    required: true
+    description: Locally loaded image tag
+runs:
+  using: composite
+  steps:
+    - name: Functional least-privilege smoke
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+      run: bash image/smoke.sh "$IMAGE"
+    - name: Complete vulnerability inventory
+      uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+      with:
+        image-ref: ${{ inputs.image }}
+        format: json
+        output: image-vulnerabilities.json
+        exit-code: '0'
+        ignore-unfixed: false
+        severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+        version: v0.69.3
+    - name: Gate high and critical vulnerabilities including unfixed
+      uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+      with:
+        image-ref: ${{ inputs.image }}
+        format: table
+        exit-code: '1'
+        ignore-unfixed: false
+        severity: HIGH,CRITICAL
+        version: v0.69.3
+    - name: Generate SPDX SBOM
+      if: ${{ !cancelled() }}
+      uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+      with:
+        image-ref: ${{ inputs.image }}
+        format: spdx-json
+        output: image.spdx.json
+        version: v0.69.3
+    - name: Upload image evidence
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: agent-image-evidence-${{ runner.arch }}-${{ strategy.job-index }}
+        path: |
+          image-vulnerabilities.json
+          image.spdx.json
+          image-env-*.js
+          image-expected-*.js
+        if-no-files-found: error

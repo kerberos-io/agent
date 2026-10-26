@@ -18,3 +18,4 @@ machinery/go.work
 machinery/go.work.sum
 deployments/docker/private-docker-compose.yaml
 video.mp4
+.checks/

@@ -1,7 +1,7 @@
 name: Build pull request
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
 
 env:
   REPO: kerberos/agent
@@ -12,6 +12,7 @@ jobs:
     permissions:
       contents: read
     strategy:
+      fail-fast: false
       matrix:
         include:
           - architecture: amd64
@@ -22,12 +23,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Run Build
+        env:
+          REVISION: ${{ github.event.pull_request.head.sha }}
         run: |
-          docker build --build-arg VERSION=$(echo "${{ github.event.pull_request.head.sha }}" | cut -c1-7) -t ${{ matrix.architecture }} .
+          docker build --target test .
+          docker build --build-arg VERSION="${REVISION:0:7}" --build-arg REVISION="$REVISION" -t ${{ matrix.architecture }} .
+      - name: Verify exact image
+        uses: ./.github/actions/verify-image
+        with:
+          image: ${{ matrix.architecture }}
+      - name: Extract verified release bundle
+        run: |
           CID=$(docker create ${{matrix.architecture}})
           docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
           docker rm ${CID}
-      - name: Strip binary
+      - name: Package binary and runtime assets
         run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
       - name: Upload artifact
         uses: actions/upload-artifact@v4
