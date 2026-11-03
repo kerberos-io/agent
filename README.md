@@ -330,6 +330,7 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_CAPTURE_IPCAMERA_ONVIF_XADDR`        | ONVIF endpoint/address running on the camera.                                                   | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_ONVIF_USERNAME`     | ONVIF username to authenticate against.                                                         | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_ONVIF_PASSWORD`     | ONVIF password to authenticate against.                                                         | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_ONVIF_CHANNEL`      | 1-based channel on multi-channel ONVIF devices (encoders, NVRs) used for PTZ, presets and focus. | "0" (first profile)            |
 | `AGENT_CAPTURE_MOTION`                      | Toggle for enabling or disabling motion.                                                        | "true"                         |
 | `AGENT_CAPTURE_LIVEVIEW`                    | Toggle for enabling or disabling liveview.                                                      | "true"                         |
 | `AGENT_CAPTURE_SNAPSHOTS`                   | Toggle for enabling or disabling snapshot generation.                                           | "true"                         |

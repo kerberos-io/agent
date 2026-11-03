@@ -296,7 +296,7 @@ func TestHeartbeatONVIFPayloadCachesStaticAndReusesLoopSubscription(t *testing.T
 		ptzFunctionCalls++
 		return nil, true, true
 	}
-	heartbeatGetPresetsFromDevice = func(*goonvif.Device) ([]models.OnvifActionPreset, error) {
+	heartbeatGetPresetsFromDevice = func(*goonvif.Device, int) ([]models.OnvifActionPreset, error) {
 		presetCalls++
 		return []models.OnvifActionPreset{{Name: "Lobby", Token: "1"}}, nil
 	}
@@ -397,7 +397,7 @@ func TestHeartbeatONVIFPayloadRefreshesAfterCameraConfigChange(t *testing.T) {
 	heartbeatGetPTZFunctionsFromDevice = func(goonvifptz.GetConfigurationsResponse) ([]string, bool, bool) {
 		return nil, false, true
 	}
-	heartbeatGetPresetsFromDevice = func(*goonvif.Device) ([]models.OnvifActionPreset, error) {
+	heartbeatGetPresetsFromDevice = func(*goonvif.Device, int) ([]models.OnvifActionPreset, error) {
 		presetCalls++
 		return nil, nil
 	}
@@ -477,7 +477,7 @@ func TestHeartbeatONVIFPayloadRetriesStaticFetchFailuresWithoutReconnect(t *test
 	heartbeatGetPTZFunctionsFromDevice = func(goonvifptz.GetConfigurationsResponse) ([]string, bool, bool) {
 		return nil, true, true
 	}
-	heartbeatGetPresetsFromDevice = func(*goonvif.Device) ([]models.OnvifActionPreset, error) {
+	heartbeatGetPresetsFromDevice = func(*goonvif.Device, int) ([]models.OnvifActionPreset, error) {
 		presetCalls++
 		if presetCalls == 1 {
 			return nil, errors.New("temporary preset failure")
@@ -618,7 +618,7 @@ func TestHeartbeatONVIFPayloadReconnectFailureInvalidatesCache(t *testing.T) {
 	heartbeatGetPTZFunctionsFromDevice = func(goonvifptz.GetConfigurationsResponse) ([]string, bool, bool) {
 		return nil, true, false
 	}
-	heartbeatGetPresetsFromDevice = func(*goonvif.Device) ([]models.OnvifActionPreset, error) {
+	heartbeatGetPresetsFromDevice = func(*goonvif.Device, int) ([]models.OnvifActionPreset, error) {
 		presetCalls++
 		return []models.OnvifActionPreset{{Name: "Preset", Token: "1"}}, nil
 	}

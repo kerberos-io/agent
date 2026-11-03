@@ -12,6 +12,7 @@ type OnvifCredentials struct {
 	ONVIFXAddr    string `json:"onvif_xaddr,omitempty" bson:"onvif_xaddr"`
 	ONVIFUsername string `json:"onvif_username,omitempty" bson:"onvif_username"`
 	ONVIFPassword string `json:"onvif_password,omitempty" bson:"onvif_password"`
+	ONVIFChannel  int    `json:"onvif_channel,omitempty" bson:"onvif_channel,omitempty"` // 1-based; 0 = first profile
 }
 
 type CameraStreams struct {

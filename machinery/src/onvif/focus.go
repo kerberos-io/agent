@@ -173,12 +173,12 @@ type onvifFocusClient struct {
 	token    xsdonvif.ReferenceToken
 }
 
-func newONVIFFocusClient(device *onvif.Device) (*onvifFocusClient, error) {
+func newONVIFFocusClient(device *onvif.Device, channel int) (*onvifFocusClient, error) {
 	endpoint, err := device.GetEndpointByRequestStruct(&imaging.Move{})
 	if err != nil {
 		return nil, errors.New("camera does not expose the ONVIF imaging service: " + err.Error())
 	}
-	token, err := GetVideoSourceTokenFromProfile(device, 0)
+	token, err := GetVideoSourceTokenFromChannel(device, channel)
 	if err != nil {
 		return nil, err
 	}
@@ -322,8 +322,8 @@ func (client *onvifFocusClient) StopFocus() error {
 // only relative or absolute focus (e.g. Axis) step by an amount scaled to the
 // speed. The camera is switched to MANUAL focus first, because cameras ignore
 // manual moves while autofocus is active; use AutoFocus to hand control back.
-func ContinuousFocus(device *onvif.Device, speed float64) error {
-	client, err := newONVIFFocusClient(device)
+func ContinuousFocus(device *onvif.Device, channel int, speed float64) error {
+	client, err := newONVIFFocusClient(device, channel)
 	if err != nil {
 		return err
 	}
@@ -333,8 +333,8 @@ func ContinuousFocus(device *onvif.Device, speed float64) error {
 // AutoFocus triggers the camera's native ONVIF autofocus. Setting AUTO while
 // already in AUTO is a no-op on most cameras, so we toggle through MANUAL to
 // force a fresh focus cycle.
-func AutoFocus(device *onvif.Device) error {
-	client, err := newONVIFFocusClient(device)
+func AutoFocus(device *onvif.Device, channel int) error {
+	client, err := newONVIFFocusClient(device, channel)
 	if err != nil {
 		return err
 	}

@@ -105,6 +105,7 @@ type IPCamera struct {
 	ONVIFXAddr    string   `json:"onvif_xaddr" bson:"onvif_xaddr"`
 	ONVIFUsername string   `json:"onvif_username" bson:"onvif_username"`
 	ONVIFPassword string   `json:"onvif_password" bson:"onvif_password"`
+	ONVIFChannel  int      `json:"onvif_channel,omitempty" bson:"onvif_channel,omitempty"` // 1-based video input on multi-channel devices (encoders, NVRs); 0 = first profile
 	SPSNALUs      [][]byte `json:"sps_nalus,omitempty" bson:"sps_nalus,omitempty"`
 	PPSNALUs      [][]byte `json:"pps_nalus,omitempty" bson:"pps_nalus,omitempty"`
 	VPSNALUs      [][]byte `json:"vps_nalus,omitempty" bson:"vps_nalus,omitempty"`
