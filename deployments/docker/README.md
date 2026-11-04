@@ -111,7 +111,7 @@ use `-mod=readonly` to reject implicit module changes, `-trimpath` to omit local
 source paths, and `-buildvcs=false` to omit checkout metadata. CGO remains enabled
 for the native camera/media dependencies.
 
-Patched Go dependencies require at least Go 1.26 for source builds.
+Source builds require at least Go 1.26.10, matching the pinned security patch floor.
 The Go, Node, and Debian bases are pinned to verified multi-platform manifest
 digests, including AMD64 and ARM64 (and ARMv7 where previously supported).
 The pinned Debian image is used only to assemble the scratch runtime with

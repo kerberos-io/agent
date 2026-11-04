@@ -153,7 +153,7 @@ The image uses a Go 1.26 scratch runtime with only required dynamic/media
 dependencies, numeric non-root UID/GID `999:999`, no file capabilities or
 setuid/setgid programs, and an application healthcheck (no curl-based probe).
 UI assets are immutable; demo mode selects its environment without rewriting them.
-Patched native Go dependencies now require Go 1.26 or newer for source builds.
+Source builds require the patched Go 1.26.10 toolchain or newer.
 It supports dropping all capabilities and preventing privilege escalation:
 
 ```sh
