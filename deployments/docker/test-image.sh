@@ -23,6 +23,16 @@ docker run --rm --entrypoint /bin/sh "$image" -ec '
 	test -z "$(find / -xdev -type f -perm /6000 -print 2>/dev/null)"
 	! command -v setcap
 	! command -v capsh
+	! command -v apt
+	! command -v apt-get
+	! command -v dpkg
+	test -s /var/lib/dpkg/status
+	test -r /etc/os-release
+	test -r /usr/share/terminfo/x/xterm-256color
+	test -s /etc/ssl/certs/ca-certificates.crt
+	test "$(id -Gn)" = "kerberosio video"
+	test "$(stat -c %a /tmp)" = 1777
+	test -w "$XDG_CACHE_HOME"
 	test ! -e /home/agent/.env
 	test -z "$(find /home/agent/data/tus -type f -print)"
 	./main -action version
@@ -31,8 +41,25 @@ docker run --rm --entrypoint /bin/sh "$image" -ec '
 	ffmpeg -nostdin -v error -i /tmp/test.aac -ar 8000 -ac 1 \
 		-c:a pcm_mulaw -f mulaw /tmp/test.pcm
 	test -s /tmp/test.pcm
+	ffprobe -v error -show_entries stream=codec_name data/test-480p.mp4
+	ffmpeg -nostdin -v error -i data/test-480p.mp4 -frames:v 1 -f null -
+	ffmpeg -nostdin -v error -i data/test-480p.mp4 -frames:v 1 \
+		-c:v libx265 -x265-params pools=none:frame-threads=1:log-level=error \
+		-f hevc /tmp/test.hevc
+	ffmpeg -nostdin -v error -i /tmp/test.hevc -frames:v 1 -f null -
+	ffmpeg -nostdin -v error -f lavfi -i color=black:s=64x64 \
+		-vf drawtext=text=scratch:fontcolor=white -frames:v 1 -f null -
 '
 
+# Exercise the same shell and PTY devices used by remote-access sessions.
+docker run --rm -t --entrypoint /bin/sh "$image" -ec '
+	test -t 0
+	test -t 1
+	test -c /dev/ptmx
+	test -d /dev/pts
+	stty size
+	printf "Shell and PTY ready\n"
+'
 wait_healthy() {
 	attempt=0
 	while [ "$attempt" -lt 60 ]; do
@@ -76,4 +103,4 @@ container=$(docker run -d --cap-drop ALL --cap-add NET_BIND_SERVICE \
 	-e no_proxy= -e NO_PROXY= "$image")
 wait_healthy
 docker exec "$container" sh -ec 'test -f www/env.js; test ! -e www/env.demo.js'
-echo "Image permissions, media transcoding, volume writes, default/custom ports, and demo startup passed."
+echo "Scratch image permissions, media, shell/PTY, volume writes, default/custom ports, and demo startup passed."

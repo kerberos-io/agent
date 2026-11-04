@@ -5,6 +5,11 @@
 !machinery/**
 !ui/
 !ui/**
+!deployments/
+deployments/*
+!deployments/docker/
+deployments/docker/*
+!deployments/docker/assemble-rootfs.sh
 
 **/.git
 **/.env

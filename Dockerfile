@@ -95,29 +95,34 @@ RUN mkdir -p ./agent && cp -r /go/src/github.com/kerberos-io/agent/machinery/www
 ############################################
 # Publish main binary to GitHub release
 
-FROM ${RUNTIME_IMAGE}
+FROM ${RUNTIME_IMAGE} AS runtime-rootfs
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	ca-certificates curl ffmpeg libatomic1 libcap2-bin libstdc++6 \
+	dash coreutils findutils grep sed tzdata ncurses-base && \
+	groupadd --system --gid 999 kerberosio && \
+	useradd --system --uid 999 --gid kerberosio --groups video \
+		--home-dir /home/agent --no-create-home agent
 
 #################################
 # Copy files from previous images
 
-COPY --chown=0:0 --from=build-machinery /dist/agent/ /home/agent/
-COPY --chown=0:0 --from=build-ui /dist/agent/ /home/agent/
+COPY --chown=0:0 --from=build-machinery /dist/agent/ /runtime/home/agent/
+COPY --chown=0:0 --from=build-ui /dist/agent/ /runtime/home/agent/
+COPY deployments/docker/assemble-rootfs.sh /usr/local/bin/assemble-rootfs
 
-# Keep media support and the health probe, but not privilege-management tools.
-# UID/GID match the existing trixie image; only mutable application data is owned by agent.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-	ca-certificates curl ffmpeg libatomic1 libcap2-bin libstdc++6 && \
-	groupadd --system --gid 999 kerberosio && \
-	useradd --system --uid 999 --gid kerberosio --groups video \
-		--home-dir /home/agent --no-create-home agent && \
-	chmod 0755 /home/agent /home/agent/main && \
-	cp /home/agent/data/config/config.json /home/agent/data/config.template.json && \
-	chown -R agent:kerberosio /home/agent/data /home/agent/www && \
-	setcap 'cap_net_bind_service=+ep' /home/agent/main && \
-	apt-get purge -y --auto-remove libcap2-bin && \
-	rm -rf /var/lib/apt/lists/* && \
-	find / -xdev -type f -perm /6000 -exec chmod a-s {} + && \
-	/home/agent/main version
+RUN chmod 0755 /runtime/home/agent /runtime/home/agent/main && \
+	cp /runtime/home/agent/data/config/config.json /runtime/home/agent/data/config.template.json && \
+	chown -R agent:kerberosio /runtime/home/agent/data /runtime/home/agent/www && \
+	sh /usr/local/bin/assemble-rootfs
+
+FROM scratch
+
+COPY --from=runtime-rootfs /runtime/ /
+
+ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV HOME=/home/agent
+ENV XDG_CACHE_HOME=/tmp/agent-cache
 
 ###################
 # Run non-root user

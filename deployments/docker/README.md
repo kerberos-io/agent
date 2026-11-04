@@ -25,9 +25,12 @@ because demo mode replaces `env.js` at startup. Existing `/home/agent/data/...`
 mount paths, the default port `80`, and the startup command are unchanged.
 
 FFmpeg is required for AAC-to-PCMU audio transcoding, curl for the health check,
-and `/bin/sh` for remote-access sessions. They are intentionally retained. The
-capability-management tools and setuid/setgid permissions on bundled utilities
-are removed. The Agent binary retains only the file capability
+and `/bin/sh` for remote-access sessions. They and the basic GNU shell utilities
+are intentionally retained. The final image uses `FROM scratch`, populated with
+an explicitly assembled Debian/glibc runtime rather than the whole Debian
+filesystem. Apt, dpkg executables, account-management and capability-management
+tools, and setuid/setgid permissions on bundled utilities are absent.
+The Agent binary retains only the file capability
 `NET_BIND_SERVICE`, needed for port `80` on hosts with privileged low ports.
 For an RTSP-only deployment, you can drop the other container capabilities:
 
@@ -70,8 +73,18 @@ for the native camera/media dependencies.
 
 The Go, Node, and Debian bases are pinned to verified multi-platform manifest
 digests, including AMD64 and ARM64 (and ARMv7 where previously supported).
-The Debian/glibc runtime is retained for FFmpeg, CGO, and MoQ compatibility;
-the reference Wolfi/scratch layout is not a drop-in replacement for this image.
+The pinned Debian image is used only to assemble the scratch runtime with
+glibc-compatible FFmpeg, CGO, and MoQ dependencies. Its native package dependency
+metadata selects the architecture's dynamic loader, shared libraries, media
+plugins/drivers, and associated data files. This is intentionally broader than
+an `ldd`-only copy, which misses dynamically loaded plugins. Certificates,
+OpenSSL configuration, time zones, font/MIME/pixbuf caches, account records, and
+standard writable `/tmp` and device mount points are retained. The runtime
+uses `XDG_CACHE_HOME=/tmp/agent-cache` for disposable user caches without making
+the application home writable. It contains package provenance in
+`/var/lib/dpkg/status` and license notices, but
+not the package manager. Update it by rebuilding and replacing the image rather
+than installing packages in a running container.
 
 ```sh
 docker build --pull -t kerberos/agent:local .
@@ -79,12 +92,15 @@ sh deployments/docker/test-image.sh kerberos/agent:local
 ```
 
 The smoke check uses temporary containers and a Docker volume, cleans them up,
-and checks permissions, FFmpeg transcoding, volume initialization/writes,
-default and custom HTTP ports, health probes, and demo-mode startup. It enforces
+and checks permissions, FFmpeg audio transcoding, H264/sample-video decoding,
+H265 encoding/decoding, font rendering, shell/PTY devices, volume
+initialization/writes, default and custom HTTP ports, health probes, and
+demo-mode startup. It enforces
 privileged low ports to check the file capability rather than relying on
 Docker's usual low-port exemption, and checks `no-new-privileges` on port `8082`. PR builds
 run it on native AMD64 and ARM64 runners. It does not replace testing against a
-real camera or checking all supported ARM variants. Review and refresh the
+real camera, hardware codecs/devices, an MQTT-mediated remote shell session, or
+all supported ARM variants. Review and refresh the
 base-image digests regularly for security updates; `--pull` alone does not update
 a pinned digest. `GO_IMAGE` and `RUNTIME_IMAGE` remain overrideable build arguments
 for compatible alternatives. The package repositories are not snapshot-pinned,
