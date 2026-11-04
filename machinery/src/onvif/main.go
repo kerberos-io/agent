@@ -119,10 +119,30 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 		// Connect to Onvif device
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, _, err := ConnectToOnvifDevice(&cameraConfiguration)
-		if err == nil {
+		if err == nil && (onvifAction.Action == "focus" || onvifAction.Action == "autofocus") {
 
-			// Get token from the first profile
-			token, err := GetTokenFromProfile(device, 0)
+			// Focus goes through the imaging service, so it also works on
+			// cameras without PTZ (e.g. fixed cameras with a motorised lens).
+			if onvifAction.Action == "focus" {
+				err := ContinuousFocus(device, cameraConfiguration.ONVIFChannel, ptzAction.Focus)
+				if err != nil {
+					log.Error("onvif.HandleONVIFActions() - ContinuousFocus: " + err.Error())
+				} else {
+					log.Info("onvif.HandleONVIFActions() - ContinuousFocus: successfully focused camera")
+				}
+			} else {
+				err := AutoFocus(device, cameraConfiguration.ONVIFChannel)
+				if err != nil {
+					log.Error("onvif.HandleONVIFActions() - AutoFocus: " + err.Error())
+				} else {
+					log.Info("onvif.HandleONVIFActions() - AutoFocus: successfully triggered autofocus")
+				}
+			}
+
+		} else if err == nil {
+
+			// Get the profile token of the configured channel
+			token, err := GetTokenFromChannel(device, cameraConfiguration.ONVIFChannel)
 			if err == nil {
 
 				// Get the configurations from the device
@@ -154,7 +174,7 @@ func HandleONVIFActions(configuration *models.Configuration, communication *mode
 
 						// Execute the preset
 						preset := ptzAction.Preset
-						err := GoToPresetFromDevice(device, preset)
+						err := GoToPresetFromDevice(device, cameraConfiguration.ONVIFChannel, preset)
 						if err != nil {
 							log.Debug("onvif.HandleONVIFActions() - GotoPreset: " + err.Error())
 						} else {
@@ -349,8 +369,8 @@ func GetPositionFromDevice(configuration models.Configuration) (xsdonvif.PTZVect
 	device, _, err := ConnectToOnvifDevice(&cameraConfiguration)
 	if err == nil {
 
-		// Get token from the first profile
-		token, err := GetTokenFromProfile(device, 0)
+		// Get the profile token of the configured channel
+		token, err := GetTokenFromChannel(device, cameraConfiguration.ONVIFChannel)
 		if err == nil {
 			// Get the PTZ configurations from the device
 			position, err := GetPosition(device, token)
@@ -863,12 +883,12 @@ func GetCapabilitiesFromDevice(dev *onvif.Device) []string {
 	return capabilities
 }
 
-func GetPresetsFromDevice(device *onvif.Device) ([]models.OnvifActionPreset, error) {
+func GetPresetsFromDevice(device *onvif.Device, channel int) ([]models.OnvifActionPreset, error) {
 	var presets []models.OnvifActionPreset
 	var presetsResponse ptz.GetPresetsResponse
 
-	// Get token from the first profile
-	token, err := GetTokenFromProfile(device, 0)
+	// Get the profile token of the requested channel
+	token, err := GetTokenFromChannel(device, channel)
 	if err == nil {
 		resp, err := device.CallMethod(ptz.GetPresets{
 			ProfileToken: token,
@@ -913,11 +933,11 @@ func GetPresetsFromDevice(device *onvif.Device) ([]models.OnvifActionPreset, err
 	return presets, err
 }
 
-func GoToPresetFromDevice(device *onvif.Device, presetName string) error {
+func GoToPresetFromDevice(device *onvif.Device, channel int, presetName string) error {
 	var goToPresetResponse ptz.GotoPresetResponse
 
-	// Get token from the first profile
-	token, err := GetTokenFromProfile(device, 0)
+	// Get the profile token of the requested channel
+	token, err := GetTokenFromChannel(device, channel)
 	if err == nil {
 		preset := xsdonvif.ReferenceToken(presetName)
 		resp, err := device.CallMethod(ptz.GotoPreset{
@@ -1020,6 +1040,7 @@ func VerifyOnvifConnection(c *gin.Context) {
 						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
 						ONVIFUsername: onvifCredentials.ONVIFUsername,
 						ONVIFPassword: onvifCredentials.ONVIFPassword,
+						ONVIFChannel:  onvifCredentials.ONVIFChannel,
 					},
 				},
 			},
@@ -1028,8 +1049,8 @@ func VerifyOnvifConnection(c *gin.Context) {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, capabilities, err := ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			// Get token from the first profile
-			token, err := GetTokenFromProfile(device, 0)
+			// Get the profile token of the requested channel
+			token, err := GetTokenFromChannel(device, cameraConfiguration.ONVIFChannel)
 			if err == nil {
 				c.JSON(200, gin.H{
 					"device":       device,

@@ -319,6 +319,7 @@ func heartbeatONVIFCameraKey(camera models.IPCamera) string {
 		camera.ONVIFXAddr,
 		camera.ONVIFUsername,
 		camera.ONVIFPassword,
+		strconv.Itoa(camera.ONVIFChannel),
 	}, "\x00")
 }
 
@@ -413,7 +414,7 @@ func (state *heartbeatONVIFState) refreshStaticPayload(device *goonvif.Device) h
 			payload.panTilt = "true"
 		}
 
-		presets, err := heartbeatGetPresetsFromDevice(device)
+		presets, err := heartbeatGetPresetsFromDevice(device, state.cameraConfiguration.ONVIFChannel)
 		if err == nil && len(presets) > 0 {
 			payload.presets = "true"
 			presetsList, marshalErr := json.Marshal(presets)

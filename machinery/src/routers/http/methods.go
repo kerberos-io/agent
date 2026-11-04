@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -74,6 +75,7 @@ func LoginToOnvif(c *gin.Context) {
 						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
 						ONVIFUsername: onvifCredentials.ONVIFUsername,
 						ONVIFPassword: onvifCredentials.ONVIFPassword,
+						ONVIFChannel:  onvifCredentials.ONVIFChannel,
 					},
 				},
 			},
@@ -82,8 +84,8 @@ func LoginToOnvif(c *gin.Context) {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, capabilities, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			// Get token from the first profile
-			token, err := onvif.GetTokenFromProfile(device, 0)
+			// Get the profile token of the requested channel
+			token, err := onvif.GetTokenFromChannel(device, cameraConfiguration.ONVIFChannel)
 			if err == nil {
 				c.JSON(200, gin.H{
 					"device":       device,
@@ -128,6 +130,7 @@ func GetOnvifCapabilities(c *gin.Context) {
 						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
 						ONVIFUsername: onvifCredentials.ONVIFUsername,
 						ONVIFPassword: onvifCredentials.ONVIFPassword,
+						ONVIFChannel:  onvifCredentials.ONVIFChannel,
 					},
 				},
 			},
@@ -172,6 +175,7 @@ func DoOnvifPanTilt(c *gin.Context) {
 						ONVIFXAddr:    onvifPanTilt.OnvifCredentials.ONVIFXAddr,
 						ONVIFUsername: onvifPanTilt.OnvifCredentials.ONVIFUsername,
 						ONVIFPassword: onvifPanTilt.OnvifCredentials.ONVIFPassword,
+						ONVIFChannel:  onvifPanTilt.OnvifCredentials.ONVIFChannel,
 					},
 				},
 			},
@@ -181,8 +185,8 @@ func DoOnvifPanTilt(c *gin.Context) {
 		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 
 		if err == nil {
-			// Get token from the first profile
-			token, err := onvif.GetTokenFromProfile(device, 0)
+			// Get the profile token of the requested channel
+			token, err := onvif.GetTokenFromChannel(device, cameraConfiguration.ONVIFChannel)
 
 			if err == nil {
 
@@ -246,6 +250,7 @@ func DoOnvifZoom(c *gin.Context) {
 						ONVIFXAddr:    onvifZoom.OnvifCredentials.ONVIFXAddr,
 						ONVIFUsername: onvifZoom.OnvifCredentials.ONVIFUsername,
 						ONVIFPassword: onvifZoom.OnvifCredentials.ONVIFPassword,
+						ONVIFChannel:  onvifZoom.OnvifCredentials.ONVIFChannel,
 					},
 				},
 			},
@@ -255,8 +260,8 @@ func DoOnvifZoom(c *gin.Context) {
 		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 
 		if err == nil {
-			// Get token from the first profile
-			token, err := onvif.GetTokenFromProfile(device, 0)
+			// Get the profile token of the requested channel
+			token, err := onvif.GetTokenFromChannel(device, cameraConfiguration.ONVIFChannel)
 
 			if err == nil {
 
@@ -298,6 +303,54 @@ func DoOnvifZoom(c *gin.Context) {
 	}
 }
 
+// DoOnvifFocus godoc
+// @Router /api/camera/onvif/focus [post]
+// @ID camera-onvif-focus
+// @Tags onvif
+// @Param focus body models.OnvifFocus true "OnvifFocus"
+// @Summary Focusing the camera near or far.
+// @Description Focusing the camera near (positive) or far (negative).
+// @Success 200 {object} models.APIResponse
+func DoOnvifFocus(c *gin.Context) {
+	var onvifFocus models.OnvifFocus
+	err := c.BindJSON(&onvifFocus)
+	if err == nil && onvifFocus.OnvifCredentials.ONVIFXAddr == "" {
+		err = errors.New("missing onvif_xaddr")
+	}
+
+	if err == nil {
+
+		cameraConfiguration := models.IPCamera{
+			ONVIFXAddr:    onvifFocus.OnvifCredentials.ONVIFXAddr,
+			ONVIFUsername: onvifFocus.OnvifCredentials.ONVIFUsername,
+			ONVIFPassword: onvifFocus.OnvifCredentials.ONVIFPassword,
+			ONVIFChannel:  onvifFocus.OnvifCredentials.ONVIFChannel,
+		}
+		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
+
+		if err == nil {
+			err := onvif.ContinuousFocus(device, cameraConfiguration.ONVIFChannel, onvifFocus.Focus)
+			if err == nil {
+				c.JSON(200, models.APIResponse{
+					Message: "Successfully focused the camera",
+				})
+			} else {
+				c.JSON(400, models.APIResponse{
+					Message: "Something went wrong: " + err.Error(),
+				})
+			}
+		} else {
+			c.JSON(400, models.APIResponse{
+				Message: "Something went wrong: " + err.Error(),
+			})
+		}
+	} else {
+		c.JSON(400, models.APIResponse{
+			Message: "Something went wrong: " + err.Error(),
+		})
+	}
+}
+
 // GetOnvifPresets godoc
 // @Router /api/camera/onvif/presets [post]
 // @ID camera-onvif-presets
@@ -319,6 +372,7 @@ func GetOnvifPresets(c *gin.Context) {
 						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
 						ONVIFUsername: onvifCredentials.ONVIFUsername,
 						ONVIFPassword: onvifCredentials.ONVIFPassword,
+						ONVIFChannel:  onvifCredentials.ONVIFChannel,
 					},
 				},
 			},
@@ -327,7 +381,7 @@ func GetOnvifPresets(c *gin.Context) {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			presets, err := onvif.GetPresetsFromDevice(device)
+			presets, err := onvif.GetPresetsFromDevice(device, cameraConfiguration.ONVIFChannel)
 			if err == nil {
 				c.JSON(200, gin.H{
 					"presets": presets,
@@ -370,6 +424,7 @@ func GoToOnvifPreset(c *gin.Context) {
 						ONVIFXAddr:    onvifPreset.OnvifCredentials.ONVIFXAddr,
 						ONVIFUsername: onvifPreset.OnvifCredentials.ONVIFUsername,
 						ONVIFPassword: onvifPreset.OnvifCredentials.ONVIFPassword,
+						ONVIFChannel:  onvifPreset.OnvifCredentials.ONVIFChannel,
 					},
 				},
 			},
@@ -378,7 +433,7 @@ func GoToOnvifPreset(c *gin.Context) {
 		cameraConfiguration := configuration.Config.Capture.IPCamera
 		device, _, err := onvif.ConnectToOnvifDevice(&cameraConfiguration)
 		if err == nil {
-			err := onvif.GoToPresetFromDevice(device, onvifPreset.Preset)
+			err := onvif.GoToPresetFromDevice(device, cameraConfiguration.ONVIFChannel, onvifPreset.Preset)
 			if err == nil {
 				c.JSON(200, gin.H{
 					"data": "Camera preset activated: " + onvifPreset.Preset,
@@ -425,6 +480,7 @@ func DoGetDigitalInputs(c *gin.Context) {
 						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
 						ONVIFUsername: onvifCredentials.ONVIFUsername,
 						ONVIFPassword: onvifCredentials.ONVIFPassword,
+						ONVIFChannel:  onvifCredentials.ONVIFChannel,
 					},
 				},
 			},
@@ -514,6 +570,7 @@ func DoGetRelayOutputs(c *gin.Context) {
 						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
 						ONVIFUsername: onvifCredentials.ONVIFUsername,
 						ONVIFPassword: onvifCredentials.ONVIFPassword,
+						ONVIFChannel:  onvifCredentials.ONVIFChannel,
 					},
 				},
 			},
@@ -587,6 +644,7 @@ func DoTriggerRelayOutput(c *gin.Context) {
 						ONVIFXAddr:    onvifCredentials.ONVIFXAddr,
 						ONVIFUsername: onvifCredentials.ONVIFUsername,
 						ONVIFPassword: onvifCredentials.ONVIFPassword,
+						ONVIFChannel:  onvifCredentials.ONVIFChannel,
 					},
 				},
 			},

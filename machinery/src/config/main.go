@@ -394,6 +394,9 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 			case "AGENT_CAPTURE_IPCAMERA_ONVIF_PASSWORD":
 				configuration.Config.Capture.IPCamera.ONVIFPassword = value
 				break
+			case "AGENT_CAPTURE_IPCAMERA_ONVIF_CHANNEL":
+				configuration.Config.Capture.IPCamera.ONVIFChannel, _ = strconv.Atoi(value)
+				break
 
 			/* Recording mode */
 			case "AGENT_CAPTURE_RECORDING":
