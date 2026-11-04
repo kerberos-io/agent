@@ -14,12 +14,11 @@ ARG TARGETARCH
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:$GOROOT/bin:/usr/local/lib:$PATH
-ENV GOSUMDB=off
 
 ##########################################
 # Installing some additional dependencies.
 
-RUN apt-get update && apt-get install -y --fix-missing --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
 	git build-essential cmake pkg-config unzip libgtk2.0-dev \
 	curl ca-certificates libavcodec-dev libavutil-dev libcurl4-openssl-dev \
 	libssl-dev libjpeg62-turbo-dev libswscale-dev && \
@@ -37,7 +36,6 @@ RUN go mod download
 # Copy the rest of the source after dependencies are primed.
 
 COPY machinery ./
-RUN rm -rf .env
 
 ##################
 # Build Machinery
@@ -52,6 +50,7 @@ RUN RESOLVED_VERSION="${VERSION:-0.0.0}" && \
 	mv version /agent && \
 	mv data /agent && \
 	mkdir -p /agent/data/cloud && \
+	mkdir -p /agent/data/tus && \
 	mkdir -p /agent/data/snapshots && \
 	mkdir -p /agent/data/log && \
 	mkdir -p /agent/data/recordings && \
@@ -96,42 +95,27 @@ RUN mkdir -p ./agent && cp -r /go/src/github.com/kerberos-io/agent/machinery/www
 
 FROM ${RUNTIME_IMAGE}
 
-############################
-# Protect by non-root user.
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-	ca-certificates curl ffmpeg libatomic1 libcap2-bin libstdc++6 && \
-	rm -rf /var/lib/apt/lists/* && \
-	groupadd --system kerberosio && \
-	useradd --system --gid kerberosio --groups video --create-home agent && \
-	chmod 0755 /home/agent
-
 #################################
 # Copy files from previous images
 
-COPY --chown=0:0 --from=build-machinery /dist /
-COPY --chown=0:0 --from=build-ui /dist /
+COPY --chown=0:0 --from=build-machinery /dist/agent/ /home/agent/
+COPY --chown=0:0 --from=build-ui /dist/agent/ /home/agent/
 
-##################
-# Try running agent
-
-RUN mv /agent/* /home/agent/
-RUN /home/agent/main version
-
-#######################
-# Make template config
-
-RUN cp /home/agent/data/config/config.json /home/agent/data/config.template.json
-
-###########################
-# Set permissions correctly
-
-RUN chown -R agent:kerberosio /home/agent/data
-RUN chown -R agent:kerberosio /home/agent/www
-
-###########################
-# Grant the necessary root capabilities to the process trying to bind to the privileged port
-RUN setcap 'cap_net_bind_service=+ep' /home/agent/main
+# Keep media support and the health probe, but not privilege-management tools.
+# UID/GID match the existing trixie image; only mutable application data is owned by agent.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+	ca-certificates curl ffmpeg libatomic1 libcap2-bin libstdc++6 && \
+	groupadd --system --gid 999 kerberosio && \
+	useradd --system --uid 999 --gid kerberosio --groups video \
+		--home-dir /home/agent --no-create-home agent && \
+	chmod 0755 /home/agent /home/agent/main && \
+	cp /home/agent/data/config/config.json /home/agent/data/config.template.json && \
+	chown -R agent:kerberosio /home/agent/data /home/agent/www && \
+	setcap 'cap_net_bind_service=+ep' /home/agent/main && \
+	apt-get purge -y --auto-remove libcap2-bin && \
+	rm -rf /var/lib/apt/lists/* && \
+	find / -xdev -type f -perm /6000 -exec chmod a-s {} + && \
+	/home/agent/main version
 
 ###################
 # Run non-root user
@@ -146,7 +130,7 @@ EXPOSE 80
 ######################################
 # Check if agent is still running
 
-HEALTHCHECK CMD curl --fail "http://localhost:${AGENT_PORT:-80}/health" || exit 1
+HEALTHCHECK --timeout=10s CMD curl --noproxy '*' --fail --silent --show-error --max-time 5 "http://localhost:${AGENT_PORT:-80}/health" || exit 1
 
 ###################################################
 # Leeeeettttt'ssss goooooo!!!

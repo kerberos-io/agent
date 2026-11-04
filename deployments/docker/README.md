@@ -16,6 +16,77 @@ Feel free to use another port if your host system already has a workload running
 
     docker run -p 8082:80 --name mycamera -d kerberos/agent:latest
 
+### Container permissions and hardening
+
+The production image runs as `agent` (UID `999`, primary GID `999`), with the
+supplementary `video` group retained. The binary and home directory are owned by
+root; within `/home/agent`, only `data/` and `www/` are writable by the Agent. `www/` must remain writable
+because demo mode replaces `env.js` at startup. Existing `/home/agent/data/...`
+mount paths, the default port `80`, and the startup command are unchanged.
+
+FFmpeg is required for AAC-to-PCMU audio transcoding, curl for the health check,
+and `/bin/sh` for remote-access sessions. They are intentionally retained. The
+capability-management tools and setuid/setgid permissions on bundled utilities
+are removed. The Agent binary retains only the file capability
+`NET_BIND_SERVICE`, needed for port `80` on hosts with privileged low ports.
+For an RTSP-only deployment, you can drop the other container capabilities:
+
+```sh
+docker run --cap-drop=ALL --cap-add=NET_BIND_SERVICE \
+  -p 80:80 --name mycamera -d kerberos/agent:latest
+```
+
+Do not use `--privileged` for ordinary IP cameras. Local cameras still use the
+separate RTSP sidecar; any device access belongs to that sidecar. Host networking
+remains supported. `no-new-privileges` prevents gaining the binary's file
+capability: if enabling it, use an unprivileged internal port (`AGENT_PORT=8082`)
+and ensure the container's `net.ipv4.ip_unprivileged_port_start` permits that
+port. Do not assume port `80` works with that option on every host.
+
+Bind mounts must be writable by the image's UID/GID; the container does not
+change host ownership at startup. Before migrating an older volume, check the
+user of the exact old and new image with `docker run --rm --entrypoint id IMAGE`
+and adjust only the mounted directories as necessary. For example:
+
+```sh
+sudo chown -R 999:999 agent/config agent/recordings
+```
+
+A read-only root filesystem is not enabled by default: both `data/` and `www/`
+need writable storage (and FFmpeg or shell sessions may need `/tmp`).
+Change the default application credentials before exposing the service.
+
+### Building and checking the image
+
+Build from a clean checkout: the default configuration files under
+`machinery/data/config/` are included in the image, so do not replace them with
+production credentials before building. `.dockerignore` excludes local `.env`
+files, recordings, upload checkpoints, dependency directories, and unrelated
+repository files from the build context. Go module downloads use Go's default
+checksum database verification.
+
+```sh
+docker build --pull -t kerberos/agent:local .
+sh deployments/docker/test-image.sh kerberos/agent:local
+```
+
+The smoke check uses temporary containers and a Docker volume, cleans them up,
+and checks permissions, FFmpeg transcoding, volume initialization/writes,
+default and custom HTTP ports, health probes, and demo-mode startup. It enforces
+privileged low ports to check the file capability rather than relying on
+Docker's usual low-port exemption, and checks `no-new-privileges` on port `8082`. PR builds
+run it on native AMD64 and ARM64 runners. It does not replace testing against a
+real camera or checking all supported ARM variants. Base image tags remain
+updateable; use reviewed digest-pinned base-image arguments (`GO_IMAGE` and
+`RUNTIME_IMAGE`) when a reproducible build is required, and rebuild regularly
+for security updates.
+
+Architecture selections and base image tags are unchanged by this hardening.
+The current upstream `golang:1.25-trixie` manifest has no `linux/arm/v6` variant,
+so the existing ARMv6 nightly target cannot be validated with that default base.
+ARMv6 needs a separately reviewed compatible builder/runtime combination; do
+not assume an ARMv7 image runs on ARMv6 hardware.
+
 ### Attach a volume
 
 By default your Kerberos agent will store all its configuration and recordings inside the container. It might be interesting to store both configuration and your recordings outside the container, on your local disk. This helps persisting your storage even after you decide to wipe out your Kerberos agent.

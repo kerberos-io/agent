@@ -228,8 +228,13 @@ You attach a volume to your container by leveraging the `-v` option. To mount yo
 
 More examples for each deployment and automation tool [can be found in the deployment section](https://github.com/kerberos-io/agent/tree/master/deployments). Be sure to verify the permissions of the directory/volume you are attaching. More information in [this issue](https://github.com/kerberos-io/agent/issues/80).
 
-    chmod -R 755 kerberos-agent/
-    chown 100:101 kerberos-agent/ -R
+The current image runs as UID `999`, GID `999`. Give that user ownership of
+the mounted directories (older image tags may use different IDs):
+
+    sudo chown -R 999:999 agent/config agent/recordings
+
+See [container permissions and hardening](deployments/docker/README.md#container-permissions-and-hardening)
+for reduced-capability deployment and migration guidance.
 
 ## Configure with environment variables
 

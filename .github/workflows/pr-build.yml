@@ -27,6 +27,8 @@ jobs:
           CID=$(docker create ${{matrix.architecture}})
           docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
           docker rm ${CID}
+      - name: Test production image
+        run: sh deployments/docker/test-image.sh ${{ matrix.architecture }}
       - name: Strip binary
         run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
       - name: Upload artifact
