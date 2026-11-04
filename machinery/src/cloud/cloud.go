@@ -1380,6 +1380,10 @@ func HandleRealtimeProcessing(processingCursor *packets.QueueCursor, configurati
 
 		// Check if we need to enable the realtime processing
 		if config.RealtimeProcessing == "true" {
+			if mqttClient == nil {
+				log.Warn("cloud.RealtimeProcessing(): stopping as MQTT client is not configured.")
+				return
+			}
 
 			hubKey := ""
 			if config.Cloud == "s3" && config.S3 != nil && config.S3.Publickey != "" {
