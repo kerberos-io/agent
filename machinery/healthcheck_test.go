@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -31,7 +32,7 @@ func TestCheckAgentHealth(t *testing.T) {
 				if r.URL.Path != "/health" {
 					t.Errorf("path = %q, want /health", r.URL.Path)
 				}
-				w.Header().Set("Location", "http://127.0.0.1:1")
+				w.Header().Set("Location", "/unexpected-redirect-target")
 				w.WriteHeader(test.status)
 				_, _ = w.Write([]byte(test.body))
 			}))
@@ -59,7 +60,7 @@ func TestCheckAgentHealthTimesOut(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
 	defer cancel()
-	if err := checkAgentHealth(ctx, port); err == nil {
-		t.Fatal("healthcheck succeeded despite its deadline")
+	if err := checkAgentHealth(ctx, port); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("healthcheck error = %v, want context deadline exceeded", err)
 	}
 }

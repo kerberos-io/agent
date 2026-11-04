@@ -44,23 +44,25 @@ jobs:
         env:
           BUILDX_METADATA_PROVENANCE: max
         run: |
-          mkdir -p evidence/build .ci-tools
+          mkdir -p evidence/build
           revision=$(git -C source rev-parse HEAD)
           version="${revision:0:7}"
           created=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           printf '%s\n' "$revision" > evidence/build/source-revision.txt
-          # A local Docker load cannot retain attestations. The second exporter
-          # retains attestations without registry writes. Never upload the full
-          # image as scan evidence: it may contain a secret that correctly failed scans.
-          docker buildx build --platform "linux/$ARCH" --provenance=mode=max \
+          # Classic Docker cannot load an attested index. Disable attestations
+          # only for this local export; BUILDX_METADATA_PROVENANCE=max retains
+          # full build provenance/materials separately, verified below.
+          docker buildx build --platform "linux/$ARCH" --provenance=false \
             --build-arg "VERSION=$version" --build-arg "REVISION=$revision" --build-arg "CREATED=$created" \
             --label "org.opencontainers.image.version=$version" \
             --label "org.opencontainers.image.revision=$revision" \
             --label "org.opencontainers.image.created=$created" \
             --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
             --metadata-file evidence/build/build-metadata.json --tag "$ARCH" \
-            --output type=docker --output type=oci,dest=.ci-tools/pr-image.oci.tar source
-          jq -e '."buildx.build.provenance" | select(type == "object" and length > 0)' \
+            --output type=docker source
+          jq -e '."buildx.build.provenance" |
+            select(type == "object" and length > 0) |
+            select(.buildConfig | type == "object" and length > 0)' \
             evidence/build/build-metadata.json > evidence/build/provenance.json
           python3 .github/scripts/image-evidence.py evidence/build
       - name: Extract release payload
