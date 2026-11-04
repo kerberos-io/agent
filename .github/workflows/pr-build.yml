@@ -27,6 +27,11 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - name: Initialize retained runtime/scanner state
+        run: |
+          mkdir -p evidence/scanner-install
+          printf '%s\n' '{"status":"not_started","reason":"waiting_for_native_build_and_smoke"}' \
+            > evidence/scanner-install/install.json
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.sha }}
@@ -35,10 +40,6 @@ jobs:
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Validate fail-closed policy helpers
         run: python3 .github/scripts/test-image-policy.py
-      - name: Install scanner
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bash .github/scripts/install-trivy.sh
       - name: Build once, populating OCI metadata from CI
         env:
           BUILDX_METADATA_PROVENANCE: max
@@ -68,9 +69,12 @@ jobs:
           trap 'docker rm -f "$cid" >/dev/null' EXIT
           docker cp "$cid:/home/agent" "output-$ARCH"
       - name: Test production image
+        id: smoke
         run: sh source/deployments/docker/test-image.sh "$ARCH"
       - name: Strip binary
         run: tar -cf "agent-$ARCH.tar" -C "output-$ARCH" . && rm -rf "output-$ARCH"
+      - name: Install pinned public OCI scanner after runtime tests
+        run: bash .github/scripts/install-trivy.sh
       - name: Source/UI dependency and final image gates with SPDX SBOMs
         run: |
           failed=0
@@ -87,6 +91,22 @@ jobs:
           name: agent-${{ matrix.architecture }}.tar
           path: agent-${{ matrix.architecture }}.tar
           if-no-files-found: error
+      - name: Record runtime result independently of scanner availability
+        if: always()
+        env:
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+        run: |
+          mkdir -p evidence
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          Path("evidence/runtime-smoke.json").write_text(json.dumps({
+              "architecture": os.environ["ARCH"],
+              "outcome": os.environ["SMOKE_OUTCOME"],
+              "workflow_revision": os.environ["GITHUB_SHA"],
+          }, indent=2) + "\n")
+          PY
       - name: Retain reports on failure
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

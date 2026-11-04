@@ -110,9 +110,7 @@ jobs:
           if [[ -n "$release_id" ]]; then
             gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" -F draft=true > evidence/draft-release.json
           fi
-      - name: Install verified scanner release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Install pinned public OCI scanner
         run: bash .github/scripts/install-trivy.sh
       - name: Source/UI dependency vulnerability, secret and misconfiguration gate with SPDX SBOM
         run: python3 .github/scripts/image-policy.py source evidence/source
