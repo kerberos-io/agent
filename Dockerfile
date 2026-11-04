@@ -1,6 +1,6 @@
 
-ARG GO_IMAGE=golang:1.25-trixie
-ARG RUNTIME_IMAGE=debian:trixie-slim
+ARG GO_IMAGE=golang:1.26.10-trixie@sha256:a050dcceee6eb9bf110151662dfac7662f3bec40927c7dee48731e3d92083d42
+ARG RUNTIME_IMAGE=debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
 ARG VERSION=0.0.0
 FROM ${GO_IMAGE} AS build-machinery
 LABEL AUTHOR=uug.ai
@@ -14,6 +14,8 @@ ARG TARGETARCH
 ENV GOROOT=/usr/local/go
 ENV GOPATH=/go
 ENV PATH=$GOPATH/bin:$GOROOT/bin:/usr/local/lib:$PATH
+ENV GOTOOLCHAIN=local
+ENV CGO_ENABLED=1
 
 ##########################################
 # Installing some additional dependencies.
@@ -30,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN mkdir -p /go/src/github.com/kerberos-io/agent
 WORKDIR /go/src/github.com/kerberos-io/agent/machinery
 COPY machinery/go.mod machinery/go.sum ./
-RUN go mod download
+RUN go version && go mod download && go mod verify
 
 ##############################################################################
 # Copy the rest of the source after dependencies are primed.
@@ -44,7 +46,7 @@ RUN RESOLVED_VERSION="${VERSION:-0.0.0}" && \
 	printf '%s' "${RESOLVED_VERSION}" > version && \
 	BUILD_TAGS=timetzdata,netgo,osusergo && \
 	case "${TARGETARCH:-$(go env GOARCH)}" in amd64|arm64) BUILD_TAGS="moq,${BUILD_TAGS}" ;; esac && \
-	go build -o main -tags "${BUILD_TAGS}" --ldflags "-s -w -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${RESOLVED_VERSION}" . && \
+	go build -mod=readonly -trimpath -buildvcs=false -o main -tags "${BUILD_TAGS}" --ldflags "-s -w -X github.com/kerberos-io/agent/machinery/src/utils.VERSION=${RESOLVED_VERSION}" . && \
 	mkdir -p /agent && \
 	mv main /agent && \
 	mv version /agent && \
@@ -69,7 +71,7 @@ RUN cp -r /agent ./
 
 RUN /dist/agent/main version
 
-FROM node:22-alpine AS build-ui
+FROM node:22-alpine@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914 AS build-ui
 
 RUN apk update && apk upgrade --available && sync
 

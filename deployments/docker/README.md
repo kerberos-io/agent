@@ -62,8 +62,16 @@ Build from a clean checkout: the default configuration files under
 `machinery/data/config/` are included in the image, so do not replace them with
 production credentials before building. `.dockerignore` excludes local `.env`
 files, recordings, upload checkpoints, dependency directories, and unrelated
-repository files from the build context. Go module downloads use Go's default
-checksum database verification.
+repository files from the build context. The builder uses Go `1.26.10` with
+`GOTOOLCHAIN=local`, checksum database verification, and `go mod verify`. Builds
+use `-mod=readonly` to reject implicit module changes, `-trimpath` to omit local
+source paths, and `-buildvcs=false` to omit checkout metadata. CGO remains enabled
+for the native camera/media dependencies.
+
+The Go, Node, and Debian bases are pinned to verified multi-platform manifest
+digests, including AMD64 and ARM64 (and ARMv7 where previously supported).
+The Debian/glibc runtime is retained for FFmpeg, CGO, and MoQ compatibility;
+the reference Wolfi/scratch layout is not a drop-in replacement for this image.
 
 ```sh
 docker build --pull -t kerberos/agent:local .
@@ -76,14 +84,16 @@ default and custom HTTP ports, health probes, and demo-mode startup. It enforces
 privileged low ports to check the file capability rather than relying on
 Docker's usual low-port exemption, and checks `no-new-privileges` on port `8082`. PR builds
 run it on native AMD64 and ARM64 runners. It does not replace testing against a
-real camera or checking all supported ARM variants. Base image tags remain
-updateable; use reviewed digest-pinned base-image arguments (`GO_IMAGE` and
-`RUNTIME_IMAGE`) when a reproducible build is required, and rebuild regularly
-for security updates.
+real camera or checking all supported ARM variants. Review and refresh the
+base-image digests regularly for security updates; `--pull` alone does not update
+a pinned digest. `GO_IMAGE` and `RUNTIME_IMAGE` remain overrideable build arguments
+for compatible alternatives. The package repositories are not snapshot-pinned,
+so base digest pins do not make the entire build bit-for-bit reproducible.
 
-Architecture selections and base image tags are unchanged by this hardening.
-The current upstream `golang:1.25-trixie` manifest has no `linux/arm/v6` variant,
-so the existing ARMv6 nightly target cannot be validated with that default base.
+Architecture selections are unchanged by this hardening.
+The pinned `golang:1.26.10-trixie` manifest, like the previous Go 1.25 trixie base,
+has no `linux/arm/v6` variant, so the existing ARMv6 nightly target cannot be
+validated with the default base.
 ARMv6 needs a separately reviewed compatible builder/runtime combination; do
 not assume an ARMv7 image runs on ARMv6 hardware.
 
