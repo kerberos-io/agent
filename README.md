@@ -134,11 +134,47 @@ lists and automatic cleanup.
 
 The easiest way to get your Kerberos Agent up and running is to use our public image on [Docker hub](https://hub.docker.com/r/kerberos/agent). Once you have selected a specific tag, run `docker` command below, which will open the web interface of your Kerberos agent on port `80`, and off you go. For a more configurable and persistent deployment have a look at [Running and automating a Kerberos Agent](#running-and-automating-a-kerberos-agent).
 
-    docker run -p 80:80 --name mycamera -d --restart=always kerberos/agent:latest
+**Forthcoming hardened image** (use this mapping only after upgrading to a
+release containing these changes):
+
+    docker run -p 80:8080 --name mycamera -d --restart=always kerberos/agent:latest
+
+The hardened image listens on **8080 inside the container**, not 80. The mapping
+`-p 80:8080` keeps the browser URL `http://localhost/` unchanged. When upgrading,
+change the container side of existing `80:80` or `8082:80` mappings to
+`80:8080` or `8082:8080`. Kubernetes Services must use `targetPort: 8080`.
+Older published images still use their original port: these examples require a
+release containing the hardening changes; pin its published digest in production.
+For the currently published `v3.14.1`, retain the old mapping:
+
+    docker run -p 80:80 --name mycamera -d --restart=always kerberos/agent:v3.14.1
+
+The image uses a Go 1.26 scratch runtime with only required dynamic/media
+dependencies, numeric non-root UID/GID `999:999`, no file capabilities or
+setuid/setgid programs, and an application healthcheck (no curl-based probe).
+UI assets are immutable; demo mode selects its environment without rewriting them.
+Patched native Go dependencies now require Go 1.26 or newer for source builds.
+It supports dropping all capabilities and preventing privilege escalation:
+
+```sh
+docker run --cap-drop=ALL --security-opt=no-new-privileges:true \
+  -p 80:8080 --name mycamera -d kerberos/agent:latest
+```
+
+See the [image contract](deployments/docker/README.md#image-contract) for writable
+paths, health checks, supported architectures, signature/evidence requirements,
+and release-policy gaps. Functional remote-shell support remains a **pending
+policy exception**, so this is not a claim of full image-hardening baseline or
+CIS compliance.
+Release promotion is also blocked by remaining native-library/UI scan findings
+and the legacy default recording-signing key; this PR is not release-qualified.
 
 If you want to connect to a USB or Raspberry Pi camera, [you'll need to run our side car container](https://github.com/kerberos-io/camera-to-rtsp) which proxies the camera to an RTSP stream. In that case you'll want to configure the Kerberos Agent container to run in the host network, so it can connect directly to the RTSP sidecar.
 
     docker run --network=host --name mycamera -d --restart=always kerberos/agent:latest
+
+With host networking, no port mapping applies: the hardened Agent is reachable
+on host port `8080` by default.
 
 ## Quickstart - Balena
 
@@ -168,7 +204,7 @@ This repository contains everything you'll need to know about our core product, 
 
 - Low memory and CPU usage.
 - Simplified and modern user interface.
-- Multi architecture (ARMv6, ARMv7, ARM64, AMD64)
+- Multi architecture (AMD64/ARM64 release images; [legacy ARM build limitations](deployments/docker/README.md#building-and-checking-the-image)).
 - Multi stream, for example recording in H265, live streaming and motion detection in H264.
 - Multi camera support: IP Cameras (H264 and H265), USB cameras and Raspberry Pi Cameras [through a RTSP proxy](https://github.com/kerberos-io/camera-to-rtsp).
 - Single camera per instance (e.g. one container per camera).
@@ -221,7 +257,7 @@ An example of how to mount a host directory is shown below using `docker`, but i
 
 You attach a volume to your container by leveraging the `-v` option. To mount your own configuration file and recordings folder, run the following commands:
 
-    docker run -p 80:80 --name mycamera \
+    docker run -p 80:8080 --name mycamera \
     -v $(pwd)/agent/config:/home/agent/data/config \
     -v $(pwd)/agent/recordings:/home/agent/data/recordings \
     -d --restart=always kerberos/agent:latest
@@ -240,7 +276,7 @@ for reduced-capability deployment and migration guidance.
 
 Next to attaching the configuration file, it is also possible to override the configuration with environment variables. This makes deploying with `docker compose` or `kubernetes` much easier and more scalable. Using this approach, we simplify automation through `ansible` and `terraform`.
 
-    docker run -p 80:80 --name mycamera \
+    docker run -p 80:8080 --name mycamera \
     -e AGENT_NAME=mycamera \
     -e AGENT_TIMEZONE=Europe/Brussels \
     -e AGENT_CAPTURE_IPCAMERA_RTSP=rtsp://fake.kerberos.io/stream \
@@ -363,7 +399,7 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
 | `LOG_LEVEL`                                 | Level for logging, could be "info", "warning", "debug", "error" or "fatal".                     | "info"                         |
 | `LOG_OUTPUT`                                | Logging output format "json" or "text".                                                         | "text"                         |
-| `AGENT_PORT`                                | HTTP web server port. Overrides the `-port` command-line value and must be between 1 and 65535. | "80"                           |
+| `AGENT_PORT`                                | HTTP web server port. Overrides `-port`; use a port above 1024 in the hardened image. | "8080" hardened Docker; "80" legacy images/binaries |
 | `AGENT_MODE`                                | You can choose to run this in 'release' for production, and or 'demo' for showcasing.           | "release"                      |
 | `AGENT_TLS_INSECURE`                        | Specify if you want to use `InsecureSkipVerify` for the internal HTTP client.                   | "false"                        |
 | `AGENT_USERNAME`                            | The username used to authenticate against the Kerberos Agent login page.                        | "root"                         |
@@ -507,7 +543,7 @@ The value must be valid JSON on a single line, so wrap it in single quotes in a
 shell:
 
 ```bash
-docker run -p 80:80 --name mycamera \
+docker run -p 80:8080 --name mycamera \
   -e AGENT_CLOUD=kstorage \
   -e AGENT_KERBEROSVAULT_URI=https://vault.domain.com/api \
   -e AGENT_KERBEROSVAULT_ACCESS_KEY=xxx \
@@ -648,7 +684,7 @@ Go and open two terminals: one for the `ui` project and one for the `machinery` 
 1.  Terminal A:
 
         cd machinery/
-        go run main.go -action run -port 80
+        go run . -action run -port 80
 
 2.  Terminal B:
 
@@ -692,7 +728,7 @@ You can simply run the `machinery` using following commands.
 
     git clone https://github.com/kerberos-io/agent
     cd machinery
-    go run main.go -action run -port 8082
+    go run . -action run -port 8082
 
 This will launch the Kerberos Agent and run a webserver on port `8082`, matching
 the UI development default. You can change the port together with
@@ -737,7 +773,7 @@ The standard AMD64 and ARM64 images include the optional MoQ publisher. Its Rust
 FFI archive requires CGO and glibc 2.38 or newer, which is why the standard image
 uses Debian Trixie. The publisher is disabled unless explicitly enabled at runtime:
 
-    docker run --rm -p 80:80 \
+    docker run --rm -p 80:8080 \
       -e AGENT_LIVE_MOQ_ENABLED=true \
       -e AGENT_LIVE_MOQ_URL=https://relay.uug.ai/anon \
       kerberos/agent

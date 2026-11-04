@@ -98,7 +98,7 @@ RUN mkdir -p ./agent && cp -r /go/src/github.com/kerberos-io/agent/machinery/www
 FROM ${RUNTIME_IMAGE} AS runtime-rootfs
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-	ca-certificates curl ffmpeg libatomic1 libcap2-bin libstdc++6 \
+	ca-certificates ffmpeg libatomic1 libstdc++6 \
 	dash coreutils findutils grep sed tzdata ncurses-base && \
 	groupadd --system --gid 999 kerberosio && \
 	useradd --system --uid 999 --gid kerberosio --groups video \
@@ -113,7 +113,7 @@ COPY deployments/docker/assemble-rootfs.sh /usr/local/bin/assemble-rootfs
 
 RUN chmod 0755 /runtime/home/agent /runtime/home/agent/main && \
 	cp /runtime/home/agent/data/config/config.json /runtime/home/agent/data/config.template.json && \
-	chown -R agent:kerberosio /runtime/home/agent/data /runtime/home/agent/www && \
+	chown -R agent:kerberosio /runtime/home/agent/data && \
 	sh /usr/local/bin/assemble-rootfs
 
 FROM scratch
@@ -123,21 +123,33 @@ COPY --from=runtime-rootfs /runtime/ /
 ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ENV HOME=/home/agent
 ENV XDG_CACHE_HOME=/tmp/agent-cache
+ENV AGENT_PORT=8080
+
+ARG VERSION
+ARG REVISION=unknown
+ARG CREATED
+LABEL org.opencontainers.image.title="Kerberos Agent" \
+	org.opencontainers.image.description="Camera and media agent with a minimal dynamic scratch runtime" \
+	org.opencontainers.image.source="https://github.com/kerberos-io/agent" \
+	org.opencontainers.image.version="${VERSION}" \
+	org.opencontainers.image.revision="${REVISION}" \
+	org.opencontainers.image.created="${CREATED}" \
+	org.opencontainers.image.vendor="UUG.AI"
 
 ###################
 # Run non-root user
 
-USER agent
+USER 999:999
 
 ######################################
-# By default the app runs on port 80
+# The image uses an unprivileged HTTP port.
 
-EXPOSE 80
+EXPOSE 8080/tcp
 
 ######################################
 # Check if agent is still running
 
-HEALTHCHECK --timeout=10s CMD curl --noproxy '*' --fail --silent --show-error --max-time 5 "http://localhost:${AGENT_PORT:-80}/health" || exit 1
+HEALTHCHECK --timeout=10s CMD ["/home/agent/main", "-action", "healthcheck"]
 
 ###################################################
 # Leeeeettttt'ssss goooooo!!!

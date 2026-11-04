@@ -83,18 +83,11 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	// Add all routes
 	AddRoutes(r, authMiddleware, configDirectory, configuration, communication, captureDevice)
 
-	// Update environment variables
-	environmentVariables := configDirectory + "/www/env.js"
-	if os.Getenv("AGENT_MODE") == "demo" {
-		demoEnvironmentVariables := configDirectory + "/www/env.demo.js"
-		// Move demo environment variables to environment variables
-		err := os.Rename(demoEnvironmentVariables, environmentVariables)
-		if err != nil {
-			log.WithError(err).WithFields(log.Fields{
-				"component": "http",
-				"event":     "demo_environment_move_failed",
-			}).Fatal("Failed to activate demo UI environment")
-		}
+	if err := addUIEnvironmentRoute(r, configDirectory); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"component": "http",
+			"event":     "ui_environment_unavailable",
+		}).Fatal("Failed to load UI environment")
 	}
 
 	// Add static routes to UI
@@ -121,6 +114,20 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 			"port":      configuration.Port,
 		}).Fatal("HTTP server stopped")
 	}
+}
+
+func addUIEnvironmentRoute(router *gin.Engine, configDirectory string) error {
+	environmentFile := configDirectory + "/www/env.js"
+	if os.Getenv("AGENT_MODE") == "demo" {
+		environmentFile = configDirectory + "/www/env.demo.js"
+	}
+	if _, err := os.Stat(environmentFile); err != nil {
+		return fmt.Errorf("loading UI environment: %w", err)
+	}
+	router.Match([]string{"GET", "HEAD"}, "/env.js", func(c *gin.Context) {
+		c.File(environmentFile)
+	})
+	return nil
 }
 
 func requestLogger() gin.HandlerFunc {

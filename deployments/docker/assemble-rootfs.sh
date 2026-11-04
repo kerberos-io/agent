@@ -16,7 +16,7 @@ fi
 # ldd alone cannot discover. Debian resolves the native architecture's loader too.
 apt-cache depends --recurse --installed --no-recommends --no-suggests \
 	--no-conflicts --no-breaks --no-replaces --no-enhances \
-	curl ffmpeg libatomic1 libstdc++6 dash coreutils findutils grep sed tzdata ncurses-base \
+	ffmpeg libatomic1 libstdc++6 dash coreutils findutils grep sed tzdata ncurses-base \
 	> /tmp/runtime-dependencies
 sed -n '/^[a-z0-9][a-z0-9+.:_-]*$/p' /tmp/runtime-dependencies \
 	| grep -vx debconf | sort -u > /tmp/runtime-candidates
@@ -92,16 +92,14 @@ cp /usr/share/doc/ca-certificates/copyright "$root/usr/share/doc/ca-certificates
 ldconfig -r "$root"
 chroot "$root" /usr/bin/fc-cache --force
 find "$root" -type f -perm /6000 -exec chmod a-s {} +
-setcap 'cap_net_bind_service=+ep' "$root/home/agent/main"
-getcap "$root/home/agent/main"
 
 # Execute against the assembled loader/libraries, not the assembly-stage rootfs.
 chroot --userspec=999:999 "$root" /bin/sh -ec '
 	/home/agent/main -action version
 	ffmpeg -version
 	ffprobe -version
-	curl --version
 	test -s /etc/ssl/certs/ca-certificates.crt
+	test ! -e /usr/bin/curl
 	test ! -e /usr/bin/apt
 	test ! -e /usr/bin/dpkg
 '

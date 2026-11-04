@@ -8,7 +8,7 @@ services:
   kerberos-agent1:
     image: "kerberos/agent:latest"
     ports:
-      - "8081:80"
+      - "8081:8080"
     environment:
       <<: *common-variables
       AGENT_NAME: agent1
@@ -17,7 +17,7 @@ services:
   kerberos-agent2:
     image: "kerberos/agent:latest"
     ports:
-      - "8082:80"
+      - "8082:8080"
     environment:
       <<: *common-variables
       AGENT_NAME: agent2
@@ -26,7 +26,7 @@ services:
   kerberos-agent3:
     image: "kerberos/agent:latest"
     ports:
-      - "8083:80"
+      - "8083:8080"
     environment:
       <<: *common-variables
       AGENT_NAME: agent3
