@@ -96,7 +96,7 @@ func main() {
 	var timeout string
 	var subnet string
 
-	flag.StringVar(&action, "action", "version", "Tell us what you want do 'run' or 'version'")
+	flag.StringVar(&action, "action", "version", "Action: run, version, healthcheck, discover, or decrypt")
 	flag.StringVar(&configDirectory, "config", ".", "Where is the configuration stored")
 	flag.StringVar(&name, "name", "agent", "Provide a name for the agent")
 	flag.StringVar(&port, "port", "80", "On which port should the agent run")
@@ -117,7 +117,7 @@ func main() {
 	// Specify the timezone of the log: "UTC" or "Local".
 	timezone, _ := time.LoadLocation("CET")
 	configureLogging(logLevel, logOutput, timezone)
-	if action == "run" {
+	if action == "run" || action == "healthcheck" {
 		resolvedPort, err := resolveServerPort(port, os.Getenv("AGENT_PORT"))
 		if err != nil {
 			log.WithError(err).WithFields(log.Fields{
@@ -139,6 +139,13 @@ func main() {
 
 	switch action {
 
+	case "healthcheck":
+		if err := checkAgentHealth(context.Background(), port); err != nil {
+			log.WithError(err).WithFields(log.Fields{
+				"component": "healthcheck",
+				"event":     "healthcheck_failed",
+			}).Fatal("Agent healthcheck failed")
+		}
 	case "version":
 		{
 			log.WithFields(log.Fields{

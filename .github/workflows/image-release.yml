@@ -1,0 +1,324 @@
+name: Verified image publication
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        default: ""
+      source_ref:
+        type: string
+        required: true
+      nightly:
+        type: boolean
+        default: false
+      publish_latest:
+        type: boolean
+        default: false
+    secrets:
+      DOCKER_USERNAME:
+        required: true
+      DOCKER_PASSWORD:
+        required: true
+
+permissions:
+  contents: read
+
+# No parallel run can overwrite a customer tag while another run verifies it.
+concurrency:
+  group: image-publication-${{ inputs.nightly && 'nightly' || 'release' }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+      tag: ${{ steps.source.outputs.tag }}
+      created: ${{ steps.source.outputs.created }}
+      matrix: ${{ steps.source.outputs.matrix }}
+      repository: ${{ steps.source.outputs.repository }}
+      staging_repository: ${{ steps.source.outputs.staging_repository }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate requested tag
+        env:
+          TAG: ${{ inputs.tag }}
+          NIGHTLY: ${{ inputs.nightly }}
+        run: |
+          if [[ "$NIGHTLY" != true && ! "$TAG" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]]; then
+            echo "Invalid Docker tag" >&2
+            exit 1
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.source_ref }}
+          path: source
+          persist-credentials: false
+      - name: Resolve once for every architecture
+        id: source
+        env:
+          TAG: ${{ inputs.tag }}
+          NIGHTLY: ${{ inputs.nightly }}
+        run: |
+          sha=$(git -C source rev-parse HEAD)
+          [[ "$sha" =~ ^[a-f0-9]{40}$ ]]
+          created=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          repository=kerberos/agent
+          staging_repository=kerberos/agent-arch
+          matrix='{"include":[{"architecture":"amd64","runner":"ubuntu-24.04"},{"architecture":"arm64","runner":"ubuntu-24.04-arm"}]}'
+          if [[ "$NIGHTLY" == true ]]; then
+            TAG="${sha:0:7}"
+            repository=kerberos/agent-nightly
+            staging_repository="$repository"
+            # Keep arm/v6: the pinned Go trixie base currently lacks this platform.
+            # Its build must fail rather than publishing an incomplete nightly index.
+            matrix='{"include":[{"architecture":"amd64","runner":"ubuntu-24.04"},{"architecture":"arm64","runner":"ubuntu-24.04-arm"},{"architecture":"arm/v7","runner":"ubuntu-24.04"},{"architecture":"arm/v6","runner":"ubuntu-24.04"}]}'
+          fi
+          {
+            echo "sha=$sha"
+            echo "tag=$TAG"
+            echo "created=$created"
+            echo "repository=$repository"
+            echo "staging_repository=$staging_repository"
+            echo "matrix=$matrix"
+          } >> "$GITHUB_OUTPUT"
+          mkdir -p evidence
+          printf '%s\n' "$sha" > evidence/source-revision.txt
+          printf '%s\n' "$created" > evidence/created.txt
+          printf '%s\n' "$TAG" > evidence/version.txt
+          cp .github/scripts/image-release-policy.json evidence/runtime-policy.json
+      - name: Validate fail-closed policy helpers
+        run: python3 .github/scripts/test-image-policy.py
+      - name: Keep existing GitHub release unpublished until gates pass
+        if: ${{ !inputs.nightly }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.source.outputs.tag }}
+        run: |
+          # A release:created event may refer to an already public release.
+          # Return it to draft immediately; do not imply this run has verified it.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases" --jq '.[]' | jq -s . > evidence/releases.json
+          release_id=$(jq -r --arg tag "$TAG" '.[] | select(.tag_name == $tag) | .id' evidence/releases.json)
+          if [[ -n "$release_id" ]]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" -F draft=true > evidence/draft-release.json
+          fi
+      - name: Install pinned public OCI scanner
+        run: bash .github/scripts/install-trivy.sh
+      - name: Source/UI dependency vulnerability, secret and misconfiguration gate with SPDX SBOM
+        run: python3 .github/scripts/image-policy.py source evidence/source
+      - name: Retain source policy evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-source-evidence
+          path: evidence/
+          retention-days: 90
+          if-no-files-found: error
+
+  build:
+    needs: resolve
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.resolve.outputs.matrix) }}
+    env:
+      ARCH: ${{ matrix.architecture }}
+      VERSION: ${{ needs.resolve.outputs.tag }}
+      REVISION: ${{ needs.resolve.outputs.sha }}
+      CREATED: ${{ needs.resolve.outputs.created }}
+      STAGING_REPOSITORY: ${{ needs.resolve.outputs.staging_repository }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          path: source
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        if: ${{ startsWith(matrix.architecture, 'arm/') }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build immutable staging image with maximal provenance
+        id: build
+        run: |
+          mkdir -p evidence
+          arch="${ARCH//\//-}"
+          echo "arch=$arch" >> "$GITHUB_OUTPUT"
+          staging="$STAGING_REPOSITORY:ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$arch"
+          printf '%s\n' "$REVISION" > evidence/source-revision.txt
+          docker buildx build --platform "linux/$ARCH" --provenance=mode=max \
+            --build-arg "VERSION=$VERSION" --build-arg "REVISION=$REVISION" --build-arg "CREATED=$CREATED" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            --label "org.opencontainers.image.revision=$REVISION" \
+            --label "org.opencontainers.image.created=$CREATED" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --metadata-file evidence/build-metadata.json --tag "$staging" --push source
+          digest=$(jq -er '."containerimage.digest"' evidence/build-metadata.json)
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          image="$STAGING_REPOSITORY@$digest"
+          printf '%s\n' "$image" > evidence/image.txt
+          docker buildx imagetools inspect "$image" --format '{{json .Provenance}}' > evidence/provenance.json
+          python3 .github/scripts/image-evidence.py evidence
+      - name: Extract release payload and smoke test the exact staged image
+        run: |
+          image=$(cat evidence/image.txt)
+          docker pull --platform "linux/$ARCH" "$image"
+          cid=$(docker create --platform "linux/$ARCH" "$image")
+          trap 'docker rm -f "$cid" >/dev/null' EXIT
+          docker cp "$cid:/home/agent" output
+          # Run the existing smoke interface, including emulated nightly architectures.
+          DOCKER_DEFAULT_PLATFORM="linux/$ARCH" sh source/deployments/docker/test-image.sh "$image"
+          arch="${ARCH//\//-}"
+          tar -cf "agent-$arch.tar" -C output .
+          rm -rf output
+      - name: Retain build evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-build-${{ steps.build.outputs.arch || strategy.job-index }}
+          path: evidence/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Retain existing binary artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agent-${{ steps.build.outputs.arch }}.tar
+          path: agent-*.tar
+          if-no-files-found: error
+
+  verify-publish:
+    needs: [resolve, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      REPOSITORY: ${{ needs.resolve.outputs.repository }}
+      STAGING_REPOSITORY: ${{ needs.resolve.outputs.staging_repository }}
+      VERSION: ${{ needs.resolve.outputs.tag }}
+      REVISION: ${{ needs.resolve.outputs.sha }}
+      PUBLISH_LATEST: ${{ inputs.publish_latest }}
+      MATRIX: ${{ needs.resolve.outputs.matrix }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: artifacts
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Install scanner
+        run: bash .github/scripts/install-trivy.sh
+      - uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+        with:
+          cosign-release: v3.1.4
+      - name: Assemble candidate index without publishing version/latest
+        run: |
+          mkdir -p evidence
+          images=()
+          while IFS= read -r arch; do
+            directory="artifacts/image-build-${arch//\//-}"
+            [[ "$(cat "$directory/source-revision.txt")" == "$REVISION" ]]
+            image=$(cat "$directory/image.txt")
+            [[ "$image" =~ ^${STAGING_REPOSITORY}@sha256:[a-f0-9]{64}$ ]]
+            images+=("$image")
+          done < <(jq -r '.include[].architecture' <<< "$MATRIX")
+          candidate="$REPOSITORY:ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker buildx imagetools create --tag "$candidate" "${images[@]}"
+          digest=$(docker buildx imagetools inspect "$candidate" --format '{{.Manifest.Digest}}')
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
+          image="$REPOSITORY@$digest"
+          printf '%s\n' "$image" > evidence/final-image.txt
+          printf '%s\n' "$REVISION" > evidence/source-revision.txt
+          docker buildx imagetools inspect "$image" --raw > evidence/index.json
+          docker buildx imagetools inspect "$image" --format '{{json .Provenance}}' > evidence/provenance.json
+          python3 .github/scripts/image-evidence.py evidence
+          # Every requested runnable platform must be present, with no silent omissions.
+          jq -r '.manifests[] | select(.platform.os == "linux") |
+            .platform | .architecture + (if .variant and .architecture == "arm" then "/" + .variant else "" end)' \
+            evidence/index.json | sort > evidence/actual-platforms.txt
+          jq -r '.include[].architecture' <<< "$MATRIX" | sort > evidence/expected-platforms.txt
+          diff -u evidence/expected-platforms.txt evidence/actual-platforms.txt
+      - name: Scan every final-index platform and enforce findings/errors
+        run: |
+          image=$(cat evidence/final-image.txt)
+          failed=0
+          while IFS= read -r arch; do
+            # Generation uses exit-code 0 only for findings; the helper explicitly
+            # blocks HIGH/CRITICAL/UNKNOWN and any scanner/inventory/SBOM error.
+            if ! python3 .github/scripts/image-policy.py "$image" "evidence/${arch//\//-}" --platform "linux/$arch"; then
+              failed=1
+            fi
+          done < <(jq -r '.include[].architecture' <<< "$MATRIX")
+          exit "$failed"
+      - name: Required release policy exception gate
+        run: |
+          # The product deliberately retains remote terminal/PTY support.
+          # No approval exists. Keep this release-only gate separate from scans;
+          # there is no dispatch input/environment variable that can waive it.
+          cp .github/scripts/image-release-policy.json evidence/runtime-policy.json
+          python3 .github/scripts/image-release-policy.py evidence/runtime-policy.json
+      - name: Sign and verify the FINAL multi-platform digest using GitHub OIDC
+        run: |
+          image=$(cat evidence/final-image.txt)
+          # Fulcio's SAN is job_workflow_ref for this local reusable workflow,
+          # not the caller's filename. Bind the exact repository and executing ref.
+          # For example: https://github.com/kerberos-io/agent/.github/workflows/image-release.yml@refs/heads/master
+          identity="https://github.com/$GITHUB_REPOSITORY/.github/workflows/image-release.yml@$GITHUB_REF"
+          printf '%s\n' "$identity" > evidence/signing-identity.txt
+          cosign sign --yes --bundle evidence/signature.sigstore.json "$image"
+          cosign verify --certificate-identity "$identity" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$image" > evidence/signature-verification.json
+      - name: Publish only the already verified and signed digest
+        run: |
+          image=$(cat evidence/final-image.txt)
+          while IFS= read -r arch; do
+            arch="${arch//\//-}"
+            staged=$(cat "artifacts/image-build-$arch/image.txt")
+            # Preserve the existing architecture tag names, after all gates.
+            docker buildx imagetools create --tag "$STAGING_REPOSITORY:arch-$arch-$VERSION" "$staged"
+          done < <(jq -r '.include[].architecture' <<< "$MATRIX")
+          docker buildx imagetools create --tag "$REPOSITORY:$VERSION" "$image"
+          [[ "$(docker buildx imagetools inspect "$REPOSITORY:$VERSION" --format '{{.Manifest.Digest}}')" == "${image##*@}" ]]
+          if [[ "$PUBLISH_LATEST" == true ]]; then
+            docker buildx imagetools create --tag "$REPOSITORY:latest" "$image"
+            [[ "$(docker buildx imagetools inspect "$REPOSITORY:latest" --format '{{.Manifest.Digest}}')" == "${image##*@}" ]]
+          fi
+      - name: Retain final reports/SBOM/provenance/signature even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-final-evidence
+          path: evidence/
+          retention-days: 90
+          if-no-files-found: error
+      - name: Attach binaries and all evidence, then publish GitHub release
+        if: ${{ !inputs.nightly }}
+        run: |
+          tar -czf image-security-evidence.tar.gz evidence artifacts/image-*
+          # Create a draft only if absent. API errors must not masquerade as absence.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases" --jq '.[]' | jq -s . > releases.json
+          if ! jq -e --arg tag "$VERSION" '.[] | select(.tag_name == $tag)' releases.json >/dev/null; then
+            gh release create "$VERSION" --target "$REVISION" --title "$VERSION" --notes "" --draft
+          fi
+          gh release upload "$VERSION" artifacts/agent-*.tar/agent-*.tar image-security-evidence.tar.gz --clobber
+          gh release edit "$VERSION" --draft=false --latest --title "$VERSION"

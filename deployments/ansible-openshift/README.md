@@ -2,6 +2,17 @@
 
 Kubernetes is great, but you might love OpenShift even more. In this directory you'll find some resources to deploy your Kerberos Agent in an OpenShift cluster using Ansible playbook. We'll review the different tasks of the Ansible playbook step by step; find the complete `playbook.yaml` here.
 
+The playbook's port mapping targets the forthcoming hardened image:
+`containerPort: 8080` and `targetPort: 8080`, with external Service port `80`
+unchanged. Previously published images, including `v3.14.1`, still need the old
+container port 80. Upgrade the image and mapping together and pin its published
+digest. See the [image contract](../docker/README.md#image-contract) for numeric
+UID/GID `999:999`, writable data/cache paths and release blockers. OpenShift SCCs
+may override the UID; provision matching volume permissions and verify your
+cluster's policy rather than granting privileged access. This legacy playbook's
+credential-debugging/certificate-validation settings also require production
+review; the image/port update does not certify the cluster deployment.
+
 ## Variabeles
 
 We'll have a few `variables` in our `playbook.yml` that will help us to setup secure connection with the OpenShift cluster. We need the `cluster_url` and the `username` and `password` of the OpenShift cluster. If you don't know where to find this, you can find this in the OpenShift web ui.

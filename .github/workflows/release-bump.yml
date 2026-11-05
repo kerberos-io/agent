@@ -1,160 +1,36 @@
 name: Bump release
-
 on:
   workflow_dispatch:
     inputs:
       bump:
-        description: "Which part of the version to bump"
+        description: Which part of the version to bump
         required: true
         default: patch
         type: choice
-        options:
-          - major
-          - minor
-          - patch
+        options: [major, minor, patch]
 
 permissions:
-  contents: write
-
-env:
-  REPO: kerberos/agent
+  contents: read
 
 jobs:
-  # Determine the next version, create the GitHub release and expose the tag.
   bump-release:
-    uses: uug-ai/workflows/.github/workflows/release-bump.yml@main
+    permissions:
+      contents: write
+    # Verified revision supports reserving a tag with an unpublished draft.
+    uses: uug-ai/workflows/.github/workflows/release-bump.yml@f31d4260a833e82228ca0e9b9163231a970feeb8
     with:
-      bump: ${{ github.event.inputs.bump }}
+      bump: ${{ inputs.bump }}
+      draft: true
     secrets: inherit
 
-  # Publish the platform image to the uug-ai GitHub Container Registry
-  # (ghcr.io/uug-ai/agent-platform).
-  #release:
-  #  needs: bump-release
-  #  uses: uug-ai/workflows/.github/workflows/release-create.yml@main
-  #  with:
-  #    organization: uug-ai
-  #    project: ${{ github.event.repository.name }}
-  #    tag: ${{ needs.bump-release.outputs.tag }}
-  #    docker_context: "."
-  #    create_gitops_pr: false
-  #    runner_matrix: >-
-  #       [
-  #         {"architecture":"amd64","runner":"ubuntu-24.04"},
-  #         {"architecture":"arm64","runner":"ubuntu-24.04-arm"}
-  #      ]
-  #  secrets: inherit
-
-  # Everything below mirrors the agent's own release-create.yml pipeline and
-  # publishes the multi-arch image to the kerberos/agent Docker Hub repo, driven
-  # by the freshly bumped tag instead of a `release: created` event.
-  build-amd64:
+  release:
     needs: bump-release
-    runs-on: ubuntu-24.04
     permissions:
       contents: write
-    strategy:
-      matrix:
-        architecture: [amd64]
-    steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Run Build
-        run: |
-          docker build --provenance=false --build-arg VERSION=${{ needs.bump-release.outputs.tag }} -t ${{matrix.architecture}} .
-          CID=$(docker create ${{matrix.architecture}})
-          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
-          docker rm ${CID}
-      - name: Strip binary
-        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
-      - name: Build and push Docker image
-        run: |
-          docker tag ${{matrix.architecture}} $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
-          docker push $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: agent-${{matrix.architecture}}.tar
-          path: agent-${{matrix.architecture}}.tar
-
-  build-arm64:
-    needs: bump-release
-    runs-on: ubuntu-24.04-arm
-    permissions:
-      contents: write
-    strategy:
-      matrix:
-        architecture: [arm64]
-    steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Run Build
-        run: |
-          docker build --provenance=false --build-arg VERSION=${{ needs.bump-release.outputs.tag }} -t ${{matrix.architecture}} .
-          CID=$(docker create ${{matrix.architecture}})
-          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
-          docker rm ${CID}
-      - name: Strip binary
-        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
-      - name: Build and push Docker image
-        run: |
-          docker tag ${{matrix.architecture}} $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
-          docker push $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: agent-${{matrix.architecture}}.tar
-          path: agent-${{matrix.architecture}}.tar
-
-  create-manifest:
-    runs-on: ubuntu-24.04
-    needs: [bump-release, build-amd64, build-arm64]
-    steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Create and push multi-arch manifest
-        run: |
-          docker manifest create $REPO:${{ needs.bump-release.outputs.tag }} \
-            $REPO-arch:arch-amd64-${{ needs.bump-release.outputs.tag }} \
-            $REPO-arch:arch-arm64-${{ needs.bump-release.outputs.tag }}
-          docker manifest push $REPO:${{ needs.bump-release.outputs.tag }}
-      - name: Create and push latest manifest
-        run: |
-          docker manifest create $REPO:latest \
-            $REPO-arch:arch-amd64-${{ needs.bump-release.outputs.tag }} \
-            $REPO-arch:arch-arm64-${{ needs.bump-release.outputs.tag }}
-          docker manifest push $REPO:latest
-
-  create-release:
-    runs-on: ubuntu-24.04
-    needs: [bump-release, build-amd64, build-arm64]
-    permissions:
-      contents: write
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-      - name: Create a release
-        uses: ncipollo/release-action@v1
-        with:
-          latest: true
-          allowUpdates: true
-          name: ${{ needs.bump-release.outputs.tag }}
-          tag: ${{ needs.bump-release.outputs.tag }}
-          generateReleaseNotes: false
-          omitBodyDuringUpdate: true
-          artifacts: "agent-*.tar/agent-*.tar"
-
-  
+      id-token: write
+    uses: ./.github/workflows/image-release.yml
+    with:
+      tag: ${{ needs.bump-release.outputs.tag }}
+      source_ref: ${{ format('refs/tags/{0}', needs.bump-release.outputs.tag) }}
+      publish_latest: true
+    secrets: inherit
