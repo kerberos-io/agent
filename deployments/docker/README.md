@@ -171,7 +171,8 @@ their application inventory/SBOM, because compiled browser assets hide lockfile
 metadata from final-rootfs scanners. Final-image evidence separately covers native
 packages and the Go binary. Current native-library findings and the legacy
 embedded default recording-signing private key are still release blockers; the
-key's trust/migration behavior has not been silently changed or waived.
+existing key and recording-trust behavior are retained by explicit user decision.
+That decision is not a scanner suppression or an approved release exception.
 
 The build jobs run compilation and production-image smoke tests before the
 security gates. A job that fails at **Source/UI dependency and final image gates
@@ -191,9 +192,11 @@ had no vendor-scanner findings but still used the same affected upstream
 adopted to obtain a misleading clean scan. A newer media stack needs matched
 CGO headers/libraries and validation of codecs, hardware acceleration and
 supported architectures, not an unreviewed mix of testing-distribution packages.
-The default recording-signing key also needs an explicit trust migration:
-per-installation keys need verifier/public-key provisioning, while requiring
-an injected key changes startup for existing keyless installations.
+The user has chosen to keep the default recording-signing key; no trust
+migration or startup change is implemented. Its source-secret finding remains
+an unresolved release blocker. Any future removal would require a separately
+authorized migration: per-installation keys need verifier/public-key provisioning,
+while requiring an injected key changes startup for existing keyless installations.
 
 Before deploying, obtain the release's digest, source revision, supported
 platforms, per-platform SBOM/scan reports, provenance, signature certificate
