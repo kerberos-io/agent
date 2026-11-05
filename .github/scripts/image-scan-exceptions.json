@@ -1,0 +1,20 @@
+{
+  "exceptions": [
+    {
+      "id": "shared-recording-signing-key",
+      "status": "approved",
+      "owner": "@cedricve",
+      "approved_by": "@cedricve",
+      "approval_url": "https://github.com/kerberos-io/agent/pull/350",
+      "expires": "2026-12-05T23:59:59Z",
+      "reason": "User approved temporary retention of the existing shared recording-signing key to preserve recording verification trust and startup behavior. Anyone possessing this shared private key can forge signatures under that identity.",
+      "target": "machinery/src/config/main.go",
+      "file_sha256": "e28a0bf6ae892559709e8ec534cfc7b7cb55180e33415461d966c1afe53ca25b",
+      "rule_id": "private-key",
+      "category": "AsymmetricPrivateKey",
+      "severity": "HIGH",
+      "start_line": 710,
+      "end_line": 710
+    }
+  ]
+}

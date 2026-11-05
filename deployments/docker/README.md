@@ -169,10 +169,25 @@ signing, or scans have already succeeded.
 Source scans cover UI production **and build/development** dependencies and retain
 their application inventory/SBOM, because compiled browser assets hide lockfile
 metadata from final-rootfs scanners. Final-image evidence separately covers native
-packages and the Go binary. Current native-library findings and the legacy
-embedded default recording-signing private key are still release blockers; the
-existing key and recording-trust behavior are retained by explicit user decision.
-That decision is not a scanner suppression or an approved release exception.
+packages and the Go binary. Current native-library findings remain release
+blockers. The existing embedded recording-signing key and trust behavior are
+retained under the user's time-limited source-secret exception, recorded for
+review in this PR in
+[image-scan-exceptions.json](../../.github/scripts/image-scan-exceptions.json).
+Owner and approver: `@cedricve`; expiry: **December 5, 2026, 23:59:59 UTC**.
+Anyone possessing this shared private key can forge signatures under its
+identity; the exception accepts that risk temporarily, it does not fix it.
+
+The exception matches only that source file's SHA-256, exact scanner rule,
+category, HIGH severity and line location, and requires exactly one match.
+Changes, missing/incomplete approval, expiry or duplicate findings fail closed.
+It cannot exempt an image finding, another secret, a vulnerability or a
+misconfiguration. The policy is loaded from the executing workflow's checkout,
+not the source directory being scanned. Retained `scan.json` still contains the
+redacted HIGH finding; `exception-policy.json`, `exception-decisions.json` and
+`policy.json` record the approval/application, without key material. Review the
+record in PR #350 before merging; repository owners must enforce required reviews.
+This exception does not approve the separate pending remote-terminal policy.
 
 The build jobs run compilation and production-image smoke tests before the
 security gates. A job that fails at **Source/UI dependency and final image gates
@@ -193,8 +208,9 @@ adopted to obtain a misleading clean scan. A newer media stack needs matched
 CGO headers/libraries and validation of codecs, hardware acceleration and
 supported architectures, not an unreviewed mix of testing-distribution packages.
 The user has chosen to keep the default recording-signing key; no trust
-migration or startup change is implemented. Its source-secret finding remains
-an unresolved release blocker. Any future removal would require a separately
+migration or startup change is implemented. Its source-secret finding becomes
+release-blocking again if the scoped exception expires or no longer matches.
+Any future removal would require a separately
 authorized migration: per-installation keys need verifier/public-key provisioning,
 while requiring an injected key changes startup for existing keyless installations.
 

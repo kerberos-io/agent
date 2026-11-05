@@ -2,6 +2,8 @@
 """Fail-closed source/application and image scans with redacted evidence."""
 
 import argparse
+from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -9,10 +11,63 @@ import subprocess
 import sys
 
 
-def check_report(report, image=False, source=False):
+def secret_identity(target, finding):
+    return (target, finding.get("RuleID"), finding.get("Category"),
+            finding.get("Severity"), finding.get("StartLine"), finding.get("EndLine"))
+
+
+def approve_shared_key(report, source_root, policy, now=None):
+    """Bind the one reviewed exception to an unchanged file and exact finding."""
+    now = now or datetime.now(timezone.utc)
+    records = policy.get("exceptions")
+    if not isinstance(records, list) or len(records) != 1:
+        raise ValueError("Exactly one shared-key exception record is required")
+    record = records[0]
+    if not isinstance(record, dict) or record.get("id") != "shared-recording-signing-key":
+        raise ValueError("Unexpected scan exception")
+    if record.get("status") != "approved" or not all(
+        isinstance(record.get(key), str) and record[key].strip()
+        for key in ("owner", "approved_by", "reason", "approval_url", "expires")
+    ):
+        raise ValueError("Shared-key exception lacks approval/owner/reason/evidence/expiry")
+    if record["approval_url"] != "https://github.com/kerberos-io/agent/pull/350":
+        raise ValueError("Shared-key exception must reference its reviewed PR record")
+    expires = datetime.fromisoformat(record["expires"].replace("Z", "+00:00"))
+    if expires.tzinfo is None or expires <= now:
+        raise ValueError("Shared-key exception expired or lacks timezone")
+    if (record.get("target") != "machinery/src/config/main.go"
+            or record.get("rule_id") != "private-key"
+            or record.get("category") != "AsymmetricPrivateKey"
+            or record.get("severity") != "HIGH"
+            or type(record.get("start_line")) is not int
+            or record["start_line"] < 1
+            or record.get("end_line") != record["start_line"]):
+        raise ValueError("Shared-key exception has an unexpected finding scope")
+    root = Path(source_root).resolve()
+    path = root / record["target"]
+    if path.resolve() != path or hashlib.sha256(path.read_bytes()).hexdigest() != record.get("file_sha256"):
+        raise ValueError("Shared-key source file changed or is a symlink; renewed review required")
+    expected = (record["target"], record["rule_id"], record["category"],
+                record["severity"], record["start_line"], record["end_line"])
+    matches = [
+        finding for result in report["Results"]
+        for finding in result.get("Secrets", [])
+        if secret_identity(result.get("Target"), finding) == expected
+    ]
+    if len(matches) != 1:
+        raise ValueError("Shared-key exception must match exactly one existing source finding")
+    return [dict(record)]
+
+
+def check_report(report, image=False, source=False, approved_exceptions=()):
     if report.get("SchemaVersion") != 2 or not isinstance(report.get("Results"), list):
         raise ValueError("Missing or unsupported Trivy report")
     failures = []
+    approved_secrets = {
+        (record["target"], record["rule_id"], record["category"], record["severity"],
+         record["start_line"], record["end_line"])
+        for record in approved_exceptions
+    } if source and not image else set()
     for result in report["Results"]:
         if result.get("Errors"):
             failures.append(f"Scan errors in {result.get('Target')}: {result['Errors']}")
@@ -25,6 +80,8 @@ def check_report(report, image=False, source=False):
                 if kind == "Misconfigurations" and finding.get("Status") != "FAIL":
                     failures.append(f"Unexpected/suppressed misconfiguration status: {finding.get('Status')}")
                 severity = finding.get("Severity", "UNKNOWN")
+                if kind == "Secrets" and secret_identity(result.get("Target"), finding) in approved_secrets:
+                    continue
                 if severity not in ("LOW", "MEDIUM"):
                     failures.append(f"{result.get('Target')}: {kind}: "
                                     f"{finding.get('VulnerabilityID', finding.get('ID', finding.get('RuleID')))} "
@@ -120,7 +177,20 @@ def scan(target, output, platform=None):
     except ValueError:
         raise ValueError("Invalid scanner JSON; raw output withheld") from None
     (output / "scan.json").write_text(json.dumps(report, indent=2) + "\n")
-    failures = check_report(report, image=bool(platform), source=not platform)
+    approved = []
+    exception_failures = []
+    if not platform:
+        try:
+            policy = json.loads(Path(__file__).with_name("image-scan-exceptions.json").read_text())
+            (output / "exception-policy.json").write_text(json.dumps(policy, indent=2) + "\n")
+            approved = approve_shared_key(report, target, policy)
+        except (OSError, ValueError, TypeError, KeyError) as error:
+            exception_failures.append(f"Shared-key exception invalid: {error}")
+    (output / "exception-decisions.json").write_text(json.dumps({
+        "approved_exceptions": approved, "failures": exception_failures,
+    }, indent=2) + "\n")
+    failures = exception_failures + check_report(
+        report, image=bool(platform), source=not platform, approved_exceptions=approved)
     if not platform:
         inventory = [{
             "target": result.get("Target"), "type": result.get("Type"),
@@ -129,7 +199,8 @@ def scan(target, output, platform=None):
                          for pkg in result.get("Packages", [])],
         } for result in report["Results"] if result.get("Packages")]
         (output / "application-inventory.json").write_text(json.dumps({
-            "policy": "All production and development/build dependencies are gated; no exclusions.",
+            "policy": "All production and development/build dependencies are gated; "
+                      "only the reviewed, exact shared-key secret exception may apply.",
             "inventories": inventory,
         }, indent=2) + "\n")
     converted = subprocess.run([
@@ -152,13 +223,15 @@ def main():
     parser.add_argument("--platform", help="Image platform, e.g. linux/amd64; omit for source/UI scanning")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
+    approved = []
     try:
         failures = scan(args.target, args.output, args.platform)
+        approved = json.loads((args.output / "exception-decisions.json").read_text())["approved_exceptions"]
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         failures = [f"Scanner/evidence error: {error}"]
     (args.output / "policy.json").write_text(json.dumps({
         "target": args.target, "platform": args.platform, "failures": failures,
-        "approved_exceptions": [], "passed": not failures,
+        "approved_exceptions": approved, "passed": not failures,
     }, indent=2) + "\n")
     for failure in failures:
         print(failure, file=sys.stderr)

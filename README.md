@@ -166,11 +166,11 @@ paths, health checks, supported architectures, signature/evidence requirements,
 and release-policy gaps. Functional remote-shell support remains a **pending
 policy exception**, so this is not a claim of full image-hardening baseline or
 CIS compliance.
-Release promotion is also blocked by remaining native-library scan findings
-and the legacy default recording-signing key; this PR is not release-qualified.
-The existing signing key and recording-trust behavior are retained by explicit
-user decision. This does not waive the key's security finding or approve a
-release exception.
+Release promotion is also blocked by remaining native-library scan findings;
+this PR is not release-qualified. The existing recording-signing key and trust
+behavior are retained under the user's narrowly scoped exception through
+December 5, 2026 (23:59:59 UTC), recorded for review in this PR. The finding
+remains visible in scan reports; other keys and findings are not exempted.
 
 If you want to connect to a USB or Raspberry Pi camera, [you'll need to run our side car container](https://github.com/kerberos-io/camera-to-rtsp) which proxies the camera to an RTSP stream. In that case you'll want to configure the Kerberos Agent container to run in the host network, so it can connect directly to the RTSP sidecar.
 
