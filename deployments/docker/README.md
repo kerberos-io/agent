@@ -173,6 +173,28 @@ packages and the Go binary. Current native-library/UI findings and the legacy
 embedded default recording-signing private key are still release blockers; the
 key's trust/migration behavior has not been silently changed or waived.
 
+The build jobs run compilation and production-image smoke tests before the
+security gates. A job that fails at **Source/UI dependency and final image gates
+with SPDX SBOMs** is not a compiler or startup failure; inspect its retained
+reports rather than disabling the gate. Patched Go dependencies are checked
+with `govulncheck` as well as the image/source scanner. The pinned
+`golang.org/x/crypto` revision is the official reviewed OpenPGP module split
+for [GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932); Agent does not import the
+retired OpenPGP packages.
+
+Debian 13 stable, security and backports currently provide no patched FFmpeg
+7.1.x or libxml2 packages for the blocking findings on either AMD64 or ARM64.
+For example, Debian defers [CVE-2026-58049](https://security-tracker.debian.org/tracker/CVE-2026-58049)
+until an upstream 7.1.x fix; a fix exists in FFmpeg 9. A Wolfi FFmpeg 7 prototype
+had no vendor-scanner findings but still used the same affected upstream
+7.1.5 code and lacked the existing hardware accelerators. It was **not**
+adopted to obtain a misleading clean scan. A newer media stack needs matched
+CGO headers/libraries and validation of codecs, hardware acceleration and
+supported architectures, not an unreviewed mix of testing-distribution packages.
+The default recording-signing key also needs an explicit trust migration:
+per-installation keys need verifier/public-key provisioning, while requiring
+an injected key changes startup for existing keyless installations.
+
 Before deploying, obtain the release's digest, source revision, supported
 platforms, per-platform SBOM/scan reports, provenance, signature certificate
 identity and policy approvals from its retained release evidence. Verify the

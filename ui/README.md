@@ -24,10 +24,69 @@ See the section about [running tests](https://facebook.github.io/create-react-ap
 Builds the app for production to the `build` folder.\
 It correctly bundles React in production mode and optimizes the build for the best performance.
 
+The build script then replaces `../machinery/www` with the generated assets.
+Run it in an isolated checkout or container when validating dependencies.
+
 The build is minified and the filenames include the hashes.\
 Your app is ready to be deployed!
 
 See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+
+## Dependency maintenance
+
+Use the Node 22 image pinned in the root Dockerfile and Yarn Classic:
+
+```sh
+yarn install --frozen-lockfile
+CI=true yarn test --watchAll=false --runInBand
+yarn test:dependencies
+yarn build
+```
+
+Keep the targeted `loader-utils` and `underscore` resolutions: the legacy
+`svg-react-loader` and `jsonpath` dependencies pin vulnerable versions.
+Those two resolutions stay within their respective major versions. Axios remains on
+its maintained 0.x line; `src/api/api.test.js` checks the HTTP behavior used by
+the app without mocking Axios. Localization uses `i18next-xhr-backend`, not the
+removed, unused `i18next-http-backend` dependency.
+
+Additional targeted build-time upgrades are validated against the pinned
+Node 22 / webpack 5 toolchain:
+
+- [`resolve-url-loader` 5](https://github.com/bholloway/resolve-url-loader/releases/tag/5.0.0)
+  upgrades PostCSS to 8, drops Node <12 / webpack <4, and removes the deprecated
+  `rework` engine. CRA uses the supported PostCSS engine and unchanged `root` /
+  `sourceMap` options. Dependency tests check relative SCSS asset URLs, query
+  strings and fragments with source maps enabled and disabled.
+- [`serialize-javascript` 7](https://github.com/yahoo/serialize-javascript/releases/tag/v7.0.0)
+  requires Node >=20, matching this UI's declared minimum. Its CommonJS serializer
+  API remains compatible with CSS minimizer and Rollup worker options.
+  Versions 5/6 changed sparse-array and URL serialization, neither of which these
+  callers use. Tests cover both consumers' function / regular-expression
+  serialization and the real Workbox Rollup minification worker; the production
+  build exercises CSS minimization. The targeted resolutions use patched 7.1.4.
+- [`@svgr/webpack` 6](https://react-svgr.com/docs/migrate/) supports webpack 5 and
+  the existing `file-loader` combination. CRA disables SVGO and does not use a
+  custom template or call `@svgr/core`, so the documented breaking changes do
+  not affect this pipeline. Tests use CRA's actual SVG rule to check asset URLs,
+  React 17 rendering, viewBox preservation, titles and forwarded refs.
+- [`webpack-dev-middleware` 7](https://github.com/webpack/webpack-dev-middleware/releases/tag/v7.0.0)
+  raises the Node minimum and upgrades its internal memory filesystem; version 6
+  raised the webpack minimum to 5. Both requirements match this toolchain, and
+  webpack-dev-server remains on CRA's 4.x line. Tests exercise real server
+  compilation, in-memory asset serving, missing assets and invalidation with
+  patched middleware 7.4.6. No build artifacts are written by this test.
+
+Refreshing the lockfile does not resolve every legacy-toolchain advisory.
+Create React App 5, `@kerberos-io/ui`'s SVG tooling, and their transitive
+dependencies still require upstream upgrades or explicit, tested migrations.
+Do not force incompatible transitive major versions just to clear a scan.
+
+In particular, `@kerberos-io/ui -> svg-react-loader -> css -> source-map-resolve`
+still imports `decode-uri-component` through CommonJS. Its high-severity fix is
+0.5.1, but 0.4 switched the package to an ESM default export, incompatible with
+that caller. Removing this dependency requires replacing or updating the legacy
+SVG loader in the shared UI package, not blindly resolving it to 0.5.1.
 
 ### `yarn eject`
 

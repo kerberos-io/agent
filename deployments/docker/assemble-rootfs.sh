@@ -25,9 +25,11 @@ awk '$2 == "installed" { print $1 }' /tmp/package-status \
 	| sort -u > /tmp/installed-packages
 comm -12 /tmp/runtime-candidates /tmp/installed-packages > /tmp/runtime-packages
 
-# The package list is generated from trusted package metadata, not build input.
-packages=$(cat /tmp/runtime-packages)
-dpkg-query -L $packages > /tmp/runtime-package-paths
+set --
+while IFS= read -r package; do
+	set -- "$@" "$package"
+done < /tmp/runtime-packages
+dpkg-query -L "$@" > /tmp/runtime-package-paths
 sort -u /tmp/runtime-package-paths > /tmp/runtime-paths
 while IFS= read -r path; do
 	case "$path" in
@@ -86,7 +88,7 @@ chmod 1777 "$root/tmp" "$root/var/tmp"
 install -d -m 0700 -o 999 -g 999 "$root/tmp/agent-cache"
 
 # Retain package provenance for scanners without shipping apt/dpkg executables.
-dpkg-query -s $packages ca-certificates base-files > "$root/var/lib/dpkg/status"
+dpkg-query -s "$@" ca-certificates base-files > "$root/var/lib/dpkg/status"
 mkdir -p "$root/usr/share/doc/ca-certificates"
 cp /usr/share/doc/ca-certificates/copyright "$root/usr/share/doc/ca-certificates/"
 ldconfig -r "$root"
