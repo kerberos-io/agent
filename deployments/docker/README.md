@@ -169,7 +169,7 @@ signing, or scans have already succeeded.
 Source scans cover UI production **and build/development** dependencies and retain
 their application inventory/SBOM, because compiled browser assets hide lockfile
 metadata from final-rootfs scanners. Final-image evidence separately covers native
-packages and the Go binary. Current native-library/UI findings and the legacy
+packages and the Go binary. Current native-library findings and the legacy
 embedded default recording-signing private key are still release blockers; the
 key's trust/migration behavior has not been silently changed or waived.
 

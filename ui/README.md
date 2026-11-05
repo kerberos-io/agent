@@ -43,9 +43,8 @@ yarn test:dependencies
 yarn build
 ```
 
-Keep the targeted `loader-utils` and `underscore` resolutions: the legacy
-`svg-react-loader` and `jsonpath` dependencies pin vulnerable versions.
-Those two resolutions stay within their respective major versions. Axios remains on
+Keep the targeted `underscore` resolution: `jsonpath` pins a vulnerable version.
+That resolution stays within the same major version. Axios remains on
 its maintained 0.x line; `src/api/api.test.js` checks the HTTP behavior used by
 the app without mocking Axios. Localization uses `i18next-xhr-backend`, not the
 removed, unused `i18next-http-backend` dependency.
@@ -82,11 +81,25 @@ Create React App 5, `@kerberos-io/ui`'s SVG tooling, and their transitive
 dependencies still require upstream upgrades or explicit, tested migrations.
 Do not force incompatible transitive major versions just to clear a scan.
 
-In particular, `@kerberos-io/ui -> svg-react-loader -> css -> source-map-resolve`
-still imports `decode-uri-component` through CommonJS. Its high-severity fix is
-0.5.1, but 0.4 switched the package to an ESM default export, incompatible with
-that caller. Removing this dependency requires replacing or updating the legacy
-SVG loader in the shared UI package, not blindly resolving it to 0.5.1.
+The obsolete `svg-react-loader` dependency declared by `@kerberos-io/ui` is
+replaced with the maintained `@svgr/webpack` 8.1.0 through a Yarn package alias.
+This removes its `css -> source-map-resolve -> decode-uri-component` chain;
+it does not force an incompatible ESM version of the decoder into a CommonJS
+caller. The shared UI ships precompiled SVG components and does not invoke that
+loader. CRA's active SVG rule remains on the separately tested SVGR 6 path.
+SVGR 8.1.0 is also pinned explicitly as a development dependency, so dependency
+scanners inventory and check its actual package identity even if their Yarn
+alias parser reports an additional `svg-react-loader@8.1.0` entry. Tests verify
+that both names resolve to identical package metadata; the alias is not used
+to conceal an unscanned replacement.
+
+This is a scoped consumer migration, **not** a general drop-in implementation of
+the old loader's `raw`, `filters`, `propsMap` or other query options. Dependency
+tests guard against shared UI code starting to call the legacy API, resolve the
+alias from the shared package, and compile/render its maintained replacement
+with React 17, titles, forwarded refs, viewBox and caller props. Rendering is
+compared to CRA's actual SVG pipeline. Recheck these assumptions on shared UI
+upgrades; use SVGR's supported options for any new loader calls.
 
 ### `yarn eject`
 

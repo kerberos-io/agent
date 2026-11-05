@@ -123,7 +123,30 @@ test('Workbox Rollup minification passes serialized options through its real wor
   }
 });
 
-test('CRA SVG exports render correctly through webpack-dev-server and its upgraded middleware', async () => {
+test('shared UI ships precompiled SVGs without legacy loader calls', () => {
+  const packagePath = require.resolve('@kerberos-io/ui/package.json');
+  const requireFromUI = createRequire(packagePath);
+  const replacement = requireFromUI('svg-react-loader/package.json');
+  assert.equal(replacement.name, '@svgr/webpack');
+  assert.equal(replacement.version, '8.1.0');
+  assert.deepEqual(replacement, require('@svgr/webpack/package.json'));
+  assert.equal(requireFromCRA('@svgr/webpack/package.json').version, '6.5.1');
+
+  const lib = path.join(path.dirname(packagePath), 'lib');
+  const files = fs
+    .readdirSync(lib, { recursive: true })
+    .filter((file) => /\.[cm]?js$/.test(file));
+  assert.ok(files.length > 0);
+  for (const file of files) {
+    assert.doesNotMatch(
+      fs.readFileSync(path.join(lib, file), 'utf8'),
+      /svg-react-loader/,
+      `Shared UI now uses the legacy loader API in ${file}`
+    );
+  }
+});
+
+test('CRA and replacement SVG loaders preserve rendering through webpack-dev-server', async () => {
   process.env.NODE_ENV = 'production';
   const webpack = requireFromCRA('webpack');
   const DevServer = requireFromCRA('webpack-dev-server');
@@ -141,9 +164,21 @@ test('CRA SVG exports render correctly through webpack-dev-server and its upgrad
     __dirname,
     '../src/header-minimal-logo-36x36.svg'
   );
+  const requireFromUI = createRequire(
+    require.resolve('@kerberos-io/ui/package.json')
+  );
+  const replacementRequest = `!!${requireFromUI.resolve(
+    'svg-react-loader'
+  )}?${JSON.stringify({
+    svgo: false,
+    titleProp: true,
+    ref: true,
+  })}!${logoPath}`;
   const entry = `import url, { ReactComponent as Logo } from ${JSON.stringify(
     logoPath
-  )}; export { url, Logo };`;
+  )}; import ReplacementLogo from ${JSON.stringify(
+    replacementRequest
+  )}; export { url, Logo, ReplacementLogo };`;
   const compiler = webpack({
     mode: 'development',
     target: 'node',
@@ -196,14 +231,20 @@ test('CRA SVG exports render correctly through webpack-dev-server and its upgrad
       exports: module.exports,
       require,
     });
-    const { Logo, url } = module.exports;
+    const { Logo, ReplacementLogo, url } = module.exports;
     assert.equal(Logo.$$typeof, Symbol.for('react.forward_ref'));
-    const markup = renderToStaticMarkup(
-      React.createElement(Logo, {
-        title: 'Camera icon',
-        titleId: 'camera-title',
-        ref: React.createRef(),
-      })
+    assert.equal(ReplacementLogo.$$typeof, Symbol.for('react.forward_ref'));
+    const props = {
+      title: 'Camera icon',
+      titleId: 'camera-title',
+      className: 'camera-icon',
+      width: 48,
+      ref: React.createRef(),
+    };
+    const markup = renderToStaticMarkup(React.createElement(Logo, props));
+    assert.equal(
+      renderToStaticMarkup(React.createElement(ReplacementLogo, props)),
+      markup
     );
     assert.match(markup, /<svg/);
     assert.match(markup, /<title id="camera-title">Camera icon<\/title>/);

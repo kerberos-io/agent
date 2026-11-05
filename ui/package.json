@@ -41,12 +41,13 @@
     "web-vitals": "^0.2.4"
   },
   "resolutions": {
-    "**/svg-react-loader/loader-utils": "^1.4.2",
+    "**/svg-react-loader": "npm:@svgr/webpack@8.1.0",
     "**/jsonpath/underscore": "^1.13.8",
     "**/resolve-url-loader": "^5.0.0",
     "**/css-minimizer-webpack-plugin/serialize-javascript": "^7.1.4",
     "**/rollup-plugin-terser/serialize-javascript": "^7.1.4",
-    "**/@svgr/webpack": "^6.5.1",
+    "**/react-scripts/@svgr/webpack": "^6.5.1",
+    "**/@kerberos-io/ui/@svgr/webpack": "^6.5.1",
     "**/webpack-dev-server/webpack-dev-middleware": "^7.4.6"
   },
   "engines": {
@@ -77,6 +78,7 @@
     ]
   },
   "devDependencies": {
+    "@svgr/webpack": "8.1.0",
     "eslint": "^7.32.0",
     "eslint-config-airbnb": "^18.2.1",
     "eslint-plugin-import": "^2.26.0",
