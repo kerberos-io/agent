@@ -12,15 +12,16 @@ describe('HTTP client compatibility', () => {
 
   beforeEach(() => {
     originalAdapter = API.defaults.adapter;
-    adapter = jest.fn((request) =>
-      Promise.resolve({
+    adapter = jest.fn((request) => {
+      const response = {
         config: request,
         status: 200,
         statusText: 'OK',
         headers: {},
         data: '{"ok":true}',
-      })
-    );
+      };
+      return Promise.resolve(response);
+    });
     API.defaults.adapter = adapter;
     localStorage.setItem('token', 'test-token');
   });
