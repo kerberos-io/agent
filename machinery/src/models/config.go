@@ -93,6 +93,10 @@ type IPCamera struct {
 	Height int    `json:"height"`
 	FPS    string `json:"fps"`
 
+	// RTSPTransport selects the transport used for RTSP media: "tcp"
+	// (default), "udp" or "auto" (UDP first, falling back to TCP).
+	RTSPTransport string `json:"rtsp_transport,omitempty" bson:"rtsp_transport,omitempty"`
+
 	SubRTSP   string `json:"sub_rtsp"`
 	SubWidth  int    `json:"sub_width"`
 	SubHeight int    `json:"sub_height"`

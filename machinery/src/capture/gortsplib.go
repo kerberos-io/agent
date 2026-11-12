@@ -50,6 +50,33 @@ const (
 	rtspsInsecureEnv = "AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE"
 )
 
+// RTSP transport options for the camera connection.
+const (
+	RTSPTransportTCP  = "tcp"
+	RTSPTransportUDP  = "udp"
+	RTSPTransportAuto = "auto"
+)
+
+// rtspProtocol maps the configured RTSP transport onto the gortsplib client
+// protocol. An empty value keeps the historical default (TCP). "auto" returns
+// nil, which lets gortsplib try UDP first and fall back to TCP when the camera
+// or the network does not support it. Unknown values fall back to TCP.
+func rtspProtocol(transport string) *gortsplib.Protocol {
+	var protocol gortsplib.Protocol
+	switch strings.ToLower(strings.TrimSpace(transport)) {
+	case "", RTSPTransportTCP:
+		protocol = gortsplib.ProtocolTCP
+	case RTSPTransportUDP:
+		protocol = gortsplib.ProtocolUDP
+	case RTSPTransportAuto:
+		return nil
+	default:
+		log.Warn("capture.golibrtsp.rtspProtocol(): unknown RTSP transport \"" + transport + "\", falling back to tcp")
+		protocol = gortsplib.ProtocolTCP
+	}
+	return &protocol
+}
+
 func rtspsTLSConfig() (*tls.Config, error) {
 	if os.Getenv(rtspsInsecureEnv) == "true" {
 		return &tls.Config{InsecureSkipVerify: true}, nil // #nosec G402 -- explicit opt-in for cameras with self-signed certificates
@@ -97,6 +124,8 @@ func sanitizeRTSPError(err error, rawURL string) error {
 type Golibrtsp struct {
 	RTSPClient
 	Url string
+	// Transport selects the RTSP transport: "tcp" (default), "udp" or "auto".
+	Transport string
 
 	Client            gortsplib.Client
 	clientStarted     bool
@@ -544,11 +573,10 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 		return fmt.Errorf("configure RTSPS TLS: %w", err)
 	}
 
-	protocol := gortsplib.ProtocolTCP
 	g.health = newStreamHealth()
 	g.Client = gortsplib.Client{
 		RequestBackChannels: false,
-		Protocol:            &protocol,
+		Protocol:            rtspProtocol(g.Transport),
 		TLSConfig:           tlsConfig,
 		// Route gortsplib's packet-loss / decode-error reporting through our
 		// structured logger with stream context (replaces its plain stdout
@@ -826,11 +854,9 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 		return fmt.Errorf("configure RTSPS TLS: %w", err)
 	}
 
-	// Transport TCP
-	protocol := gortsplib.ProtocolTCP
 	g.Client = gortsplib.Client{
 		RequestBackChannels: true,
-		Protocol:            &protocol,
+		Protocol:            rtspProtocol(g.Transport),
 		TLSConfig:           tlsConfig,
 	}
 	// parse URL
