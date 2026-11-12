@@ -860,7 +860,10 @@ func HandleVerifyStream(mqttClient mqtt.Client, hubKey string, payload models.Pa
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 
-		rtspClient := &capture.Golibrtsp{Url: rtspUrl}
+		rtspClient := &capture.Golibrtsp{
+			Url:       rtspUrl,
+			Transport: configuration.Config.Capture.IPCamera.RTSPTransport,
+		}
 		errConnect := rtspClient.Connect(ctx, ctx)
 		if errConnect != nil {
 			errMsg = errConnect.Error()
