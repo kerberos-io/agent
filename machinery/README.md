@@ -26,3 +26,28 @@ Kerberos Open source (v3) is a cutting edge video surveillance management system
 ## Security reporting
 
 For sensitive vulnerabilities, use private disclosure channels documented in [../SECURITY.md](../SECURITY.md).
+
+## WebRTC startup and keyframe recovery
+
+Each H264 viewer waits until its WebRTC transport is connected and a fresh IDR
+arrives before receiving video. Reconnects, viewer PLI/FIR feedback, and a full
+per-viewer sample buffer reset that viewer's keyframe gate without stalling
+other viewers. Audio continues to use the existing independent sample queues.
+Each viewer's skipped and discarded video durations advance its RTP clock before
+recovery, without sending filler packets, so an IDR wait does not compress the
+video timeline relative to audio.
+
+The main and sub streams request keyframes from their own RTSP sources. Viewer
+PLI and FIR feedback is translated into an RTSP PLI using the camera session's
+SSRCs, never forwarded with the browser's SSRCs. Requests are coalesced and
+limited to one per second per broadcaster, retrying while connected viewers
+still need an IDR. Requests stop once all waiting viewers receive an IDR or
+the broadcaster closes.
+
+Camera support for RTCP PLI varies. Unsupported sources, cameras that ignore
+feedback, and failed requests fall back to the next periodic IDR; failures are
+logged as `keyframe_request_failed`. No encoder settings are changed. A camera
+with a long GOP can therefore still start slowly; configure a shorter IDR
+interval (for example 1-2 seconds) when camera feedback is unavailable, accounting
+for the bandwidth tradeoff. An isolated cached IDR must not be replayed followed
+by arbitrary live P-frames: the dependent reference chain would be incomplete.
