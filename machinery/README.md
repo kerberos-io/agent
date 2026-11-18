@@ -33,6 +33,9 @@ Each H264 viewer waits until its WebRTC transport is connected and a fresh IDR
 arrives before receiving video. Reconnects, viewer PLI/FIR feedback, and a full
 per-viewer sample buffer reset that viewer's keyframe gate without stalling
 other viewers. Audio continues to use the existing independent sample queues.
+Each viewer's skipped and discarded video durations advance its RTP clock before
+recovery, without sending filler packets, so an IDR wait does not compress the
+video timeline relative to audio.
 
 The main and sub streams request keyframes from their own RTSP sources. Viewer
 PLI and FIR feedback is translated into an RTSP PLI using the camera session's

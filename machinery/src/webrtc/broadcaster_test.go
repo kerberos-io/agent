@@ -22,7 +22,7 @@ func bufferedTestPeer(capacity int) *peerTrack {
 	done := make(chan struct{})
 	close(done)
 	return &peerTrack{
-		samples:       make(chan pionMedia.Sample, capacity),
+		samples:       make(chan peerSample, capacity),
 		done:          done,
 		needsKeyframe: true,
 	}

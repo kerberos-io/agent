@@ -18,13 +18,19 @@ const (
 	keyframeRequestInterval = time.Second
 )
 
+type peerSample struct {
+	pionMedia.Sample
+	skippedDuration time.Duration
+}
+
 // peerTrack is a per-peer track with its own non-blocking sample channel.
 type peerTrack struct {
-	track         *pionWebRTC.TrackLocalStaticSample
-	samples       chan pionMedia.Sample
-	done          chan struct{}
-	connected     bool
-	needsKeyframe bool
+	track           *pionWebRTC.TrackLocalStaticSample
+	samples         chan peerSample
+	done            chan struct{}
+	connected       bool
+	needsKeyframe   bool
+	skippedDuration time.Duration
 }
 
 // TrackBroadcaster fans out media samples to multiple peer-specific tracks
@@ -69,7 +75,7 @@ func (b *TrackBroadcaster) AddPeer(sessionKey string) (*pionWebRTC.TrackLocalSta
 
 	pt := &peerTrack{
 		track:         track,
-		samples:       make(chan pionMedia.Sample, peerSampleBuffer),
+		samples:       make(chan peerSample, peerSampleBuffer),
 		done:          make(chan struct{}),
 		connected:     b.mimeType != pionWebRTC.MimeTypeH264,
 		needsKeyframe: b.mimeType == pionWebRTC.MimeTypeH264,
@@ -87,7 +93,7 @@ func (b *TrackBroadcaster) AddPeer(sessionKey string) (*pionWebRTC.TrackLocalSta
 	go func() {
 		defer close(pt.done)
 		for sample := range pt.samples {
-			if err := pt.track.WriteSample(sample); err != nil {
+			if err := writePeerSample(pt.track, sample); err != nil {
 				if err == io.ErrClosedPipe {
 					return
 				}
@@ -106,6 +112,16 @@ func (b *TrackBroadcaster) AddPeer(sessionKey string) (*pionWebRTC.TrackLocalSta
 		"session_id": sessionKey,
 	}).Info("WebRTC peer added")
 	return track, nil
+}
+
+func writePeerSample(track *pionWebRTC.TrackLocalStaticSample, sample peerSample) error {
+	if sample.skippedDuration > 0 {
+		// An empty sample advances Pion's RTP clock without sending a packet.
+		if err := track.WriteSample(pionMedia.Sample{Duration: sample.skippedDuration}); err != nil {
+			return err
+		}
+	}
+	return track.WriteSample(sample.Sample)
 }
 
 // RemovePeer stops the writer goroutine and removes the peer.
@@ -141,10 +157,12 @@ func (b *TrackBroadcaster) WriteSample(sample pionMedia.Sample, isKeyframe bool)
 	for sessionKey, pt := range b.peers {
 		video := b.mimeType == pionWebRTC.MimeTypeH264
 		if video && (!pt.connected || (pt.needsKeyframe && !isKeyframe)) {
+			pt.skippedDuration += sample.Duration
 			continue
 		}
 		select {
-		case pt.samples <- sample:
+		case pt.samples <- peerSample{Sample: sample, skippedDuration: pt.skippedDuration}:
+			pt.skippedDuration = 0
 			if video && isKeyframe {
 				pt.needsKeyframe = false
 			}
@@ -153,8 +171,11 @@ func (b *TrackBroadcaster) WriteSample(sample pionMedia.Sample, isKeyframe bool)
 				pt.needsKeyframe = true
 				drainPeerSamples(pt)
 				if isKeyframe {
-					pt.samples <- sample
+					pt.samples <- peerSample{Sample: sample, skippedDuration: pt.skippedDuration}
+					pt.skippedDuration = 0
 					pt.needsKeyframe = false
+				} else {
+					pt.skippedDuration += sample.Duration
 				}
 			}
 			log.WithFields(log.Fields{
@@ -170,7 +191,8 @@ func (b *TrackBroadcaster) WriteSample(sample pionMedia.Sample, isKeyframe bool)
 func drainPeerSamples(pt *peerTrack) {
 	for {
 		select {
-		case <-pt.samples:
+		case sample := <-pt.samples:
+			pt.skippedDuration += sample.skippedDuration + sample.Duration
 		default:
 			return
 		}
