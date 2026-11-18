@@ -1285,7 +1285,7 @@ func HandleLiveStreamHD(
 			// viewer can pick the resolution it needs per peer connection without
 			// the agent re-negotiating the RTSP source.
 			mainStreams, _ := rtspClient.GetStreams()
-			mainVideoBroadcaster := webrtc.NewVideoBroadcaster(mainStreams)
+			mainVideoBroadcaster := webrtc.NewVideoBroadcaster(mainStreams, rtspClient)
 			mainAudioBroadcaster := webrtc.NewAudioBroadcaster(mainStreams)
 
 			if mainVideoBroadcaster == nil && mainAudioBroadcaster == nil {
@@ -1316,7 +1316,7 @@ func HandleLiveStreamHD(
 			var subAudioBroadcaster *webrtc.TrackBroadcaster
 			if subStreamEnabled && rtspSubClient != nil && subQueue != nil {
 				subStreams, _ := rtspSubClient.GetStreams()
-				subVideoBroadcaster = webrtc.NewVideoBroadcaster(subStreams)
+				subVideoBroadcaster = webrtc.NewVideoBroadcaster(subStreams, rtspSubClient)
 				subAudioBroadcaster = webrtc.NewAudioBroadcaster(subStreams)
 				defer func() {
 					if subVideoBroadcaster != nil {

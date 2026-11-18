@@ -72,6 +72,10 @@ func (c *Capture) ClearClients(main, sub, backchannel *Golibrtsp) {
 	}
 }
 
+type KeyframeRequester interface {
+	RequestKeyframe() error
+}
+
 // RTSPClient is a interface that abstracts the RTSP client implementation.
 type RTSPClient interface {
 	// Connect to the RTSP server.

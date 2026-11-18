@@ -101,6 +101,8 @@ type Golibrtsp struct {
 	Client            gortsplib.Client
 	clientStarted     bool
 	VideoDecoderMutex *sync.Mutex
+	keyframeMu        sync.Mutex
+	keyframeReady     bool
 
 	VideoH264Index        int8
 	VideoH264Media        *description.Media
@@ -812,6 +814,10 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 
 		}
 	}
+
+	g.keyframeMu.Lock()
+	g.keyframeReady = err == nil && g.VideoH264Media != nil && g.VideoH264Decoder != nil
+	g.keyframeMu.Unlock()
 
 	return
 }
@@ -1712,6 +1718,10 @@ func (g *Golibrtsp) Close(ctxOtel context.Context) error {
 
 	_, span := tracer.Start(ctxOtel, "Close")
 	defer span.End()
+
+	g.keyframeMu.Lock()
+	g.keyframeReady = false
+	g.keyframeMu.Unlock()
 
 	if !g.clientStarted {
 		return nil
