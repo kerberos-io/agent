@@ -177,6 +177,11 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 					// The vault does not implement tus; let the caller fall back.
 					return false, false, false, "", cerr
 				}
+				if status == http.StatusTooManyRequests {
+					// Upload limit reached: retrying now cannot help. The caller
+					// pauses uploads until Retry-After.
+					return false, true, true, "", cerr
+				}
 				log.Info(label + ": resumable create failed, " + cerr.Error())
 				tusBackoff(attempt)
 				continue
@@ -195,6 +200,10 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 				removeTusResumeState(sidecar)
 				uploadURL = ""
 				continue
+			}
+			if status == http.StatusTooManyRequests {
+				// Keep the resume state so the upload continues after the pause.
+				return false, true, true, "", herr
 			}
 			log.Info(label + ": resumable head failed, " + herr.Error())
 			tusBackoff(attempt)
@@ -247,6 +256,11 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 			lastStatus = status
 			if perr != nil {
 				lastErr = perr
+				if status == http.StatusTooManyRequests {
+					// The resume state saved at creation stays, so the upload
+					// continues from the server offset after the pause.
+					return false, true, true, "", perr
+				}
 				if status >= 400 {
 					// Definitive rejection (e.g. provider push failed during finalize).
 					// Re-evaluate via HEAD on the next iteration to decide retry/restart.
@@ -408,7 +422,7 @@ func tusCreate(client *http.Client, baseURL string, size int64, metadata string,
 		const maxErrorBodyBytes = 4096
 		body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes+1))
 		if readErr != nil {
-			return "", resp.StatusCode, fmt.Errorf("unexpected status creating upload: %s; read error response: %w", resp.Status, readErr)
+			return "", resp.StatusCode, throttledError(resp, fmt.Errorf("unexpected status creating upload: %s; read error response: %w", resp.Status, readErr))
 		}
 		truncated := len(body) > maxErrorBodyBytes
 		if truncated {
@@ -419,9 +433,9 @@ func tusCreate(client *http.Client, baseURL string, size int64, metadata string,
 			message += " [truncated]"
 		}
 		if message != "" {
-			return "", resp.StatusCode, fmt.Errorf("unexpected status creating upload: %s: %q", resp.Status, message)
+			return "", resp.StatusCode, throttledError(resp, fmt.Errorf("unexpected status creating upload: %s: %q", resp.Status, message))
 		}
-		return "", resp.StatusCode, fmt.Errorf("unexpected status creating upload: %s", resp.Status)
+		return "", resp.StatusCode, throttledError(resp, fmt.Errorf("unexpected status creating upload: %s", resp.Status))
 	}
 	// Location identifies the created upload; its response body is optional.
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
@@ -454,7 +468,7 @@ func tusHead(client *http.Client, uploadURL string, setHeaders tusHeaderFunc) (i
 	io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return 0, resp.StatusCode, fmt.Errorf("unexpected status on HEAD: %s", resp.Status)
+		return 0, resp.StatusCode, throttledError(resp, fmt.Errorf("unexpected status on HEAD: %s", resp.Status))
 	}
 	offsetStr := resp.Header.Get("Upload-Offset")
 	offset, perr := strconv.ParseInt(offsetStr, 10, 64)
@@ -489,7 +503,7 @@ func tusPatch(client *http.Client, uploadURL string, offset, length int64, file 
 	respBody := string(bodyBytes)
 
 	if resp.StatusCode != http.StatusNoContent {
-		return offset, resp.StatusCode, respBody, fmt.Errorf("unexpected status on PATCH: %s, %s", resp.Status, respBody)
+		return offset, resp.StatusCode, respBody, throttledError(resp, fmt.Errorf("unexpected status on PATCH: %s, %s", resp.Status, respBody))
 	}
 	newOffsetStr := resp.Header.Get("Upload-Offset")
 	newOffset, perr := strconv.ParseInt(newOffsetStr, 10, 64)

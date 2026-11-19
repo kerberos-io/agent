@@ -57,14 +57,27 @@ func HandleUpload(configDirectory string, configuration *models.Configuration, c
 		// Half a second delay between two uploads
 		delay := 500 * time.Millisecond
 
+		// Kerberos Hub answers 429 + Retry-After when the organisation reached
+		// its upload limit; uploads to Hub then pause until that time. A
+		// (re)started loop, e.g. after a reconfiguration, tries again at once.
+		uploadsToHub := config.Cloud == "s3" || config.Cloud == "kerberoshub"
+		hubUploadPause.Reset()
+
 	loop:
 		for {
+			wait := 2 * time.Second
+			if uploadsToHub {
+				if remaining := hubUploadPause.Remaining(); remaining > wait {
+					wait = remaining
+				}
+			}
+
 			// This will check if we need to stop the thread,
 			// because of a reconfiguration.
 			select {
 			case <-communication.HandleUpload:
 				break loop
-			case <-time.After(2 * time.Second):
+			case <-time.After(wait):
 			}
 
 			ff, err := utils.ReadDirectory(watchDirectory)
@@ -140,6 +153,12 @@ func HandleUpload(configDirectory string, configuration *models.Configuration, c
 						if err != nil {
 							log.Error("HandleUpload: " + err.Error())
 						}
+					}
+
+					if uploadsToHub && hubUploadPause.Remaining() > 0 {
+						// Paused: leave this and the following recordings queued
+						// on disk; the outer loop waits until the pause ends.
+						break
 					}
 
 					time.Sleep(delay)
@@ -1813,6 +1832,8 @@ func hubPersistenceVerificationError(statusCode int) string {
 		reason += ": the account has no active subscription or the subscription expired"
 	case http.StatusForbidden:
 		reason += ": the device is muted"
+	case http.StatusTooManyRequests:
+		reason += ": the organisation reached its upload limit for this period"
 	}
 	return "cloud.VerifyPersistence(kerberoshub): " + reason + " (HTTP " + strconv.Itoa(statusCode) + ")"
 }
