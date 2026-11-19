@@ -120,7 +120,13 @@ type tusHeaderFunc func(h http.Header, fileName string)
 //   - supported: the server exposes a tus endpoint. When false, the caller
 //     should fall back to the legacy single-POST upload (older deployments).
 //   - body:      a short message for logging.
-func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tusHeaderFunc) (uploaded bool, responded bool, supported bool, body string, err error) {
+//
+// stopOnRateLimit makes a 429 end the attempt at once (Kerberos Hub: the
+// organisation reached its upload limit and the caller pauses uploads until
+// Retry-After). Direct Vault uploads pass false, so a 429 from a vault keeps the
+// existing in-cycle retries and does not advance the vault's retry budget or
+// secondary-storage failover early.
+func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tusHeaderFunc, stopOnRateLimit bool) (uploaded bool, responded bool, supported bool, body string, err error) {
 	file, ferr := utils.OpenRecording("data/recordings", fileName)
 	if file != nil {
 		defer file.Close()
@@ -177,7 +183,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 					// The vault does not implement tus; let the caller fall back.
 					return false, false, false, "", cerr
 				}
-				if status == http.StatusTooManyRequests {
+				if stopOnRateLimit && status == http.StatusTooManyRequests {
 					// Upload limit reached: retrying now cannot help. The caller
 					// pauses uploads until Retry-After.
 					return false, true, true, "", cerr
@@ -201,7 +207,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 				uploadURL = ""
 				continue
 			}
-			if status == http.StatusTooManyRequests {
+			if stopOnRateLimit && status == http.StatusTooManyRequests {
 				// Keep the resume state so the upload continues after the pause.
 				return false, true, true, "", herr
 			}
@@ -256,7 +262,7 @@ func runTusUpload(baseURL, metadata, fileName, label, slot string, setHeaders tu
 			lastStatus = status
 			if perr != nil {
 				lastErr = perr
-				if status == http.StatusTooManyRequests {
+				if stopOnRateLimit && status == http.StatusTooManyRequests {
 					// The resume state saved at creation stays, so the upload
 					// continues from the server offset after the pause.
 					return false, true, true, "", perr
@@ -351,7 +357,7 @@ func uploadVaultResumable(vault models.KStorage, publicKey, deviceKey, fileName,
 			h[name] = append([]string(nil), values...)
 		}
 	}
-	return runTusUpload(baseURL, metadata, fileName, label, slot, setHeaders)
+	return runTusUpload(baseURL, metadata, fileName, label, slot, setHeaders, false)
 }
 
 // uploadHubResumable uploads a recording to Kerberos Hub's tus endpoint, which
@@ -372,7 +378,7 @@ func uploadHubResumable(config *models.Config, fileName, label, slot string) (bo
 	setHeaders := func(h http.Header, fn string) {
 		setHubTusHeaders(h, config, fn)
 	}
-	return runTusUpload(baseURL, metadata, fileName, label, slot, setHeaders)
+	return runTusUpload(baseURL, metadata, fileName, label, slot, setHeaders, true)
 }
 
 func addRecordingTusMetadata(values map[string]string, fileName string) {

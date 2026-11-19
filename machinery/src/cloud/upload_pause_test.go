@@ -348,3 +348,40 @@ func TestUploadKerberosHubOtherStatusesDoNotPause(t *testing.T) {
 		t.Fatalf("pause after a non-429 answer = %v, want 0", remaining)
 	}
 }
+
+// A direct Vault upload is not a Hub upload: a 429 from a vault keeps the
+// existing in-cycle retries and never sets the Hub upload pause.
+func TestVaultTusCreate429KeepsInCycleRetries(t *testing.T) {
+	withHubUploadPause(t)
+	previousDelay := tusBackoffBaseDelay
+	tusBackoffBaseDelay = 0
+	t.Cleanup(func() { tusBackoffBaseDelay = previousDelay })
+
+	var posts int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			atomic.AddInt32(&posts, 1)
+			w.Header().Set("Retry-After", "3600")
+			http.Error(w, "slow down", http.StatusTooManyRequests)
+			return
+		}
+		t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	fileName := "1564859471_6-474162_oprit_577-283-727-375_1153_27.mp4"
+	withRecording(t, fileName, bytes.Repeat([]byte("r"), 1024))
+
+	setHeaders := func(h http.Header, fn string) {}
+	uploaded, _, supported, _, _ := runTusUpload(server.URL+tusUploadPath, "", fileName, "vault-test", "primary", setHeaders, false)
+	if uploaded || !supported {
+		t.Fatalf("runTusUpload = uploaded %v, supported %v; want false, true", uploaded, supported)
+	}
+	if got := atomic.LoadInt32(&posts); got < 2 {
+		t.Fatalf("tus create requests = %d, want the in-cycle retries (> 1) for a vault", got)
+	}
+	if remaining := hubUploadPause.Remaining(); remaining != 0 {
+		t.Fatalf("hub upload pause = %v, want none for a vault upload", remaining)
+	}
+}
