@@ -45,8 +45,17 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 	// endpoint (older deployments) we transparently fall back to the legacy
 	// single-POST upload below.
 	if resumableUploadsEnabled() {
-		uploaded, _, supported, body, rerr := uploadHubResumable(&config, fileName, "UploadKerberosHub", "hub")
+		uploaded, responded, supported, body, rerr := uploadHubResumable(&config, fileName, "UploadKerberosHub", "hub")
 		if supported {
+			var throttled *uploadThrottledError
+			if errors.As(rerr, &throttled) {
+				// Upload limit reached: keep the recording and pause uploads.
+				hubUploadPause.Throttled(throttled.retryAfter, throttled.ok)
+				return false, true, nil
+			}
+			if uploaded || responded {
+				hubUploadPause.Clear()
+			}
 			if uploaded {
 				log.WithFields(log.Fields{
 					"component":      "kerberos_hub",
@@ -125,6 +134,11 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 	}
 
 	if err == nil && resp != nil {
+		if resp.StatusCode == http.StatusTooManyRequests {
+			// Upload limit reached: keep the recording and pause uploads.
+			hubUploadPause.Throttled(retryAfterFromResponse(resp))
+			return false, true, nil
+		}
 		if resp.StatusCode == 200 {
 			log.WithFields(log.Fields{
 				"component":   "kerberos_hub",
@@ -132,6 +146,7 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 				"status_code": resp.StatusCode,
 			}).Debug("Hub upload authorized")
 		} else {
+			hubUploadPause.Clear()
 			log.WithFields(log.Fields{
 				"component":   "kerberos_hub",
 				"event":       "upload_rejected",
@@ -165,6 +180,12 @@ func UploadKerberosHub(configuration *models.Configuration, fileName string) (bo
 
 	if err == nil {
 		if resp != nil {
+			if resp.StatusCode == http.StatusTooManyRequests {
+				// Upload limit reached: keep the recording and pause uploads.
+				hubUploadPause.Throttled(retryAfterFromResponse(resp))
+				return false, true, nil
+			}
+			hubUploadPause.Clear()
 			body, err := ioutil.ReadAll(resp.Body)
 			if err == nil {
 				if resp.StatusCode == 200 {
