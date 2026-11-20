@@ -14,41 +14,56 @@ spec:
       labels:
         app: agent
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
       volumes:
         - name: kerberos-data
           persistentVolumeClaim:
             claimName: kerberos-data
+        - name: temporary
+          emptyDir: {}
 
       initContainers:
         - name: download-config
           image: kerberos/agent:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           volumeMounts:
             - name: kerberos-data
-              mountPath: /home/agent/data/config
-              subPath: config
-          command:
-            [
-              "cp",
-              "/home/agent/data/config.template.json",
-              "/home/agent/data/config/config.json",
-            ]
+              mountPath: /runtime-data
+            - name: temporary
+              mountPath: /runtime-tmp
+          command: ["/bin/sh", "-ec", "cp -R --update=none /home/agent/data/. /runtime-data/; install -d -m 0700 /runtime-tmp/agent-cache"]
 
       containers:
         - name: agent
           image: kerberos/agent:latest
+          livenessProbe:
+            exec:
+              command: ["/home/agent/main", "-action", "healthcheck"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           volumeMounts:
             - name: kerberos-data
-              mountPath: /home/agent/data/config
-              subPath: config
-            - name: kerberos-data
-              mountPath: /home/agent/data/recordings
-              subPath: recordings
-            - name: kerberos-data
-              mountPath: /home/agent/data/snapshots
-              subPath: snapshots
-            - name: kerberos-data
-              mountPath: /home/agent/data/cloud
-              subPath: cloud
+              mountPath: /home/agent/data
+            - name: temporary
+              mountPath: /tmp
+            - name: temporary
+              mountPath: /var/tmp
           ports:
-            - containerPort: 80
+            - containerPort: 8080
               protocol: TCP

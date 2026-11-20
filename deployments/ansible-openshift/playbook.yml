@@ -111,7 +111,7 @@
                         mountPath: /home/agent/data/cloud
                         subPath: cloud
                     ports:
-                      - containerPort: 80
+                      - containerPort: 8080
                         protocol: TCP
 
     - name: Expose Kerberos Agent
@@ -136,5 +136,5 @@
             ports:
               - name: http
                 port: 80
-                targetPort: 80
+                targetPort: 8080
                 protocol: TCP

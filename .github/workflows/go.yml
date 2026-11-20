@@ -17,7 +17,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.10"
           check-latest: true
           cache: true
           cache-dependency-path: machinery/go.sum
@@ -32,9 +32,9 @@ jobs:
             libswscale-dev \
             pkg-config
       - name: Get dependencies
-        run: cd machinery && go mod download
+        run: cd machinery && go mod download && go mod verify
       - name: Build
-        run: cd machinery && go build -v ./...
+        run: cd machinery && go build -mod=readonly -trimpath -buildvcs=false -v ./...
       - name: Vet
         run: cd machinery && go vet -v ./...
       - name: Test

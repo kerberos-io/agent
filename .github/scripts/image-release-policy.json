@@ -1,0 +1,13 @@
+{
+  "required_exceptions": [
+    {
+      "id": "remote-terminal-pty",
+      "status": "pending",
+      "reason": "The product retains functional remote terminal/PTY support, contrary to the no-shell baseline.",
+      "owner": null,
+      "expires": null,
+      "approved_by": null,
+      "approval_url": null
+    }
+  ]
+}

@@ -14,11 +14,55 @@ spec:
       labels:
         app: agent
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: temporary
+          emptyDir: {}
+      initContainers:
+        - name: initialize-data
+          image: kerberos/agent:latest
+          command: ["/bin/sh", "-ec", "cp -R --update=none /home/agent/data/. /runtime-data/; install -d -m 0700 /runtime-tmp/agent-cache"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /runtime-data
+            - name: temporary
+              mountPath: /runtime-tmp
       containers:
         - name: agent
-          image: kerberos/agent:3.2.3
+          image: kerberos/agent:latest
+          livenessProbe:
+            exec:
+              command: ["/home/agent/main", "-action", "healthcheck"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: data
+              mountPath: /home/agent/data
+            - name: temporary
+              mountPath: /tmp
+            - name: temporary
+              mountPath: /var/tmp
           ports:
-            - containerPort: 80
+            - containerPort: 8080
               protocol: TCP
           resources:
             limits:
@@ -48,6 +92,6 @@ spec:
   type: LoadBalancer
   ports:
     - port: 80
-      targetPort: 80
+      targetPort: 8080
   selector:
     app: agent

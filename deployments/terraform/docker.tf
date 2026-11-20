@@ -34,9 +34,9 @@ resource "linux_script" "install_docker" {
 
 resource "linux_script" "install_docker_kerberos_agent" {
     lifecycle_commands {
-        create = "docker pull $IMAGE:$VERSION && docker run -d -p $PORT:80 --name agent $IMAGE:$VERSION"
+        create = "docker pull $IMAGE:$VERSION && docker run -d -p $PORT:8080 --name agent $IMAGE:$VERSION"
         read = "docker inspect agent"
-        update = "docker pull $IMAGE:$VERSION && docker rm agent --force && docker run -d -p $PORT:80 --name agent $IMAGE:$VERSION"
+        update = "docker pull $IMAGE:$VERSION && docker rm agent --force && docker run -d -p $PORT:8080 --name agent $IMAGE:$VERSION"
         delete = "docker rm agent --force"
     }
     environment = {

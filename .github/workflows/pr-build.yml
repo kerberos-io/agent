@@ -1,36 +1,119 @@
 name: Build pull request
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
 
-env:
-  REPO: kerberos/agent
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   build:
     runs-on: ${{ matrix.runner }}
-    permissions:
-      contents: read
     strategy:
+      fail-fast: false
       matrix:
         include:
           - architecture: amd64
             runner: ubuntu-24.04
           - architecture: arm64
             runner: ubuntu-24.04-arm
+    env:
+      ARCH: ${{ matrix.architecture }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Run Build
-        run: |
-          docker build --build-arg VERSION=$(echo "${{ github.event.pull_request.head.sha }}" | cut -c1-7) -t ${{ matrix.architecture }} .
-          CID=$(docker create ${{matrix.architecture}})
-          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
-          docker rm ${CID}
-      - name: Strip binary
-        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          name: agent-${{matrix.architecture}}.tar
-          path: agent-${{matrix.architecture}}.tar
+          persist-credentials: false
+      - name: Initialize retained runtime/scanner state
+        run: |
+          mkdir -p evidence/scanner-install
+          printf '%s\n' '{"status":"not_started","reason":"waiting_for_native_build_and_smoke"}' \
+            > evidence/scanner-install/install.json
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          path: source
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Validate fail-closed policy helpers
+        run: python3 .github/scripts/test-image-policy.py
+      - name: Build once, populating OCI metadata from CI
+        env:
+          BUILDX_METADATA_PROVENANCE: max
+        run: |
+          mkdir -p evidence/build
+          revision=$(git -C source rev-parse HEAD)
+          version="${revision:0:7}"
+          created=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          printf '%s\n' "$revision" > evidence/build/source-revision.txt
+          # Classic Docker cannot load an attested index. Disable attestations
+          # only for this local export; BUILDX_METADATA_PROVENANCE=max retains
+          # full build provenance/materials separately, verified below.
+          docker buildx build --platform "linux/$ARCH" --provenance=false \
+            --build-arg "VERSION=$version" --build-arg "REVISION=$revision" --build-arg "CREATED=$created" \
+            --label "org.opencontainers.image.version=$version" \
+            --label "org.opencontainers.image.revision=$revision" \
+            --label "org.opencontainers.image.created=$created" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --metadata-file evidence/build/build-metadata.json --tag "$ARCH" \
+            --output type=docker source
+          jq -e '."buildx.build.provenance" |
+            select(type == "object" and length > 0) |
+            select(.buildConfig | type == "object" and length > 0)' \
+            evidence/build/build-metadata.json > evidence/build/provenance.json
+          python3 .github/scripts/image-evidence.py evidence/build
+      - name: Extract release payload
+        run: |
+          cid=$(docker create "$ARCH")
+          trap 'docker rm -f "$cid" >/dev/null' EXIT
+          docker cp "$cid:/home/agent" "output-$ARCH"
+      - name: Test production image
+        id: smoke
+        run: sh source/deployments/docker/test-image.sh "$ARCH"
+      - name: Strip binary
+        run: tar -cf "agent-$ARCH.tar" -C "output-$ARCH" . && rm -rf "output-$ARCH"
+      - name: Install pinned public OCI scanner after runtime tests
+        run: bash .github/scripts/install-trivy.sh
+      - name: Source/UI dependency and final image gates with SPDX SBOMs
+        run: |
+          failed=0
+          if ! python3 .github/scripts/image-policy.py source evidence/source; then
+            failed=1
+          fi
+          if ! python3 .github/scripts/image-policy.py "$ARCH" "evidence/$ARCH" --platform "linux/$ARCH"; then
+            failed=1
+          fi
+          exit "$failed"
+      - name: Upload artifact only after secret and vulnerability gates pass
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: agent-${{ matrix.architecture }}.tar
+          path: agent-${{ matrix.architecture }}.tar
+          if-no-files-found: error
+      - name: Record runtime result independently of scanner availability
+        if: always()
+        env:
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+        run: |
+          mkdir -p evidence
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          Path("evidence/runtime-smoke.json").write_text(json.dumps({
+              "architecture": os.environ["ARCH"],
+              "outcome": os.environ["SMOKE_OUTCOME"],
+              "workflow_revision": os.environ["GITHUB_SHA"],
+          }, indent=2) + "\n")
+          PY
+      - name: Retain reports on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-pr-evidence-${{ matrix.architecture }}
+          path: evidence/
+          retention-days: 90
+          if-no-files-found: error

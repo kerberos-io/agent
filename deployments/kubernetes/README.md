@@ -6,6 +6,27 @@ Kubernetes can help you to build a scalable, flexible and resilient deployment. 
 
 We've provided an example deployment `deployment-agent.yml` in this directory, which show case you have to create a deployment (and under the hood a pod), to run a Kerberos Agent workload.
 
+These manifests target the forthcoming hardened image: **containerPort and
+Service targetPort are 8080**, while external Service/Ingress port 80 stays
+unchanged. Pin a published hardened release digest before production use.
+Previously published port-80 images (including `v3.14.1`) require the old
+container/target ports; upgrade the image and mapping together. Host-network
+deployments use host port 8080 without Service port translation.
+
+The examples use UID/GID `999:999`, `fsGroup: 999`, a read-only root filesystem,
+no privilege escalation, all capabilities dropped and runtime-default seccomp.
+A non-root init container copies missing packaged data to the writable volume
+without overwriting existing files and initializes the user cache. Temporary
+storage is ephemeral. The PVC example preserves the existing `config/`,
+`recordings/`, `snapshots/` and `cloud/` directories under the same PVC root,
+mounting that root at `/home/agent/data` to cover all writable data paths.
+Ensure the storage driver honors fsGroup or pre-provision UID/GID permissions.
+If deliberately passing video devices, add their actual GID with
+`supplementalGroups`; ordinary IP cameras do not need that group or devices.
+See the [image contract](../docker/README.md#image-contract), including the pending
+remote-terminal policy exception and release blockers. These examples do not
+assert a running cluster or security-policy approval.
+
 ## Create a Kerberos Agent deployment
 
 It's always a best practices to isolate and structure your workloads in Kubernetes. To achieve this we are utilising the concept of namespaces. For this example we will create a new namespace `demo`.
@@ -61,8 +82,7 @@ Depending on where and how you are hosting the Kubernetes cluster, you may need 
           image: kerberos/agent:latest
           volumeMounts:
             - name: kerberos-data
-              mountPath: /home/agent/data/config
-              subPath: config
+              mountPath: /home/agent/data
         ...
 
 ## Expose with Ingress
@@ -76,6 +96,7 @@ In the first example `deployment-agent.yml` we are using a `LoadBalancer` to exp
     type: LoadBalancer
     ports:
         - port: 80
+          targetPort: 8080
     ...
 
 An alternative to `LoadBalancer` is `Ingress`. By leveraging an ingress such as `ingress-nginx` or `traefik` you setup a gateway (single point of contact), through which all communication to your apps (services) will flow.

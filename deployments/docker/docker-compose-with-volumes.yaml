@@ -3,7 +3,7 @@ services:
   kerberos-agent1:
     image: "kerberos/agent:latest"
     ports:
-      - "8081:80"
+      - "8081:8080"
     environment:
       - AGENT_NAME=agent1
       # You can still override the configuration with environment variables, but might not makes sense if you are attaching a host config.
@@ -14,14 +14,14 @@ services:
   kerberos-agent2:
     image: "kerberos/agent:latest"
     ports:
-      - "8082:80"
+      - "8082:8080"
     volumes:
       - ./agent2/config:/home/agent/data/config
       - ./agent2/recordings:/home/agent/data/recordings
   kerberos-agent3:
     image: "kerberos/agent:latest"
     ports:
-      - "8083:80"
+      - "8083:8080"
     volumes:
       - ./agent3/config:/home/agent/data/config
       - ./agent3/recordings:/home/agent/data/recordings

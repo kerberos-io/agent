@@ -1,62 +1,19 @@
 name: Nightly build
-
 on:
-  # Triggers the workflow every day at 9PM (CET).
   schedule:
     - cron: "0 22 * * *"
-  # Allows manual triggering from the Actions tab.
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  nightly-build-amd64:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        architecture: [amd64]
-    steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: master
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
-      - name: Run Buildx
-        run: docker buildx build --build-arg VERSION=$(echo $GITHUB_SHA | cut -c1-7) --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push .
-      - name: Create new and append to manifest
-        run: docker buildx imagetools create -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
-  nightly-build-other:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        architecture: [arm64, arm/v7, arm/v6]
-    steps:
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: master
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
-      - name: Run Buildx
-        run: docker buildx build --build-arg VERSION=$(echo $GITHUB_SHA | cut -c1-7) --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push .
-      - name: Create new and append to manifest
-        run: docker buildx imagetools create --append -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+  nightly:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/image-release.yml
+    with:
+      source_ref: master
+      nightly: true
+    secrets: inherit

@@ -4,6 +4,13 @@ If you are using Terraform as part of your DevOps stack, you might utilise it to
 
 For this example we will install Kerberos Agent using `docker` on a remote `linux` machine. Therefore we'll make sure we have the `TelkomIndonesia/linux` provider initialised.
 
+The example targets the forthcoming hardened image and maps the configured host
+port (80 by default) to **container port 8080**. Pin a published hardened release
+digest before deployment. Older releases, including `v3.14.1`, still require
+container port 80; change the image and mapping together. See the
+[image contract](../docker/README.md#image-contract) for runtime permissions,
+writable paths and release-policy limitations.
+
      terraform init
 
 Once initialised you should see similar output:
