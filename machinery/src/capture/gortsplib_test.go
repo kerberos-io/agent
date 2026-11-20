@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bluenviron/gortsplib/v5"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 )
 
@@ -246,4 +247,36 @@ func TestH264FrameNumTrackerHonorsPermittedGaps(t *testing.T) {
 
 func testH264Slice(naluType h264.NALUType, frameNum uint32) []byte {
 	return []byte{0x60 | byte(naluType), 0xE0 | byte(frameNum&0x1F)}
+}
+
+func TestRTSPProtocol(t *testing.T) {
+	tcp := gortsplib.ProtocolTCP
+	udp := gortsplib.ProtocolUDP
+	tests := []struct {
+		transport string
+		want      *gortsplib.Protocol
+	}{
+		{transport: "", want: &tcp},
+		{transport: "tcp", want: &tcp},
+		{transport: " TCP ", want: &tcp},
+		{transport: "udp", want: &udp},
+		{transport: "UDP", want: &udp},
+		{transport: "auto", want: nil},
+		{transport: "Auto", want: nil},
+		{transport: "bogus", want: &tcp},
+	}
+	for _, test := range tests {
+		t.Run(test.transport, func(t *testing.T) {
+			got := rtspProtocol(test.transport)
+			if test.want == nil {
+				if got != nil {
+					t.Fatalf("rtspProtocol(%q) = %v, want nil (auto)", test.transport, *got)
+				}
+				return
+			}
+			if got == nil || *got != *test.want {
+				t.Fatalf("rtspProtocol(%q) = %v, want %v", test.transport, got, *test.want)
+			}
+		})
+	}
 }

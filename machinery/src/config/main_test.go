@@ -104,6 +104,18 @@ func TestApplyAgentEnvVarsVaultCustomHeaders(t *testing.T) {
 	}
 }
 
+func TestApplyAgentEnvVarsRTSPTransport(t *testing.T) {
+	t.Setenv("AGENT_CAPTURE_IPCAMERA_RTSP_TRANSPORT", "udp")
+	configuration := &models.Configuration{}
+	initConfigPointers(&configuration.Config)
+
+	applyAgentEnvVars(configuration, "", false)
+
+	if got := configuration.Config.Capture.IPCamera.RTSPTransport; got != "udp" {
+		t.Fatalf("RTSPTransport = %q, want udp", got)
+	}
+}
+
 func intPointer(value int) *int {
 	return &value
 }

@@ -207,6 +207,7 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 	// Establishing the camera connection without backchannel if no substream
 	rtspUrl := mainRTSP
 	rtspClient = captureDevice.SetMainClient(rtspUrl)
+	rtspClient.Transport = config.Capture.IPCamera.RTSPTransport
 	run.SetMainClient(rtspClient)
 	if rtspUrl != "" {
 		err := rtspClient.Connect(run.Context(), ctxRunAgent)
@@ -316,6 +317,7 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 		// For the sub stream we will not enable backchannel.
 		subStreamEnabled = true
 		rtspSubClient = captureDevice.SetSubClient(subRtspUrl)
+		rtspSubClient.Transport = config.Capture.IPCamera.RTSPTransport
 
 		run.SetSubClient(rtspSubClient)
 
@@ -436,6 +438,7 @@ func RunAgent(parent context.Context, configDirectory string, configuration *mod
 	// Try to create backchannel
 	communication.HasBackChannel.Store(false)
 	rtspBackChannelClient = captureDevice.SetBackChannelClient(rtspUrl)
+	rtspBackChannelClient.Transport = config.Capture.IPCamera.RTSPTransport
 	run.SetBackchannelClient(rtspBackChannelClient)
 	err = rtspBackChannelClient.ConnectBackChannel(run.Context(), ctxRunAgent)
 	if err == nil {

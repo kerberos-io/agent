@@ -18,6 +18,8 @@ type OnvifCredentials struct {
 type CameraStreams struct {
 	RTSP    string `json:"rtsp"`
 	SubRTSP string `json:"sub_rtsp"`
+	// RTSPTransport is optional: "tcp" (default), "udp" or "auto".
+	RTSPTransport string `json:"rtsp_transport,omitempty"`
 }
 
 // DiscoveredDevice describes a device found on the local network during a

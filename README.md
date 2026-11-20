@@ -375,6 +375,7 @@ See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI,
 | `AGENT_TIMETABLE`                           | A (weekly) time table to specify when to make recordings "start1,end1,start2,end2;start1..      | ""                             |
 | `AGENT_REGION_POLYGON`                      | A single polygon set for motion detection: "x1,y1;x2,y2;x3,y3;...                               | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_RTSP`               | Full-HD RTSP or RTSPS endpoint for the target camera.                                           | ""                             |
+| `AGENT_CAPTURE_IPCAMERA_RTSP_TRANSPORT`     | Transport for the RTSP streams: "tcp", "udp" or "auto" (UDP first, falls back to TCP).          | "tcp"                          |
 | `AGENT_CAPTURE_IPCAMERA_SUB_RTSP`           | RTSP or RTSPS sub-stream endpoint used for livestreaming (WebRTC).                              | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_RTSPS_CA_FILE`      | PEM CA bundle appended to the system roots for RTSPS camera certificate verification.           | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_RTSPS_INSECURE`     | Disable RTSPS camera certificate verification; use only when a trusted CA cannot be installed.  | "false"                        |
