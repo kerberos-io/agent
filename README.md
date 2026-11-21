@@ -662,7 +662,9 @@ The Kerberos Agent is divided in two parts: a `machinery` and `web` part. Both p
 
 ### UI
 
-The `web` is a **React** project, built with [Vite](https://vite.dev), which is the main entry point for an end user to view recordings, a livestream, and modify the configuration of the `machinery`.
+The `web` is a **React** project, built with [Vite](https://vite.dev), which is
+the main entry point for an end user to view recordings, a livestream, and
+modify the configuration of the `machinery`.
 
     git clone https://github.com/kerberos-io/agent
     cd ui

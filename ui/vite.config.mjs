@@ -1,3 +1,5 @@
+// eslint-plugin-import 2.x cannot resolve packages that only define "exports".
+/* eslint-disable import/no-unresolved */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 

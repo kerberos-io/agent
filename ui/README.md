@@ -6,14 +6,15 @@ Requires Node.js 20.19 or newer.
 
 ## Scripts
 
-| Command | What it does |
-|---|---|
-| `yarn start` | Starts the dev server on [http://localhost:3000](http://localhost:3000) with hot reload. |
-| `yarn build` | Builds for production and moves the output to `../machinery/www`, where the Agent serves it. |
-| `yarn preview` | Serves the production build from `../machinery/www` on port 3000. Run `yarn build` first. |
-| `yarn test` | Runs the test suite once. `yarn test:watch` keeps it running. |
-| `yarn lint` | Lints `src/` with ESLint. |
-| `yarn format` | Formats the code with Prettier. |
+- `yarn start`: starts the dev server on
+  [http://localhost:3000](http://localhost:3000) with hot reload.
+- `yarn build`: builds for production and moves the output to
+  `../machinery/www`, where the Agent serves it.
+- `yarn preview`: serves the production build from `../machinery/www` on
+  port 3000. Run `yarn build` first.
+- `yarn test`: runs the test suite once. `yarn test:watch` keeps it running.
+- `yarn lint`: lints `src/` with ESLint.
+- `yarn format`: formats the code with Prettier.
 
 ## Configuration
 
