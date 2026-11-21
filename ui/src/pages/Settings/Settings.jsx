@@ -1074,6 +1074,34 @@ export class Settings extends React.Component {
                       )
                     }
                   />
+                  <Dropdown
+                    isRadio
+                    label={t('settings.camera.rtsp_transport')}
+                    placeholder={t('settings.camera.rtsp_transport_select')}
+                    items={[
+                      {
+                        label: t('settings.camera.rtsp_transport_tcp'),
+                        value: 'tcp',
+                      },
+                      {
+                        label: t('settings.camera.rtsp_transport_udp'),
+                        value: 'udp',
+                      },
+                      {
+                        label: t('settings.camera.rtsp_transport_auto'),
+                        value: 'auto',
+                      },
+                    ]}
+                    selected={[config.capture.ipcamera.rtsp_transport || 'tcp']}
+                    onChange={(value) =>
+                      this.onUpdateDropdown(
+                        'capture.ipcamera',
+                        'rtsp_transport',
+                        value[0],
+                        config.capture.ipcamera
+                      )
+                    }
+                  />
                 </BlockBody>
                 <BlockFooter>
                   {config.capture.ipcamera &&

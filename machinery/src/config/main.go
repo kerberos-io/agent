@@ -369,6 +369,11 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 			case "AGENT_CAPTURE_IPCAMERA_RTSP":
 				configuration.Config.Capture.IPCamera.RTSP = value
 				break
+
+			case "AGENT_CAPTURE_IPCAMERA_RTSP_TRANSPORT":
+				configuration.Config.Capture.IPCamera.RTSPTransport = value
+				break
+
 			case "AGENT_CAPTURE_IPCAMERA_SUB_RTSP":
 				configuration.Config.Capture.IPCamera.SubRTSP = value
 				break

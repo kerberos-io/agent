@@ -858,7 +858,8 @@ func VerifyCamera(c *gin.Context) {
 		// Currently only support H264 encoded cameras, this will change.
 		// Establishing the camera connection without backchannel if no substream
 		rtspClient := &Golibrtsp{
-			Url: rtspUrl,
+			Url:       rtspUrl,
+			Transport: cameraStreams.RTSPTransport,
 		}
 
 		err := rtspClient.Connect(ctx, ctxVerifyCamera)

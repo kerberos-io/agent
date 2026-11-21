@@ -134,11 +134,14 @@ export function doVerifyCamera(streamType, config, onSuccess, onError) {
   const cameraStreams = {
     rtsp: '',
     sub_rtsp: '',
+    rtsp_transport: '',
   };
 
   if (config) {
     cameraStreams.rtsp = config.capture.ipcamera.rtsp;
     cameraStreams.sub_rtsp = config.capture.ipcamera.sub_rtsp;
+    cameraStreams.rtsp_transport =
+      config.capture.ipcamera.rtsp_transport || '';
   }
 
   const endpoint = API.post(`camera/verify/${streamType}`, cameraStreams);
