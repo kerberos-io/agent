@@ -354,6 +354,22 @@ For a private CA, mount a PEM trust bundle containing every CA certificate neede
 
 See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI, private-CA, deployment, validation, and troubleshooting procedure.
 
+### RTSP transport (TCP, UDP or auto)
+
+`AGENT_CAPTURE_IPCAMERA_RTSP_TRANSPORT` (or the transport dropdown in Settings) selects how RTP media is received from the camera:
+
+- `tcp` (default): media is interleaved on the RTSP TCP connection. Most reliable, works through any NAT or firewall.
+- `udp`: media is sent over separate UDP ports. Lower latency, but lost packets are not resent.
+- `auto`: UDP first, falling back to TCP when the camera refuses UDP or no UDP packets arrive within 3 seconds.
+
+Notes:
+
+- With `rtsps://` URLs, `udp` only works when the camera offers SRTP. Otherwise the connection fails with a message pointing to `tcp` or `auto`. `auto` uses TCP for such cameras on its own.
+- The audio backchannel (talk-back) always uses TCP.
+- For UDP the Agent requests a 4 MiB socket receive buffer, capped at the host's `net.core.rmem_max` (often about 208 KiB). For high-bitrate main streams, raise the limit on the host, for example `sysctl -w net.core.rmem_max=4194304`. Lost packets are logged as `rtp_packets_lost`.
+- UDP needs the camera's RTP packets to reach the Agent. Docker bridge networking normally works; if a firewall or Kubernetes network policy drops them, use `auto` or `tcp`.
+- The transport the Agent ended up with is logged as `rtsp_transport` (and `rtsp_transport_switch` when `auto` falls back to TCP).
+
 | Name                                    | Description                                                                                     | Default Value                  |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
 | `LOG_LEVEL`                                 | Level for logging, could be "info", "warning", "debug", "error" or "fatal".                     | "info"                         |

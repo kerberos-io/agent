@@ -13,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/bluenviron/gortsplib/v5"
+	"github.com/bluenviron/gortsplib/v5/pkg/description"
+	"github.com/bluenviron/gortsplib/v5/pkg/headers"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 )
 
@@ -276,6 +278,71 @@ func TestRTSPProtocol(t *testing.T) {
 			}
 			if got == nil || *got != *test.want {
 				t.Fatalf("rtspProtocol(%q) = %v, want %v", test.transport, got, *test.want)
+			}
+		})
+	}
+}
+
+func TestBackChannelProtocolIsTCP(t *testing.T) {
+	if got := backChannelProtocol(); got == nil || *got != gortsplib.ProtocolTCP {
+		t.Fatalf("backChannelProtocol() = %v, want tcp", got)
+	}
+}
+
+func TestCheckSecureUDP(t *testing.T) {
+	tcp := gortsplib.ProtocolTCP
+	udp := gortsplib.ProtocolUDP
+	plainVideo := []*description.Media{
+		{Type: description.MediaTypeVideo, Profile: headers.TransportProfileAVP},
+	}
+	srtpVideo := []*description.Media{
+		{Type: description.MediaTypeVideo, Profile: headers.TransportProfileSAVP},
+	}
+	tests := []struct {
+		name     string
+		scheme   string
+		protocol *gortsplib.Protocol
+		medias   []*description.Media
+		wantErr  bool
+	}{
+		{name: "rtsps udp plain video", scheme: "rtsps", protocol: &udp, medias: plainVideo, wantErr: true},
+		{name: "rtsps udp srtp video", scheme: "rtsps", protocol: &udp, medias: srtpVideo},
+		{name: "rtsps tcp", scheme: "rtsps", protocol: &tcp, medias: plainVideo},
+		{name: "rtsps auto", scheme: "rtsps", protocol: nil, medias: plainVideo},
+		{name: "rtsp udp", scheme: "rtsp", protocol: &udp, medias: plainVideo},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := checkSecureUDP(test.scheme, test.protocol, test.medias)
+			if test.wantErr && !errors.Is(err, errSecureUDPUnavailable) {
+				t.Fatalf("checkSecureUDP() = %v, want errSecureUDPUnavailable", err)
+			}
+			if !test.wantErr && err != nil {
+				t.Fatalf("checkSecureUDP() = %v, want nil", err)
+			}
+		})
+	}
+}
+
+func TestUDPReadBufferSize(t *testing.T) {
+	tcp := gortsplib.ProtocolTCP
+	udp := gortsplib.ProtocolUDP
+	tests := []struct {
+		name     string
+		protocol *gortsplib.Protocol
+		rmemMax  int
+		want     int
+	}{
+		{name: "tcp keeps os default", protocol: &tcp, rmemMax: 8 << 20, want: 0},
+		{name: "unknown limit keeps os default", protocol: &udp, rmemMax: 0, want: 0},
+		{name: "default linux limit", protocol: &udp, rmemMax: 212992, want: 212992},
+		{name: "raised limit capped at target", protocol: &udp, rmemMax: 16 << 20, want: udpReadBufferTarget},
+		{name: "auto uses target", protocol: nil, rmemMax: 16 << 20, want: udpReadBufferTarget},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := udpReadBufferSize(test.protocol, test.rmemMax); got != test.want {
+				t.Fatalf("udpReadBufferSize() = %d, want %d", got, test.want)
 			}
 		})
 	}
