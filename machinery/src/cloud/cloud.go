@@ -1503,9 +1503,9 @@ func VerifyHub(c *gin.Context, configuredHubURI string) {
 				tr := &http.Transport{
 					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 				}
-				client = &http.Client{Transport: tr, CheckRedirect: rejectHubVerificationRedirect}
+				client = &http.Client{Transport: tr, CheckRedirect: rejectVerificationRedirect}
 			} else {
-				client = &http.Client{CheckRedirect: rejectHubVerificationRedirect}
+				client = &http.Client{CheckRedirect: rejectVerificationRedirect}
 			}
 
 			resp, err := client.Do(req)
@@ -1554,7 +1554,7 @@ func VerifyHub(c *gin.Context, configuredHubURI string) {
 // @Summary Will verify the persistence.
 // @Description Will verify the persistence.
 // @Success 200 {object} models.APIResponse
-func VerifyPersistence(c *gin.Context, configDirectory, configuredHubURI string) {
+func VerifyPersistence(c *gin.Context, configDirectory, configuredHubURI, configuredVaultURI string) {
 
 	var config models.Config
 	err := c.BindJSON(&config)
@@ -1610,9 +1610,9 @@ func VerifyPersistence(c *gin.Context, configDirectory, configuredHubURI string)
 					tr := &http.Transport{
 						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 					}
-					client = &http.Client{Transport: tr, CheckRedirect: rejectHubVerificationRedirect}
+					client = &http.Client{Transport: tr, CheckRedirect: rejectVerificationRedirect}
 				} else {
-					client = &http.Client{CheckRedirect: rejectHubVerificationRedirect}
+					client = &http.Client{CheckRedirect: rejectVerificationRedirect}
 				}
 
 				resp, err := client.Do(req)
@@ -1655,18 +1655,27 @@ func VerifyPersistence(c *gin.Context, configDirectory, configuredHubURI string)
 			provider := config.KStorage.Provider
 
 			if err == nil && uri != "" && accessKey != "" && secretAccessKey != "" {
+				vaultURI, uriErr := configuredVaultVerificationURI(uri, configuredVaultURI)
+				if uriErr != nil {
+					msg := "cloud.VerifyPersistence(kerberosvault): " + uriErr.Error()
+					log.Error(msg)
+					c.JSON(http.StatusBadRequest, models.APIResponse{
+						Data: msg,
+					})
+					return
+				}
 
 				var client *http.Client
 				if os.Getenv("AGENT_TLS_INSECURE") == "true" {
 					tr := &http.Transport{
 						TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 					}
-					client = &http.Client{Transport: tr}
+					client = &http.Client{Transport: tr, CheckRedirect: rejectVerificationRedirect}
 				} else {
-					client = &http.Client{}
+					client = &http.Client{CheckRedirect: rejectVerificationRedirect}
 				}
 
-				req, err := http.NewRequest("POST", uri+"/ping", nil)
+				req, err := http.NewRequest("POST", vaultURI+"/ping", nil)
 				if err == nil {
 					req.Header.Add("X-Kerberos-Storage-AccessKey", accessKey)
 					req.Header.Add("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
@@ -1695,7 +1704,7 @@ func VerifyPersistence(c *gin.Context, configDirectory, configuredHubURI string)
 								}
 								defer file.Close()
 
-								req, err := http.NewRequest("POST", uri+"/storage", file)
+								req, err := http.NewRequest("POST", vaultURI+"/storage", file)
 								if err == nil {
 
 									req.Header.Set("Content-Type", "video/mp4")
@@ -1713,9 +1722,9 @@ func VerifyPersistence(c *gin.Context, configDirectory, configuredHubURI string)
 										tr := &http.Transport{
 											TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 										}
-										client = &http.Client{Transport: tr}
+										client = &http.Client{Transport: tr, CheckRedirect: rejectVerificationRedirect}
 									} else {
-										client = &http.Client{}
+										client = &http.Client{CheckRedirect: rejectVerificationRedirect}
 									}
 
 									resp, err := client.Do(req)
@@ -1807,19 +1816,30 @@ func VerifyPersistence(c *gin.Context, configDirectory, configuredHubURI string)
 	}
 }
 
-func configuredHubVerificationURI(requested, configured string) (string, error) {
+// configuredVerificationURI only lets a verify request reach the endpoint that
+// is already saved in the agent configuration. It returns the saved value, not
+// the requested one, so credentials are never sent to a URI from the request body.
+func configuredVerificationURI(target, requested, configured string) (string, error) {
 	requested = strings.TrimRight(strings.TrimSpace(requested), "/")
 	configured = strings.TrimRight(strings.TrimSpace(configured), "/")
 	if configured == "" {
-		return "", errors.New("save the Hub URI before verifying it")
+		return "", errors.New("save the " + target + " URI before verifying it")
 	}
 	if requested != configured {
-		return "", errors.New("the Hub URI does not match the saved configuration; save it before verifying")
+		return "", errors.New("the " + target + " URI does not match the saved configuration; save it before verifying")
 	}
 	return configured, nil
 }
 
-func rejectHubVerificationRedirect(_ *http.Request, _ []*http.Request) error {
+func configuredHubVerificationURI(requested, configured string) (string, error) {
+	return configuredVerificationURI("Hub", requested, configured)
+}
+
+func configuredVaultVerificationURI(requested, configured string) (string, error) {
+	return configuredVerificationURI("Kerberos Vault", requested, configured)
+}
+
+func rejectVerificationRedirect(_ *http.Request, _ []*http.Request) error {
 	return http.ErrUseLastResponse
 }
 
@@ -1850,7 +1870,7 @@ func hubPersistenceVerificationError(statusCode int) string {
 // @Summary Will verify the secondary persistence.
 // @Description Will verify the secondary persistence.
 // @Success 200 {object} models.APIResponse
-func VerifySecondaryPersistence(c *gin.Context, configDirectory string) {
+func VerifySecondaryPersistence(c *gin.Context, configDirectory, configuredVaultURI string) {
 
 	var config models.Config
 	err := c.BindJSON(&config)
@@ -1874,18 +1894,27 @@ func VerifySecondaryPersistence(c *gin.Context, configDirectory string) {
 				provider := config.KStorageSecondary.Provider
 
 				if err == nil && uri != "" && accessKey != "" && secretAccessKey != "" {
+					vaultURI, uriErr := configuredVaultVerificationURI(uri, configuredVaultURI)
+					if uriErr != nil {
+						msg := "cloud.VerifySecondaryPersistence(kerberosvault): " + uriErr.Error()
+						log.Error(msg)
+						c.JSON(http.StatusBadRequest, models.APIResponse{
+							Data: msg,
+						})
+						return
+					}
 
 					var client *http.Client
 					if os.Getenv("AGENT_TLS_INSECURE") == "true" {
 						tr := &http.Transport{
 							TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 						}
-						client = &http.Client{Transport: tr}
+						client = &http.Client{Transport: tr, CheckRedirect: rejectVerificationRedirect}
 					} else {
-						client = &http.Client{}
+						client = &http.Client{CheckRedirect: rejectVerificationRedirect}
 					}
 
-					req, err := http.NewRequest("POST", uri+"/ping", nil)
+					req, err := http.NewRequest("POST", vaultURI+"/ping", nil)
 					if err == nil {
 						req.Header.Add("X-Kerberos-Storage-AccessKey", accessKey)
 						req.Header.Add("X-Kerberos-Storage-SecretAccessKey", secretAccessKey)
@@ -1914,7 +1943,7 @@ func VerifySecondaryPersistence(c *gin.Context, configDirectory string) {
 									}
 									defer file.Close()
 
-									req, err := http.NewRequest("POST", uri+"/storage", file)
+									req, err := http.NewRequest("POST", vaultURI+"/storage", file)
 									if err == nil {
 
 										req.Header.Set("Content-Type", "video/mp4")
@@ -1932,9 +1961,9 @@ func VerifySecondaryPersistence(c *gin.Context, configDirectory string) {
 											tr := &http.Transport{
 												TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 											}
-											client = &http.Client{Transport: tr}
+											client = &http.Client{Transport: tr, CheckRedirect: rejectVerificationRedirect}
 										} else {
-											client = &http.Client{}
+											client = &http.Client{CheckRedirect: rejectVerificationRedirect}
 										}
 
 										resp, err := client.Do(req)
