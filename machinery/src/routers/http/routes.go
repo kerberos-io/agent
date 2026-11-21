@@ -70,12 +70,12 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 
 			// Will verify the persistence settings.
 			api.POST("/persistence/verify", func(c *gin.Context) {
-				cloud.VerifyPersistence(c, configDirectory, configuration.Config.HubURI)
+				cloud.VerifyPersistence(c, configDirectory, configuration.Config.HubURI, savedVaultURI(configuration.Config.KStorage))
 			})
 
 			// Will verify the secondary persistence settings.
 			api.POST("/persistence/secondary/verify", func(c *gin.Context) {
-				cloud.VerifySecondaryPersistence(c, configDirectory)
+				cloud.VerifySecondaryPersistence(c, configDirectory, savedVaultURI(configuration.Config.KStorageSecondary))
 			})
 
 			// Camera specific methods.
@@ -116,4 +116,13 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 		}
 	}
 	return api
+}
+
+// savedVaultURI returns the Kerberos Vault URI from the saved configuration,
+// which is the only endpoint a persistence verify request may contact.
+func savedVaultURI(storage *models.KStorage) string {
+	if storage == nil {
+		return ""
+	}
+	return storage.URI
 }
