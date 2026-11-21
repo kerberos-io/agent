@@ -1,15 +1,18 @@
 /* eslint-env jest */
+import { vi } from 'vitest';
 import API from './api';
 import { doGetDashboardInformation } from './agent';
 
-jest.mock('./api', () => ({
-  get: jest.fn(),
+vi.mock('./api', () => ({
+  default: {
+    get: vi.fn(),
+  },
 }));
 
 describe('dashboard API', () => {
   it('bounds dashboard requests so polling can recover', async () => {
-    const onSuccess = jest.fn();
-    const onError = jest.fn();
+    const onSuccess = vi.fn();
+    const onError = vi.fn();
     API.get.mockResolvedValue({
       status: 200,
       data: { uptime: '1 minute' },

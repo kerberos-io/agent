@@ -679,7 +679,9 @@ The Kerberos Agent is divided in two parts: a `machinery` and `web` part. Both p
 
 ### UI
 
-The `web` is a **React** project which is the main entry point for an end user to view recordings, a livestream, and modify the configuration of the `machinery`.
+The `web` is a **React** project, built with [Vite](https://vite.dev), which is
+the main entry point for an end user to view recordings, a livestream, and
+modify the configuration of the `machinery`.
 
     git clone https://github.com/kerberos-io/agent
     cd ui
@@ -688,7 +690,7 @@ The `web` is a **React** project which is the main entry point for an end user t
 This starts the web app on port `3000`. In development, the UI connects to the
 Agent API on port `8082`. Override that port when needed:
 
-    REACT_APP_AGENT_API_PORT=9090 yarn start
+    VITE_AGENT_API_PORT=9090 yarn start
 
 ![login-agent](./assets/img/agent-login.gif)
 
@@ -708,7 +710,7 @@ You can simply run the `machinery` using following commands.
 
 This will launch the Kerberos Agent and run a webserver on port `8082`, matching
 the UI development default. You can change the port together with
-`REACT_APP_AGENT_API_PORT`. We strongly support the usage of
+`VITE_AGENT_API_PORT`. We strongly support the usage of
 [Goland](https://www.jetbrains.com/go/) or
 [Visual Studio Code](https://code.visualstudio.com/), as it comes with all the
 debugging and linting features built in.

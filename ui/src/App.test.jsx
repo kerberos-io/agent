@@ -1,4 +1,5 @@
 /* eslint-env jest */
+import { vi } from 'vitest';
 /* eslint-disable react/prop-types */
 import React from 'react';
 import { interval } from 'rxjs';
@@ -6,11 +7,11 @@ import { App } from './App';
 
 const subscriptions = [];
 
-jest.mock('rxjs', () => ({
-  interval: jest.fn(),
+vi.mock('rxjs', () => ({
+  interval: vi.fn(),
 }));
 
-jest.mock('@kerberos-io/ui', () => {
+vi.mock('@kerberos-io/ui', () => {
   const Mock = ({ children }) => <div>{children}</div>;
   return {
     Badge: Mock,
@@ -27,42 +28,46 @@ jest.mock('@kerberos-io/ui', () => {
   };
 });
 
-jest.mock('./components/LanguageSelect/LanguageSelect', () => () => null);
-jest.mock('./actions', () => ({ logout: jest.fn() }));
-jest.mock('./actions/agent', () => ({
-  getDashboardInformation: jest.fn(),
+vi.mock('./components/LanguageSelect/LanguageSelect', () => ({
+  default: () => null,
 }));
-jest.mock('./config', () => ({
-  MODE: 'release',
-  URL: 'http://localhost',
-  WS_URL: 'ws://localhost/ws',
+vi.mock('./actions', () => ({ logout: vi.fn() }));
+vi.mock('./actions/agent', () => ({
+  getDashboardInformation: vi.fn(),
 }));
-jest.mock('react-redux', () => ({
+vi.mock('./config', () => ({
+  default: {
+    MODE: 'release',
+    URL: 'http://localhost',
+    WS_URL: 'ws://localhost/ws',
+  },
+}));
+vi.mock('react-redux', () => ({
   connect: () => (Component) => Component,
 }));
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   withTranslation: () => (Component) => Component,
 }));
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   Link: ({ children }) => <>{children}</>,
 }));
-jest.mock('@giantmachines/redux-websocket', () => ({
-  connect: jest.fn(),
-  disconnect: jest.fn(),
-  send: jest.fn(),
+vi.mock('@giantmachines/redux-websocket', () => ({
+  connect: vi.fn(),
+  disconnect: vi.fn(),
+  send: vi.fn(),
 }));
-jest.mock('uuid', () => ({
-  v4: jest.fn(() => 'uuid-1'),
+vi.mock('uuid', () => ({
+  v4: vi.fn(() => 'uuid-1'),
 }));
 
 describe('App lifecycle refresh behaviour', () => {
   const baseProps = () => ({
     t: (value) => value,
-    dispatchLogout: jest.fn(),
-    dispatchConnect: jest.fn(),
-    dispatchDisconnect: jest.fn(),
-    dispatchSend: jest.fn(),
-    dispatchGetDashboardInformation: jest.fn((onSuccess) => {
+    dispatchLogout: vi.fn(),
+    dispatchConnect: vi.fn(),
+    dispatchDisconnect: vi.fn(),
+    dispatchSend: vi.fn(),
+    dispatchGetDashboardInformation: vi.fn((onSuccess) => {
       if (onSuccess) {
         onSuccess();
       }
@@ -78,12 +83,12 @@ describe('App lifecycle refresh behaviour', () => {
 
   beforeEach(() => {
     subscriptions.length = 0;
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     interval.mockImplementation(() => ({
-      subscribe: jest.fn((callback) => {
+      subscribe: vi.fn((callback) => {
         const subscription = {
           callback,
-          unsubscribe: jest.fn(),
+          unsubscribe: vi.fn(),
         };
         subscriptions.push(subscription);
         return subscription;
