@@ -1,5 +1,9 @@
 FROM mcr.microsoft.com/devcontainers/go:1.26-trixie
 
+# Same pin as the main Dockerfile: Go 1.26.11 rejects moq-go-ffi v0.3.x's
+# archives (LLVM bitcode), which breaks `go build -tags moq`.
+ENV GOTOOLCHAIN=go1.26.10
+
 # Install node environment
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
