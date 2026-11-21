@@ -6,7 +6,7 @@
   },
   "dependencies": {
     "@giantmachines/redux-websocket": "^1.5.1",
-    "@kerberos-io/ui": "^1.76.0",
+    "@kerberos-io/ui": "file:vendor/kerberos-io-ui-1.77.1.tgz",
     "@material-ui/core": "^4.12.4",
     "@material-ui/icons": "^4.11.3",
     "@testing-library/jest-dom": "^5.16.5",
