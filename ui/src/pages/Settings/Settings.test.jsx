@@ -1,17 +1,18 @@
 /* eslint-env jest */
+import { vi } from 'vitest';
 /* eslint-disable react/prop-types */
 import React from 'react';
 import { Settings } from './Settings';
 
-jest.mock('rxjs', () => ({
-  interval: jest.fn(() => ({
-    subscribe: jest.fn(() => ({
-      unsubscribe: jest.fn(),
+vi.mock('rxjs', () => ({
+  interval: vi.fn(() => ({
+    subscribe: vi.fn(() => ({
+      unsubscribe: vi.fn(),
     })),
   })),
 }));
 
-jest.mock('@kerberos-io/ui', () => {
+vi.mock('@kerberos-io/ui', () => {
   const Mock = ({ children }) => <div>{children}</div>;
   return {
     Breadcrumb: Mock,
@@ -31,36 +32,37 @@ jest.mock('@kerberos-io/ui', () => {
   };
 });
 
-jest.mock('react-redux', () => ({
+vi.mock('react-redux', () => ({
   connect: () => (Component) => Component,
 }));
-jest.mock('react-i18next', () => ({
+vi.mock('react-i18next', () => ({
   withTranslation: () => (Component) => Component,
 }));
-jest.mock('react-router-dom', () => ({
+vi.mock('react-router-dom', () => ({
   Link: ({ children }) => <>{children}</>,
   withRouter: (Component) => Component,
 }));
-jest.mock('@giantmachines/redux-websocket', () => ({
-  send: jest.fn(),
+vi.mock('@giantmachines/redux-websocket', () => ({
+  send: vi.fn(),
 }));
-jest.mock('../../components/ImageCanvas/ImageCanvas', () => () => null);
-jest.mock('../../websocket', () => ({
-  __esModule: true,
+vi.mock('../../components/ImageCanvas/ImageCanvas', () => ({
+  default: () => null,
+}));
+vi.mock('../../websocket', () => ({
   default: 'uuid-1',
 }));
-jest.mock('../../actions/agent', () => ({
-  addRegion: jest.fn(),
-  updateRegion: jest.fn(),
-  removeRegion: jest.fn(),
-  saveConfig: jest.fn(),
-  verifyOnvif: jest.fn(),
-  verifyCamera: jest.fn(),
-  verifyHub: jest.fn(),
-  verifyPersistence: jest.fn(),
-  verifySecondaryPersistence: jest.fn(),
-  getConfig: jest.fn(),
-  updateConfig: jest.fn(),
+vi.mock('../../actions/agent', () => ({
+  addRegion: vi.fn(),
+  updateRegion: vi.fn(),
+  removeRegion: vi.fn(),
+  saveConfig: vi.fn(),
+  verifyOnvif: vi.fn(),
+  verifyCamera: vi.fn(),
+  verifyHub: vi.fn(),
+  verifyPersistence: vi.fn(),
+  verifySecondaryPersistence: vi.fn(),
+  getConfig: vi.fn(),
+  updateConfig: vi.fn(),
 }));
 
 describe('Settings liveview lifecycle', () => {
@@ -78,22 +80,22 @@ describe('Settings liveview lifecycle', () => {
     connected: true,
     config,
     images: [],
-    dispatchVerifyHub: jest.fn(),
-    dispatchVerifyPersistence: jest.fn(),
-    dispatchVerifySecondaryPersistence: jest.fn(),
-    dispatchGetConfig: jest.fn(),
-    dispatchUpdateConfig: jest.fn(),
-    dispatchSaveConfig: jest.fn(),
-    dispatchAddRegion: jest.fn(),
-    dispatchUpdateRegion: jest.fn(),
-    dispatchRemoveRegion: jest.fn(),
-    dispatchVerifyCamera: jest.fn(),
-    dispatchVerifyOnvif: jest.fn(),
-    dispatchSend: jest.fn(),
+    dispatchVerifyHub: vi.fn(),
+    dispatchVerifyPersistence: vi.fn(),
+    dispatchVerifySecondaryPersistence: vi.fn(),
+    dispatchGetConfig: vi.fn(),
+    dispatchUpdateConfig: vi.fn(),
+    dispatchSaveConfig: vi.fn(),
+    dispatchAddRegion: vi.fn(),
+    dispatchUpdateRegion: vi.fn(),
+    dispatchRemoveRegion: vi.fn(),
+    dispatchVerifyCamera: vi.fn(),
+    dispatchVerifyOnvif: vi.fn(),
+    dispatchSend: vi.fn(),
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('starts and stops SD imagery with the conditions editor visibility', () => {
@@ -105,8 +107,8 @@ describe('Settings liveview lifecycle', () => {
       selectedTab: 'conditions',
       search: '',
     };
-    settings.initialiseLiveview = jest.fn();
-    settings.stopLiveview = jest.fn();
+    settings.initialiseLiveview = vi.fn();
+    settings.stopLiveview = vi.fn();
 
     settings.componentDidUpdate(props, {
       ...settings.state,
@@ -138,7 +140,7 @@ describe('Settings liveview lifecycle', () => {
       search: '',
     };
     settings.sdLiveviewActive = true;
-    settings.requestSDLiveviewFrame = jest.fn();
+    settings.requestSDLiveviewFrame = vi.fn();
 
     settings.componentDidUpdate(
       {
@@ -157,7 +159,7 @@ describe('Settings liveview lifecycle', () => {
     settings.props = props;
     settings.sdLiveviewActive = true;
     settings.requestStreamSubscription = {
-      unsubscribe: jest.fn(),
+      unsubscribe: vi.fn(),
     };
 
     settings.componentWillUnmount();

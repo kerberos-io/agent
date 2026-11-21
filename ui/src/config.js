@@ -1,6 +1,6 @@
 const { hostname, host, protocol } = window.location;
 const websocketprotocol = protocol === 'http:' ? 'ws:' : 'wss:';
-const devAgentPort = process.env.REACT_APP_AGENT_API_PORT || '8082';
+const devAgentPort = import.meta.env.VITE_AGENT_API_PORT || '8082';
 
 // Uncomment this when using codespaces or other special DNS names (which you can't control)
 // replace this with the DNS name of the kerberos agent server (the codespace url)
@@ -22,7 +22,7 @@ const dev = {
 };
 
 const prod = {
-  ENV: process.env.REACT_APP_ENVIRONMENT,
+  ENV: import.meta.env.MODE,
   HOSTNAME: hostname,
   API_URL: `${protocol}//${host}/api`,
   URL: `${protocol}//${host}`,
@@ -30,7 +30,7 @@ const prod = {
   MODE: window['env']['mode'],
 };
 
-const config = process.env.REACT_APP_ENVIRONMENT === 'production' ? prod : dev;
+const config = import.meta.env.PROD ? prod : dev;
 
 export default {
   // Add common config values here

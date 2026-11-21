@@ -1,70 +1,36 @@
-# Getting Started with Create React App
+# Kerberos Agent UI
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+The web interface of the Kerberos Agent: a React app built with
+[Vite](https://vite.dev) and tested with [Vitest](https://vitest.dev).
+Requires Node.js 20.19 or newer.
 
-## Available Scripts
+## Scripts
 
-In the project directory, you can run:
+| Command | What it does |
+|---|---|
+| `yarn start` | Starts the dev server on [http://localhost:3000](http://localhost:3000) with hot reload. |
+| `yarn build` | Builds for production and moves the output to `../machinery/www`, where the Agent serves it. |
+| `yarn preview` | Serves the production build from `../machinery/www` on port 3000. Run `yarn build` first. |
+| `yarn test` | Runs the test suite once. `yarn test:watch` keeps it running. |
+| `yarn lint` | Lints `src/` with ESLint. |
+| `yarn format` | Formats the code with Prettier. |
 
-### `yarn start`
+## Configuration
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+In development the UI talks to the Agent API on port `8082` of the same host.
+Override it with `VITE_AGENT_API_PORT`:
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+    VITE_AGENT_API_PORT=9090 yarn start
 
-### `yarn test`
+In production builds the UI uses the host and port it was served from.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Runtime settings that differ per deployment (such as demo mode) live in
+`public/env.js`, which the Agent can replace without rebuilding the UI.
 
-### `yarn build`
+## Layout
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `yarn eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `yarn build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- `index.html`: the HTML entry point; Vite injects the bundle here.
+- `src/`: application code. `src/index.jsx` is the entry module.
+- `public/`: copied unchanged to the build root (favicons, fonts, locales, `env.js`).
+- Bundled JS, CSS and assets go to `static/` in the build, so they don't mix
+  with the `assets/` folder from `public/`.

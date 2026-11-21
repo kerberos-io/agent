@@ -1,22 +1,23 @@
 /* eslint-env jest */
+import { vi } from 'vitest';
 import { ImageCanvas } from './ImageCanvas';
 
-jest.mock('vott-ct', () => ({
+vi.mock('vott-ct', () => ({
   CanvasTools: {
-    Editor: jest.fn(),
+    Editor: vi.fn(),
     Core: {
-      RegionData: jest.fn(),
-      Point2D: jest.fn(),
-      Tag: jest.fn(),
-      TagsDescriptor: jest.fn(),
+      RegionData: vi.fn(),
+      Point2D: vi.fn(),
+      Tag: vi.fn(),
+      TagsDescriptor: vi.fn(),
       Colors: {
-        Color: jest.fn(),
+        Color: vi.fn(),
       },
     },
   },
 }));
 
-jest.mock('vott-ct/lib/js/CanvasTools/Interface/ISelectorSettings', () => ({
+vi.mock('vott-ct/lib/js/CanvasTools/Interface/ISelectorSettings', () => ({
   SelectionMode: {
     NONE: 'none',
     RECT: 'rect',
@@ -24,7 +25,7 @@ jest.mock('vott-ct/lib/js/CanvasTools/Interface/ISelectorSettings', () => ({
   },
 }));
 
-jest.mock('vott-ct/lib/js/CanvasTools/Core/RegionData', () => ({
+vi.mock('vott-ct/lib/js/CanvasTools/Core/RegionData', () => ({
   RegionDataType: {
     Polygon: 'polygon',
   },
@@ -32,9 +33,9 @@ jest.mock('vott-ct/lib/js/CanvasTools/Core/RegionData', () => ({
 
 describe('ImageCanvas update guards', () => {
   const callbacks = {
-    onAddRegion: jest.fn(),
-    onUpdateRegion: jest.fn(),
-    onDeleteRegion: jest.fn(),
+    onAddRegion: vi.fn(),
+    onUpdateRegion: vi.fn(),
+    onDeleteRegion: vi.fn(),
   };
 
   const baseProps = () => ({
@@ -45,7 +46,7 @@ describe('ImageCanvas update guards', () => {
   });
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it('ignores unrelated parent updates', () => {
@@ -55,8 +56,8 @@ describe('ImageCanvas update guards', () => {
     };
     const canvas = new ImageCanvas(props);
     canvas.props = props;
-    canvas.loadImage = jest.fn();
-    canvas.loadData = jest.fn();
+    canvas.loadImage = vi.fn();
+    canvas.loadData = vi.fn();
 
     canvas.componentDidUpdate({
       ...props,
@@ -71,8 +72,8 @@ describe('ImageCanvas update guards', () => {
     const props = baseProps();
     const canvas = new ImageCanvas(props);
     canvas.props = props;
-    canvas.loadImage = jest.fn();
-    canvas.loadData = jest.fn();
+    canvas.loadImage = vi.fn();
+    canvas.loadData = vi.fn();
 
     canvas.componentDidUpdate({
       ...props,
@@ -97,8 +98,8 @@ describe('ImageCanvas update guards', () => {
       width: 100,
       height: 100,
     };
-    canvas.loadImage = jest.fn();
-    canvas.loadData = jest.fn();
+    canvas.loadImage = vi.fn();
+    canvas.loadData = vi.fn();
 
     canvas.componentDidUpdate({
       ...props,
