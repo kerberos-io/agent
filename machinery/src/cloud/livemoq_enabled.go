@@ -16,7 +16,7 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/cloud/livemoq"
 	"github.com/kerberos-io/agent/machinery/src/models"
 	"github.com/kerberos-io/agent/machinery/src/packets"
-	"github.com/moq-dev/moq-go/moq"
+	"moq.dev/moq"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -292,7 +292,7 @@ func publishLiveStreamMoQ(ctx context.Context, config liveMoQConfig) error {
 	}
 	defer finishBroadcast()
 
-	stream, err := broadcast.PublishMedia("avc3", nil)
+	stream, err := broadcast.PublishVideo(moq.VideoFormatAvc3, nil)
 	if err != nil {
 		return fmt.Errorf("create H.264 media stream: %w", err)
 	}
