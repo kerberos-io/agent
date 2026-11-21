@@ -11,6 +11,9 @@ on:
 
 env:
   REPO: kerberos/agent
+  # Expressions are passed to shell steps through the environment and quoted,
+  # never interpolated into the script, so a crafted tag cannot inject commands.
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
 
 jobs:
   build-amd64:
@@ -20,7 +23,15 @@ jobs:
     strategy:
       matrix:
         architecture: [amd64]
+    env:
+      ARCH: ${{ matrix.architecture }}
     steps:
+      - name: Validate release tag
+        run: |
+          if [[ ! "${RELEASE_TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "Invalid release tag: only letters, digits, '.', '_' and '-' are allowed." >&2
+            exit 1
+          fi
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
@@ -30,16 +41,16 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Build
         run: |
-          docker build --provenance=false --build-arg VERSION=${{github.event.inputs.tag || github.ref_name}} -t ${{matrix.architecture}} .
-          CID=$(docker create ${{matrix.architecture}})
-          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
-          docker rm ${CID}
+          docker build --provenance=false --build-arg VERSION="${RELEASE_TAG}" -t "${ARCH}" .
+          CID=$(docker create "${ARCH}")
+          docker cp "${CID}:/home/agent" "./output-${ARCH}"
+          docker rm "${CID}"
       - name: Strip binary
-        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
+        run: tar -cf "agent-${ARCH}.tar" -C "output-${ARCH}" . && rm -rf "output-${ARCH}"
       - name: Build and push Docker image
         run: |
-          docker tag ${{matrix.architecture}} $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
-          docker push $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
+          docker tag "${ARCH}" "${REPO}-arch:arch-${ARCH}-${RELEASE_TAG}"
+          docker push "${REPO}-arch:arch-${ARCH}-${RELEASE_TAG}"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -53,7 +64,15 @@ jobs:
     strategy:
       matrix:
         architecture: [arm64]
+    env:
+      ARCH: ${{ matrix.architecture }}
     steps:
+      - name: Validate release tag
+        run: |
+          if [[ ! "${RELEASE_TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "Invalid release tag: only letters, digits, '.', '_' and '-' are allowed." >&2
+            exit 1
+          fi
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
@@ -63,16 +82,16 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Build
         run: |
-          docker build --provenance=false --build-arg VERSION=${{github.event.inputs.tag || github.ref_name}} -t ${{matrix.architecture}} .
-          CID=$(docker create ${{matrix.architecture}})
-          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
-          docker rm ${CID}
+          docker build --provenance=false --build-arg VERSION="${RELEASE_TAG}" -t "${ARCH}" .
+          CID=$(docker create "${ARCH}")
+          docker cp "${CID}:/home/agent" "./output-${ARCH}"
+          docker rm "${CID}"
       - name: Strip binary
-        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
+        run: tar -cf "agent-${ARCH}.tar" -C "output-${ARCH}" . && rm -rf "output-${ARCH}"
       - name: Build and push Docker image
         run: |
-          docker tag ${{matrix.architecture}} $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
-          docker push $REPO-arch:arch-${{matrix.architecture}}-${{github.event.inputs.tag || github.ref_name}}
+          docker tag "${ARCH}" "${REPO}-arch:arch-${ARCH}-${RELEASE_TAG}"
+          docker push "${REPO}-arch:arch-${ARCH}-${RELEASE_TAG}"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -90,16 +109,16 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Create and push multi-arch manifest
         run: |
-          docker manifest create $REPO:${{ github.event.inputs.tag || github.ref_name }} \
-            $REPO-arch:arch-amd64-${{github.event.inputs.tag || github.ref_name}} \
-            $REPO-arch:arch-arm64-${{github.event.inputs.tag || github.ref_name}}
-          docker manifest push $REPO:${{ github.event.inputs.tag || github.ref_name }}
+          docker manifest create "${REPO}:${RELEASE_TAG}" \
+            "${REPO}-arch:arch-amd64-${RELEASE_TAG}" \
+            "${REPO}-arch:arch-arm64-${RELEASE_TAG}"
+          docker manifest push "${REPO}:${RELEASE_TAG}"
       - name: Create and push latest manifest
         run: |
-          docker manifest create $REPO:latest \
-            $REPO-arch:arch-amd64-${{github.event.inputs.tag || github.ref_name}} \
-            $REPO-arch:arch-arm64-${{github.event.inputs.tag || github.ref_name}}
-          docker manifest push $REPO:latest
+          docker manifest create "${REPO}:latest" \
+            "${REPO}-arch:arch-amd64-${RELEASE_TAG}" \
+            "${REPO}-arch:arch-arm64-${RELEASE_TAG}"
+          docker manifest push "${REPO}:latest"
         if: github.event.inputs.tag == 'test'
 
   create-release:

@@ -15,6 +15,7 @@ import { Link, withRouter } from 'react-router-dom';
 import { connect } from 'react-redux';
 import { getEvents } from '../../actions/agent';
 import config from '../../config';
+import { withToken } from '../../api/api';
 import './Media.scss';
 
 function formatDateTimeLocal(date) {
@@ -258,11 +259,13 @@ class Media extends React.Component {
           {events.map((event) => (
             <div
               key={event.key}
-              onClick={() => this.openModal(`${config.URL}/file/${event.key}`)}
+              onClick={() =>
+                this.openModal(withToken(`${config.URL}/file/${event.key}`))
+              }
             >
               <VideoCard
                 isMediaWall
-                videoSrc={`${config.URL}/file/${event.key}`}
+                videoSrc={withToken(`${config.URL}/file/${event.key}`)}
                 hours={event.time}
                 month={event.short_day}
                 videoStatus=""

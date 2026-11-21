@@ -18,7 +18,10 @@ func AddRoutes(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirect
 		HealthCheck(c, communication)
 	})
 
-	r.GET("/ws", func(c *gin.Context) {
+	// The WebSocket carries the live camera stream, so it needs a token like
+	// the API. Browsers cannot set headers on WebSocket requests, so the UI
+	// passes it as the ?token= query parameter.
+	r.GET("/ws", authMiddleware.MiddlewareFunc(), func(c *gin.Context) {
 		websocket.WebsocketHandler(c, configuration, communication, captureDevice)
 	})
 

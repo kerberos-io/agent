@@ -26,6 +26,7 @@ import {
 import './Dashboard.scss';
 import ReactTooltip from 'react-tooltip';
 import config from '../../config';
+import { withToken } from '../../api/api';
 import { getConfig } from '../../actions/agent';
 
 function createUUID() {
@@ -426,7 +427,7 @@ class Dashboard extends React.Component {
       }
     };
 
-    this.webrtcSocket = new WebSocket(config.WS_URL);
+    this.webrtcSocket = new WebSocket(withToken(config.WS_URL));
     this.webrtcSocket.onopen = () => {
       this.sendWebRTCMessage('hello', {});
     };
@@ -612,7 +613,7 @@ class Dashboard extends React.Component {
                               className="time"
                               onClick={() =>
                                 this.openModal(
-                                  `${config.URL}/file/${event.key}`
+                                  withToken(`${config.URL}/file/${event.key}`)
                                 )
                               }
                             >
@@ -625,7 +626,7 @@ class Dashboard extends React.Component {
                               className="pointer event-description"
                               onClick={() =>
                                 this.openModal(
-                                  `${config.URL}/file/${event.key}`
+                                  withToken(`${config.URL}/file/${event.key}`)
                                 )
                               }
                             >
