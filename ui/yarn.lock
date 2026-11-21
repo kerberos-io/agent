@@ -407,9 +407,9 @@
   resolved "https://ms-feed-25.pkgs.visualstudio.com/1es-public/_packaging/npm-public/npm/registry/@jridgewell/sourcemap-codec/-/sourcemap-codec-1.6.0.tgz#f4c663e862f06dc98ca4d453862c46902789a18d"
   integrity sha1-9MZj6GLwbcmMpNRThixGkCeJoY0=
 
-"@kerberos-io/ui@file:vendor/kerberos-io-ui-1.77.1.tgz":
+"@kerberos-io/ui@https://github.com/kerberos-io/ui/releases/download/v1.77.1/kerberos-io-ui-1.77.1.tgz":
   version "1.77.1"
-  resolved "file:vendor/kerberos-io-ui-1.77.1.tgz#2df4f990cd27716d514510a038178337995ff5d5"
+  resolved "https://github.com/kerberos-io/ui/releases/download/v1.77.1/kerberos-io-ui-1.77.1.tgz#91bf86bdb9c39eeaeb4b18b759149741903f02c6"
   dependencies:
     "@emotion/react" "^11.10.4"
     "@emotion/styled" "^11.10.4"

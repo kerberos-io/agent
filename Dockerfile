@@ -80,8 +80,6 @@ RUN apk update && apk upgrade --available && sync
 RUN mkdir -p /go/src/github.com/kerberos-io/agent/machinery/www
 WORKDIR /go/src/github.com/kerberos-io/agent/ui
 COPY ui/package.json ui/yarn.lock ./
-# Vendored packages referenced by file: in package.json (see ui/vendor/README.md).
-COPY ui/vendor ./vendor
 RUN yarn config set network-timeout 300000 && yarn --frozen-lockfile
 COPY ui ./
 RUN yarn build
