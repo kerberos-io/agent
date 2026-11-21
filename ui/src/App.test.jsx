@@ -51,9 +51,8 @@ jest.mock('@giantmachines/redux-websocket', () => ({
   disconnect: jest.fn(),
   send: jest.fn(),
 }));
-jest.mock('uuidv4', () => ({
-  __esModule: true,
-  default: jest.fn(() => 'uuid-1'),
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'uuid-1'),
 }));
 
 describe('App lifecycle refresh behaviour', () => {

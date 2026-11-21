@@ -1,5 +1,8 @@
 
-ARG GO_IMAGE=golang:1.25-trixie
+# Pinned to 1.26.10: Go 1.26.11 rejects C archives containing LLVM bitcode
+# ("disallowed LTO section .llvmbc"), and moq-go-ffi v0.3.x ships such archives.
+# Unpin once the MoQ code moves to moq.dev/moq (moq-ffi v0.4.27+ is clean).
+ARG GO_IMAGE=golang:1.26.10-trixie
 ARG RUNTIME_IMAGE=debian:trixie-slim
 ARG VERSION=0.0.0
 FROM ${GO_IMAGE} AS build-machinery
