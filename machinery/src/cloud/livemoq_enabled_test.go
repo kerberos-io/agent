@@ -12,7 +12,7 @@ import (
 
 	"github.com/kerberos-io/agent/machinery/src/cloud/livemoq"
 	"github.com/kerberos-io/agent/machinery/src/models"
-	"github.com/moq-dev/moq-go/moq"
+	"moq.dev/moq"
 )
 
 func TestCloseLiveMoQPublisherFinishesBeforeClosingClient(t *testing.T) {
@@ -155,7 +155,7 @@ func TestNativeMoQClientCloseStopsActiveWriter(t *testing.T) {
 		server.Close()
 		t.Fatal(err)
 	}
-	stream, err := broadcast.PublishMedia("avc3", nil)
+	stream, err := broadcast.PublishVideo(moq.VideoFormatAvc3, nil)
 	if err != nil {
 		client.Close()
 		server.Close()
