@@ -32,6 +32,7 @@ import (
 	"github.com/bluenviron/gortsplib/v5/pkg/format/rtplpcm"
 	"github.com/bluenviron/gortsplib/v5/pkg/format/rtpmpeg4audio"
 	"github.com/bluenviron/gortsplib/v5/pkg/format/rtpsimpleaudio"
+	"github.com/bluenviron/gortsplib/v5/pkg/headers"
 	"github.com/bluenviron/mediacommon/pkg/bits"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h265"
@@ -75,6 +76,77 @@ func rtspProtocol(transport string) *gortsplib.Protocol {
 		protocol = gortsplib.ProtocolTCP
 	}
 	return &protocol
+}
+
+// backChannelProtocol is the transport used for the audio backchannel. It is
+// always TCP: gortsplib's "auto" fallback only switches to TCP when no packets
+// are received over UDP, which never happens on a send-only backchannel, and
+// talk-back over UDP has not been validated on camera hardware.
+func backChannelProtocol() *gortsplib.Protocol {
+	protocol := gortsplib.ProtocolTCP
+	return &protocol
+}
+
+// errSecureUDPUnavailable is returned when UDP is forced on an RTSPS camera
+// that does not offer SRTP, so the media could not be sent encrypted over UDP.
+var errSecureUDPUnavailable = errors.New(
+	"the RTSPS camera does not offer SRTP, so RTP over UDP cannot be encrypted; " +
+		"set the RTSP transport to \"tcp\" or \"auto\"")
+
+// checkSecureUDP rejects forced UDP on an RTSPS stream whose video media is not
+// SRTP (RTP/SAVP). gortsplib would otherwise fail every SETUP with "unable to
+// setup secure UDP", which Connect only logs. "auto" is not affected because
+// gortsplib picks TCP on its own for such streams.
+func checkSecureUDP(scheme string, protocol *gortsplib.Protocol, medias []*description.Media) error {
+	if protocol == nil || *protocol != gortsplib.ProtocolUDP || !strings.EqualFold(scheme, "rtsps") {
+		return nil
+	}
+	for _, medi := range medias {
+		if medi.Type == description.MediaTypeVideo && medi.Profile != headers.TransportProfileSAVP {
+			return errSecureUDPUnavailable
+		}
+	}
+	return nil
+}
+
+// udpReadBufferTarget is the UDP socket read buffer requested for RTP over
+// UDP. The OS default (around 208 KiB on Linux) drops packets on
+// high-bitrate main streams.
+const udpReadBufferTarget = 4 * 1024 * 1024
+
+// rmemMaxPath holds the largest receive buffer an unprivileged socket may use.
+const rmemMaxPath = "/proc/sys/net/core/rmem_max"
+
+// udpReadBufferSize returns the UDP read buffer to request: the target,
+// capped at the OS limit rmemMax. gortsplib fails the SETUP when it cannot get
+// the exact size it asked for, so the size must never exceed the limit. It
+// returns 0 (OS default) for TCP, or when the limit is unknown or not above the
+// default.
+func udpReadBufferSize(protocol *gortsplib.Protocol, rmemMax int) int {
+	if protocol != nil && *protocol == gortsplib.ProtocolTCP {
+		return 0
+	}
+	if rmemMax <= 0 {
+		return 0
+	}
+	if rmemMax < udpReadBufferTarget {
+		return rmemMax
+	}
+	return udpReadBufferTarget
+}
+
+// readRmemMax reads the OS receive buffer limit, or 0 when it is unavailable
+// (non-Linux systems or a restricted /proc).
+func readRmemMax() int {
+	data, err := os.ReadFile(rmemMaxPath)
+	if err != nil {
+		return 0
+	}
+	value, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return 0
+	}
+	return value
 }
 
 func rtspsTLSConfig() (*tls.Config, error) {
@@ -576,10 +648,21 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	}
 
 	g.health = newStreamHealth()
+	protocol := rtspProtocol(g.Transport)
 	g.Client = gortsplib.Client{
 		RequestBackChannels: false,
-		Protocol:            rtspProtocol(g.Transport),
+		Protocol:            protocol,
+		UDPReadBufferSize:   udpReadBufferSize(protocol, readRmemMax()),
 		TLSConfig:           tlsConfig,
+		// In "auto" mode gortsplib may move from UDP to TCP; report it through
+		// the structured logger instead of gortsplib's plain stdout logging.
+		OnTransportSwitch: func(err error) {
+			log.WithFields(log.Fields{
+				"component": "capture",
+				"event":     "rtsp_transport_switch",
+				"stream":    g.streamLabel,
+			}).Warn("RTSP transport switched: " + err.Error())
+		},
 		// Route gortsplib's packet-loss / decode-error reporting through our
 		// structured logger with stream context (replaces its plain stdout
 		// logging). These hooks are what let us tell whether the camera is
@@ -611,6 +694,10 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	desc, _, err := g.Client.Describe(u)
 	if err != nil {
 		return sanitizeRTSPError(err, g.Url)
+	}
+
+	if err = checkSecureUDP(u.Scheme, protocol, desc.Medias); err != nil {
+		return err
 	}
 
 	// Initialize the mutex and FPS calculation.
@@ -850,6 +937,27 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	return
 }
 
+// logNegotiatedTransport logs the transport that SETUP agreed on, which can
+// differ from the configured one in "auto" mode. A later UDP to TCP switch
+// (no packets received in time) is reported by OnTransportSwitch.
+func (g *Golibrtsp) logNegotiatedTransport() {
+	transport := g.Client.Transport()
+	if transport == nil || transport.Session == nil {
+		return
+	}
+	configured := strings.ToLower(strings.TrimSpace(g.Transport))
+	if configured == "" {
+		configured = RTSPTransportTCP
+	}
+	log.WithFields(log.Fields{
+		"component":  "capture",
+		"event":      "rtsp_transport",
+		"stream":     g.streamLabel,
+		"configured": configured,
+		"negotiated": transport.Session.Protocol.String(),
+	}).Info("RTSP transport negotiated")
+}
+
 func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.Context) (err error) {
 
 	_, span := tracer.Start(ctxRunAgent, "ConnectBackChannel")
@@ -862,7 +970,7 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 
 	g.Client = gortsplib.Client{
 		RequestBackChannels: true,
-		Protocol:            rtspProtocol(g.Transport),
+		Protocol:            backChannelProtocol(),
 		TLSConfig:           tlsConfig,
 	}
 	// parse URL
@@ -982,6 +1090,7 @@ func (g *Golibrtsp) Start(ctx context.Context, streamType string, queue *packets
 	if g.health == nil {
 		g.health = newStreamHealth()
 	}
+	g.logNegotiatedTransport()
 
 	// called when a MULAW audio RTP packet arrives
 	if g.AudioG711Media != nil && g.AudioG711Forma != nil {

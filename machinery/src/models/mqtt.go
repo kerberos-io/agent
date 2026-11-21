@@ -256,6 +256,9 @@ type VerifyStreamPayload struct {
 	Timestamp int64  `json:"timestamp"` // timestamp of the verify request.
 	Stream    string `json:"stream"`    // "main" or "sub".
 	RTSP      string `json:"rtsp"`      // optional RTSP url to verify; falls back to the configured one.
+	// RTSPTransport is the optional transport to verify with ("tcp", "udp" or
+	// "auto"); falls back to the configured one.
+	RTSPTransport string `json:"rtsp_transport,omitempty"`
 }
 
 // We received a update config request, we'll update the current config and send a confirmation back.
