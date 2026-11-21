@@ -845,12 +845,6 @@ func HandleVerifyStream(mqttClient mqtt.Client, hubKey string, payload models.Pa
 		}
 	}
 
-	// Same for the transport, so an unsaved transport choice can be verified.
-	rtspTransport := verifyPayload.RTSPTransport
-	if rtspTransport == "" {
-		rtspTransport = configuration.Config.Capture.IPCamera.RTSPTransport
-	}
-
 	success := false
 	errMsg := ""
 	width := 0
@@ -868,7 +862,7 @@ func HandleVerifyStream(mqttClient mqtt.Client, hubKey string, payload models.Pa
 
 		rtspClient := &capture.Golibrtsp{
 			Url:       rtspUrl,
-			Transport: rtspTransport,
+			Transport: configuration.Config.Capture.IPCamera.RTSPTransport,
 		}
 		errConnect := rtspClient.Connect(ctx, ctx)
 		if errConnect != nil {
