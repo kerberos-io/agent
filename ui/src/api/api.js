@@ -16,6 +16,18 @@ export function getToken() {
   return localStorage.getItem('token');
 }
 
+// Browsers cannot attach an Authorization header to WebSocket connections or
+// to media elements such as <video src>, so those URLs carry the token as the
+// ?token= query parameter, which the agent's JWT middleware also accepts.
+export function withToken(url) {
+  const token = getToken();
+  if (!token) {
+    return url;
+  }
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}token=${encodeURIComponent(token)}`;
+}
+
 export function getAPIObject(url) {
   return {
     url: config.API_URL + url,

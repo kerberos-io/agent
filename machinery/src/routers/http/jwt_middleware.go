@@ -11,21 +11,17 @@ import (
 	"github.com/kerberos-io/agent/machinery/src/models"
 )
 
-func JWTMiddleWare() jwt.GinJWTMiddleware {
+func JWTMiddleWare(configDirectory string) jwt.GinJWTMiddleware {
 
 	identityKey := "id"
-	// Allow the JWT signing secret to be configured through an environment
-	// variable so that tokens issued by another service (e.g. the Kerberos
-	// Factory) can be validated by the agent. Falls back to the historic
-	// default to preserve backwards compatibility.
-	myKey := os.Getenv("AGENT_JWT_SECRET")
-	if myKey == "" {
-		myKey = "TOBECHANGED"
-	}
+	// AGENT_JWT_SECRET lets tokens issued by another service (e.g. the
+	// Kerberos Factory) be validated by the agent. Without it, a random secret
+	// is generated once and stored with the configuration; see loadJWTSecret.
+	myKey := loadJWTSecret(configDirectory)
 
 	m := jwt.GinJWTMiddleware{
 		Realm:       "kerberosio",
-		Key:         []byte(myKey),
+		Key:         myKey,
 		Timeout:     time.Hour * 24,
 		MaxRefresh:  time.Hour * 24 * 7,
 		IdentityKey: identityKey,
@@ -39,10 +35,15 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 		},
 		IdentityHandler: func(c *gin.Context) interface{} {
 			claims := jwt.ExtractClaims(c)
-			user := claims["id"].(map[string]interface{})
+			user, ok := claims["id"].(map[string]interface{})
+			if !ok {
+				return nil
+			}
+			username, _ := user["username"].(string)
+			role, _ := user["role"].(string)
 			return &models.User{
-				Username: user["username"].(string),
-				Role:     user["role"].(string),
+				Username: username,
+				Role:     role,
 			}
 		},
 		Authenticator: func(c *gin.Context) (interface{}, error) {
@@ -53,11 +54,7 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 			username := loginVals.Username
 			password := loginVals.Password
 
-			// Get username from ENV
-			usernameFromConfig := os.Getenv("AGENT_USERNAME")
-			if usernameFromConfig == "" {
-				usernameFromConfig = "root"
-			}
+			usernameFromConfig := agentUsername()
 			// Get password from ENV
 			passwordFromConfig := os.Getenv("AGENT_PASSWORD")
 			if passwordFromConfig == "" {
@@ -76,7 +73,7 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 		LoginResponse: func(c *gin.Context, code int, token string, expire time.Time) {
 
 			// Decrypt the token
-			hmacSecret := []byte(myKey) // todo in config file
+			hmacSecret := myKey
 			t, _ := jwtgo.Parse(token, func(token *jwtgo.Token) (interface{}, error) {
 				return hmacSecret, nil
 			})
@@ -94,10 +91,10 @@ func JWTMiddleWare() jwt.GinJWTMiddleware {
 			})
 		},
 		Authorizator: func(data interface{}, c *gin.Context) bool {
-			if _, ok := data.(*models.User); ok { //&& v.Username == "admin" {
-				return true
-			}
-			return false
+			// Only the configured account may use the API, even with a
+			// validly signed token.
+			user, ok := data.(*models.User)
+			return ok && user.Username != "" && user.Username == agentUsername()
 		},
 		Unauthorized: func(c *gin.Context, code int, message string) {
 			c.AbortWithStatusJSON(code, gin.H{

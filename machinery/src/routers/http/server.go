@@ -61,17 +61,14 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 		c.AbortWithStatus(500)
 	}))
 
-	// Profiler
-	pprof.Register(r)
-
 	// Setup CORS
 	r.Use(CORS())
 
 	// Add Swagger
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// The JWT middlewareergreggre
-	middleWare := JWTMiddleWare()
+	// The JWT middleware
+	middleWare := JWTMiddleWare(configDirectory)
 	authMiddleware, err := jwt.New(&middleWare)
 	if err != nil {
 		log.WithError(err).WithFields(log.Fields{
@@ -79,6 +76,8 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 			"event":     "jwt_initialization_failed",
 		}).Fatal("Failed to initialize JWT middleware")
 	}
+
+	registerProfiler(r, authMiddleware)
 
 	// Add all routes
 	AddRoutes(r, authMiddleware, configDirectory, configuration, communication, captureDevice)
@@ -103,9 +102,7 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 	r.Use(static.Serve("/media", static.LocalFile(configDirectory+"/www", true)))
 	r.Use(static.Serve("/settings", static.LocalFile(configDirectory+"/www", true)))
 	r.Use(static.Serve("/login", static.LocalFile(configDirectory+"/www", true)))
-	r.Handle("GET", "/file/*filepath", func(c *gin.Context) {
-		Files(c, configDirectory, configuration)
-	})
+	registerFileRoute(r, authMiddleware, configDirectory, configuration)
 
 	// Run the api on port
 	log.WithFields(log.Fields{
@@ -121,6 +118,23 @@ func StartServer(configDirectory string, configuration *models.Configuration, co
 			"port":      configuration.Port,
 		}).Fatal("HTTP server stopped")
 	}
+}
+
+// registerProfiler exposes the Go profiler only when AGENT_ENABLE_PPROF=true.
+// The endpoints expose heap dumps (which can contain credentials) and can be
+// used to exhaust the CPU, so they always require a valid token.
+func registerProfiler(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware) {
+	if os.Getenv("AGENT_ENABLE_PPROF") == "true" {
+		pprof.Register(r.Group("", authMiddleware.MiddlewareFunc()))
+	}
+}
+
+// registerFileRoute serves recordings to signed-in users. Browsers load them
+// through <video src>, so the UI passes the token as ?token=.
+func registerFileRoute(r *gin.Engine, authMiddleware *jwt.GinJWTMiddleware, configDirectory string, configuration *models.Configuration) {
+	r.Handle("GET", "/file/*filepath", authMiddleware.MiddlewareFunc(), func(c *gin.Context) {
+		Files(c, configDirectory, configuration)
+	})
 }
 
 func requestLogger() gin.HandlerFunc {
@@ -196,7 +210,6 @@ func Files(c *gin.Context, configDirectory string, configuration *models.Configu
 		fileSize := len(contents)
 
 		// Send file to gin
-		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Content-Disposition", "attachment; filename="+filePath)
 		c.Header("Content-Type", "video/mp4")
 		c.Header("Content-Length", strconv.Itoa(fileSize))

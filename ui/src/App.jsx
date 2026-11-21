@@ -24,6 +24,7 @@ import { connect } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { logout } from './actions';
 import config from './config';
+import { getToken, withToken } from './api/api';
 import { getDashboardInformation } from './actions/agent';
 import LanguageSelect from './components/LanguageSelect/LanguageSelect';
 import websocketClientId from './websocket';
@@ -260,7 +261,12 @@ const mapStateToProps = (state) => ({
 const mapDispatchToProps = (dispatch) => ({
   dispatchLogout: () => dispatch(logout()),
   dispatchConnect: () => {
-    dispatch(connectWS(config.WS_URL));
+    // The WebSocket requires a token; there is nothing to connect to before
+    // sign-in (App mounts briefly on first load before the login redirect).
+    if (!getToken()) {
+      return;
+    }
+    dispatch(connectWS(withToken(config.WS_URL)));
   },
   dispatchDisconnect: () => dispatch(disconnectWS()),
   dispatchSend: (message) => dispatch(send(message)),

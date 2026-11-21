@@ -16,7 +16,7 @@ import (
 func TestHealthCheckReturnsStandardPublicResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	middlewareConfig := JWTMiddleWare()
+	middlewareConfig := JWTMiddleWare(t.TempDir())
 	authMiddleware, err := jwt.New(&middlewareConfig)
 	if err != nil {
 		t.Fatalf("initialize JWT middleware: %v", err)

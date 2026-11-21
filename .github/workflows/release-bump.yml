@@ -22,10 +22,12 @@ env:
 jobs:
   # Determine the next version, create the GitHub release and expose the tag.
   bump-release:
-    uses: uug-ai/workflows/.github/workflows/release-bump.yml@main
+    # Pinned to a reviewed commit of uug-ai/workflows so changes there cannot
+    # alter this release without a change here. It only needs GITHUB_TOKEN,
+    # which GitHub provides to called workflows, so no secrets are passed on.
+    uses: uug-ai/workflows/.github/workflows/release-bump.yml@6c1805abf25ac34add01d4af711277e8a68945ab # main as of 2026-11-20
     with:
       bump: ${{ github.event.inputs.bump }}
-    secrets: inherit
 
   # Publish the platform image to the uug-ai GitHub Container Registry
   # (ghcr.io/uug-ai/agent-platform).
@@ -56,6 +58,9 @@ jobs:
     strategy:
       matrix:
         architecture: [amd64]
+    env:
+      ARCH: ${{ matrix.architecture }}
+      RELEASE_TAG: ${{ needs.bump-release.outputs.tag }}
     steps:
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -66,16 +71,16 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Build
         run: |
-          docker build --provenance=false --build-arg VERSION=${{ needs.bump-release.outputs.tag }} -t ${{matrix.architecture}} .
-          CID=$(docker create ${{matrix.architecture}})
-          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
-          docker rm ${CID}
+          docker build --provenance=false --build-arg VERSION="${RELEASE_TAG}" -t "${ARCH}" .
+          CID=$(docker create "${ARCH}")
+          docker cp "${CID}:/home/agent" "./output-${ARCH}"
+          docker rm "${CID}"
       - name: Strip binary
-        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
+        run: tar -cf "agent-${ARCH}.tar" -C "output-${ARCH}" . && rm -rf "output-${ARCH}"
       - name: Build and push Docker image
         run: |
-          docker tag ${{matrix.architecture}} $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
-          docker push $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
+          docker tag "${ARCH}" "${REPO}-arch:arch-${ARCH}-${RELEASE_TAG}"
+          docker push "${REPO}-arch:arch-${ARCH}-${RELEASE_TAG}"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -90,6 +95,9 @@ jobs:
     strategy:
       matrix:
         architecture: [arm64]
+    env:
+      ARCH: ${{ matrix.architecture }}
+      RELEASE_TAG: ${{ needs.bump-release.outputs.tag }}
     steps:
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -100,16 +108,16 @@ jobs:
         uses: actions/checkout@v4
       - name: Run Build
         run: |
-          docker build --provenance=false --build-arg VERSION=${{ needs.bump-release.outputs.tag }} -t ${{matrix.architecture}} .
-          CID=$(docker create ${{matrix.architecture}})
-          docker cp ${CID}:/home/agent ./output-${{matrix.architecture}}
-          docker rm ${CID}
+          docker build --provenance=false --build-arg VERSION="${RELEASE_TAG}" -t "${ARCH}" .
+          CID=$(docker create "${ARCH}")
+          docker cp "${CID}:/home/agent" "./output-${ARCH}"
+          docker rm "${CID}"
       - name: Strip binary
-        run: tar -cf agent-${{matrix.architecture}}.tar -C output-${{matrix.architecture}} . && rm -rf output-${{matrix.architecture}}
+        run: tar -cf "agent-${ARCH}.tar" -C "output-${ARCH}" . && rm -rf "output-${ARCH}"
       - name: Build and push Docker image
         run: |
-          docker tag ${{matrix.architecture}} $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
-          docker push $REPO-arch:arch-${{matrix.architecture}}-${{ needs.bump-release.outputs.tag }}
+          docker tag "${ARCH}" "${REPO}-arch:arch-${ARCH}-${RELEASE_TAG}"
+          docker push "${REPO}-arch:arch-${ARCH}-${RELEASE_TAG}"
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -119,6 +127,8 @@ jobs:
   create-manifest:
     runs-on: ubuntu-24.04
     needs: [bump-release, build-amd64, build-arm64]
+    env:
+      RELEASE_TAG: ${{ needs.bump-release.outputs.tag }}
     steps:
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -127,16 +137,16 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Create and push multi-arch manifest
         run: |
-          docker manifest create $REPO:${{ needs.bump-release.outputs.tag }} \
-            $REPO-arch:arch-amd64-${{ needs.bump-release.outputs.tag }} \
-            $REPO-arch:arch-arm64-${{ needs.bump-release.outputs.tag }}
-          docker manifest push $REPO:${{ needs.bump-release.outputs.tag }}
+          docker manifest create "${REPO}:${RELEASE_TAG}" \
+            "${REPO}-arch:arch-amd64-${RELEASE_TAG}" \
+            "${REPO}-arch:arch-arm64-${RELEASE_TAG}"
+          docker manifest push "${REPO}:${RELEASE_TAG}"
       - name: Create and push latest manifest
         run: |
-          docker manifest create $REPO:latest \
-            $REPO-arch:arch-amd64-${{ needs.bump-release.outputs.tag }} \
-            $REPO-arch:arch-arm64-${{ needs.bump-release.outputs.tag }}
-          docker manifest push $REPO:latest
+          docker manifest create "${REPO}:latest" \
+            "${REPO}-arch:arch-amd64-${RELEASE_TAG}" \
+            "${REPO}-arch:arch-arm64-${RELEASE_TAG}"
+          docker manifest push "${REPO}:latest"
 
   create-release:
     runs-on: ubuntu-24.04
