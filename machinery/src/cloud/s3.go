@@ -59,11 +59,13 @@ func UploadS3(configuration *models.Configuration, fileName string) (bool, bool,
 
 	// Check if we need to use the proxy.
 	if config.S3.ProxyURI != "" {
-		var transport http.RoundTripper = &http.Transport{
+		transport := &http.Transport{
 			Proxy: func(*http.Request) (*url.URL, error) {
 				return url.Parse(config.S3.ProxyURI)
 			},
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		if os.Getenv("AGENT_TLS_INSECURE") == "true" {
+			transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		}
 		s3Client.SetCustomTransport(transport)
 	}
