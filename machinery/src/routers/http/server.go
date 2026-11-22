@@ -199,7 +199,7 @@ func Files(c *gin.Context, configDirectory string, configuration *models.Configu
 			}
 
 			// Decrypt file
-			contents, err = encryption.AesDecrypt(contents, symmetricKey)
+			contents, err = encryption.DecryptRecording(contents, symmetricKey)
 			if err != nil {
 				c.JSON(404, gin.H{"error": "File not found"})
 				return

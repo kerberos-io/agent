@@ -26,6 +26,9 @@ func SignWithPrivateKey(data []byte, privateKey *rsa.PrivateKey) ([]byte, error)
 	return signature, err
 }
 
+// AesEncrypt writes the OpenSSL/CryptoJS "Salted__" format (MD5-based key
+// derivation). It is kept for MQTT messages with Kerberos Hub, whose keys are
+// random. Recordings use EncryptRecording instead.
 func AesEncrypt(content []byte, password string) ([]byte, error) {
 	salt := make([]byte, 8)
 	_, err := rand.Read(salt)
@@ -33,6 +36,9 @@ func AesEncrypt(content []byte, password string) ([]byte, error) {
 		return nil, err
 	}
 	key, iv, err := DefaultEvpKDF([]byte(password), salt)
+	if err != nil {
+		return nil, err
+	}
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -50,13 +56,18 @@ func AesEncrypt(content []byte, password string) ([]byte, error) {
 	return cipherText, nil
 }
 
+// AesDecrypt reads the OpenSSL/CryptoJS "Salted__" format used for MQTT
+// messages with Kerberos Hub and by recordings from older releases.
 func AesDecrypt(cipherText []byte, password string) ([]byte, error) {
-	if string(cipherText[:8]) != "Salted__" {
+	if len(cipherText) < 16+aes.BlockSize || string(cipherText[:8]) != "Salted__" {
 		return nil, errors.New("invalid crypto js aes encryption")
+	}
+	if (len(cipherText)-16)%aes.BlockSize != 0 {
+		return nil, errLegacyCiphertext
 	}
 
 	salt := cipherText[8:16]
-	cipherBytes := cipherText[16:]
+	cipherBytes := append([]byte(nil), cipherText[16:]...)
 	key, iv, err := DefaultEvpKDF([]byte(password), salt)
 	if err != nil {
 		return nil, err
@@ -70,8 +81,7 @@ func AesDecrypt(cipherText []byte, password string) ([]byte, error) {
 	mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(cipherBytes, cipherBytes)
 
-	result := PKCS5UnPadding(cipherBytes)
-	return result, nil
+	return pkcs7Unpad(cipherBytes, aes.BlockSize)
 }
 
 func EvpKDF(password []byte, salt []byte, keySize int, iterations int, hashAlgorithm string) ([]byte, error) {
@@ -111,6 +121,25 @@ func DefaultEvpKDF(password []byte, salt []byte) (key []byte, iv []byte, err err
 		return []byte{}, []byte{}, err
 	}
 	return derivedKeyBytes[:keySize*4], derivedKeyBytes[keySize*4:], nil
+}
+
+// pkcs7Unpad validates the padding instead of trusting the last byte, so a
+// wrong key or a truncated file returns an error rather than panicking.
+func pkcs7Unpad(src []byte, blockSize int) ([]byte, error) {
+	length := len(src)
+	if length == 0 || length%blockSize != 0 {
+		return nil, errLegacyCiphertext
+	}
+	padding := int(src[length-1])
+	if padding == 0 || padding > blockSize || padding > length {
+		return nil, errLegacyCiphertext
+	}
+	for _, b := range src[length-padding:] {
+		if int(b) != padding {
+			return nil, errLegacyCiphertext
+		}
+	}
+	return src[:length-padding], nil
 }
 
 func PKCS5UnPadding(src []byte) []byte {

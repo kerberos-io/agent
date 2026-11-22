@@ -452,7 +452,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						contents, err := os.ReadFile(fullName)
 						if err == nil {
 							// encrypt
-							encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
+							encryptedContents, err := encryption.EncryptRecording(contents, config.Encryption.SymmetricKey)
 							if err == nil {
 								// write back to file
 								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
@@ -567,7 +567,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 						contents, err := os.ReadFile(fullName)
 						if err == nil {
 							// encrypt
-							encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
+							encryptedContents, err := encryption.EncryptRecording(contents, config.Encryption.SymmetricKey)
 							if err == nil {
 								// write back to file
 								err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
@@ -793,7 +793,7 @@ func HandleRecordStream(queue *packets.Queue, configDirectory string, configurat
 					contents, err := os.ReadFile(fullName)
 					if err == nil {
 						// encrypt
-						encryptedContents, err := encryption.AesEncrypt(contents, config.Encryption.SymmetricKey)
+						encryptedContents, err := encryption.EncryptRecording(contents, config.Encryption.SymmetricKey)
 						if err == nil {
 							// write back to file
 							err := os.WriteFile(fullName, []byte(encryptedContents), 0644)
