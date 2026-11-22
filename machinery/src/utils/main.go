@@ -409,7 +409,7 @@ func Decrypt(directoryOrFile string, symmetricKey []byte) {
 			return
 		}
 		// Decrypt using AES key
-		decrypted, err := encryption.AesDecrypt(content, string(symmetricKey))
+		decrypted, err := encryption.DecryptRecording(content, string(symmetricKey))
 		if err != nil {
 			log.Fatal("Something went wrong while decrypting: " + err.Error())
 			return

@@ -14,11 +14,10 @@ import (
 func TestFilesServesFlatAndDatedRecordings(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, layout := range []string{"flat", "dated"} {
-		for _, encrypted := range []bool{false, true} {
-			name := layout + "-plain"
-			if encrypted {
-				name = layout + "-encrypted"
-			}
+		// "legacy" is the OpenSSL format written by older releases; "v1" is
+		// the current PBKDF2 + AES-GCM recording format.
+		for _, format := range []string{"plain", "legacy", "v1"} {
+			name := layout + "-" + format
 			t.Run(name, func(t *testing.T) {
 				const fileName = "1767355200123-device-key.mp4"
 				directory := t.TempDir()
@@ -32,14 +31,18 @@ func TestFilesServesFlatAndDatedRecordings(t *testing.T) {
 				}
 				config := &models.Configuration{Config: models.Config{Encryption: &models.Encryption{}}}
 				content := []byte("recording-payload")
-				if encrypted {
+				if format != "plain" {
 					config.Config.Encryption.Recordings = "true"
 					config.Config.Encryption.SymmetricKey = "0123456789abcdef0123456789abcdef"
-					ciphertext, err := encryption.AesEncrypt(content, config.Config.Encryption.SymmetricKey)
+					encrypt := encryption.EncryptRecording
+					if format == "legacy" {
+						encrypt = encryption.AesEncrypt
+					}
+					ciphertext, err := encrypt(content, config.Config.Encryption.SymmetricKey)
 					if err != nil {
 						t.Fatal(err)
 					}
-					content = []byte(ciphertext)
+					content = ciphertext
 				}
 				if err := os.WriteFile(filePath, content, 0o644); err != nil {
 					t.Fatal(err)

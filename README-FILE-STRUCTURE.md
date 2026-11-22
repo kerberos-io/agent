@@ -25,6 +25,27 @@ Directory decryption also processes dated subdirectories and writes each output
 to a sibling `decrypted/` directory; those outputs are excluded from recording
 lists and automatic cleanup.
 
+## Recording encryption format
+
+When recording encryption is enabled, recordings are written in a versioned
+format:
+
+| Bytes | Field |
+|---|---|
+| 8 | Magic `KRBREC1\0` |
+| 4 | PBKDF2 iteration count (big-endian) |
+| 16 | Salt |
+| 12 | Nonce |
+| rest | AES-256-GCM ciphertext and 16-byte tag |
+
+- **Key derivation:** the key is derived from the configured symmetric key with
+  PBKDF2-HMAC-SHA256, currently 600,000 iterations.
+- **Authentication:** the header is authenticated together with the payload, so
+  any change to a recording is detected.
+- **Older recordings:** recordings from releases before 3.14.5 use the
+  OpenSSL/CryptoJS `Salted__` format. Playback and `-action decrypt` still read
+  them, so no migration is needed.
+
 ## Direct S3 recording layout
 
 Direct S3 uploads store recordings as
