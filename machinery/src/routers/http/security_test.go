@@ -71,8 +71,15 @@ func TestLoadJWTSecretReplacesShortStoredSecret(t *testing.T) {
 // securityRouter wires the real middleware and routes the way StartServer does.
 func securityRouter(t *testing.T) (*gin.Engine, []byte) {
 	t.Helper()
+	return securityRouterWithSecret(t, "")
+}
+
+// securityRouterWithSecret is securityRouter with AGENT_JWT_SECRET set to
+// secret ("" means the generated per-install secret).
+func securityRouterWithSecret(t *testing.T, secret string) (*gin.Engine, []byte) {
+	t.Helper()
 	gin.SetMode(gin.TestMode)
-	t.Setenv("AGENT_JWT_SECRET", "")
+	t.Setenv("AGENT_JWT_SECRET", secret)
 	t.Setenv("AGENT_USERNAME", "")
 	t.Setenv("AGENT_PASSWORD", "")
 
@@ -200,5 +207,31 @@ func TestProfilerRequiresTokenWhenEnabled(t *testing.T) {
 	}
 	if code := request(router, "GET", "/debug/pprof/", signedToken(t, key, "root")); code != stdhttp.StatusOK {
 		t.Fatalf("enabled pprof with token: status %d, want 200", code)
+	}
+}
+
+// Kerberos Factory signs tokens for the agent with the shared AGENT_JWT_SECRET
+// under the "factory" identity (uug-ai/factory api/k8sproxy/jwt.go).
+func TestFactoryTokenAcceptedWithSharedSecret(t *testing.T) {
+	router, key := securityRouterWithSecret(t, "shared-with-factory")
+	if string(key) != "shared-with-factory" {
+		t.Fatalf("middleware key = %q, want the shared secret", key)
+	}
+	token := signedToken(t, key, "factory")
+
+	// An authorised request reaches the handler, which reports the missing file.
+	if code := request(router, "GET", "/file/missing.mp4", token); code != stdhttp.StatusNotFound {
+		t.Fatalf("factory token with shared secret: status %d, want 404 from the handler", code)
+	}
+	if code := request(router, "GET", "/file/missing.mp4", signedToken(t, key, "someone-else")); code != stdhttp.StatusForbidden {
+		t.Fatalf("other identity with shared secret: status %d, want 403", code)
+	}
+}
+
+func TestFactoryIdentityRejectedWithoutSharedSecret(t *testing.T) {
+	router, key := securityRouter(t)
+
+	if code := request(router, "GET", "/file/missing.mp4", signedToken(t, key, "factory")); code != stdhttp.StatusForbidden {
+		t.Fatalf("factory identity with the per-install secret: status %d, want 403", code)
 	}
 }

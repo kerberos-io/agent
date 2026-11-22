@@ -21,6 +21,9 @@ const (
 	// legacyJWTSecret was the hard-coded fallback in earlier releases. It is
 	// public, so it is never used implicitly.
 	legacyJWTSecret = "TOBECHANGED"
+	// factoryServiceUsername is the identity Kerberos Factory puts in the
+	// tokens it signs with the shared AGENT_JWT_SECRET.
+	factoryServiceUsername = "factory"
 )
 
 // loadJWTSecret returns the key used to sign and verify API tokens.
