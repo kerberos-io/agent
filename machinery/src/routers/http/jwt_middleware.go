@@ -18,6 +18,11 @@ func JWTMiddleWare(configDirectory string) jwt.GinJWTMiddleware {
 	// Kerberos Factory) be validated by the agent. Without it, a random secret
 	// is generated once and stored with the configuration; see loadJWTSecret.
 	myKey := loadJWTSecret(configDirectory)
+	// With an explicitly shared secret, Kerberos Factory signs its own tokens
+	// for the agent under the "factory" service identity. Only holders of that
+	// secret can produce them. With the generated per-install secret, only the
+	// agent's own login issues tokens, so that identity is not accepted.
+	sharedSecret := os.Getenv("AGENT_JWT_SECRET") != ""
 
 	m := jwt.GinJWTMiddleware{
 		Realm:       "kerberosio",
@@ -94,7 +99,10 @@ func JWTMiddleWare(configDirectory string) jwt.GinJWTMiddleware {
 			// Only the configured account may use the API, even with a
 			// validly signed token.
 			user, ok := data.(*models.User)
-			return ok && user.Username != "" && user.Username == agentUsername()
+			if !ok || user.Username == "" {
+				return false
+			}
+			return user.Username == agentUsername() || (sharedSecret && user.Username == factoryServiceUsername)
 		},
 		Unauthorized: func(c *gin.Context, code int, message string) {
 			c.AbortWithStatusJSON(code, gin.H{
