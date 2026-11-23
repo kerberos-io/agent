@@ -58,21 +58,59 @@ func init() {
 	mqtt.ERROR = pahoErrorLogger{}
 }
 
-func enableMQTTConnectionDiagnostics(options *mqtt.ClientOptions, brokerURL string) {
-	if !strings.Contains(brokerURL, "://") {
-		options.SetCustomOpenConnectionFn(openMQTTConnection)
-		return
+// parseMQTTBrokers turns the configured MQTT URI into the list of brokers to
+// connect to. Besides a single broker URI it accepts an ActiveMQ-style
+// failover URI, as used by Amazon MQ active/standby brokers:
+//
+//	failover:(mqtt+ssl://b-1.example:8883,mqtt+ssl://b-2.example:8883)
+//
+// and a plain comma-separated list of broker URIs. Transport options after
+// the closing parenthesis (e.g. "?randomize=false") are ignored: paho tries
+// the brokers in the order they are listed, on connect and on reconnect.
+func parseMQTTBrokers(raw string) []string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) >= len("failover:") && strings.EqualFold(raw[:len("failover:")], "failover:") {
+		raw = strings.TrimSpace(raw[len("failover:"):])
+		if strings.HasPrefix(raw, "(") {
+			if end := strings.LastIndex(raw, ")"); end > 0 {
+				raw = raw[1:end]
+			} else {
+				raw = raw[1:]
+			}
+		}
 	}
 
-	parsedURL, err := url.Parse(brokerURL)
-	if err != nil {
+	brokers := []string{}
+	for _, broker := range strings.Split(raw, ",") {
+		if broker = strings.TrimSpace(broker); broker != "" {
+			brokers = append(brokers, broker)
+		}
+	}
+	return brokers
+}
+
+// enableMQTTConnectionDiagnostics installs our instrumented TCP/TLS dialer.
+// The custom dialer is used for every broker, so it is only installed when
+// all brokers use a TCP-based scheme (WebSocket brokers keep paho's dialer).
+func enableMQTTConnectionDiagnostics(options *mqtt.ClientOptions, brokerURLs []string) {
+	if len(brokerURLs) == 0 {
 		return
 	}
-
-	switch strings.ToLower(parsedURL.Scheme) {
-	case "", "mqtt", "tcp", "ssl", "tls", "mqtts", "mqtt+ssl", "tcps":
-		options.SetCustomOpenConnectionFn(openMQTTConnection)
+	for _, brokerURL := range brokerURLs {
+		if !strings.Contains(brokerURL, "://") {
+			continue
+		}
+		parsedURL, err := url.Parse(brokerURL)
+		if err != nil {
+			return
+		}
+		switch strings.ToLower(parsedURL.Scheme) {
+		case "", "mqtt", "tcp", "ssl", "tls", "mqtts", "mqtt+ssl", "tcps":
+		default:
+			return
+		}
 	}
+	options.SetCustomOpenConnectionFn(openMQTTConnection)
 }
 
 func openMQTTConnection(uri *url.URL, options mqtt.ClientOptions) (net.Conn, error) {
@@ -270,8 +308,11 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 
 		// We will set the MQTT endpoint to which we want to connect
 		// and share and receive messages to/from.
-		mqttURL := config.MQTTURI
-		opts.AddBroker(mqttURL)
+		// The URI may list several brokers (failover), paho tries them in order.
+		mqttBrokers := parseMQTTBrokers(config.MQTTURI)
+		for _, broker := range mqttBrokers {
+			opts.AddBroker(broker)
+		}
 
 		// Our MQTT broker can have username/password credentials
 		// to protect it from the outside.
@@ -282,7 +323,8 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 			opts.SetPassword(mqtt_password)
 		}
 		log.WithFields(log.Fields{
-			"broker_configured":   mqttURL != "",
+			"broker_configured":   len(mqttBrokers) > 0,
+			"broker_count":        len(mqttBrokers),
 			"component":           "routers/mqtt",
 			"event":               "credentials_configured",
 			"password_configured": mqtt_password != "",
@@ -292,7 +334,7 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 		// Some extra options to make sure the connection behaves
 		// properly. More information here: github.com/eclipse/paho.mqtt.golang.
 		//opts.SetCleanSession(true)
-		enableMQTTConnectionDiagnostics(opts, mqttURL)
+		enableMQTTConnectionDiagnostics(opts, mqttBrokers)
 		opts.SetCleanSession(false)
 		opts.SetResumeSubs(true)
 		opts.SetStore(mqtt.NewMemoryStore())
@@ -354,7 +396,7 @@ func ConfigureMQTT(configDirectory string, configuration *models.Configuration, 
 				"event":     "connected",
 			}).Info("MQTT broker connected")
 			log.WithFields(log.Fields{
-				"broker_configured": mqttURL != "",
+				"broker_configured": len(mqttBrokers) > 0,
 				"component":         "routers/mqtt",
 				"event":             "connection_details",
 			}).Debug("MQTT connection details")
