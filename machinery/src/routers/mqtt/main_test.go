@@ -230,6 +230,15 @@ func TestParseMQTTBrokers(t *testing.T) {
 		},
 		{name: "failover without parentheses", raw: "failover:tcp://b-1.example:1883", want: []string{"tcp://b-1.example:1883"}},
 		{name: "comma separated", raw: "tcp://b-1.example:1883,tcp://b-2.example:1883", want: []string{"tcp://b-1.example:1883", "tcp://b-2.example:1883"}},
+		{name: "comma in query string", raw: "wss://broker.example/mqtt?token=a,b", want: []string{"wss://broker.example/mqtt?token=a,b"}},
+		{name: "comma in password", raw: "mqtt+ssl://user:p,ss@broker.example:8883", want: []string{"mqtt+ssl://user:p,ss@broker.example:8883"}},
+		{name: "comma in path", raw: "wss://broker.example/a,b/mqtt", want: []string{"wss://broker.example/a,b/mqtt"}},
+		{name: "comma followed by text that looks like a scheme without slashes", raw: "wss://broker.example/mqtt?list=a,b:c", want: []string{"wss://broker.example/mqtt?list=a,b:c"}},
+		{
+			name: "failover with commas inside a broker URI",
+			raw:  "failover:(wss://b-1.example/mqtt?token=a,b,wss://b-2.example/mqtt?token=c,d)",
+			want: []string{"wss://b-1.example/mqtt?token=a,b", "wss://b-2.example/mqtt?token=c,d"},
+		},
 	}
 
 	for _, test := range tests {

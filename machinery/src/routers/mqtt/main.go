@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -67,6 +68,11 @@ func init() {
 // and a plain comma-separated list of broker URIs. Transport options after
 // the closing parenthesis (e.g. "?randomize=false") are ignored: paho tries
 // the brokers in the order they are listed, on connect and on reconnect.
+//
+// A comma only separates brokers when the text after it starts with a URI
+// scheme ("scheme://"). Any other comma belongs to the current broker URI,
+// so existing single-broker URIs with commas in their credentials, path or
+// query string (e.g. "wss://broker/mqtt?token=a,b") keep working.
 func parseMQTTBrokers(raw string) []string {
 	raw = strings.TrimSpace(raw)
 	if len(raw) >= len("failover:") && strings.EqualFold(raw[:len("failover:")], "failover:") {
@@ -80,14 +86,26 @@ func parseMQTTBrokers(raw string) []string {
 		}
 	}
 
+	segments := []string{}
+	for _, segment := range strings.Split(raw, ",") {
+		if len(segments) > 0 && !mqttBrokerSchemePattern.MatchString(strings.TrimSpace(segment)) {
+			segments[len(segments)-1] += "," + segment
+			continue
+		}
+		segments = append(segments, segment)
+	}
+
 	brokers := []string{}
-	for _, broker := range strings.Split(raw, ",") {
+	for _, broker := range segments {
 		if broker = strings.TrimSpace(broker); broker != "" {
 			brokers = append(brokers, broker)
 		}
 	}
 	return brokers
 }
+
+// mqttBrokerSchemePattern matches the start of a URI with a scheme (RFC 3986).
+var mqttBrokerSchemePattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9+.-]*://`)
 
 // enableMQTTConnectionDiagnostics installs our instrumented TCP/TLS dialer.
 // The custom dialer is used for every broker, so it is only installed when
