@@ -23,12 +23,15 @@ func TestEnableMQTTConnectionDiagnostics(t *testing.T) {
 		{name: "TCP", brokerURL: "tcp://broker.example:1883", want: true},
 		{name: "default TCP", brokerURL: "broker.example:1883", want: true},
 		{name: "WebSocket", brokerURL: "wss://broker.example/mqtt", want: false},
+		{name: "ActiveMQ failover", brokerURL: "failover:(mqtt+ssl://b-1.example:8883,mqtt+ssl://b-2.example:8883)", want: true},
+		{name: "mixed TCP and WebSocket", brokerURL: "tcp://b-1.example:1883,wss://b-2.example/mqtt", want: false},
+		{name: "empty", brokerURL: "", want: false},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			options := mqtt.NewClientOptions()
-			enableMQTTConnectionDiagnostics(options, test.brokerURL)
+			enableMQTTConnectionDiagnostics(options, parseMQTTBrokers(test.brokerURL))
 			if got := options.CustomOpenConnectionFn != nil; got != test.want {
 				t.Fatalf("CustomOpenConnectionFn configured = %t, want %t", got, test.want)
 			}
@@ -204,5 +207,66 @@ func TestRemoteSessionReservationIsIdempotent(t *testing.T) {
 	}
 	if _, err := manager.reserve(session); !errors.Is(err, errRemoteSessionExists) {
 		t.Fatalf("duplicate reserve() error = %v, want %v", err, errRemoteSessionExists)
+	}
+}
+
+func TestParseMQTTBrokers(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want []string
+	}{
+		{name: "single", raw: "mqtt+ssl://broker.example:8883", want: []string{"mqtt+ssl://broker.example:8883"}},
+		{name: "empty", raw: "  ", want: []string{}},
+		{
+			name: "Amazon MQ failover",
+			raw:  "failover:(mqtt+ssl://b-1.mq.eu-west-2.amazonaws.com:8883,mqtt+ssl://b-2.mq.eu-west-2.amazonaws.com:8883)",
+			want: []string{"mqtt+ssl://b-1.mq.eu-west-2.amazonaws.com:8883", "mqtt+ssl://b-2.mq.eu-west-2.amazonaws.com:8883"},
+		},
+		{
+			name: "failover with spaces and transport options",
+			raw:  " FAILOVER:( ssl://b-1.example:8883 , ssl://b-2.example:8883 )?randomize=false",
+			want: []string{"ssl://b-1.example:8883", "ssl://b-2.example:8883"},
+		},
+		{name: "failover without parentheses", raw: "failover:tcp://b-1.example:1883", want: []string{"tcp://b-1.example:1883"}},
+		{name: "comma separated", raw: "tcp://b-1.example:1883,tcp://b-2.example:1883", want: []string{"tcp://b-1.example:1883", "tcp://b-2.example:1883"}},
+		{name: "comma in query string", raw: "wss://broker.example/mqtt?token=a,b", want: []string{"wss://broker.example/mqtt?token=a,b"}},
+		{name: "comma in password", raw: "mqtt+ssl://user:p,ss@broker.example:8883", want: []string{"mqtt+ssl://user:p,ss@broker.example:8883"}},
+		{name: "comma in path", raw: "wss://broker.example/a,b/mqtt", want: []string{"wss://broker.example/a,b/mqtt"}},
+		{name: "comma followed by text that looks like a scheme without slashes", raw: "wss://broker.example/mqtt?list=a,b:c", want: []string{"wss://broker.example/mqtt?list=a,b:c"}},
+		{
+			name: "failover with commas inside a broker URI",
+			raw:  "failover:(wss://b-1.example/mqtt?token=a,b,wss://b-2.example/mqtt?token=c,d)",
+			want: []string{"wss://b-1.example/mqtt?token=a,b", "wss://b-2.example/mqtt?token=c,d"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := parseMQTTBrokers(test.raw)
+			if len(got) != len(test.want) {
+				t.Fatalf("parseMQTTBrokers(%q) = %q, want %q", test.raw, got, test.want)
+			}
+			for i := range got {
+				if got[i] != test.want[i] {
+					t.Fatalf("parseMQTTBrokers(%q) = %q, want %q", test.raw, got, test.want)
+				}
+			}
+		})
+	}
+}
+
+func TestConfigureMQTTOptionsRegistersFailoverBrokers(t *testing.T) {
+	options := mqtt.NewClientOptions()
+	for _, broker := range parseMQTTBrokers("failover:(mqtt+ssl://b-1.example:8883,mqtt+ssl://b-2.example:8883)") {
+		options.AddBroker(broker)
+	}
+	if len(options.Servers) != 2 {
+		t.Fatalf("registered %d brokers, want 2", len(options.Servers))
+	}
+	for i, host := range []string{"b-1.example:8883", "b-2.example:8883"} {
+		if options.Servers[i].Scheme != "mqtt+ssl" || options.Servers[i].Host != host {
+			t.Fatalf("broker %d = %s, want mqtt+ssl://%s", i, options.Servers[i], host)
+		}
 	}
 }
