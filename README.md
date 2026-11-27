@@ -336,7 +336,7 @@ Notes:
 | `AGENT_AUTO_CLEAN_MIN_FREE_SPACE`           | When `AUTO_CLEAN` is enabled and no `MAX_SIZE` is set, keep at least this much free space (in MB) on the recordings disk before deleting the oldest (already-uploaded first) recordings. Defaults to 5% of the disk. | ""                             |
 | `AGENT_TIME`                                | Enable the timetable for Kerberos Agent                                                         | "false"                        |
 | `AGENT_TIMETABLE`                           | A (weekly) time table to specify when to make recordings "start1,end1,start2,end2;start1..      | ""                             |
-| `AGENT_REGION_POLYGON`                      | A single polygon set for motion detection: "x1,y1;x2,y2;x3,y3;...                               | ""                             |
+| `AGENT_REGION_POLYGON`                      | One or more polygons for motion detection. Points are "x,y" separated by ";", polygons are separated by "\|": "x1,y1;x2,y2;x3,y3\|x1,y1;x2,y2;x3,y3". Each polygon needs at least 3 points. | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_RTSP`               | Full-HD RTSP or RTSPS endpoint for the target camera.                                           | ""                             |
 | `AGENT_CAPTURE_IPCAMERA_RTSP_TRANSPORT`     | Transport for the RTSP streams: "tcp", "udp" or "auto" (UDP first, falls back to TCP).          | "tcp"                          |
 | `AGENT_CAPTURE_IPCAMERA_SUB_RTSP`           | RTSP or RTSPS sub-stream endpoint used for livestreaming (WebRTC).                              | ""                             |
