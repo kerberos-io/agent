@@ -726,6 +726,13 @@ func SaveConfig(configDirectory string, config models.Config, configuration *mod
 	if !communication.IsConfiguring.IsSet() {
 		communication.IsConfiguring.Set()
 
+		// The posted config carries the runtime-resolved base size (see
+		// utils.ResolveBaseDimensions). Persist the configured base size
+		// instead, so the coordinate space the region polygons are drawn in
+		// doesn't change when the config is saved.
+		config.Capture.IPCamera.BaseWidth = configuration.CustomConfig.Capture.IPCamera.BaseWidth
+		config.Capture.IPCamera.BaseHeight = configuration.CustomConfig.Capture.IPCamera.BaseHeight
+
 		err := StoreConfig(configDirectory, config)
 		if err != nil {
 			communication.IsConfiguring.UnSet()
@@ -758,10 +765,6 @@ func StoreConfig(configDirectory string, config models.Config) error {
 		encryptionPrivateKey = strings.ReplaceAll(encryptionPrivateKey, "\\n", "\n")
 		config.Encryption.PrivateKey = encryptionPrivateKey
 	}
-
-	// Reset the basewidth and baseheight
-	config.Capture.IPCamera.BaseWidth = 0
-	config.Capture.IPCamera.BaseHeight = 0
 
 	// Save into database
 	if os.Getenv("DEPLOYMENT") == "factory" || os.Getenv("MACHINERY_ENVIRONMENT") == "kubernetes" {
