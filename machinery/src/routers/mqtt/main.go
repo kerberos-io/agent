@@ -848,6 +848,13 @@ func HandleRequestConfig(mqttClient mqtt.Client, hubKey string, payload models.P
 			// Unset encryption part.
 			delete(configMap, "encryption")
 
+			// Tell the Hub which settings come from environment variables:
+			// those are applied again on every start, so the Hub shows them
+			// as read-only instead of saving changes that would be undone.
+			if envManaged := configService.EnvManagedConfig(); !envManaged.IsEmpty() && configMap != nil {
+				configMap["env_managed"] = envManaged
+			}
+
 			message := models.Message{
 				Payload: models.Payload{
 					Action:   "receive-config",
