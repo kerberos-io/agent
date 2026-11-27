@@ -13,6 +13,18 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// buildRegionPolygon converts a motion region's coordinates into a polygon in
+// frame space, scaling them by the given ratios. Every vertex is kept: the
+// polygon's even-odd Contains test handles concave shapes, so a vertex that
+// falls inside the shape built so far is part of the outline, not a duplicate.
+func buildRegionPolygon(coordinates []models.Coordinate, widthRatio, heightRatio float64) geo.Polygon {
+	poly := geo.Polygon{}
+	for _, c := range coordinates {
+		poly.Add(geo.NewPoint(c.X*widthRatio, c.Y*heightRatio))
+	}
+	return poly
+}
+
 func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Configuration, communication *models.Communication, mqttClient mqtt.Client, rtspClient capture.RTSPClient) {
 
 	log.Debug("computervision.main.ProcessMotion(): start motion detection")
@@ -101,17 +113,7 @@ func ProcessMotion(motionCursor *packets.QueueCursor, configuration *models.Conf
 		var polyObjects []geo.Polygon
 		if config.Region != nil {
 			for _, polygon := range config.Region.Polygon {
-				coords := polygon.Coordinates
-				poly := geo.Polygon{}
-				for _, c := range coords {
-					x := c.X * baseWidthRatio
-					y := c.Y * baseHeightRatio
-					p := geo.NewPoint(x, y)
-					if !poly.Contains(p) {
-						poly.Add(p)
-					}
-				}
-				polyObjects = append(polyObjects, poly)
+				polyObjects = append(polyObjects, buildRegionPolygon(polygon.Coordinates, baseWidthRatio, baseHeightRatio))
 			}
 		}
 
