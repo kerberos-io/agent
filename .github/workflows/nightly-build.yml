@@ -8,11 +8,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  nightly-build-amd64:
+  # Build one image per architecture. Only architectures we also ship in
+  # releases (amd64 + arm64): the golang/debian trixie base images don't
+  # provide arm/v6, which made every nightly fail since February.
+  nightly-build:
     runs-on: ubuntu-latest
     strategy:
+      # Let every architecture finish, so one broken build doesn't hide the others.
+      fail-fast: false
       matrix:
-        architecture: [amd64]
+        architecture: [amd64, arm64]
     steps:
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -31,32 +36,25 @@ jobs:
       - name: Available platforms
         run: echo ${{ steps.buildx.outputs.platforms }}
       - name: Run Buildx
-        run: docker buildx build --build-arg VERSION=$(echo $GITHUB_SHA | cut -c1-7) --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push .
-      - name: Create new and append to manifest
-        run: docker buildx imagetools create -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
-  nightly-build-other:
+        run: docker buildx build --build-arg VERSION=$(echo $GITHUB_SHA | cut -c1-7) --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-${{matrix.architecture}}-$(echo $GITHUB_SHA | cut -c1-7) --push .
+
+  # Create the multi-arch manifest once, after all architectures are pushed.
+  # Previously each build job created/appended to it in parallel, so the
+  # result depended on which job finished last.
+  nightly-manifest:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        architecture: [arm64, arm/v7, arm/v6]
+    needs: nightly-build
     steps:
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: master
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
-        id: buildx
         uses: docker/setup-buildx-action@v3
-      - name: Available platforms
-        run: echo ${{ steps.buildx.outputs.platforms }}
-      - name: Run Buildx
-        run: docker buildx build --build-arg VERSION=$(echo $GITHUB_SHA | cut -c1-7) --platform linux/${{matrix.architecture}} -t kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7) --push .
-      - name: Create new and append to manifest
-        run: docker buildx imagetools create --append -t kerberos/agent-nightly:$(echo $GITHUB_SHA | cut -c1-7) kerberos/agent-nightly:arch-$(echo ${{matrix.architecture}} | tr / -)-$(echo $GITHUB_SHA | cut -c1-7)
+      - name: Create manifest
+        run: |
+          SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-7)
+          docker buildx imagetools create -t kerberos/agent-nightly:$SHORT_SHA \
+            kerberos/agent-nightly:arch-amd64-$SHORT_SHA \
+            kerberos/agent-nightly:arch-arm64-$SHORT_SHA
