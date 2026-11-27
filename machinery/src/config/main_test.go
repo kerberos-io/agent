@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -150,5 +151,95 @@ func TestFactoryConfigRetryableErrors(t *testing.T) {
 	}
 	if isRetryableFactoryConfigReadError(errors.New("invalid BSON")) {
 		t.Fatal("decode errors should not retry")
+	}
+}
+
+func TestParseRegionPolygons(t *testing.T) {
+	square := []models.Coordinate{{X: 0, Y: 0}, {X: 10, Y: 0}, {X: 10, Y: 10}, {X: 0, Y: 10}}
+	triangle := []models.Coordinate{{X: 20, Y: 20}, {X: 30, Y: 20}, {X: 30, Y: 30}}
+
+	tests := []struct {
+		name  string
+		value string
+		want  []models.Polygon
+	}{
+		{
+			name:  "single polygon parses as before",
+			value: "0,0;10,0;10,10;0,10",
+			want:  []models.Polygon{{ID: "0", Coordinates: square}},
+		},
+		{
+			name:  "multiple polygons separated by pipe",
+			value: "0,0;10,0;10,10;0,10|20,20;30,20;30,30",
+			want:  []models.Polygon{{ID: "0", Coordinates: square}, {ID: "1", Coordinates: triangle}},
+		},
+		{
+			name:  "issue example",
+			value: "64,36;576,36;608,324;32,324|700,40;900,40;900,300",
+			want: []models.Polygon{
+				{ID: "0", Coordinates: []models.Coordinate{{X: 64, Y: 36}, {X: 576, Y: 36}, {X: 608, Y: 324}, {X: 32, Y: 324}}},
+				{ID: "1", Coordinates: []models.Coordinate{{X: 700, Y: 40}, {X: 900, Y: 40}, {X: 900, Y: 300}}},
+			},
+		},
+		{
+			name:  "empty parts are skipped and ids stay sequential",
+			value: "|0,0;10,0;10,10;0,10||20,20;30,20;30,30|",
+			want:  []models.Polygon{{ID: "0", Coordinates: square}, {ID: "1", Coordinates: triangle}},
+		},
+		{
+			name:  "parts with fewer than 3 points are skipped",
+			value: "1,1;2,2|0,0;10,0;10,10;0,10|5,5",
+			want:  []models.Polygon{{ID: "0", Coordinates: square}},
+		},
+		{
+			name:  "invalid points are ignored before counting",
+			value: "0,0;x,1;10,0;10;10,10;0,10;",
+			want:  []models.Polygon{{ID: "0", Coordinates: square}},
+		},
+		{
+			name:  "whitespace is trimmed",
+			value: " 0, 0 ; 10,0;10 ,10; 0,10 | 20,20; 30,20 ;30,30 ",
+			want:  []models.Polygon{{ID: "0", Coordinates: square}, {ID: "1", Coordinates: triangle}},
+		},
+		{
+			name:  "decimal coordinates",
+			value: "0.5,0.5;10.25,0;10,10.75",
+			want:  []models.Polygon{{ID: "0", Coordinates: []models.Coordinate{{X: 0.5, Y: 0.5}, {X: 10.25, Y: 0}, {X: 10, Y: 10.75}}}},
+		},
+		{name: "empty value", value: "", want: []models.Polygon{}},
+		{name: "only separators", value: "||", want: []models.Polygon{}},
+		{name: "single polygon with too few points", value: "0,0;10,10", want: []models.Polygon{}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := parseRegionPolygons(test.value)
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("parseRegionPolygons(%q) = %+v, want %+v", test.value, got, test.want)
+			}
+		})
+	}
+}
+
+func TestApplyAgentEnvVarsRegionPolygon(t *testing.T) {
+	for _, prefix := range []string{"", "GLOBAL_"} {
+		t.Run("prefix="+prefix, func(t *testing.T) {
+			t.Setenv(prefix+"AGENT_REGION_POLYGON", "0,0;10,0;10,10;0,10|20,20;30,20;30,30")
+			configuration := &models.Configuration{}
+			initConfigPointers(&configuration.Config)
+
+			applyAgentEnvVars(configuration, prefix, false)
+
+			polygons := configuration.Config.Region.Polygon
+			if len(polygons) != 2 {
+				t.Fatalf("got %d polygons, want 2: %+v", len(polygons), polygons)
+			}
+			if polygons[0].ID != "0" || polygons[1].ID != "1" {
+				t.Fatalf("got ids %q, %q, want \"0\", \"1\"", polygons[0].ID, polygons[1].ID)
+			}
+			if len(polygons[0].Coordinates) != 4 || len(polygons[1].Coordinates) != 3 {
+				t.Fatalf("got %d and %d points, want 4 and 3", len(polygons[0].Coordinates), len(polygons[1].Coordinates))
+			}
+		})
 	}
 }

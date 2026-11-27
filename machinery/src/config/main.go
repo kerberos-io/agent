@@ -308,6 +308,39 @@ func initConfigPointers(config *models.Config) {
 	}
 }
 
+// parseRegionPolygons parses the AGENT_REGION_POLYGON value into motion
+// regions. Points are "x,y" pairs separated by ";", and several polygons can
+// be given separated by "|", e.g. "0,0;10,0;10,10|20,20;30,20;30,30". Each
+// part becomes its own polygon, with IDs "0", "1", ... assigned in order.
+// Invalid points are ignored, and empty parts or parts with fewer than 3 valid
+// points are skipped.
+func parseRegionPolygons(value string) []models.Polygon {
+	polygons := []models.Polygon{}
+	for _, part := range strings.Split(value, "|") {
+		var coordinates []models.Coordinate
+		for _, pair := range strings.Split(part, ";") {
+			xy := strings.Split(strings.TrimSpace(pair), ",")
+			if len(xy) != 2 {
+				continue
+			}
+			x, errX := strconv.ParseFloat(strings.TrimSpace(xy[0]), 64)
+			y, errY := strconv.ParseFloat(strings.TrimSpace(xy[1]), 64)
+			if errX != nil || errY != nil {
+				continue
+			}
+			coordinates = append(coordinates, models.Coordinate{X: x, Y: y})
+		}
+		if len(coordinates) < 3 {
+			continue
+		}
+		polygons = append(polygons, models.Polygon{
+			ID:          strconv.Itoa(len(polygons)),
+			Coordinates: coordinates,
+		})
+	}
+	return polygons
+}
+
 // applyAgentEnvVars applies the AGENT_* environment variables (optionally
 // carrying the given prefix, e.g. "GLOBAL_") onto configuration.Config. When
 // applyDefaults is true, defaults (such as the signing key) are applied after
@@ -503,35 +536,8 @@ func applyAgentEnvVars(configuration *models.Configuration, prefix string, apply
 				break
 
 			case "AGENT_REGION_POLYGON":
-				var coordinates []models.Coordinate
-
-				// Convert value to coordinates array
-				// 0,0;1,1;2,2;3,3
-				coordinatesString := strings.Split(value, ";")
-				for _, coordinateString := range coordinatesString {
-					coordinate := strings.Split(coordinateString, ",")
-					if len(coordinate) == 2 {
-						x, err := strconv.ParseFloat(coordinate[0], 64)
-						if err != nil {
-							continue
-						}
-						y, err := strconv.ParseFloat(coordinate[1], 64)
-						if err != nil {
-							continue
-						}
-						coordinates = append(coordinates, models.Coordinate{
-							X: x,
-							Y: y,
-						})
-					}
-				}
-
-				configuration.Config.Region.Polygon = []models.Polygon{
-					{
-						Coordinates: coordinates,
-						ID:          "0",
-					},
-				}
+				// One or more polygons: "x,y;x,y;x,y|x,y;x,y;x,y"
+				configuration.Config.Region.Polygon = parseRegionPolygons(value)
 				break
 
 			/* MQTT settings for bi-directional communication */
