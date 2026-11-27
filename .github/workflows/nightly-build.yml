@@ -12,6 +12,9 @@ jobs:
   # releases (amd64 + arm64): the golang/debian trixie base images don't
   # provide arm/v6, which made every nightly fail since February.
   nightly-build:
+    # Nightlies always build the latest master: schedules run on the default
+    # branch, and manual runs from any other branch are skipped.
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     strategy:
       # Let every architecture finish, so one broken build doesn't hide the others.
@@ -24,10 +27,10 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+      # Check out the triggering commit (master HEAD) so the code matches the
+      # $GITHUB_SHA used in the image tags.
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: master
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
