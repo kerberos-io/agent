@@ -321,6 +321,11 @@ Notes:
 | --------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------ |
 | `LOG_LEVEL`                                 | Level for logging, could be "info", "warning", "debug", "error" or "fatal".                     | "info"                         |
 | `LOG_OUTPUT`                                | Logging output format "json" or "text".                                                         | "text"                         |
+| `LOG_FILE`                                  | Also write logs to rotating files in `LOG_DIRECTORY`, "true" or "false". See [Log files](#log-files). | "false"                        |
+| `LOG_DIRECTORY`                             | Directory for log files when `LOG_FILE` is enabled.                                             | "data/log" in the `-config` directory |
+| `LOG_FILE_MAX_SIZE`                         | Size in MB after which the log file is rotated.                                                 | "10"                           |
+| `LOG_FILE_MAX_BACKUPS`                      | Number of rotated log files to keep, "0" keeps all of them.                                     | "5"                            |
+| `LOG_FILE_MAX_AGE`                          | Days to keep rotated log files, "0" keeps them regardless of age.                               | "0"                            |
 | `AGENT_PORT`                                | HTTP web server port. Overrides the `-port` command-line value and must be between 1 and 65535. | "80"                           |
 | `AGENT_MODE`                                | You can choose to run this in 'release' for production, and or 'demo' for showcasing.           | "release"                      |
 | `AGENT_TLS_INSECURE`                        | Specify if you want to use `InsecureSkipVerify` for the internal HTTP client.                   | "false"                        |
@@ -407,6 +412,33 @@ end-to-end MQTT encryption is configured and used. A remote shell runs inside
 the Agent process environment as the Agent operating-system user; it is not an
 SSH server and does not expose a new network port. Keep the feature disabled on
 deployments where Hub owners should not have operating-system access.
+
+### Log files
+
+The Agent always logs to stdout. When you cannot capture stdout, for example
+when the Agent is started by a service manager or on a device without a
+container runtime, set `LOG_FILE=true` to also write the logs of the running
+Agent to `data/log/agent.log`:
+
+```bash
+docker run -p 80:80 --name mycamera \
+  -e LOG_FILE=true \
+  -v $(pwd)/agent/log:/home/agent/data/log \
+  -d --restart=always kerberos/agent:latest
+```
+
+As with the other volumes, make sure the Agent user can write to the mounted
+directory, see [Configure and persist with volume mounts](#configure-and-persist-with-volume-mounts).
+
+Log files use the format selected by `LOG_OUTPUT` and the level selected by
+`LOG_LEVEL`. When `agent.log` reaches `LOG_FILE_MAX_SIZE` MB it is renamed to
+`agent-<timestamp>.log`, with the rotation time in UTC, and a new `agent.log`
+is started. The Agent keeps the newest `LOG_FILE_MAX_BACKUPS` rotated files and
+removes rotated files older than `LOG_FILE_MAX_AGE` days. With the defaults,
+log files use at most about 60 MB of disk space. Use `LOG_DIRECTORY` to write
+them somewhere else. The Agent creates the directory if needed and creates the
+log files with owner-only permissions. If the directory cannot be written, the
+Agent logs a warning and continues to log to stdout only.
 
 ### Resumable upload chunk size
 

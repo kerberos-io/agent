@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -116,8 +117,18 @@ func main() {
 	}
 	// Specify the timezone of the log: "UTC" or "Local".
 	timezone, _ := time.LoadLocation("CET")
-	configureLogging(logLevel, logOutput, timezone)
+	configureLogging(os.Stdout, logLevel, logOutput, timezone)
+
+	// When LOG_FILE is enabled, the running Agent also writes its logs to
+	// rotating files on disk.
+	logWriter := io.Writer(os.Stdout)
 	if action == "run" {
+		if logFile := openLogFile(log.StandardLogger(), configDirectory); logFile != nil {
+			defer logFile.Close()
+			logWriter = io.MultiWriter(os.Stdout, logFile)
+			log.SetOutput(logWriter)
+		}
+
 		resolvedPort, err := resolveServerPort(port, os.Getenv("AGENT_PORT"))
 		if err != nil {
 			log.WithError(err).WithFields(log.Fields{
@@ -246,7 +257,7 @@ func main() {
 					Warn("invalid Agent timezone; using the host timezone for logs")
 				timezone = time.Local
 			}
-			configureLogging(logLevel, logOutput, timezone)
+			configureLogging(logWriter, logLevel, logOutput, timezone)
 
 			// Check if we have a device Key or not, if not
 			// we will generate one.
