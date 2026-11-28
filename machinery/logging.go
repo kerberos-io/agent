@@ -2,18 +2,30 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 const (
 	defaultLogLevel  = log.InfoLevel
 	defaultLogOutput = "text"
+
+	// Log files are written when LOG_FILE is enabled. The default directory
+	// is relative to the configuration directory and is created by the
+	// Docker image.
+	logFileName              = "agent.log"
+	defaultLogDirectory      = "data/log"
+	defaultLogFileMaxSize    = 10 // megabytes
+	defaultLogFileMaxBackups = 5
+	defaultLogFileMaxAge     = 0 // days; 0 keeps rotated files regardless of age
 )
 
 type localTimeFormatter struct {
@@ -40,11 +52,11 @@ func (componentHook) Fire(entry *log.Entry) error {
 	return nil
 }
 
-func configureLogging(levelValue string, outputValue string, timezone *time.Location) {
-	configureLogger(log.StandardLogger(), levelValue, outputValue, timezone)
+func configureLogging(writer io.Writer, levelValue string, outputValue string, timezone *time.Location) {
+	configureLogger(log.StandardLogger(), writer, levelValue, outputValue, timezone)
 }
 
-func configureLogger(logger *log.Logger, levelValue string, outputValue string, timezone *time.Location) {
+func configureLogger(logger *log.Logger, writer io.Writer, levelValue string, outputValue string, timezone *time.Location) {
 	if timezone == nil {
 		timezone = time.Local
 	}
@@ -52,7 +64,7 @@ func configureLogger(logger *log.Logger, levelValue string, outputValue string, 
 	level, levelErr := parseLogLevel(levelValue)
 	output, outputErr := parseLogOutput(outputValue)
 
-	logger.SetOutput(os.Stdout)
+	logger.SetOutput(writer)
 	logger.SetLevel(level)
 	logger.SetReportCaller(true)
 	logger.SetFormatter(localTimeFormatter{
@@ -140,6 +152,110 @@ func parseLogOutput(value string) (string, error) {
 	default:
 		return defaultLogOutput, fmt.Errorf("unsupported LOG_OUTPUT %q", value)
 	}
+}
+
+// openLogFile returns a size-rotated log file when LOG_FILE is enabled, and nil
+// otherwise. The file is named agent.log and lives in LOG_DIRECTORY, which
+// defaults to data/log inside the configuration directory. Invalid limits fall
+// back to their defaults, and a log file that cannot be written leaves logging
+// on stdout only. Both are reported through logger instead of stopping the
+// Agent.
+func openLogFile(logger *log.Logger, configDirectory string) *lumberjack.Logger {
+	enabledValue := os.Getenv("LOG_FILE")
+	enabled, err := parseLogFileEnabled(enabledValue)
+	if err != nil {
+		logger.WithFields(log.Fields{
+			"configured_value": enabledValue,
+			"setting":          "LOG_FILE",
+		}).WithError(err).Warn("invalid LOG_FILE; writing logs to stdout only")
+	}
+	if !enabled {
+		return nil
+	}
+
+	limit := func(name string, defaultValue int, minimum int) int {
+		value := os.Getenv(name)
+		parsed, err := parseLogFileLimit(name, value, defaultValue, minimum)
+		if err != nil {
+			logger.WithFields(log.Fields{
+				"configured_value": value,
+				"effective_value":  parsed,
+				"setting":          name,
+			}).WithError(err).Warn("invalid log file setting; using default")
+		}
+		return parsed
+	}
+
+	directory := strings.TrimSpace(os.Getenv("LOG_DIRECTORY"))
+	if directory == "" {
+		directory = filepath.Join(configDirectory, defaultLogDirectory)
+	}
+	logFile := &lumberjack.Logger{
+		Filename:   filepath.Join(directory, logFileName),
+		MaxSize:    limit("LOG_FILE_MAX_SIZE", defaultLogFileMaxSize, 1),
+		MaxBackups: limit("LOG_FILE_MAX_BACKUPS", defaultLogFileMaxBackups, 0),
+		MaxAge:     limit("LOG_FILE_MAX_AGE", defaultLogFileMaxAge, 0),
+	}
+
+	if err := checkLogFileWritable(logFile.Filename); err != nil {
+		logger.WithFields(log.Fields{
+			"event":    "log_file_unavailable",
+			"log_file": logFile.Filename,
+		}).WithError(err).Warn("cannot write log file; writing logs to stdout only")
+		return nil
+	}
+
+	logger.WithFields(log.Fields{
+		"event":        "log_file_configured",
+		"log_file":     logFile.Filename,
+		"max_size_mb":  logFile.MaxSize,
+		"max_backups":  logFile.MaxBackups,
+		"max_age_days": logFile.MaxAge,
+	}).Info("writing logs to rotating files")
+	return logFile
+}
+
+// checkLogFileWritable creates the log directory and file when they do not
+// exist yet, so a location the Agent cannot write to is reported once at
+// startup instead of failing every log entry.
+func checkLogFileWritable(filename string) error {
+	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+	if err != nil {
+		return err
+	}
+	return file.Close()
+}
+
+func parseLogFileEnabled(value string) (bool, error) {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return false, nil
+	}
+
+	enabled, err := strconv.ParseBool(normalized)
+	if err != nil {
+		return false, fmt.Errorf("parse LOG_FILE: %w", err)
+	}
+	return enabled, nil
+}
+
+func parseLogFileLimit(name string, value string, defaultValue int, minimum int) (int, error) {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return defaultValue, nil
+	}
+
+	limit, err := strconv.Atoi(normalized)
+	if err != nil {
+		return defaultValue, fmt.Errorf("parse %s: %w", name, err)
+	}
+	if limit < minimum {
+		return defaultValue, fmt.Errorf("%s must be at least %d, got %d", name, minimum, limit)
+	}
+	return limit, nil
 }
 
 func newLogFormatter(output string) log.Formatter {

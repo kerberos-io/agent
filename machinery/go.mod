@@ -46,6 +46,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.47.0
 	go.opentelemetry.io/otel/trace v1.47.0
 	golang.org/x/net v0.62.0
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	moq.dev/moq v0.7.27
 )
 
