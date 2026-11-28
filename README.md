@@ -301,6 +301,19 @@ For a private CA, mount a PEM trust bundle containing every CA certificate neede
 
 See [RTSPS and TLS certificates](README-RTSPS-TLS.md) for the complete Bosch UI, private-CA, deployment, validation, and troubleshooting procedure.
 
+### Special characters in camera credentials
+
+The username and password in a camera URL can contain characters such as `^`, `@`, `%`, spaces or non-ASCII letters. The Agent percent-encodes them before connecting, so they can be typed as is. Only `/`, `?` and `#` must be percent-encoded, as `%2F`, `%3F` and `%23`, because they would otherwise be read as the start of the stream path:
+
+```bash
+# password: pa^ss@word
+AGENT_CAPTURE_IPCAMERA_RTSP='rtsp://admin:pa^ss@word@192.168.1.10:554/stream1'
+# password: pa/ss#1
+AGENT_CAPTURE_IPCAMERA_RTSP='rtsp://admin:pa%2Fss%231@192.168.1.10:554/stream1'
+```
+
+Credentials that are already percent-encoded keep working: a `%` followed by two hexadecimal digits, such as `%5E`, is decoded. To use a literal `%` followed by two hexadecimal digits, write that `%` as `%25`.
+
 ### RTSP transport (TCP, UDP or auto)
 
 `AGENT_CAPTURE_IPCAMERA_RTSP_TRANSPORT` (or the transport dropdown in Settings) selects how RTP media is received from the camera:
