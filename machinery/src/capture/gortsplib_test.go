@@ -6,6 +6,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"math"
+	"net"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/bluenviron/gortsplib/v5"
+	"github.com/bluenviron/gortsplib/v5/pkg/base"
 	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/gortsplib/v5/pkg/headers"
 	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
@@ -68,6 +70,137 @@ func TestSanitizeRTSPErrorRemovesCredentialsAndQuery(t *testing.T) {
 	}
 	if !strings.Contains(got.Error(), "rtsp://10.0.20.15/live") {
 		t.Fatalf("sanitizeRTSPError() removed useful host/path context: %q", got)
+	}
+}
+
+func TestEscapeRTSPUserinfo(t *testing.T) {
+	tests := []struct {
+		name         string
+		rawURL       string
+		want         string
+		wantUsername string
+		wantPassword string
+		wantHost     string
+	}{
+		{
+			name:         "caret in password",
+			rawURL:       "rtsp://admin:pass^word@10.0.0.1:554/stream1",
+			want:         "rtsp://admin:pass%5Eword@10.0.0.1:554/stream1",
+			wantUsername: "admin",
+			wantPassword: "pass^word",
+			wantHost:     "10.0.0.1:554",
+		},
+		{
+			name:         "space, quotes and braces",
+			rawURL:       `rtsps://cam user:my "p{a}ss"@camera.local:322/live`,
+			want:         "rtsps://cam%20user:my%20%22p%7Ba%7Dss%22@camera.local:322/live",
+			wantUsername: "cam user",
+			wantPassword: `my "p{a}ss"`,
+			wantHost:     "camera.local:322",
+		},
+		{
+			name:         "at sign next to an escaped character",
+			rawURL:       "rtsp://admin:p@ss^@10.0.0.1/stream",
+			want:         "rtsp://admin:p%40ss%5E@10.0.0.1/stream",
+			wantUsername: "admin",
+			wantPassword: "p@ss^",
+			wantHost:     "10.0.0.1",
+		},
+		{
+			name:         "existing escapes are kept",
+			rawURL:       "rtsp://admin:pass%5Eword@10.0.0.1/stream",
+			want:         "rtsp://admin:pass%5Eword@10.0.0.1/stream",
+			wantUsername: "admin",
+			wantPassword: "pass^word",
+			wantHost:     "10.0.0.1",
+		},
+		{
+			name:         "stray percent sign",
+			rawURL:       "rtsp://admin:100%@10.0.0.1/stream",
+			want:         "rtsp://admin:100%25@10.0.0.1/stream",
+			wantUsername: "admin",
+			wantPassword: "100%",
+			wantHost:     "10.0.0.1",
+		},
+		{
+			name:         "non-ASCII password",
+			rawURL:       "rtsp://admin:pässwörd@10.0.0.1/stream",
+			want:         "rtsp://admin:p%C3%A4ssw%C3%B6rd@10.0.0.1/stream",
+			wantUsername: "admin",
+			wantPassword: "pässwörd",
+			wantHost:     "10.0.0.1",
+		},
+		{
+			name:         "IPv6 host",
+			rawURL:       "rtsp://admin:pa^ss@[fe80::1]:554/stream",
+			want:         "rtsp://admin:pa%5Ess@[fe80::1]:554/stream",
+			wantUsername: "admin",
+			wantPassword: "pa^ss",
+			wantHost:     "[fe80::1]:554",
+		},
+		{
+			name:         "valid characters are unchanged",
+			rawURL:       "rtsp://admin:a-b._~!$&'()*+,;=:c@10.0.0.1/stream?channel=1&subtype=0",
+			want:         "rtsp://admin:a-b._~!$&'()*+,;=:c@10.0.0.1/stream?channel=1&subtype=0",
+			wantUsername: "admin",
+			wantPassword: "a-b._~!$&'()*+,;=:c",
+			wantHost:     "10.0.0.1",
+		},
+		{
+			name:     "no credentials",
+			rawURL:   "rtsp://10.0.0.1:554/stream?owner=user@example.com",
+			want:     "rtsp://10.0.0.1:554/stream?owner=user@example.com",
+			wantHost: "10.0.0.1:554",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := escapeRTSPUserinfo(test.rawURL)
+			if got != test.want {
+				t.Fatalf("escapeRTSPUserinfo(%q) = %q, want %q", test.rawURL, got, test.want)
+			}
+
+			u, err := base.ParseURL(got)
+			if err != nil {
+				t.Fatalf("base.ParseURL(%q) error = %v", got, err)
+			}
+			var username, password string
+			if u.User != nil {
+				username = u.User.Username()
+				password, _ = u.User.Password()
+			}
+			if username != test.wantUsername || password != test.wantPassword {
+				t.Fatalf("credentials = (%q, %q), want (%q, %q)", username, password, test.wantUsername, test.wantPassword)
+			}
+			if u.Host != test.wantHost {
+				t.Fatalf("host = %q, want %q", u.Host, test.wantHost)
+			}
+		})
+	}
+}
+
+func TestConnectAcceptsSpecialCharactersInPassword(t *testing.T) {
+	// Reserve a local port and close it again, so connecting is refused.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	address := listener.Addr().String()
+	listener.Close()
+
+	client := &Golibrtsp{Url: "rtsp://admin:pass^word@" + address + "/stream"}
+	err = client.Connect(context.Background(), context.Background())
+	t.Cleanup(func() { client.Close(context.Background()) })
+
+	if err == nil {
+		t.Fatal("Connect() error = nil, want a connection error")
+	}
+	if strings.Contains(err.Error(), "invalid userinfo") {
+		t.Fatalf("Connect() could not parse the camera URL: %v", err)
+	}
+	if strings.Contains(err.Error(), "pass") {
+		t.Fatalf("Connect() exposed the camera password in %q", err)
 	}
 }
 

@@ -192,6 +192,56 @@ func sanitizeRTSPError(err error, rawURL string) error {
 	return errors.New(strings.ReplaceAll(err.Error(), rawURL, replacement))
 }
 
+// escapeRTSPUserinfo percent-encodes the characters in the credentials of an
+// RTSP URL that net/url rejects, such as "^", a space or a stray "%", so camera
+// passwords containing them can be used as typed. The credentials end at the
+// last "@" before the first "/", "?" or "#"; existing %XX escapes are kept, and
+// an "@" inside the credentials is encoded so it is not taken for the host
+// separator. URLs without credentials are returned unchanged.
+func escapeRTSPUserinfo(rawURL string) string {
+	_, rest, found := strings.Cut(rawURL, "://")
+	if !found {
+		return rawURL
+	}
+	authority := rest
+	if end := strings.IndexAny(authority, "/?#"); end >= 0 {
+		authority = authority[:end]
+	}
+	at := strings.LastIndex(authority, "@")
+	if at < 0 {
+		return rawURL
+	}
+
+	userinfo := authority[:at]
+	var escaped strings.Builder
+	for i := 0; i < len(userinfo); i++ {
+		c := userinfo[i]
+		existingEscape := c == '%' && i+2 < len(userinfo) && isHexDigit(userinfo[i+1]) && isHexDigit(userinfo[i+2])
+		if existingEscape || isUserinfoByte(c) {
+			escaped.WriteByte(c)
+		} else {
+			fmt.Fprintf(&escaped, "%%%02X", c)
+		}
+	}
+
+	userinfoStart := len(rawURL) - len(rest)
+	return rawURL[:userinfoStart] + escaped.String() + rawURL[userinfoStart+at:]
+}
+
+// isUserinfoByte reports whether c may appear unescaped in the credentials of
+// a URL (RFC 3986 unreserved and sub-delims characters, and ":").
+func isUserinfoByte(c byte) bool {
+	switch {
+	case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9':
+		return true
+	}
+	return strings.IndexByte("-._~!$&'()*+,;=:", c) >= 0
+}
+
+func isHexDigit(c byte) bool {
+	return '0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F'
+}
+
 // Implements the RTSPClient interface.
 type Golibrtsp struct {
 	RTSPClient
@@ -676,9 +726,10 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	}
 
 	// parse URL
-	u, err := base.ParseURL(g.Url)
+	rtspURL := escapeRTSPUserinfo(g.Url)
+	u, err := base.ParseURL(rtspURL)
 	if err != nil {
-		return sanitizeRTSPError(err, g.Url)
+		return sanitizeRTSPError(err, rtspURL)
 	}
 
 	// connect to the server
@@ -686,14 +737,14 @@ func (g *Golibrtsp) Connect(ctx context.Context, ctxOtel context.Context) (err e
 	g.Client.Host = u.Host
 	err = g.Client.Start()
 	if err != nil {
-		return sanitizeRTSPError(err, g.Url)
+		return sanitizeRTSPError(err, rtspURL)
 	}
 	g.clientStarted = true
 
 	// find published medias
 	desc, _, err := g.Client.Describe(u)
 	if err != nil {
-		return sanitizeRTSPError(err, g.Url)
+		return sanitizeRTSPError(err, rtspURL)
 	}
 
 	if err = checkSecureUDP(u.Scheme, protocol, desc.Medias); err != nil {
@@ -974,9 +1025,10 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 		TLSConfig:           tlsConfig,
 	}
 	// parse URL
-	u, err := base.ParseURL(g.Url)
+	rtspURL := escapeRTSPUserinfo(g.Url)
+	u, err := base.ParseURL(rtspURL)
 	if err != nil {
-		return sanitizeRTSPError(err, g.Url)
+		return sanitizeRTSPError(err, rtspURL)
 	}
 
 	// connect to the server
@@ -984,14 +1036,14 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 	g.Client.Host = u.Host
 	err = g.Client.Start()
 	if err != nil {
-		return sanitizeRTSPError(err, g.Url)
+		return sanitizeRTSPError(err, rtspURL)
 	}
 	g.clientStarted = true
 
 	// find published medias
 	desc, _, err := g.Client.Describe(u)
 	if err != nil {
-		return sanitizeRTSPError(err, g.Url)
+		return sanitizeRTSPError(err, rtspURL)
 	}
 
 	// Look for audio back channel.
@@ -1011,7 +1063,7 @@ func (g *Golibrtsp) ConnectBackChannel(ctx context.Context, ctxRunAgent context.
 		_, err = g.Client.Setup(desc.BaseURL, audioMediBackChannel, 0, 0)
 		if err != nil {
 			g.HasBackChannel = false
-			return sanitizeRTSPError(err, g.Url)
+			return sanitizeRTSPError(err, rtspURL)
 		} else {
 			g.HasBackChannel = true
 			streamIndex := len(g.Streams)
